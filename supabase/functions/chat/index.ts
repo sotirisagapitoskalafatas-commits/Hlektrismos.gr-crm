@@ -39,23 +39,33 @@ ${tariffLines}
 
 Χρησιμοποίησε αυτές τις τιμές για να απαντήσεις αν σε ρωτήσουν για τιμές ρεύματος ή φυσικού αερίου. Εάν δεν ρωτήσουν για κάτι συγκεκριμένο, υπενθύμισε τους ότι μπορούν να συμπληρώσουν τη φόρμα επικοινωνίας στο τέλος της σελίδας για μια εξειδικευμένη δωρεάν προσφορά.`;
 
-    const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const geminiMessages = messages.map((m: any) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using gpt-4o-mini for better and faster performance
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-        ],
+        system_instruction: {
+          parts: { text: systemPrompt }
+        },
+        contents: geminiMessages,
       }),
     })
 
-    const aiData = await openAiResponse.json()
-    const reply = aiData.choices[0].message.content
+    const aiData = await geminiResponse.json()
+    
+    if (!geminiResponse.ok) {
+      throw new Error(aiData.error?.message || 'Failed to fetch from Gemini API');
+    }
+
+    const reply = aiData.candidates[0].content.parts[0].text;
 
     return new Response(JSON.stringify({ reply }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

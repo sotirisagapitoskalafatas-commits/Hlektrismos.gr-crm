@@ -84,16 +84,25 @@ export default function ChatBot() {
     }
   }, [messages, typing]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim()) return;
-    setMessages((prev) => [...prev, { role: 'user', text }]);
+    const newMessages = [...messages, { role: 'user' as const, text }];
+    setMessages(newMessages);
     setInput('');
     setTyping(true);
-    setTimeout(() => {
-      const response = findResponse(text);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: { messages: newMessages.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text })) },
+      });
+
       setTyping(false);
-      setMessages((prev) => [...prev, { role: 'bot', text: response }]);
-    }, 700 + Math.random() * 500);
+      if (error) throw error;
+      setMessages((prev) => [...prev, { role: 'bot', text: data.reply || 'Δεν μπόρεσα να απαντήσω αυτή τη στιγμή.' }]);
+    } catch (err) {
+      setTyping(false);
+      setMessages((prev) => [...prev, { role: 'bot', text: 'Υπήρξε ένα σφάλμα στο δίκτυο. Προσπαθήστε ξανά ή χρησιμοποιήστε τη φόρμα επικοινωνίας.' }]);
+    }
   };
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {

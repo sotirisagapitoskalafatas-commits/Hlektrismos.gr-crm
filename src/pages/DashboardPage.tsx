@@ -191,6 +191,15 @@ export default function DashboardPage() {
     loadData();
   };
 
+  const updateTariffPrice = async (t: Tariff) => {
+    const newPrice = prompt(`Εισάγετε νέα τιμή για το ${t.tariff_name}:`, t.price_eur.toString());
+    if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
+      await supabase.from('market_tariffs').update({ price_eur: parseFloat(newPrice), updated_at: new Date().toISOString() }).eq('id', t.id);
+      loadData();
+      setToast({ msg: 'Η τιμή ενημερώθηκε.', type: 'success' });
+    }
+  };
+
   const filteredLeads = leads.filter((l) => {
     const matchesSearch = !search ||
       l.first_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -489,7 +498,7 @@ export default function DashboardPage() {
                             <tr key={t.id}>
                               <td><span className={`rag-resource-tag ${t.resource.toLowerCase().replace(/\s/g, '-')}`}>{t.resource}</span></td>
                               <td>{t.tariff_name}</td>
-                              <td><strong>{t.price_eur.toFixed(4)}</strong></td>
+                              <td style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => updateTariffPrice(t)} title="Κλικ για επεξεργασία"><strong>{t.price_eur.toFixed(4)}</strong></td>
                               <td>{t.unit}</td>
                               <td>{new Date(t.updated_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                             </tr>

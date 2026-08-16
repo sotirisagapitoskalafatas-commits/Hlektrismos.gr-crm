@@ -207,11 +207,15 @@ export default function LandingPage() {
       email: form.email || 'not-provided@powerfor.local',
       region: form.region || 'Δεν δηλώθηκε',
       customer_type: form.propertyType,
+      property_type: form.propertyType,
       provider: form.service,
       comments: form.message || null,
       bill_file_path: billFilePath,
       bill_file_name: form.billFile?.name ?? null,
       consent: form.consent,
+      lawful_basis: form.consent ? 'Consent' : null,
+      customer_category: form.propertyType === 'Σπίτι' ? 'B2C_Household' : 'B2B_Corporate',
+      pipeline_status: 'new'
     });
     setSubmitting(false);
     if (error) { setFormError('Κάτι πήγε στραβά. Δοκιμάστε ξανά.'); return; }

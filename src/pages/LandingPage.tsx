@@ -122,10 +122,14 @@ const advantages = [
 function useScrollReveal() {
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add('visible')),
-      { threshold: 0.12 },
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+        }
+      }),
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' },
     );
-    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 }
@@ -373,8 +377,8 @@ export default function LandingPage() {
         <section className="advantages-section">
           <div className="container">
             <div className="advantages-grid">
-              {advantages.map((a) => (
-                <div className="advantage-card reveal" key={a.title}>
+              {advantages.map((a, i) => (
+                <div className={`advantage-card reveal stagger-${i + 1}`} key={a.title}>
                   <div className="advantage-icon"><a.icon size={24} /></div>
                   <h3>{a.title}</h3>
                   <p>{a.text}</p>
@@ -392,8 +396,8 @@ export default function LandingPage() {
               <p>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
             </div>
             <div className="services-grid">
-              {features.map((f) => (
-                <div className="service-card reveal" key={f.title}>
+              {features.map((f, i) => (
+                <div className={`service-card reveal stagger-${i + 1}`} key={f.title}>
                   <div className="service-icon"><f.icon size={28} /></div>
                   <h3>{f.title}</h3>
                   <p>{f.text}</p>
@@ -407,7 +411,7 @@ export default function LandingPage() {
         <section className="section about-section" id="about">
           <div className="container">
             <div className="about-grid">
-              <div className="about-copy reveal">
+              <div className="about-copy reveal-left">
                 <div className="eyebrow"><span className="eyebrow-dot" /> Ποιοι Είμαστε</div>
                 <h2>Ο προσωπικός σου <span className="gradient-text">σύμβουλος ενέργειας!</span></h2>
                 <p>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
@@ -419,7 +423,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              <div className="about-visual reveal">
+              <div className="about-visual reveal-right">
                 <div className="about-logo-wrap">
                   <img src="/images/image.png" alt="Ηλεκτρισμός - Ενεργειακοί Σύμβουλοι" className="official-logo" />
                 </div>
@@ -434,7 +438,7 @@ export default function LandingPage() {
 
         <section className="gdpr-section" id="gdpr">
           <div className="container">
-            <div className="gdpr-inner reveal">
+            <div className="gdpr-inner reveal-scale">
               <div className="gdpr-shield"><ShieldCheck size={36} /></div>
               <div>
                 <h3>Το GDPR δεν είναι checkbox. Είναι η αρχιτεκτονική.</h3>
@@ -466,7 +470,7 @@ export default function LandingPage() {
           <div className="contact-glow" />
           <div className="container">
             <div className="contact-grid">
-              <div className="contact-copy reveal">
+              <div className="contact-copy reveal-left">
                 <div className="eyebrow"><span className="eyebrow-dot" /> Ζητήστε να σας καλέσουμε!</div>
                 <h2>Έτοιμος να εξοικονομήσεις <span className="gradient-text">χρήματα;</span></h2>
                 <p>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
@@ -477,7 +481,7 @@ export default function LandingPage() {
                    <div className="contact-point"><Lock size={18} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</div>
                  </div>
               </div>
-              <div className="form-card reveal">
+              <div className="form-card reveal-right">
                 {submitted ? (
                   <div className="success-state">
                     <div className="success-icon"><Check size={28} /></div>

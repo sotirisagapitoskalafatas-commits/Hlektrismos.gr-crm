@@ -60,6 +60,7 @@ type Agent = {
   target_region?: string | null;
   base_prompt?: string | null;
   handoff_condition?: string | null;
+  deleted_at?: string | null;
 };
 
 type Source = {
@@ -183,7 +184,10 @@ export default function DashboardPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [leadsSubTab, setLeadsSubTab] = useState<'active' | 'deleted'>('active');
+  const [agentsSubTab, setAgentsSubTab] = useState<'active' | 'deleted'>('active');
+  const [agentStatusFilter, setAgentStatusFilter] = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteAgentId, setConfirmDeleteAgentId] = useState<string | null>(null);
 
   const [runningAgents, setRunningAgents] = useState(false);
 
@@ -381,6 +385,26 @@ export default function DashboardPage() {
     loadData();
   };
 
+  const softDeleteAgent = async (agentId: string) => {
+    await supabase.from('ai_agents').update({ deleted_at: new Date().toISOString() }).eq('id', agentId);
+    setConfirmDeleteAgentId(null);
+    setToast({ msg: 'Το agent μεταφέρθηκε στα διεγραμμένα.', type: 'success' });
+    loadData();
+  };
+
+  const restoreAgent = async (agentId: string) => {
+    await supabase.from('ai_agents').update({ deleted_at: null }).eq('id', agentId);
+    setToast({ msg: 'Το agent αποκαταστάθηκε.', type: 'success' });
+    loadData();
+  };
+
+  const permanentDeleteAgent = async (agentId: string) => {
+    await supabase.from('ai_agents').delete().eq('id', agentId);
+    setConfirmDeleteAgentId(null);
+    setToast({ msg: 'Το agent διαγράφηκε μόνιμα.', type: 'success' });
+    loadData();
+  };
+
   const syncTariffs = async () => {
     setSyncing(true);
     const now = new Date().toISOString();
@@ -417,6 +441,14 @@ export default function DashboardPage() {
       l.email.toLowerCase().includes(search.toLowerCase());
     return matchesSearch;
   });
+
+  const filteredAgents = agents.filter((a) => {
+    if (a.deleted_at) return false;
+    const matchesStatus = agentStatusFilter === 'all' || a.status === agentStatusFilter;
+    return matchesStatus;
+  });
+
+  const deletedAgents = agents.filter((a) => !!a.deleted_at);
 
   const totalLeadsContacted = agents.reduce((sum, a) => sum + a.leads_contacted, 0);
   const totalReplies = agents.reduce((sum, a) => sum + a.replies, 0);
@@ -504,16 +536,28 @@ export default function DashboardPage() {
             {tab === 'overview' && (
               <div className="dash-overview">
                 <div className="dash-stats-grid">
-                  <div className="dash-stat-card"><div className="dash-stat-icon"><Users size={20} /></div><div><strong>{leads.filter(l => !l.deleted_at).length}</strong><span>Σύνολο Leads</span></div></div>
-                  <div className="dash-stat-card"><div className="dash-stat-icon"><Bot size={20} /></div><div><strong>{agents.length}</strong><span>Ενεργά AI Agents</span></div></div>
-                  <div className="dash-stat-card"><div className="dash-stat-icon"><Mail size={20} /></div><div><strong>{totalLeadsContacted}</strong><span>Επικοινωνίες</span></div></div>
-                  <div className="dash-stat-card"><div className="dash-stat-icon"><TrendingUp size={20} /></div><div><strong>{conversionRate}%</strong><span>Conversion Rate</span></div></div>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,200,120,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(0,200,120,0.15)' }}>
+                    <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.15)', color: '#00c878' }}><Users size={24} /></div>
+                    <div><strong style={{ fontSize: 32 }}>{leads.filter(l => !l.deleted_at).length}</strong><span>Σύνολο Leads</span></div>
+                  </div>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,102,204,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(0,102,204,0.15)' }}>
+                    <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.15)', color: '#0066cc' }}><Bot size={24} /></div>
+                    <div><strong style={{ fontSize: 32 }}>{agents.filter(a => !a.deleted_at && a.status === 'active').length}</strong><span>Ενεργά AI Agents</span></div>
+                  </div>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(147,51,234,0.15)' }}>
+                    <div className="dash-stat-icon" style={{ background: 'rgba(147,51,234,0.15)', color: '#9333ea' }}><Mail size={24} /></div>
+                    <div><strong style={{ fontSize: 32 }}>{totalLeadsContacted}</strong><span>Επικοινωνίες</span></div>
+                  </div>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)' }}>
+                    <div className="dash-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><TrendingUp size={24} /></div>
+                    <div><strong style={{ fontSize: 32 }}>{conversionRate}%</strong><span>Conversion Rate</span></div>
+                  </div>
                 </div>
-                <div className="dash-panels">
+                <div className="dash-panels" style={{ gridTemplateColumns: '1.2fr 0.8fr' }}>
                   <div className="dash-panel">
-                    <h3>Πρόσφατα Leads</h3>
+                    <h3 style={{ marginBottom: 16 }}>Πρόσφατα Leads</h3>
                     <div className="dash-mini-leads">
-                      {leads.filter(l => !l.deleted_at).slice(0, 5).map((l) => (
+                      {leads.filter(l => !l.deleted_at).slice(0, 6).map((l) => (
                         <div className="dash-mini-lead" key={l.id}>
                           <div className="dash-mini-lead-avatar">{l.first_name[0]}{l.last_name[0]}</div>
                           <div><strong>{l.first_name} {l.last_name}</strong><span>{l.email}</span></div>
@@ -524,9 +568,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="dash-panel">
-                    <h3>Απόδοση AI Agents</h3>
+                    <h3 style={{ marginBottom: 16 }}>Απόδοση AI Agents</h3>
                     <div className="dash-mini-leads">
-                      {agents.slice(0, 5).map((a) => (
+                      {agents.filter(a => !a.deleted_at).slice(0, 5).map((a) => (
                         <div className="dash-mini-lead" key={a.id}>
                           <div className="dash-mini-lead-icon">{channelIcon(a.channel)}</div>
                           <div><strong>{a.name}</strong><span>{a.leads_contacted} επικοινωνίες · {a.meetings_booked} ραντεβού</span></div>
@@ -551,6 +595,19 @@ export default function DashboardPage() {
                     <button className="btn btn-primary" onClick={() => setShowAddAgent(!showAddAgent)}><Plus size={16} /> Νέο Agent</button>
                   </div>
                 </div>
+                <div className="dash-filters" style={{ marginBottom: 16 }}>
+                  <div className="dash-leads-subtabs">
+                    <button className={agentsSubTab === 'active' ? 'active' : ''} onClick={() => setAgentsSubTab('active')}><Bot size={14} /> Ενεργά Agents ({filteredAgents.length})</button>
+                    <button className={agentsSubTab === 'deleted' ? 'active' : ''} onClick={() => setAgentsSubTab('deleted')}><Trash2 size={14} /> Διεγραμμένα ({deletedAgents.length})</button>
+                  </div>
+                  {agentsSubTab === 'active' && (
+                    <select value={agentStatusFilter} onChange={(e) => setAgentStatusFilter(e.target.value)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13 }}>
+                      <option value="all">Όλα τα status</option>
+                      <option value="active">Ενεργό</option>
+                      <option value="paused">Παυμένο</option>
+                    </select>
+                  )}
+                </div>
                 {showAddAgent && (
                   <div className="dash-add-form">
                     <input placeholder="Όνομα agent" value={newAgent.name} onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })} />
@@ -567,32 +624,72 @@ export default function DashboardPage() {
                     <button className="btn btn-primary" onClick={createAgent}>Δημιουργία</button>
                   </div>
                 )}
-                <div className="dash-agents-grid">
-                  {agents.map((a) => (
-                    <div className="dash-agent-card" key={a.id}>
-                      <div className="dash-agent-header">
-                        <div className="dash-agent-icon">{channelIcon(a.channel)}</div>
-                        <div><h3>{a.name}</h3><span className="dash-agent-channel">{a.channel}</span></div>
-                        <span className={`dash-status-pill ${a.status}`}>{a.status}</span>
+                {agentsSubTab === 'active' && (
+                  <div className="dash-agents-grid">
+                    {filteredAgents.map((a) => (
+                      <div className="dash-agent-card" key={a.id}>
+                        <div className="dash-agent-header">
+                          <div className="dash-agent-icon">{channelIcon(a.channel)}</div>
+                          <div><h3>{a.name}</h3><span className="dash-agent-channel">{a.channel}</span></div>
+                          <span className={`dash-status-pill ${a.status}`}>{a.status}</span>
+                        </div>
+                        <div className="dash-agent-stats">
+                          <div><strong>{a.leads_contacted}</strong><span>Επικοινωνίες</span></div>
+                          <div><strong>{a.replies}</strong><span>Απαντήσεις</span></div>
+                          <div><strong>{a.meetings_booked}</strong><span>Ραντεβού</span></div>
+                        </div>
+                        {a.target_region && <div className="dash-agent-region"><Globe size={14} /> {a.target_region}</div>}
+                        <div className="dash-agent-actions">
+                          <button className="dash-agent-toggle" onClick={() => setConfigAgent(a)}>
+                            <Settings size={14} /> Διαμόρφωση
+                          </button>
+                          <button className="dash-agent-toggle" onClick={() => toggleAgentStatus(a)}>
+                            {a.status === 'active' ? 'Παύση' : 'Ενεργοποίηση'}
+                          </button>
+                          {confirmDeleteAgentId === a.id ? (
+                            <div className="dash-delete-confirm">
+                              <button className="btn-delete-yes" onClick={() => softDeleteAgent(a.id)}>Ναι</button>
+                              <button className="btn-delete-yes permanent" onClick={() => permanentDeleteAgent(a.id)}>Μόνιμα</button>
+                              <button className="btn-delete-lead" onClick={() => setConfirmDeleteAgentId(null)}>Όχι</button>
+                            </div>
+                          ) : (
+                            <button className="btn-delete-lead" onClick={() => setConfirmDeleteAgentId(a.id)}>
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="dash-agent-stats">
-                        <div><strong>{a.leads_contacted}</strong><span>Επικοινωνίες</span></div>
-                        <div><strong>{a.replies}</strong><span>Απαντήσεις</span></div>
-                        <div><strong>{a.meetings_booked}</strong><span>Ραντεβού</span></div>
+                    ))}
+                    {filteredAgents.length === 0 && <p className="dash-empty">Δεν υπάρχουν agents με αυτό το φίλτρο.</p>}
+                  </div>
+                )}
+                {agentsSubTab === 'deleted' && (
+                  <div className="dash-agents-grid">
+                    {deletedAgents.map((a) => (
+                      <div className="dash-agent-card" key={a.id} style={{ opacity: 0.6 }}>
+                        <div className="dash-agent-header">
+                          <div className="dash-agent-icon">{channelIcon(a.channel)}</div>
+                          <div><h3>{a.name}</h3><span className="dash-agent-channel">{a.channel}</span></div>
+                          <span className="dash-status-pill" style={{ background: 'rgba(231,76,60,0.1)', color: '#e74c3c' }}>διεγραμμένο</span>
+                        </div>
+                        <div className="dash-agent-stats">
+                          <div><strong>{a.leads_contacted}</strong><span>Επικοινωνίες</span></div>
+                          <div><strong>{a.replies}</strong><span>Απαντήσεις</span></div>
+                          <div><strong>{a.meetings_booked}</strong><span>Ραντεβού</span></div>
+                        </div>
+                        <div className="dash-agent-actions">
+                          <button className="btn btn-secondary" onClick={() => restoreAgent(a.id)} style={{ fontSize: 12 }}>
+                            <RefreshCw size={12} /> Αποκατάσταση
+                          </button>
+                          <button className="btn-delete-lead" onClick={() => permanentDeleteAgent(a.id)}>
+                            <Trash2 size={12} /> Μόνιμα
+                          </button>
+                        </div>
                       </div>
-                      {a.target_region && <div className="dash-agent-region"><Globe size={14} /> {a.target_region}</div>}
-                      <div className="dash-agent-actions">
-                        <button className="dash-agent-toggle" onClick={() => setConfigAgent(a)}>
-                          <Settings size={14} /> Διαμόρφωση
-                        </button>
-                        <button className="dash-agent-toggle" onClick={() => toggleAgentStatus(a)}>
-                          {a.status === 'active' ? 'Παύση' : 'Ενεργοποίηση'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {agents.length === 0 && <p className="dash-empty">Δεν υπάρχουν agents. Δημιουργήστε το πρώτο σας agent.</p>}
-                </div>
+                    ))}
+                    {deletedAgents.length === 0 && <p className="dash-empty">Δεν υπάρχουν διεγραμμένα agents.</p>}
+                  </div>
+                )}
               </div>
             )}
 

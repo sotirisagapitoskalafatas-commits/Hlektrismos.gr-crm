@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 type MapBackgroundProps = {
   activeStopIndex: number;
   stops: { lat: number; lng: number; zoom: number }[];
+  darkMode?: boolean;
 };
 
 declare global {
@@ -25,7 +26,7 @@ function loadLeaflet(): Promise<void> {
   });
 }
 
-export default function MapBackground({ activeStopIndex, stops }: MapBackgroundProps) {
+export default function MapBackground({ activeStopIndex, stops, darkMode = true }: MapBackgroundProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
 
@@ -54,9 +55,21 @@ export default function MapBackground({ activeStopIndex, stops }: MapBackgroundP
         maxZoom: 18,
       }).addTo(map.current);
 
-      map.current.getPane('tilePane')!.style.filter = 'brightness(0.45) contrast(1.2) saturate(1.3)';
+      map.current.getPane('tilePane')!.style.filter = darkMode
+        ? 'brightness(0.45) contrast(1.2) saturate(1.3)'
+        : 'brightness(0.85) contrast(1.05) saturate(1.1)';
     });
   }, []);
+
+  useEffect(() => {
+    if (!map.current) return;
+    const tilePane = map.current.getPane('tilePane');
+    if (tilePane) {
+      tilePane.style.filter = darkMode
+        ? 'brightness(0.45) contrast(1.2) saturate(1.3)'
+        : 'brightness(0.85) contrast(1.05) saturate(1.1)';
+    }
+  }, [darkMode]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -70,10 +83,11 @@ export default function MapBackground({ activeStopIndex, stops }: MapBackgroundP
   }, [activeStopIndex, stops]);
 
   return (
-    <div className="satellite-map-bg">
+    <div className={darkMode ? 'satellite-map-bg' : 'satellite-map-bg light-mode'}>
       <div ref={mapContainer} className="satellite-map-container" />
       <div className="satellite-overlay-earth-glow" />
       <div className="satellite-overlay-vignette" />
+      {!darkMode && <div className="satellite-light-overlay" />}
     </div>
   );
 }

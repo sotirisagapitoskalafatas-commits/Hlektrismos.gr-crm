@@ -260,7 +260,7 @@ export default function LandingPage() {
 
   return (
     <div className="app-shell">
-      <MapBackground activeStopIndex={journeyIndex} stops={mapStops} />
+      <MapBackground activeStopIndex={journeyIndex} stops={mapStops} darkMode={darkMode} />
       <div className="scroll-progress"><div className="scroll-progress-fill" style={{ width: `${scrollPct}%` }} /></div>
 
       <header className={scrolled ? 'site-header scrolled' : 'site-header'}>

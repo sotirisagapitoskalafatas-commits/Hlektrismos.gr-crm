@@ -3,7 +3,6 @@ import React, { useEffect, useRef } from 'react';
 type MapBackgroundProps = {
   activeStopIndex: number;
   stops: { lat: number; lng: number; zoom: number }[];
-  darkMode?: boolean;
 };
 
 declare global {
@@ -26,7 +25,7 @@ function loadLeaflet(): Promise<void> {
   });
 }
 
-export default function MapBackground({ activeStopIndex, stops, darkMode = true }: MapBackgroundProps) {
+export default function MapBackground({ activeStopIndex, stops }: MapBackgroundProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
 
@@ -55,9 +54,7 @@ export default function MapBackground({ activeStopIndex, stops, darkMode = true 
         maxZoom: 18,
       }).addTo(map.current);
 
-      map.current.getPane('tilePane')!.style.filter = darkMode
-        ? 'brightness(0.45) contrast(1.2) saturate(1.3)'
-        : 'brightness(0.85) contrast(1.05) saturate(1.1)';
+      map.current.getPane('tilePane')!.style.filter = 'brightness(0.45) contrast(1.2) saturate(1.3)';
     });
   }, []);
 
@@ -65,11 +62,13 @@ export default function MapBackground({ activeStopIndex, stops, darkMode = true 
     if (!map.current) return;
     const tilePane = map.current.getPane('tilePane');
     if (tilePane) {
-      tilePane.style.filter = darkMode
-        ? 'brightness(0.45) contrast(1.2) saturate(1.3)'
-        : 'brightness(0.85) contrast(1.05) saturate(1.1)';
+      const style = getComputedStyle(document.documentElement);
+      const brightness = style.getPropertyValue('--map-brightness').trim() || '0.45';
+      const contrast = style.getPropertyValue('--map-contrast').trim() || '1.2';
+      const saturate = style.getPropertyValue('--map-saturate').trim() || '1.4';
+      tilePane.style.filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturate})`;
     }
-  }, [darkMode]);
+  });
 
   useEffect(() => {
     if (!map.current) return;
@@ -83,11 +82,10 @@ export default function MapBackground({ activeStopIndex, stops, darkMode = true 
   }, [activeStopIndex, stops]);
 
   return (
-    <div className={darkMode ? 'satellite-map-bg' : 'satellite-map-bg light-mode'}>
+    <div className="satellite-map-bg">
       <div ref={mapContainer} className="satellite-map-container" />
       <div className="satellite-overlay-earth-glow" />
       <div className="satellite-overlay-vignette" />
-      {!darkMode && <div className="satellite-light-overlay" />}
     </div>
   );
 }

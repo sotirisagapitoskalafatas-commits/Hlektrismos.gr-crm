@@ -264,7 +264,7 @@ export default function LandingPage() {
 
   return (
     <div className="app-shell">
-      <MapBackground activeStopIndex={journeyIndex} stops={mapStops} darkMode={darkMode} />
+      <MapBackground activeStopIndex={journeyIndex} stops={mapStops} />
       <div className="scroll-progress"><div className="scroll-progress-fill" style={{ width: `${scrollPct}%` }} /></div>
 
       <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
@@ -550,8 +550,12 @@ export default function LandingPage() {
           <div className="footer-grid">
             <div className="footer-brand">
               <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
-              <div className="footer-logo-wrap"><img src="/images/image.png" alt="Ηλεκτρισμός - Ενεργειακοί Σύμβουλοι" className="footer-logo" /></div>
               <p>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
+              <div className="footer-contact-info">
+                <a href="https://maps.app.goo.gl/6h38xGoe2mW7mqTb8" target="_blank" rel="noopener noreferrer">Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</a>
+                <a href="tel:+302102255000">+30 210 22 55 000</a>
+                <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
+              </div>
             </div>
             <div className="footer-col">
               <h4>Υπηρεσίες</h4>
@@ -559,26 +563,22 @@ export default function LandingPage() {
               <a href="#services">Αέριο</a>
               <a href="#services">Φωτοβολταϊκά</a>
               <a href="#services">Ηλεκτροκίνηση</a>
-              <a href="#services">Αποθήκευση Ενέργειας</a>
-              <a href="#services">Εξοικονόμηση Ενέργειας</a>
+              <a href="#services">Ολοκληρωμένες Λύσεις</a>
             </div>
             <div className="footer-col">
               <h4>Χρήσιμοι Σύνδεσμοι</h4>
+              <a href="#/">Αρχική</a>
               <a href="#about">Σχετικά με εμάς</a>
+              <a href="#services">Λύσεις</a>
+              <a href="#faq">Ενέργεια Σήμερα</a>
               <a href="#faq">Συχνές Ερωτήσεις</a>
               <a href="#contact">Επικοινωνία</a>
-              <a href="#/login">Σύνδεση CRM</a>
             </div>
             <div className="footer-col">
               <h4>Ώρες Λειτουργίας</h4>
               <span>Είμαστε εδώ για εσένα</span>
               <span>Δευτέρα - Παρασκευή 09:00 - 17:00</span>
               <span>Σάββατο - Κυριακή Κλειστά</span>
-              <div className="footer-contact-info">
-                <a href="tel:+302102255000">+30 210 22 55 000</a>
-                <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
-                <a href="https://maps.app.goo.gl/6h38xGoe2mW7mqTb8" target="_blank" rel="noopener noreferrer">Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</a>
-              </div>
             </div>
           </div>
           <div className="footer-bottom">

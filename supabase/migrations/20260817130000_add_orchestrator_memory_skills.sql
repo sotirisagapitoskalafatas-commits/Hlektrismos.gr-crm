@@ -54,9 +54,16 @@ ALTER TABLE ai_agents
   ADD COLUMN IF NOT EXISTS handoff_condition text;
 
 -- Drop and recreate the select_all_agents policy to avoid conflicts
-DROP POLICY IF EXISTS "select_all_agents" ON ai_agents;
-CREATE POLICY "select_all_agents" ON ai_agents
-  FOR SELECT TO authenticated USING (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "select_all_agents" ON ai_agents;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "select_all_agents" ON ai_agents
+    FOR SELECT TO authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Agent memory: conversation history per agent
 CREATE TABLE IF NOT EXISTS agent_memory (
@@ -74,9 +81,16 @@ CREATE INDEX IF NOT EXISTS idx_agent_memory_created ON agent_memory(created_at D
 
 ALTER TABLE agent_memory ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "authenticated_all_agent_memory" ON agent_memory;
-CREATE POLICY "authenticated_all_agent_memory" ON agent_memory
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "authenticated_all_agent_memory" ON agent_memory;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "authenticated_all_agent_memory" ON agent_memory
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Agent conversations: inter-agent communication
 CREATE TABLE IF NOT EXISTS agent_conversations (
@@ -96,9 +110,16 @@ CREATE INDEX IF NOT EXISTS idx_agent_conversations_unresolved ON agent_conversat
 
 ALTER TABLE agent_conversations ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "authenticated_all_agent_conversations" ON agent_conversations;
-CREATE POLICY "authenticated_all_agent_conversations" ON agent_conversations
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "authenticated_all_agent_conversations" ON agent_conversations;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "authenticated_all_agent_conversations" ON agent_conversations
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Agent reports
 CREATE TABLE IF NOT EXISTS agent_reports (
@@ -117,6 +138,13 @@ CREATE INDEX IF NOT EXISTS idx_agent_reports_created ON agent_reports(created_at
 
 ALTER TABLE agent_reports ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "authenticated_all_agent_reports" ON agent_reports;
-CREATE POLICY "authenticated_all_agent_reports" ON agent_reports
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "authenticated_all_agent_reports" ON agent_reports;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "authenticated_all_agent_reports" ON agent_reports
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

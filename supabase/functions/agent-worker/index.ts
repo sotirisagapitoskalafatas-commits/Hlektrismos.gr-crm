@@ -59,20 +59,20 @@ serve(async (req: any) => {
       let agent = agents.find(a => a.target_region === lead.region);
       if (!agent) agent = agents[0]; // Fallback to the first active agent
 
-      const systemPrompt = \`Είσαι ο \${agent.name}, ένας εξειδικευμένος σύμβουλος της PowerFor.
-Κανάλι Επικοινωνίας: \${agent.channel} (Γράψε το μήνυμα ώστε να ταιριάζει σε \${agent.channel}).
-Οδηγίες: \${agent.base_prompt || 'Γράψε ένα φιλικό μήνυμα για να κλείσεις ένα ραντεβού σχετικά με το ρεύμα/αέριο.'}\`;
+      const systemPrompt = `Είσαι ο ${agent.name}, ένας εξειδικευμένος σύμβουλος της PowerFor.
+Κανάλι Επικοινωνίας: ${agent.channel} (Γράψε το μήνυμα ώστε να ταιριάζει σε ${agent.channel}).
+Οδηγίες: ${agent.base_prompt || 'Γράψε ένα φιλικό μήνυμα για να κλείσεις ένα ραντεβού σχετικά με το ρεύμα/αέριο.'}`;
 
-      const userPrompt = \`Στοιχεία Lead:
-Όνομα: \${lead.first_name} \${lead.last_name}
-Ενδιαφέρον: \${lead.provider}
-Τύπος Πελάτη: \${lead.customer_type}
-Σχόλια: \${lead.comments || 'Κανένα'}
+      const userPrompt = `Στοιχεία Lead:
+Όνομα: ${lead.first_name} ${lead.last_name}
+Ενδιαφέρον: ${lead.provider}
+Τύπος Πελάτη: ${lead.customer_type}
+Σχόλια: ${lead.comments || 'Κανένα'}
 
-Γράψε το πρώτο μήνυμα (outbound) που θα στείλεις σε αυτό το lead.\`;
+Γράψε το πρώτο μήνυμα (outbound) που θα στείλεις σε αυτό το lead.`;
 
       // Call Gemini API to generate the message
-      const geminiResponse = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\${geminiApiKey}\`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,14 +97,14 @@ serve(async (req: any) => {
         .eq('id', agent.id);
 
       results.push({
-        lead: \`\${lead.first_name} \${lead.last_name}\`,
+        lead: `${lead.first_name} ${lead.last_name}`,
         agent: agent.name,
         channel: agent.channel,
         message_preview: generatedMessage.substring(0, 100) + '...'
       });
     }
 
-    return new Response(JSON.stringify({ message: \`Processed \${results.length} leads.\`, results }), {
+    return new Response(JSON.stringify({ message: `Processed ${results.length} leads.`, results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

@@ -10,10 +10,12 @@ import {
   Lock,
   Mail,
   Menu,
+  Moon,
   Phone,
   Plug,
   ShieldCheck,
   Sparkles,
+  Sun,
   TrendingUp,
   Users,
   X,
@@ -139,10 +141,19 @@ export default function LandingPage() {
   const [scrollPct, setScrollPct] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved ? saved === 'dark' : false;
+  });
   const journeySectionRef = useRef<HTMLElement>(null);
   const [bgTransform, setBgTransform] = useState('');
   const journeyIndex = Math.min(greekJourney.length - 1, Math.floor((scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)) * greekJourney.length));
   const activeJourney = greekJourney[journeyIndex];
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   useScrollReveal();
 
@@ -254,6 +265,9 @@ export default function LandingPage() {
             <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
           </nav>
           <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
+          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
           <a href="#contact" className="header-cta">Ζητήστε κλήση <ArrowRight size={16} /></a>
         </div>
       </header>
@@ -446,12 +460,12 @@ export default function LandingPage() {
                 <div className="eyebrow"><span className="eyebrow-dot" /> Ζητήστε να σας καλέσουμε!</div>
                 <h2>Έτοιμος να εξοικονομήσεις <span className="gradient-text">χρήματα;</span></h2>
                 <p>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
-                <div className="contact-points">
-                  <div className="contact-point"><Phone size={18} /> +30 210 22 55 000</div>
-                   <div className="contact-point"><Mail size={18} /> info@hlektrismos.gr</div>
-                  <div className="contact-point"><Home size={18} /> Ζαλοκώστα 8, Αθήνα 10671</div>
-                  <div className="contact-point"><Lock size={18} /> Χωρίς scraping. GDPR-first. Τα δεδομένα σου είναι ασφαλή.</div>
-                </div>
+            <div className="contact-points">
+                   <div className="contact-point"><Phone size={18} /> +30 210 22 55 000</div>
+                    <div className="contact-point"><Mail size={18} /> info@hlektrismos.gr</div>
+                   <div className="contact-point"><Home size={18} /> Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</div>
+                   <div className="contact-point"><Lock size={18} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</div>
+                 </div>
               </div>
               <div className="form-card reveal">
                 {submitted ? (
@@ -523,7 +537,7 @@ export default function LandingPage() {
             <div className="footer-brand">
               <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
               <div className="footer-logo-wrap"><img src="/images/image.png" alt="Ηλεκτρισμός - Ενεργειακοί Σύμβουλοι" className="footer-logo" /></div>
-              <p>Ο προσωπικός σου σύμβουλος ενέργειας. Συγκρίνουμε πάροχους και βρίσκουμε την καλύτερη λύση — δωρεάν.</p>
+              <p>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
             </div>
             <div className="footer-col">
               <h4>Υπηρεσίες</h4>
@@ -531,25 +545,36 @@ export default function LandingPage() {
               <a href="#services">Φυσικό Αέριο</a>
               <a href="#services">Φωτοβολταϊκά</a>
               <a href="#services">Ηλεκτροκίνηση</a>
+              <a href="#services">Ολοκληρωμένες Λύσεις</a>
             </div>
             <div className="footer-col">
-              <h4>Εταιρεία</h4>
-              <a href="#about">Ποιοι Είμαστε</a>
+              <h4>Χρήσιμοι Σύνδεσμοι</h4>
+              <a href="#about">Σχετικά με εμάς</a>
               <a href="#faq">Συχνές Ερωτήσεις</a>
               <a href="#contact">Επικοινωνία</a>
-              <a href="#/login">Σύνδεση</a>
+              <a href="#/login">Σύνδεση CRM</a>
             </div>
             <div className="footer-col">
-              <h4>Επικοινωνία</h4>
-              <a href="tel:+302102255000">+30 210 22 55 000</a>
-              <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
-              <span>Ζαλοκώστα 8, Αθήνα 10671</span>
-              <span>Δευ – Παρ · 09:00 – 18:00</span>
+              <h4>Ώρες Λειτουργίας</h4>
+              <span>Είμαστε εδώ για εσένα</span>
+              <span>Δευτέρα - Παρασκευή 09:00 - 17:00</span>
+              <span>Σάββατο - Κυριακή Κλειστά</span>
+              <div className="footer-contact-info">
+                <a href="tel:+302102255000">+30 210 22 55 000</a>
+                <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
+                <a href="https://maps.app.goo.gl/6h38xGoe2mW7mqTb8" target="_blank" rel="noopener noreferrer">Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</a>
+              </div>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>© 2026 Hlektrismos.gr. Με επιφύλαξη παντών δικαιωμάτων.</span>
-            <span>Πολιτική Απορρήτου · Όροι Χρήσης · GDPR</span>
+            <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
+            <div className="footer-legal-links">
+              <a href="https://hlektrismos.gr/politiki-aporritou/" target="_blank" rel="noopener noreferrer">Πολιτική Απορρήτου</a>
+              <span>·</span>
+              <a href="https://hlektrismos.gr/oroi-chrisis/" target="_blank" rel="noopener noreferrer">Όροι Χρήσης</a>
+              <span>·</span>
+              <a href="https://hlektrismos.gr/cookies/" target="_blank" rel="noopener noreferrer">Cookies</a>
+            </div>
           </div>
         </div>
       </footer>

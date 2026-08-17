@@ -47,6 +47,10 @@ type Lead = {
   customer_category?: string | null;
   pipeline_status?: string | null;
   deleted_at?: string | null;
+  property_type?: string | null;
+  comments?: string | null;
+  bill_file_path?: string | null;
+  bill_file_name?: string | null;
 };
 
 type Agent = {
@@ -188,6 +192,10 @@ export default function DashboardPage() {
   const [agentStatusFilter, setAgentStatusFilter] = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteAgentId, setConfirmDeleteAgentId] = useState<string | null>(null);
+  const [openLead, setOpenLead] = useState<Lead | null>(null);
+  const [billUrl, setBillUrl] = useState<string | null>(null);
+  const [billLoading, setBillLoading] = useState(false);
+  const [billError, setBillError] = useState<string | null>(null);
 
   const [runningAgents, setRunningAgents] = useState(false);
 
@@ -227,6 +235,33 @@ export default function DashboardPage() {
       return () => clearTimeout(t);
     }
   }, [toast]);
+
+  // Fetch a signed URL for the uploaded bill whenever a lead detail is opened.
+  useEffect(() => {
+    if (!openLead || !openLead.bill_file_path) {
+      setBillUrl(null);
+      setBillError(null);
+      setBillLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setBillLoading(true);
+    setBillError(null);
+    setBillUrl(null);
+    (async () => {
+      const { data, error } = await supabase.storage
+        .from('energy-bills')
+        .createSignedUrl(openLead.bill_file_path!, 60 * 10);
+      if (cancelled) return;
+      if (error) {
+        setBillError(error.message);
+      } else if (data?.signedUrl) {
+        setBillUrl(data.signedUrl);
+      }
+      setBillLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [openLead]);
 
   // Conversation management functions
   const createNewConversation = () => {
@@ -729,14 +764,18 @@ export default function DashboardPage() {
                         {filteredLeads.map((l) => {
                           const aiOk = canActivateAI(l);
                           return (
-                            <tr key={l.id}>
-                              <td>{l.first_name} {l.last_name}</td>
+                            <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLead(l)}>
+                              <td>
+                                <button className="dash-lead-name-btn" onClick={(e) => { e.stopPropagation(); setOpenLead(l); }}>
+                                  {l.first_name} {l.last_name}
+                                </button>
+                              </td>
                               <td>{l.email}</td>
                               <td>{l.phone}</td>
                               <td>{l.region}</td>
                               <td>{l.customer_type}</td>
                               <td>
-                                <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)}>
+                                <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)} onClick={(e) => e.stopPropagation()}>
                                   <option value="" disabled>—</option>
                                   <option value="B2C_Household">B2C</option>
                                   <option value="B2B_Corporate">B2B</option>
@@ -744,7 +783,7 @@ export default function DashboardPage() {
                               </td>
                               <td>
                                 <div className="gdpr-badge-wrap">
-                                  <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)}>
+                                  <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)} onClick={(e) => e.stopPropagation()}>
                                     <option value="" disabled>—</option>
                                     <option value="Consent">Consent</option>
                                     <option value="Legitimate_Interest">Leg. Interest</option>
@@ -754,12 +793,12 @@ export default function DashboardPage() {
                               </td>
                               <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
                               <td>
-                                <button className={`ai-activate-btn ${aiOk ? 'active' : 'disabled'}`} disabled={!aiOk} title={!aiOk ? 'Missing GDPR Consent' : undefined} onClick={() => aiOk && setToast({ msg: `AI Agent ενεργοποιήθηκε για ${l.first_name} ${l.last_name}.`, type: 'info' })}>
+                                <button className={`ai-activate-btn ${aiOk ? 'active' : 'disabled'}`} disabled={!aiOk} title={!aiOk ? 'Missing GDPR Consent' : undefined} onClick={(e) => { e.stopPropagation(); if (aiOk) setToast({ msg: `AI Agent ενεργοποιήθηκε για ${l.first_name} ${l.last_name}.`, type: 'info' }); }}>
                                   <Zap size={14} /> {aiOk ? 'Ενεργό' : 'Αποκλεισμένο'}
                                 </button>
                               </td>
                               <td>
-                                <div className="dash-lead-actions">
+                                <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
                                   <select className="dash-status-select" value={l.status} onChange={(e) => updateLeadStatus(l, e.target.value)}>
                                     <option value="new">new</option>
                                     <option value="contacted">contacted</option>
@@ -2368,6 +2407,92 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <div className="workflow-rule">
                 <span className="rule-action">Action:</span> Ειδοποίηση πωλητή, αλλαγή pipeline_status
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openLead && (
+        <div className="lead-modal-overlay" onClick={() => setOpenLead(null)} role="dialog" aria-modal="true" aria-label="Λεπτομέρειες Lead">
+          <div className="lead-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="lead-modal-header">
+              <div>
+                <div className="lead-modal-eyebrow">Lead Folder</div>
+                <h2>{openLead.first_name} {openLead.last_name}</h2>
+              </div>
+              <button className="lead-modal-close" onClick={() => setOpenLead(null)} aria-label="Κλείσιμο">
+                <X size={20} />
+              </button>
+            </header>
+
+            <div className="lead-modal-body">
+              <section className="lead-modal-section">
+                <h3><Users size={16} /> Στοιχεία Επικοινωνίας</h3>
+                <dl className="lead-modal-grid">
+                  <div><dt>Email</dt><dd>{openLead.email || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Τηλέφωνο</dt><dd>{openLead.phone || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Περιοχή</dt><dd>{openLead.region || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Τύπος Πελάτη</dt><dd>{openLead.customer_type || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Τύπος Ακινήτου</dt><dd>{openLead.property_type || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Πάροχος</dt><dd>{openLead.provider || <span className="muted">—</span>}</dd></div>
+                </dl>
+              </section>
+
+              <section className="lead-modal-section">
+                <h3><ShieldCheck size={16} /> Κατάσταση & GDPR</h3>
+                <dl className="lead-modal-grid">
+                  <div><dt>Pipeline Status</dt><dd><span className={`dash-status-pill ${openLead.status}`}>{openLead.status}</span></dd></div>
+                  <div><dt>Customer Category</dt><dd>{openLead.customer_category || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Lawful Basis</dt><dd>{openLead.lawful_basis || <span className="muted">—</span>}</dd></div>
+                  <div><dt>Δημιουργήθηκε</dt><dd>{new Date(openLead.created_at).toLocaleString('el-GR')}</dd></div>
+                  {openLead.deleted_at && (
+                    <div><dt>Διαγράφηκε</dt><dd>{new Date(openLead.deleted_at).toLocaleString('el-GR')}</dd></div>
+                  )}
+                </dl>
+              </section>
+
+              <section className="lead-modal-section">
+                <h3><MessageSquare size={16} /> Σχόλια</h3>
+                {openLead.comments ? (
+                  <p className="lead-modal-comments">{openLead.comments}</p>
+                ) : (
+                  <p className="muted">Δεν υπάρχουν σχόλια.</p>
+                )}
+              </section>
+
+              <section className="lead-modal-section">
+                <h3><FileText size={16} /> Ανεβασμένος Λογαριασμός</h3>
+                {openLead.bill_file_path ? (
+                  <div className="lead-bill">
+                    <div className="lead-bill-meta">
+                      <FileText size={18} />
+                      <div>
+                        <div className="lead-bill-name">{openLead.bill_file_name || openLead.bill_file_path.split('/').pop()}</div>
+                        <div className="lead-bill-path">{openLead.bill_file_path}</div>
+                      </div>
+                    </div>
+                    {billLoading && <p className="muted">Δημιουργία συνδέσμου…</p>}
+                    {billError && <p className="lead-bill-error">Σφάλμα: {billError}</p>}
+                    {billUrl && !billLoading && !billError && (
+                      <div className="lead-bill-actions">
+                        <a href={billUrl} target="_blank" rel="noopener noreferrer" className="lead-bill-btn lead-bill-btn-primary">
+                          <Eye size={14} /> Προβολή / Λήψη
+                        </a>
+                        {/\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(openLead.bill_file_name || openLead.bill_file_path) && (
+                          <a href={billUrl} target="_blank" rel="noopener noreferrer" className="lead-bill-preview">
+                            <img src={billUrl} alt={openLead.bill_file_name || 'Bill preview'} />
+                          </a>
+                        )}
+                        {/\.pdf$/i.test(openLead.bill_file_name || openLead.bill_file_path) && (
+                          <iframe title="Bill preview" src={billUrl} className="lead-bill-iframe" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="muted">Δεν έχει ανέβει λογαριασμός.</p>
+                )}
+              </section>
             </div>
           </div>
         </div>

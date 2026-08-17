@@ -854,6 +854,49 @@ img { display: block; max-width: 100%; }
   background: transparent;
 }
 
+/* ===== Leads Delete / Deleted Tab ===== */
+.dash-leads-subtabs { display: flex; gap: 4px; background: var(--bg-2); border-radius: 10px; padding: 3px; }
+.dash-leads-subtabs button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: none;
+  background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.2s;
+}
+.dash-leads-subtabs button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.dash-leads-subtabs button:hover:not(.active) { color: var(--text); }
+.dash-lead-actions { display: flex; align-items: center; gap: 6px; }
+.btn-delete-lead {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; transition: all 0.15s;
+}
+.btn-delete-lead:hover { border-color: #e74c3c; color: #e74c3c; background: rgba(231,76,60,0.06); }
+.dash-delete-confirm { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.btn-delete-yes {
+  padding: 4px 10px; border-radius: 6px; border: none; background: #e74c3c; color: #fff;
+  font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+}
+.btn-delete-yes:hover { background: #c0392b; }
+.btn-delete-yes.permanent { background: #8e44ad; }
+.btn-delete-yes.permanent:hover { background: #7d3c98; }
+.btn-delete-no {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); font-size: 11px; cursor: pointer; transition: all 0.15s;
+}
+.btn-delete-no:hover { background: var(--bg-2); }
+.btn-restore-lead {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s;
+}
+.btn-restore-lead:hover { border-color: #27ae60; color: #27ae60; background: rgba(39,174,96,0.06); }
+.btn-delete-lead.permanent { border-color: rgba(142,68,173,0.3); color: #8e44ad; font-weight: 500; }
+.btn-delete-lead.permanent:hover { background: rgba(142,68,173,0.06); border-color: #8e44ad; }
+.dash-row-deleted { opacity: 0.7; }
+.dash-row-deleted:hover { opacity: 1; }
+.dash-deleted-notice {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 16px;
+  border-radius: 10px; background: rgba(142,68,173,0.08); border: 1px solid rgba(142,68,173,0.2);
+  color: #8e44ad; font-size: 13px;
+}
+
 @media (max-width: 1024px) {
   .rag-layout { grid-template-columns: 1fr; }
   .reports-layout { grid-template-columns: 1fr; }

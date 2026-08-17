@@ -43,6 +43,7 @@ type Lead = {
   lawful_basis?: string | null;
   customer_category?: string | null;
   pipeline_status?: string | null;
+  deleted_at?: string | null;
 };
 
 type Agent = {
@@ -118,6 +119,8 @@ export default function DashboardPage() {
   const [configAgent, setConfigAgent] = useState<Agent | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [leadsSubTab, setLeadsSubTab] = useState<'active' | 'deleted'>('active');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [runningAgents, setRunningAgents] = useState(false);
 
@@ -217,6 +220,26 @@ export default function DashboardPage() {
     loadData();
   };
 
+  const softDeleteLead = async (leadId: string) => {
+    await supabase.from('hlektrismos_leads').update({ deleted_at: new Date().toISOString() }).eq('id', leadId);
+    setConfirmDeleteId(null);
+    setToast({ msg: 'Το lead μεταφέρθηκε στα διεγραμμένα.', type: 'success' });
+    loadData();
+  };
+
+  const restoreLead = async (leadId: string) => {
+    await supabase.from('hlektrismos_leads').update({ deleted_at: null }).eq('id', leadId);
+    setToast({ msg: 'Το lead αποκαταστάθηκε.', type: 'success' });
+    loadData();
+  };
+
+  const permanentDeleteLead = async (leadId: string) => {
+    await supabase.from('hlektrismos_leads').delete().eq('id', leadId);
+    setConfirmDeleteId(null);
+    setToast({ msg: 'Το lead διαγράφηκε μόνιμα.', type: 'success' });
+    loadData();
+  };
+
   const syncTariffs = async () => {
     setSyncing(true);
     const now = new Date().toISOString();
@@ -236,12 +259,22 @@ export default function DashboardPage() {
   };
 
   const filteredLeads = leads.filter((l) => {
+    if (l.deleted_at) return false;
     const matchesSearch = !search ||
       l.first_name.toLowerCase().includes(search.toLowerCase()) ||
       l.last_name.toLowerCase().includes(search.toLowerCase()) ||
       l.email.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
     return matchesSearch && matchesStatus;
+  });
+
+  const deletedLeads = leads.filter((l) => {
+    if (!l.deleted_at) return false;
+    const matchesSearch = !search ||
+      l.first_name.toLowerCase().includes(search.toLowerCase()) ||
+      l.last_name.toLowerCase().includes(search.toLowerCase()) ||
+      l.email.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch;
   });
 
   const totalLeadsContacted = agents.reduce((sum, a) => sum + a.leads_contacted, 0);
@@ -319,7 +352,7 @@ export default function DashboardPage() {
             {tab === 'overview' && (
               <div className="dash-overview">
                 <div className="dash-stats-grid">
-                  <div className="dash-stat-card"><div className="dash-stat-icon"><Users size={20} /></div><div><strong>{leads.length}</strong><span>Σύνολο Leads</span></div></div>
+                  <div className="dash-stat-card"><div className="dash-stat-icon"><Users size={20} /></div><div><strong>{leads.filter(l => !l.deleted_at).length}</strong><span>Σύνολο Leads</span></div></div>
                   <div className="dash-stat-card"><div className="dash-stat-icon"><Bot size={20} /></div><div><strong>{agents.length}</strong><span>Ενεργά AI Agents</span></div></div>
                   <div className="dash-stat-card"><div className="dash-stat-icon"><Mail size={20} /></div><div><strong>{totalLeadsContacted}</strong><span>Επικοινωνίες</span></div></div>
                   <div className="dash-stat-card"><div className="dash-stat-icon"><TrendingUp size={20} /></div><div><strong>{conversionRate}%</strong><span>Conversion Rate</span></div></div>
@@ -328,7 +361,7 @@ export default function DashboardPage() {
                   <div className="dash-panel">
                     <h3>Πρόσφατα Leads</h3>
                     <div className="dash-mini-leads">
-                      {leads.slice(0, 5).map((l) => (
+                      {leads.filter(l => !l.deleted_at).slice(0, 5).map((l) => (
                         <div className="dash-mini-lead" key={l.id}>
                           <div className="dash-mini-lead-avatar">{l.first_name[0]}{l.last_name[0]}</div>
                           <div><strong>{l.first_name} {l.last_name}</strong><span>{l.email}</span></div>
@@ -410,74 +443,144 @@ export default function DashboardPage() {
               <div className="dash-content">
                 <div className="dash-content-header">
                   <div className="dash-filters">
+                    <div className="dash-leads-subtabs">
+                      <button className={leadsSubTab === 'active' ? 'active' : ''} onClick={() => setLeadsSubTab('active')}><Users size={14} /> Ενεργά Leads ({leads.filter(l => !l.deleted_at).length})</button>
+                      <button className={leadsSubTab === 'deleted' ? 'active' : ''} onClick={() => setLeadsSubTab('deleted')}><X size={14} /> Διεγραμμένα ({deletedLeads.length})</button>
+                    </div>
                     <div className="dash-search">
                       <Search size={16} />
                       <input placeholder="Αναζήτηση leads..." value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
-                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                      <option value="all">Όλα τα status</option>
-                      <option value="new">new</option>
-                      <option value="contacted">contacted</option>
-                      <option value="qualified">qualified</option>
-                      <option value="closed">closed</option>
-                    </select>
+                    {leadsSubTab === 'active' && (
+                      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                        <option value="all">Όλα τα status</option>
+                        <option value="new">new</option>
+                        <option value="contacted">contacted</option>
+                        <option value="qualified">qualified</option>
+                        <option value="closed">closed</option>
+                      </select>
+                    )}
                   </div>
                 </div>
-                <div className="dash-table-wrap">
-                  <table className="dash-table">
-                    <thead>
-                      <tr>
-                        <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLeads.map((l) => {
-                        const aiOk = canActivateAI(l);
-                        return (
-                          <tr key={l.id}>
+
+                {leadsSubTab === 'active' && (
+                  <div className="dash-table-wrap">
+                    <table className="dash-table">
+                      <thead>
+                        <tr>
+                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLeads.map((l) => {
+                          const aiOk = canActivateAI(l);
+                          return (
+                            <tr key={l.id}>
+                              <td>{l.first_name} {l.last_name}</td>
+                              <td>{l.email}</td>
+                              <td>{l.phone}</td>
+                              <td>{l.region}</td>
+                              <td>{l.customer_type}</td>
+                              <td>
+                                <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)}>
+                                  <option value="" disabled>—</option>
+                                  <option value="B2C_Household">B2C</option>
+                                  <option value="B2B_Corporate">B2B</option>
+                                </select>
+                              </td>
+                              <td>
+                                <div className="gdpr-badge-wrap">
+                                  <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)}>
+                                    <option value="" disabled>—</option>
+                                    <option value="Consent">Consent</option>
+                                    <option value="Legitimate_Interest">Leg. Interest</option>
+                                  </select>
+                                  <span className={`gdpr-badge ${aiOk ? 'ok' : 'blocked'}`}>{aiOk ? 'OK' : 'Missing'}</span>
+                                </div>
+                              </td>
+                              <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
+                              <td>
+                                <button className={`ai-activate-btn ${aiOk ? 'active' : 'disabled'}`} disabled={!aiOk} title={!aiOk ? 'Missing GDPR Consent' : undefined} onClick={() => aiOk && setToast({ msg: `AI Agent ενεργοποιήθηκε για ${l.first_name} ${l.last_name}.`, type: 'info' })}>
+                                  <Zap size={14} /> {aiOk ? 'Ενεργό' : 'Αποκλεισμένο'}
+                                </button>
+                              </td>
+                              <td>
+                                <div className="dash-lead-actions">
+                                  <select className="dash-status-select" value={l.status} onChange={(e) => updateLeadStatus(l, e.target.value)}>
+                                    <option value="new">new</option>
+                                    <option value="contacted">contacted</option>
+                                    <option value="qualified">qualified</option>
+                                    <option value="closed">closed</option>
+                                  </select>
+                                  {confirmDeleteId === l.id ? (
+                                    <div className="dash-delete-confirm">
+                                      <span>Διαγραφή;</span>
+                                      <button className="btn-delete-yes" onClick={() => softDeleteLead(l.id)}>Ναι</button>
+                                      <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>Όχι</button>
+                                    </div>
+                                  ) : (
+                                    <button className="btn-delete-lead" onClick={() => setConfirmDeleteId(l.id)} title="Μεταφορά στα διεγραμμένα">
+                                      <X size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads.</p>}
+                  </div>
+                )}
+
+                {leadsSubTab === 'deleted' && (
+                  <div className="dash-table-wrap">
+                    <div className="dash-deleted-notice">
+                      <AlertCircle size={16} />
+                      <span>Τα διεγραμμένα leads αποθηκεύονται εδώ. Μπορείτε να τα αποκαταστήσετε ή να τα διαγράψετε μόνιμα.</span>
+                    </div>
+                    <table className="dash-table">
+                      <thead>
+                        <tr>
+                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Status</th><th>Διαγράφηκε</th><th>Ενέργεια</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deletedLeads.map((l) => (
+                          <tr key={l.id} className="dash-row-deleted">
                             <td>{l.first_name} {l.last_name}</td>
                             <td>{l.email}</td>
                             <td>{l.phone}</td>
                             <td>{l.region}</td>
                             <td>{l.customer_type}</td>
+                            <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
+                            <td>{l.deleted_at ? new Date(l.deleted_at).toLocaleDateString('el-GR') : '—'}</td>
                             <td>
-                              <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)}>
-                                <option value="" disabled>—</option>
-                                <option value="B2C_Household">B2C</option>
-                                <option value="B2B_Corporate">B2B</option>
-                              </select>
-                            </td>
-                            <td>
-                              <div className="gdpr-badge-wrap">
-                                <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)}>
-                                  <option value="" disabled>—</option>
-                                  <option value="Consent">Consent</option>
-                                  <option value="Legitimate_Interest">Leg. Interest</option>
-                                </select>
-                                <span className={`gdpr-badge ${aiOk ? 'ok' : 'blocked'}`}>{aiOk ? 'OK' : 'Missing'}</span>
+                              <div className="dash-lead-actions">
+                                <button className="btn-restore-lead" onClick={() => restoreLead(l.id)} title="Αποκατάσταση">
+                                  <RefreshCw size={14} /> Αποκατάσταση
+                                </button>
+                                {confirmDeleteId === l.id ? (
+                                  <div className="dash-delete-confirm">
+                                    <span>Μόνιμη;</span>
+                                    <button className="btn-delete-yes permanent" onClick={() => permanentDeleteLead(l.id)}>Ναι</button>
+                                    <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>Όχι</button>
+                                  </div>
+                                ) : (
+                                  <button className="btn-delete-lead permanent" onClick={() => setConfirmDeleteId(l.id)} title="Μόνιμη διαγραφή">
+                                    <X size={14} /> Μόνιμη Διαγραφή
+                                  </button>
+                                )}
                               </div>
                             </td>
-                            <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
-                            <td>
-                              <button className={`ai-activate-btn ${aiOk ? 'active' : 'disabled'}`} disabled={!aiOk} title={!aiOk ? 'Missing GDPR Consent' : undefined} onClick={() => aiOk && setToast({ msg: `AI Agent ενεργοποιήθηκε για ${l.first_name} ${l.last_name}.`, type: 'info' })}>
-                                <Zap size={14} /> {aiOk ? 'Ενεργό' : 'Αποκλεισμένο'}
-                              </button>
-                            </td>
-                            <td>
-                              <select className="dash-status-select" value={l.status} onChange={(e) => updateLeadStatus(l, e.target.value)}>
-                                <option value="new">new</option>
-                                <option value="contacted">contacted</option>
-                                <option value="qualified">qualified</option>
-                                <option value="closed">closed</option>
-                              </select>
-                            </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads.</p>}
-                </div>
+                        ))}
+                      </tbody>
+                    </table>
+                    {deletedLeads.length === 0 && <p className="dash-empty">Δεν υπάρχουν διεγραμμένα leads.</p>}
+                  </div>
+                )}
               </div>
             )}
 

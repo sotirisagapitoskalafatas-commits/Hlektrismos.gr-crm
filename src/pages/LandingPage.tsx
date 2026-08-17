@@ -444,7 +444,7 @@ export default function LandingPage() {
               {galleryItems.map((item, i) => (
                 <div
                   key={item.title}
-                  className={`gallery-item ${item.wide ? 'gallery-item-wide' : ''} reveal stagger-${i + 1}`}
+                  className={`gallery-item ${item.wide ? 'gallery-item-wide' : ''} ${i % 2 === 0 ? 'reveal-left' : 'reveal-right'} stagger-${i + 1}`}
                   onClick={() => setGalleryModal(i)}
                   style={{ cursor: 'pointer' }}
                 >

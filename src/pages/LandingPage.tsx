@@ -264,7 +264,6 @@ export default function LandingPage() {
 
   return (
     <div className="app-shell">
-      <MapBackground activeStopIndex={journeyIndex} stops={mapStops} />
       <div className="scroll-progress"><div className="scroll-progress-fill" style={{ width: `${scrollPct}%` }} /></div>
 
       <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
@@ -288,6 +287,7 @@ export default function LandingPage() {
 
       <main id="top">
         <section className="hero">
+          <MapBackground activeStopIndex={journeyIndex} stops={mapStops} />
           <div className="hero-bg">
             <div className="hero-greece-img" style={{ transform: heroBgTransform, opacity: heroOpacity }} />
             <div className="hero-greece-overlay" />

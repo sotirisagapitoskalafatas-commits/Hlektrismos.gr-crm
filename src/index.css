@@ -164,7 +164,7 @@ img { display: block; max-width: 100%; }
 .stat-cell span { display: block; margin-top: 6px; color: var(--card-text-muted); font-size: 13px; }
 
 /* ===== Sections ===== */
-.section { position: relative; padding: 120px 0; }
+.section { position: relative; padding: 120px 0; background: var(--section-bg); backdrop-filter: blur(12px); }
 .section-heading { max-width: 720px; margin: 0 auto 64px; text-align: center; }
 .section-heading h2 { margin: 20px 0; font: 700 clamp(32px, 4.5vw, 56px)/1.1 var(--font-display); letter-spacing: -1.5px; color: var(--card-text); }
 .section-heading p { margin: 0; color: var(--card-text-muted); font-size: 17px; line-height: 1.65; }
@@ -395,7 +395,7 @@ img { display: block; max-width: 100%; }
 .official-logo { width: 150px; height: auto; object-fit: contain; }
 
 /* ===== Advantages ===== */
-.advantages-section { position: relative; padding: 60px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.advantages-section { position: relative; padding: 60px 0; border-bottom: 1px solid rgba(255,255,255,0.06); background: var(--section-bg); backdrop-filter: blur(12px); }
 .advantages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .advantage-card { padding: 28px; text-align: center; border-radius: var(--radius); background: rgba(6,10,18,0.8); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.3s, border-color 0.3s; backdrop-filter: blur(12px); }
 .advantage-card:hover { transform: translateY(-4px); border-color: rgba(0,200,120,0.3); }
@@ -941,15 +941,13 @@ img { display: block; max-width: 100%; }
 .report-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); text-align: center; gap: 16px; }
 .report-generate-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
 
-/* ===== Satellite Map Background ===== */
+/* ===== Satellite Map Background (hero-contained) ===== */
 .satellite-map-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  position: absolute;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 .satellite-map-container {
   width: 100%;
@@ -971,53 +969,17 @@ img { display: block; max-width: 100%; }
     radial-gradient(ellipse 50% 40% at 48% 42%, rgba(0,200,120,0.08) 0%, transparent 50%);
   pointer-events: none;
 }
-.satellite-map-bg.light-mode .satellite-map-container .leaflet-tile-pane {
-  filter: brightness(0.85) contrast(1.05) saturate(1.1);
-}
 .satellite-overlay-vignette {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 50%, transparent 30%, var(--vignette-color) 100%),
-    linear-gradient(180deg, var(--vignette-edge) 0%, transparent 20%, transparent 80%, var(--vignette-edge) 100%);
+    radial-gradient(ellipse 70% 50% at 50% 50%, transparent 30%, rgba(6,10,18,0.85) 100%),
+    linear-gradient(180deg, rgba(6,10,18,0.6) 0%, transparent 20%, transparent 80%, rgba(6,10,18,0.9) 100%);
   pointer-events: none;
 }
-.satellite-light-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(255,255,255,0.15);
-  pointer-events: none;
-}
-.app-shell {
-  position: relative;
-  z-index: 1;
-}
-.hero, .hero-bg {
-  background: transparent;
-}
-.hero-greece-img, .hero-greece-overlay {
-  display: none;
-}
-.hero-glow-1, .hero-glow-2 {
-  opacity: 0.6;
-}
-/* Light mode stat-cell handled by :root:not(.dark) overrides below */
-.stat-cell {
-  background: var(--section-bg);
-  backdrop-filter: blur(12px);
-  border-color: var(--card-border);
-}
-.stat-cell strong {
-  background: linear-gradient(135deg, #00c878, #0066cc);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.stat-cell span {
-  color: var(--card-text-muted);
-}
+/* Stat-cell uses CSS variables from :root */
 
-/* Journey section over satellite */
+/* Journey section */
 .greece-journey {
   background: transparent;
 }
@@ -1027,23 +989,6 @@ img { display: block; max-width: 100%; }
 .journey-content {
   position: relative;
   z-index: 2;
-}
-
-/* Dark surface for content sections */
-.section {
-  background: var(--section-bg);
-  backdrop-filter: blur(12px);
-}
-.advantages-section {
-  background: var(--section-bg);
-  backdrop-filter: blur(12px);
-}
-.gdpr-section {
-  background: var(--section-bg-solid) !important;
-  backdrop-filter: blur(12px);
-}
-.contact-section {
-  background: transparent;
 }
 
 /* ===== Leads Delete / Deleted Tab ===== */

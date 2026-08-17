@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Bot, Send, Sparkles, X } from 'lucide-react';
+import { Bot, Phone, Send, Sparkles, X, CheckCircle, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Message = {
@@ -7,102 +7,159 @@ type Message = {
   text: string;
 };
 
-type QuickReply = {
-  label: string;
-  keywords: string[];
-  response: string;
+type VisitorInfo = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  billAmount?: string;
+  currentProvider?: string;
+  needs?: string;
 };
 
-const quickReplies: QuickReply[] = [
-  {
-    label: 'Είναι δωρεάν;',
-    keywords: ['δωρεάν', 'δωρεαν', 'χρεωση', 'χρεώσεις', 'κοστος', 'κόστος', 'πληρωνω', 'πληρώνω', 'free'],
-    response: 'Ναι, η υπηρεσία μας είναι εντελώς δωρεάν, χωρίς κρυφές χρεώσεις. Αποζημιωνόμαστε από τους παρόχους, όχι από εσάς.',
-  },
-  {
-    label: 'Πώς γίνεται η αλλαγή;',
-    keywords: ['αλλαγη', 'αλλαγή', 'αλλάζω', 'αλλαζω', 'διαδικασια', 'διαδικασία', 'πώς', 'πως'],
-    response: 'Η διαδικασία είναι απλή: υπογράφεις Σύμβαση Προμήθειας με τον νέο πάροχο και καταθέτεις τα απαραίτητα δικαιολογητικά. Αναλαμβάνουμε εμείς όλη τη γραφειοκρατία.',
-  },
-  {
-    label: 'Πόσος χρόνος;',
-    keywords: ['χρονος', 'χρόνος', 'μερες', 'μέρες', 'ημερες', 'ημέρες', 'ποτε', 'πότε', 'γρηγορα', 'γρήγορα'],
-    response: 'Από την ημέρα που θα υπογράψεις τη σύμβαση απαιτούνται 7 εργάσιμες ημέρες για να ολοκληρωθεί η αλλαγή μέσω του ΔΕΔΔΗΕ.',
-  },
-  {
-    label: 'Μπορεί να διακοπεί το ρεύμα;',
-    keywords: ['διακοπη', 'διακοπή', 'διακοπεί', 'διακοπει', 'ρευμα', 'ρεύμα', 'απεργεια', 'απεργία'],
-    response: 'Όχι. Η αλλαγή παρόχου είναι καθαρά εμπορική/λογιστική μεταβολή. Η παροχή ρεύματος είναι εγγυημένη από τον ΔΕΔΔΗΕ.',
-  },
-  {
-    label: 'Ποιες υπηρεσίες;',
-    keywords: ['υπηρεσιες', 'υπηρεσίες', 'υπηρεσια', 'υπηρεσία', 'ρευμα', 'ρεύμα', 'αεριο', 'αέριο', 'φωτοβολταικα', 'φωτοβολταϊκά', 'ηλεκτροκινηση', 'ηλεκτροκίνηση', 'τι', 'τις'],
-    response: 'Προσφέρουμε: Ρεύμα, Φυσικό Αέριο, Φωτοβολταϊκά και Ηλεκτροκίνηση. Συγκρίνουμε πάροχους και βρίσκουμε την καλύτερη λύση για τις ανάγκες σου.',
-  },
-  {
-    label: 'Που λειτουργείτε;',
-    keywords: ['που', 'πού', 'περιοχη', 'περιοχή', 'ελλαδα', 'ελλάδα', 'αθηνα', 'αθήνα', 'θεσσαλονικη', 'θεσσαλονίκη', 'νησια', 'νησιά', 'κρητη', 'κρήτη'],
-    response: 'Εξυπηρετούμε όλη την Ελλάδα — από την Αθήνα και τη Θεσσαλονίκη μέχρι τα νησιά και την Κρήτη. Έχουμε προσωπικό σύμβουλο για κάθε περιοχή.',
-  },
-  {
-    label: 'Θέλω να με καλέσετε',
-    keywords: ['καλεστε', 'καλέστε', 'καλει', 'καλεί', 'επικοινωνια', 'επικοινωνία', 'τηλεφωνο', 'τηλέφωνο', 'επικοινωνησετε', 'επικοινωνήσετε'],
-    response: 'Τέλεια! Συμπληρώσε τη φόρμα επικοινωνίας στο τέλος της σελίδας και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει μαζί σου άμεσα. Μπορείς επίσης να καλέσεις στο +30 210 22 55 000.',
-  },
+const initialMessages: Message[] = [
+  { role: 'bot', text: 'Γεια σου! Είμαι ο Αλέξης, σύμβουλος ενέργειας της Hlektrismos.gr. Πώς μπορώ να σε βοηθήσω σήμερα;' },
 ];
 
-const defaultResponse = 'Δεν είμαι σίγουρος για αυτό. Μπορείς να μου κάνεις μια πιο συγκεκριμένη ερώτηση, ή να συμπληρώσεις τη φόρμα επικοινωνίας στο τέλος της σελίδας και ένας σύμβουλος θα σε καλέσει άμεσα!';
-
-function findResponse(input: string): string {
-  const lower = input.toLowerCase();
-  let bestMatch: QuickReply | null = null;
-  let bestScore = 0;
-  for (const qr of quickReplies) {
-    let score = 0;
-    for (const kw of qr.keywords) {
-      if (lower.includes(kw)) score++;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = qr;
-    }
-  }
-  return bestMatch ? bestMatch.response : defaultResponse;
-}
+const quickStarters = [
+  { label: 'Ρεύμα', icon: '⚡' },
+  { label: 'Αέριο', icon: '🔥' },
+  { label: 'Φωτοβολταϊκά', icon: '☀️' },
+  { label: 'Ζητώ κλήση', icon: '📞' },
+];
 
 export default function ChatBot() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', text: 'Γεια σου! Είμαι ο Hlektrismos.gr Assistant. Πώς μπορώ να σε βοηθήσω με τις ενεργειακές σου ανάγκες;' },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  const [visitorInfo, setVisitorInfo] = useState<VisitorInfo>({});
+  const [callbackMode, setCallbackMode] = useState(false);
+  const [callbackStep, setCallbackStep] = useState<'idle' | 'name' | 'phone' | 'email' | 'confirm' | 'done'>('idle');
+  const [callbackDraft, setCallbackDraft] = useState<VisitorInfo>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, typing]);
+  }, [messages, typing, callbackMode, callbackStep]);
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim()) return;
-    const newMessages = [...messages, { role: 'user' as const, text }];
-    setMessages(newMessages);
-    setInput('');
+  const sendToAI = async (text: string) => {
     setTyping(true);
-
     try {
       const { data, error } = await supabase.functions.invoke('chat', {
-        body: { messages: newMessages.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text })) },
+        body: { 
+          messages: [...messages, { role: 'user', text }].map(m => ({ 
+            role: m.role === 'bot' ? 'assistant' : 'user', 
+            content: m.text 
+          })),
+          visitorInfo,
+        },
       });
 
       setTyping(false);
       if (error) throw error;
       setMessages((prev) => [...prev, { role: 'bot', text: data.reply || 'Δεν μπόρεσα να απαντήσω αυτή τη στιγμή.' }]);
-    } catch (err) {
+    } catch {
       setTyping(false);
-      setMessages((prev) => [...prev, { role: 'bot', text: 'Υπήρξε ένα σφάλμα στο δίκτυο. Προσπαθήστε ξανά ή χρησιμοποιήστε τη φόρμα επικοινωνίας.' }]);
+      setMessages((prev) => [...prev, { role: 'bot', text: 'Υπήρξε σφάλμα. Προσπάθησε ξανά ή κάλεσε στο +30 210 22 55 000.' }]);
+    }
+  };
+
+  const handleCallbackFlow = async (text: string) => {
+    switch (callbackStep) {
+      case 'name':
+        setCallbackDraft(prev => ({ ...prev, name: text }));
+        setCallbackStep('phone');
+        setMessages(prev => [...prev, 
+          { role: 'user', text },
+          { role: 'bot', text: `Ευχαριστώ, ${text}! Ποιος είναι ο αριθμός τηλεφώνου σου;` }
+        ]);
+        break;
+      case 'phone':
+        setCallbackDraft(prev => ({ ...prev, phone: text }));
+        setCallbackStep('email');
+        setMessages(prev => [...prev, 
+          { role: 'user', text },
+          { role: 'bot', text: 'Τέλεια. Ένα email για επικοινωνία;' }
+        ]);
+        break;
+      case 'email':
+        setCallbackDraft(prev => ({ ...prev, email: text }));
+        setCallbackStep('confirm');
+        setMessages(prev => [...prev, 
+          { role: 'user', text },
+          { role: 'bot', text: 'Έτσι θα σε καλέσουμε:\n📞 ' + callbackDraft.phone + '\n👤 ' + callbackDraft.name + '\n📧 ' + text + '\n\n Θέλεις να συνεχίσουμε;' }
+        ]);
+        break;
+      case 'confirm':
+        if (text.toLowerCase().includes('ναι') || text.toLowerCase().includes('ok') || text.toLowerCase().includes('συμφωνώ')) {
+          setCallbackStep('done');
+          try {
+            const { data, error } = await supabase.functions.invoke('chat', {
+              body: { 
+                messages: [{ role: 'user', content: 'Ηλεκτρονικό μήνυμα' }],
+                visitorInfo: callbackDraft,
+                callbackRequest: callbackDraft,
+              },
+            });
+            setTyping(false);
+            const reply = data?.reply || 'Τέλεια! Θα σε καλέσουμε σύντομα.';
+            setMessages(prev => [...prev, 
+              { role: 'user', text: 'Ναι, συμφωνώ' },
+              { role: 'bot', text: reply }
+            ]);
+          } catch {
+            setMessages(prev => [...prev, 
+              { role: 'user', text: 'Ναι, συμφωνώ' },
+              { role: 'bot', text: 'Τέλεια! Ένας σύμβουλός μας θα σε καλέσει στο ' + callbackDraft.phone + ' το συντομότερο. Ευχαριστούμε!' }
+            ]);
+          }
+          setCallbackMode(false);
+          setVisitorInfo(prev => ({ ...prev, ...callbackDraft }));
+        } else {
+          setCallbackStep('idle');
+          setCallbackMode(false);
+          setMessages(prev => [...prev, 
+            { role: 'user', text },
+            { role: 'bot', text: 'Εντάξει, αν αλλάξεις γνώμη, απλά πες "Ζητώ κλήση" και θα σε βοηθήσω.' }
+          ]);
+        }
+        break;
+    }
+  };
+
+  const handleQuickReply = async (label: string) => {
+    if (label === 'Ζητώ κλήση') {
+      setCallbackMode(true);
+      setCallbackStep('name');
+      setMessages(prev => [...prev, 
+        { role: 'user', text: 'Ζητώ κλήση' },
+        { role: 'bot', text: 'Τέλεια! Ένας εξειδικευμένος σύμβουλος θα σε καλέσει. Πώς σε λένε;' }
+      ]);
+      return;
+    }
+    const fullText = `Ζητώ πληροφορίες για: ${label}`;
+    setMessages(prev => [...prev, { role: 'user', text: fullText }]);
+    await sendToAI(fullText);
+  };
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim()) return;
+    
+    // Auto-detect visitor info from messages
+    const phoneMatch = text.match(/(\d{10})/);
+    const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
+    if (phoneMatch) setVisitorInfo(prev => ({ ...prev, phone: phoneMatch[1] }));
+    if (emailMatch) setVisitorInfo(prev => ({ ...prev, email: emailMatch[0] }));
+
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    setInput('');
+
+    if (callbackMode && callbackStep !== 'idle' && callbackStep !== 'done') {
+      await handleCallbackFlow(text);
+    } else {
+      await sendToAI(text);
     }
   };
 
@@ -126,8 +183,8 @@ export default function ChatBot() {
             <div className="chatbot-header-info">
               <div className="chatbot-avatar"><Sparkles size={18} /></div>
               <div>
-                <strong>Hlektrismos.gr Assistant</strong>
-                <span className="chatbot-status"><span className="chatbot-status-dot" /> Online</span>
+                <strong>Αλέξης — Hlektrismos.gr</strong>
+                <span className="chatbot-status"><span className="chatbot-status-dot" /> Online · Ζωντανός Υπάλληλος</span>
               </div>
             </div>
             <button className="chatbot-close" onClick={() => setOpen(false)} aria-label="Κλείσιμο"><X size={20} /></button>
@@ -148,11 +205,28 @@ export default function ChatBot() {
             )}
           </div>
 
-          {messages.length <= 2 && (
+          {messages.length <= 2 && !callbackMode && (
             <div className="chatbot-quick-replies">
-              {quickReplies.slice(0, 4).map((qr) => (
-                <button key={qr.label} className="chatbot-quick-btn" onClick={() => sendMessage(qr.label)}>{qr.label}</button>
+              {quickStarters.map((qr) => (
+                <button key={qr.label} className="chatbot-quick-btn" onClick={() => handleQuickReply(qr.label)}>
+                  <span>{qr.icon}</span> {qr.label}
+                </button>
               ))}
+            </div>
+          )}
+
+          {callbackMode && callbackStep === 'idle' && (
+            <div className="chatbot-quick-replies">
+              <button className="chatbot-quick-btn callback-btn" onClick={() => { setCallbackStep('name'); setMessages(prev => [...prev, { role: 'bot', text: 'Πώς σε λένε;' }]); }}>
+                <Phone size={14} /> Ξεκινήστε
+              </button>
+            </div>
+          )}
+
+          {callbackStep === 'done' && (
+            <div className="chatbot-callback-done">
+              <CheckCircle size={24} />
+              <span>Κλήση Ζητήθηκε!</span>
             </div>
           )}
 
@@ -161,7 +235,14 @@ export default function ChatBot() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Γράψε την ερώτησή σου..."
+              placeholder={
+                callbackMode 
+                  ? callbackStep === 'name' ? 'Το όνομά σου...' 
+                  : callbackStep === 'phone' ? 'Το τηλέφωνό σου...' 
+                  : callbackStep === 'email' ? 'Το email σου...'
+                  : 'Πληκτρολογήστε...'
+                : 'Γράψε την ερώτησή σου...'
+              }
               autoFocus
             />
             <button type="submit" className="chatbot-send" aria-label="Αποστολή"><Send size={18} /></button>
@@ -171,4 +252,3 @@ export default function ChatBot() {
     </>
   );
 }
-

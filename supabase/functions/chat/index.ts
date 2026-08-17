@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apiapi, content-type',
 }
 
 serve(async (req: any) => {
@@ -12,32 +12,87 @@ serve(async (req: any) => {
   }
 
   try {
-    const { messages } = await req.json()
+    const { messages, visitorInfo, callbackRequest } = await req.json()
 
-    // Create a Supabase client to fetch tariffs
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    // Fetch the tariffs from the database for RAG Context
-    const { data: tariffs, error } = await supabaseClient
+    // Fetch tariffs for RAG context
+    const { data: tariffs } = await supabaseClient
       .from('market_tariffs')
       .select('*')
     
-    if (error) throw error;
-
     const tariffLines = tariffs?.map((t: any) => `- ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n') || '';
-    
-    const systemPrompt = `Είσαι ο Hlektrismos.gr Assistant, ένας έξυπνος βοηθός για εξοικονόμηση ενέργειας.
-    
-Ο ρόλος σου είναι να βοηθάς τους χρήστες να βρουν τα καλύτερα προγράμματα ρεύματος, φυσικού αερίου και φωτοβολταϊκών.
-Να είσαι ευγενικός, συνοπτικός και επαγγελματίας.
 
-Εδώ είναι τα σημερινά διαθέσιμα τιμολόγια (RAG Data):
+    // Handle callback request — store as lead
+    if (callbackRequest) {
+      const { name, phone, email, message, billAmount, currentProvider, consumption } = callbackRequest;
+      
+      const { error: insertError } = await supabaseClient
+        .from('hlektrismos_leads')
+        .insert({
+          first_name: name?.split(' ')[0] || '',
+          last_name: name?.split(' ').slice(1).join(' ') || '',
+          phone: phone || '',
+          email: email || '',
+          customer_type: 'individual',
+          region: 'Αττική',
+          status: 'new',
+          consent: true,
+          lawful_basis: 'consent',
+          customer_category: 'b2c',
+          property_type: 'apartment',
+          comments: message || `Κλήση από chatbot. Τρέχονς λογαριασμός: ${billAmount || 'Δεν δόθηκε'}€. Πάροχος: ${currentProvider || 'Δεν δόθηκε'}. Κατανάλωση: ${consumption || 'Δεν δόθηκε'} kWh.`,
+        })
+
+      if (insertError) throw insertError;
+
+      return new Response(JSON.stringify({ 
+        reply: `Ευχαριστούμε, ${name || 'φίλε μου'}! Ένας εξειδικευμένος σύμβουλός μας θα σε καλέσει στο ${phone} το συντομότερο δυνατό. Συνήθως επικοινωνούμε εντός 1-2 ωρών στις εργάσιμες. Αν έχεις άλλες ερωτήσεις, είμαι εδώ!`,
+        callbackConfirmed: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    const visitorContext = visitorInfo 
+      ? `\n\nΠληροφορίες επισκέπτη που έχεις συλλέξει ήδη:\n${JSON.stringify(visitorInfo, null, 2)}`
+      : '';
+
+    const systemPrompt = `Είσαι ο Αλέξης, ένας ζωντανός υπάλληλος υποστήριξης πελατών της Hlektrismos.gr. Μιλάς Ελληνικά.
+Προσωπικότητα: Είσαι φιλικός, επαγγελματίας, και ενεργός. Μιλάς σαν πραγματικός άνθρωπος, όχι ρομπότ. Χρησιμοποιείς φυσική γλώσσα.
+
+ΣΚΟΠΟΣ ΣΟΥ (σειρά προτεραιοτήτων):
+1. Καλωσόρισμα του επισκέπτη με ζεστό τρόπο.
+2. Μάθε το όνομά του.
+3. Μάθε τι χρειάζεται (ρεύμα, αέριο, φωτοβολταϊκά, ηλεκτροκίνηση).
+4. Μάθε τον τρέχοντα λογαριασμό του (πόσο πληρώνει το μήνα) και τον πάροχό του.
+5. Αν έχει λογαριασμό ρεύματος, ρώτα: "Πόσο πληρώνεις κάθε μήνα για ρεύμα;" και "Ποιος είναι ο πάροχός σου;"
+6. Πρότεινε τη δωρεάν εξοικονόμηση και ζήτα callback από εξειδικευμένο σύμβουλο.
+7. Ζήτα: όνομα, τηλέφωνο, email.
+
+ΡΟΗ ΣΥΝΟΜΙΛΙΑΣ:
+- Αν ο χρήστης σου δώσει πληροφορίες (π.χ. "πληρώνω 150€"), αποδέξου τις και συνέχισε.
+- Αν σου δώσει το τηλέφωνό του, ζήτα και email.
+- Αν σου δώσει όλα τα στοιχεία, ενημέρωσέ τον ότι θα τον καλέσουμε.
+- Αν ρωτάει για τιμές, χρησιμοποίησε τα τιμολόγια παρακάτω.
+- Μην είσαι υπερβολικά μακρύς. Κράτα τις απαντήσεις σε 2-3 προτάσεις.
+- Αν δεν καταλαβαίνεις κάτι, ζήτα επεξήγηση φιλικά.
+- ΠΟΤΕ μην πεις ότι είσαι AI ή chatbot. Είσαι "Αλέξης, σύμβουλος ενέργειας".
+
+ΤΙΜΟΛΟΓΙΑ (RAG Data):
 ${tariffLines}
 
-Χρησιμοποίησε αυτές τις τιμές για να απαντήσεις αν σε ρωτήσουν για τιμές ρεύματος ή φυσικού αερίου. Εάν δεν ρωτήσουν για κάτι συγκεκριμένο, υπενθύμισε τους ότι μπορούν να συμπληρώσουν τη φόρμα επικοινωνίας στο τέλος της σελίδας για μια εξειδικευμένη δωρεάν προσφορά.`;
+${visitorContext}
+
+ΑΠΑΝΤΗΣΕΙΣ:
+- Αν σε ρωτήσουν για τιμές, δώσε συγκεκριμένα τιμολόγια.
+- Αν σε ρωτήσουν για διαδικασία, εξήγησε ότι υπογράφεις σύμβαση προμήθειας και τα υπόλοιπα τα διαχειριζόμαστε εμείς.
+- Αν θέλουν callback, ζήτα στοιχεία επικοινωνίας (όνομα, τηλέφωνο, email) και υπόσχεσαι κλήση.
+- Αν ρωτήσουν αν είσαι bot, απάντησε "Είμαι ο Αλέξης, σύμβουλος ενέργειας της Hlektrismos.gr".`;
 
     const geminiMessages = messages.map((m: any) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
@@ -56,6 +111,10 @@ ${tariffLines}
           parts: { text: systemPrompt }
         },
         contents: geminiMessages,
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 300,
+        }
       }),
     })
 

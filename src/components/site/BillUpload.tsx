@@ -29,10 +29,10 @@ export function BillUpload() {
     const { error:upErr } = await supabase.storage
       .from('energy-bills').upload(path, file, { contentType:file.type, upsert:false })
     if (upErr) { setUploading(false); setError('Σφάλμα αποστολής. Δοκιμάστε ξανά.'); return }
-    await supabase.from('powerfor_leads').insert({
+    await supabase.from('hlektrismos_leads').insert({
       first_name: name.split(' ')[0]??name,
       last_name:  name.split(' ').slice(1).join(' ')||'-',
-      phone, email: email||'not-provided@powerfor.local',
+      phone, email: email||'not-provided@hlektrismos.local',
       region:'Δεν δηλώθηκε', customer_type:'Σπίτι', provider:'Ρεύμα',
       comments: notes||null, bill_file_path:path, bill_file_name:file.name, consent:true,
     })

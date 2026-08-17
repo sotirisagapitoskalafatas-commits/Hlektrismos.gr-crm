@@ -9,10 +9,10 @@ export default function Footer() {
           <div className="footer-brand">
             <Link to="/" className="brand">
               <span className="brand-mark"><Zap size={18} fill="currentColor" /></span>
-              <span>Power<span>For</span></span>
+              <span>Hlektrismos<span>.gr</span></span>
             </Link>
             <div className="footer-logo-wrap">
-              <img src="/images/image.png" alt="PowerFor" className="footer-logo" />
+              <img src="/images/image.png" alt="Hlektrismos.gr" className="footer-logo" />
             </div>
             <p>Ο προσωπικός σου σύμβουλος ενέργειας. Συγκρίνουμε πάροχους και βρίσκουμε την καλύτερη λύση — δωρεάν.</p>
           </div>
@@ -33,13 +33,13 @@ export default function Footer() {
           <div className="footer-col">
             <h4>Επικοινωνία</h4>
             <a href="tel:+302102255000">+30 210 22 55 000</a>
-            <a href="mailto:info@powerfor.gr">info@powerfor.gr</a>
+            <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
             <span>Ζαλοκώστα 8, Αθήνα 10671</span>
             <span>Δευ – Παρ · 09:00 – 18:00</span>
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 PowerFor. Με επιφύλαξη παντών δικαιωμάτων.</span>
+          <span>© 2026 Hlektrismos.gr. Με επιφύλαξη παντών δικαιωμάτων.</span>
           <span>Πολιτική Απορρήτου · Όροι Χρήσης · GDPR</span>
         </div>
       </div>

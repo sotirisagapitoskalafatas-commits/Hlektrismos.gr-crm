@@ -53,8 +53,10 @@ async function seedAgents() {
         replies: 87,
         meetings_booked: 23,
         target_region: 'Αττική',
-        base_prompt: 'Γράψε ένα επαγγελματικό email παρουσιάζοντας την PowerFor και ζητώντας ένα σύντομο ραντεβού.',
-        handoff_condition: 'Pricing Requested'
+        base_prompt: 'Γράψε ένα επαγγελματικό email παρουσιάζοντας την Hlektrismos.gr και ζητώντας ένα σύντομο ραντεβού.',
+        handoff_condition: 'Pricing Requested',
+        skills: ['email_outreach', 'appointment_setting', 'pricing_comparison'],
+        personality: 'Επαγγελματικός, αξιόπιστος, λεπτομερής'
       },
       {
         user_id: demoUserId,
@@ -66,7 +68,9 @@ async function seedAgents() {
         meetings_booked: 15,
         target_region: 'Θεσσαλονίκη',
         base_prompt: 'Γράψε ένα πολύ σύντομο και φιλικό SMS (κάτω από 160 χαρακτήρες) για προσφορά ρεύματος.',
-        handoff_condition: 'Interest Confirmed'
+        handoff_condition: 'Interest Confirmed',
+        skills: ['sms_outreach', 'quick_engagement'],
+        personality: 'Σύντομος, φιλικός, αποτελεσματικός'
       },
       {
         user_id: demoUserId,
@@ -78,7 +82,9 @@ async function seedAgents() {
         meetings_booked: 8,
         target_region: 'Νησιά Αιγαίου',
         base_prompt: 'Μίλα σαν να κάνεις τηλεφωνική κλήση. Ρώτησε αν ενδιαφέρονται για φωτοβολταϊκά.',
-        handoff_condition: 'Interest Confirmed'
+        handoff_condition: 'Interest Confirmed',
+        skills: ['voice_calls', 'solar_expertise', 'island_market'],
+        personality: 'Θερμός, περιστασιακός, εξειδικευμένος'
       },
       {
         user_id: demoUserId,
@@ -90,7 +96,9 @@ async function seedAgents() {
         meetings_booked: 41,
         target_region: 'Αττική',
         base_prompt: 'Γράψε ένα αυστηρά επαγγελματικό B2B email για εταιρικό τιμολόγιο.',
-        handoff_condition: 'Pricing Requested'
+        handoff_condition: 'Pricing Requested',
+        skills: ['b2b_outreach', 'corporate_pricing', 'roi_analysis'],
+        personality: 'Επαγγελματικός, αναλυτικός, αξιόπιστος'
       }
     ];
 

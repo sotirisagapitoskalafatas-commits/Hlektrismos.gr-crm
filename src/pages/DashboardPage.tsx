@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Activity,
   Bot,
   ChevronDown,
   Database,
+  FileText,
   Filter,
   LayoutDashboard,
   LogOut,
@@ -14,6 +15,8 @@ import {
   Radar,
   Search,
   Settings,
+  Send,
+  Sparkles,
   TrendingUp,
   Users,
   X,
@@ -73,7 +76,7 @@ type Tariff = {
   updated_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports';
 
 const greekRegions = [
   'Αττική', 'Θεσσαλονίκη', 'Κεντρική Μακεδονία', 'Δυτική Μακεδονία',
@@ -118,6 +121,22 @@ export default function DashboardPage() {
 
   const [runningAgents, setRunningAgents] = useState(false);
 
+  // Agent Hub state
+  const [hubMessages, setHubMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([
+    { role: 'assistant', text: 'Γεια σου! Είμαι ο Master Orchestrator της Hlektrismos.gr. Πώς μπορώ να σε βοηθήσω με τα AI agents;' },
+  ]);
+  const [hubInput, setHubInput] = useState('');
+  const [hubLoading, setHubLoading] = useState(false);
+  const [hubContextId, setHubContextId] = useState<string | null>(null);
+  const [hubSelectedAgent, setHubSelectedAgent] = useState<string>('');
+  const hubEndRef = useRef<HTMLDivElement>(null);
+
+  // Reports state
+  const [reports, setReports] = useState<any[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -132,7 +151,7 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true);
     const [leadsRes, agentsRes, sourcesRes, tariffsRes] = await Promise.all([
-      supabase.from('powerfor_leads').select('*').order('created_at', { ascending: false }),
+      supabase.from('hlektrismos_leads').select('*').order('created_at', { ascending: false }),
       supabase.from('ai_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_sources').select('*').order('created_at', { ascending: false }),
       supabase.from('market_tariffs').select('*').order('resource', { ascending: true }),
@@ -189,12 +208,12 @@ export default function DashboardPage() {
   };
 
   const updateLeadStatus = async (lead: Lead, status: string) => {
-    await supabase.from('powerfor_leads').update({ status, pipeline_status: status }).eq('id', lead.id);
+    await supabase.from('hlektrismos_leads').update({ status, pipeline_status: status }).eq('id', lead.id);
     loadData();
   };
 
   const updateLeadGdpr = async (lead: Lead, field: 'lawful_basis' | 'customer_category', value: string) => {
-    await supabase.from('powerfor_leads').update({ [field]: value }).eq('id', lead.id);
+    await supabase.from('hlektrismos_leads').update({ [field]: value }).eq('id', lead.id);
     loadData();
   };
 
@@ -249,6 +268,8 @@ export default function DashboardPage() {
     leads: 'Leads',
     sources: 'Πηγές Leads',
     market: 'Market RAG',
+    hub: 'Agent Hub',
+    reports: 'Reports',
   };
 
   return (
@@ -264,6 +285,8 @@ export default function DashboardPage() {
           <button className={tab === 'leads' ? 'active' : ''} onClick={() => setTab('leads')}><Users size={18} /> Leads</button>
           <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={18} /> Πηγές Leads</button>
           <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}><Globe size={18} /> Market RAG</button>
+          <button className={tab === 'hub' ? 'active' : ''} onClick={() => setTab('hub')}><Sparkles size={18} /> Agent Hub</button>
+          <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}><FileText size={18} /> Reports</button>
         </nav>
         <div className="dash-sidebar-footer">
           <div className="dash-user">
@@ -543,6 +566,41 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+
+            {tab === 'hub' && (
+              <AgentHubTab 
+                agents={agents}
+                messages={hubMessages}
+                setMessages={setHubMessages}
+                input={hubInput}
+                setInput={setHubInput}
+                loading={hubLoading}
+                setLoading={setHubLoading}
+                contextId={hubContextId}
+                setContextId={setHubContextId}
+                selectedAgent={hubSelectedAgent}
+                setSelectedAgent={setHubSelectedAgent}
+                endRef={hubEndRef}
+                toast={toast}
+                setToast={setToast}
+              />
+            )}
+
+            {tab === 'reports' && (
+              <ReportsTab
+                agents={agents}
+                reports={reports}
+                setReports={setReports}
+                loading={reportsLoading}
+                setLoading={setReportsLoading}
+                selectedReport={selectedReport}
+                setSelectedReport={setSelectedReport}
+                generating={generatingReport}
+                setGenerating={setGeneratingReport}
+                toast={toast}
+                setToast={setToast}
+              />
+            )}
           </>
         )}
       </div>
@@ -617,6 +675,214 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
         <div className="drawer-footer">
           <button className="btn btn-ghost" onClick={onClose}>Άκυρο</button>
           <button className="btn btn-primary" onClick={handleSave}><CheckCircle2 size={16} /> Αποθήκευση</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentHubTab({ agents, messages, setMessages, input, setInput, loading, setLoading, contextId, setContextId, selectedAgent, setSelectedAgent, endRef, toast, setToast }: {
+  agents: Agent[];
+  messages: { role: 'user' | 'assistant'; text: string }[];
+  setMessages: React.Dispatch<React.SetStateAction<{ role: 'user' | 'assistant'; text: string }[]>>;
+  input: string;
+  setInput: (v: string) => void;
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  contextId: string | null;
+  setContextId: (v: string | null) => void;
+  selectedAgent: string;
+  setSelectedAgent: (v: string) => void;
+  endRef: React.RefObject<HTMLDivElement>;
+  toast: { msg: string; type: 'success' | 'info' } | null;
+  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+}) {
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', text: userMsg }]);
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('orchestrator', {
+        body: {
+          message: userMsg,
+          agent_id: selectedAgent || undefined,
+          context_id: contextId || undefined,
+          mode: 'chat',
+        },
+      });
+
+      if (error) throw error;
+      setMessages((prev) => [...prev, { role: 'assistant', text: data.reply }]);
+      if (data.context_id) setContextId(data.context_id);
+    } catch (e: any) {
+      setMessages((prev) => [...prev, { role: 'assistant', text: 'Σφάλμα: ' + (e.message || 'Άγνωστο σφάλμα') }]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="dash-content hub-tab">
+      <div className="dash-content-header">
+        <p>Επικοινώνησε με τον Master Orchestrator ή με συγκεκριμένα AI agents. Κάθε μήνυμα αποθηκεύεται στη μνήμη του agent.</p>
+        <div className="hub-agent-selector">
+          <label>Agent:</label>
+          <select value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)}>
+            <option value="">Master Orchestrator</option>
+            {agents.filter(a => a.status === 'active').map((a) => (
+              <option key={a.id} value={a.id}>{a.name} ({a.channel})</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="hub-chat-container">
+        <div className="hub-messages">
+          {messages.map((m, i) => (
+            <div key={i} className={`hub-message ${m.role}`}>
+              <div className="hub-message-avatar">
+                {m.role === 'assistant' ? <Bot size={18} /> : <Users size={18} />}
+              </div>
+              <div className="hub-message-content">
+                <div className="hub-message-text">{m.text}</div>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="hub-message assistant">
+              <div className="hub-message-avatar"><Bot size={18} /></div>
+              <div className="hub-message-content">
+                <div className="hub-message-text hub-typing">Σκέφτομαι<span className="dot-anim">...</span></div>
+              </div>
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
+
+        <div className="hub-input-bar">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Γράψε ένα μήνυμα στον Orchestrator..."
+            disabled={loading}
+          />
+          <button className="btn btn-primary" onClick={sendMessage} disabled={loading || !input.trim()}>
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportsTab({ agents, reports, setReports, loading, setLoading, selectedReport, setSelectedReport, generating, setGenerating, toast, setToast }: {
+  agents: Agent[];
+  reports: any[];
+  setReports: React.Dispatch<React.SetStateAction<any[]>>;
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  selectedReport: any;
+  setSelectedReport: (v: any) => void;
+  generating: boolean;
+  setGenerating: (v: boolean) => void;
+  toast: { msg: string; type: 'success' | 'info' } | null;
+  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+}) {
+  const loadReports = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('agent_reports').select('*').order('created_at', { ascending: false }).limit(50);
+    if (data) setReports(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadReports(); }, []);
+
+  const generateReport = async (reportType: 'master' | 'on_demand', agentId?: string) => {
+    setGenerating(true);
+    setToast({ msg: 'Δημιουργία αναφοράς...', type: 'info' });
+    try {
+      const { data, error } = await supabase.functions.invoke('orchestrator', {
+        body: { mode: 'report', report_type: reportType, agent_id: agentId },
+      });
+      if (error) throw error;
+      setToast({ msg: 'Η αναφορά δημιουργήθηκε!', type: 'success' });
+      loadReports();
+      if (data.report) setSelectedReport({ content: data.report, title: reportType === 'master' ? 'Master Report' : `Agent Report`, metrics: data.metrics });
+    } catch (e: any) {
+      setToast({ msg: 'Σφάλμα: ' + e.message, type: 'info' });
+    }
+    setGenerating(false);
+  };
+
+  return (
+    <div className="dash-content reports-tab">
+      <div className="dash-content-header">
+        <p>Αναφορές απόδοσης AI agents και Master Orchestrator summary.</p>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn btn-secondary" onClick={loadReports} disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'spin' : ''} /> Ανανέωση
+          </button>
+          <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
+            <FileText size={16} /> Master Report
+          </button>
+        </div>
+      </div>
+
+      <div className="reports-layout">
+        <div className="reports-sidebar">
+          <h3>Αποθηκευμένες Αναφορές</h3>
+          {reports.map((r) => (
+            <div key={r.id} className={`report-item ${selectedReport?.id === r.id ? 'active' : ''}`} onClick={() => setSelectedReport(r)}>
+              <div className="report-item-icon"><FileText size={14} /></div>
+              <div>
+                <strong>{r.title}</strong>
+                <span>{new Date(r.created_at).toLocaleDateString('el-GR')} · {r.report_type}</span>
+              </div>
+            </div>
+          ))}
+          {reports.length === 0 && <p className="dash-empty">Δεν υπάρχουν αναφορές.</p>}
+        </div>
+
+        <div className="reports-main">
+          {selectedReport ? (
+            <div className="report-viewer">
+              <h2>{selectedReport.title}</h2>
+              <div className="report-meta">
+                <span>{new Date(selectedReport.created_at).toLocaleString('el-GR')}</span>
+                <span className="report-type-badge">{selectedReport.report_type}</span>
+              </div>
+              {selectedReport.metrics && (
+                <div className="report-metrics">
+                  <div><strong>{selectedReport.metrics.total_agents}</strong><span>Agents</span></div>
+                  <div><strong>{selectedReport.metrics.total_leads}</strong><span>Leads</span></div>
+                  <div><strong>{selectedReport.metrics.total_meetings}</strong><span>Ραντεβού</span></div>
+                </div>
+              )}
+              <div className="report-content">{selectedReport.content}</div>
+            </div>
+          ) : (
+            <div className="report-placeholder">
+              <FileText size={48} />
+              <p>Επιλέξτε μια αναφορά ή δημιουργήστε μια νέα.</p>
+              <div className="report-generate-grid">
+                <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
+                  <Sparkles size={16} /> Master Report (Όλοι οι Agents)
+                </button>
+                {agents.filter(a => a.status === 'active').map((a) => (
+                  <button key={a.id} className="btn btn-secondary" onClick={() => generateReport('on_demand', a.id)} disabled={generating}>
+                    <Bot size={16} /> {a.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

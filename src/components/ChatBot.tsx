@@ -126,7 +126,7 @@ export default function ChatBot() {
             <div className="chatbot-header-info">
               <div className="chatbot-avatar"><Sparkles size={18} /></div>
               <div>
-                <strong>PowerFor Assistant</strong>
+                <strong>Hlektrismos.gr Assistant</strong>
                 <span className="chatbot-status"><span className="chatbot-status-dot" /> Online</span>
               </div>
             </div>

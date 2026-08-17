@@ -44,9 +44,9 @@ export function LeadForm() {
         .from('energy-bills').upload(path, form.billFile, { contentType:form.billFile.type, upsert:false })
       if (upErr) { setSubmitting(false); setError('Σφάλμα κατά την αποστολή του αρχείου.'); return }
     }
-    const { error:dbErr } = await supabase.from('powerfor_leads').insert({
+    const { error:dbErr } = await supabase.from('hlektrismos_leads').insert({
       first_name:form.firstName, last_name:form.lastName,
-      phone:form.phone, email:form.email||'not-provided@powerfor.local',
+      phone:form.phone, email:form.email||'not-provided@hlektrismos.local',
       region:form.region||'Δεν δηλώθηκε', customer_type:form.propertyType,
       provider:form.service, comments:form.message||null,
       bill_file_path:path, bill_file_name:form.billFile?.name??null, consent:form.consent,

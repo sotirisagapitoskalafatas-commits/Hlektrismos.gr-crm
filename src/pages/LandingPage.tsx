@@ -21,6 +21,7 @@ import {
   Zap,
 } from 'lucide-react';
 import ChatBot from '@/components/ChatBot';
+import MapBackground from '@/components/MapBackground';
 import { supabase } from '@/lib/supabase';
 
 type LeadForm = {
@@ -46,6 +47,15 @@ const greekJourney = [
   { region: 'Νησιά Ιονίου', city: 'Κέρκυρα · Ζάκυνθος', title: 'Ενέργεια χωρίς σύνορα', text: 'Εξυπηρέτηση σε κάθε νησί, με προτάσεις που λαμβάνουν υπόψη εποχικότητα, τουρισμό και πραγματική χρήση.', x: 37, y: 45 },
   { region: 'Νησιά Αιγαίου', city: 'Κυκλάδες · Δωδεκάνησα', title: 'Έξυπνη ενέργεια στα νησιά', text: 'Προγράμματα ρεύματος, φωτοβολταϊκά και λύσεις ηλεκτροκίνησης για τις ανάγκες κάθε νησιωτικής κοινότητας.', x: 71, y: 52 },
   { region: 'Κρήτη', city: 'Ηράκλειο · Χανιά', title: 'Η πράσινη επόμενη μέρα', text: 'Σχεδιάζουμε το επόμενο βήμα με φωτοβολταϊκά, ενεργειακή αυτονομία και λύσεις για κατοικίες και τουριστικές μονάδες.', x: 63, y: 75 },
+];
+
+const mapStops = [
+  { lat: 37.9838, lng: 23.7275, zoom: 9, pitch: 45, bearing: -20 },
+  { lat: 39.6, lng: 22.4, zoom: 8.5, pitch: 50, bearing: 10 },
+  { lat: 40.6401, lng: 22.9444, zoom: 9, pitch: 40, bearing: -15 },
+  { lat: 39.6243, lng: 19.9217, zoom: 9.5, pitch: 55, bearing: 25 },
+  { lat: 37.4, lng: 25.4, zoom: 8.5, pitch: 45, bearing: -10 },
+  { lat: 35.2401, lng: 24.8093, zoom: 8.5, pitch: 50, bearing: 15 },
 ];
 
 const regions = [
@@ -200,11 +210,11 @@ export default function LandingPage() {
       }
     }
 
-    const { error } = await supabase.from('powerfor_leads').insert({
+    const { error } = await supabase.from('hlektrismos_leads').insert({
       first_name: form.firstName,
       last_name: form.lastName,
       phone: form.phone,
-      email: form.email || 'not-provided@powerfor.local',
+      email: form.email || 'not-provided@hlektrismos.local',
       region: form.region || 'Δεν δηλώθηκε',
       customer_type: form.propertyType,
       property_type: form.propertyType,
@@ -229,6 +239,7 @@ export default function LandingPage() {
 
   return (
     <div className="app-shell">
+      <MapBackground activeStopIndex={journeyIndex} stops={mapStops} />
       <div className="scroll-progress"><div className="scroll-progress-fill" style={{ width: `${scrollPct}%` }} /></div>
 
       <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
@@ -437,7 +448,7 @@ export default function LandingPage() {
                 <p>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
                 <div className="contact-points">
                   <div className="contact-point"><Phone size={18} /> +30 210 22 55 000</div>
-                  <div className="contact-point"><Mail size={18} /> info@powerfor.gr</div>
+                   <div className="contact-point"><Mail size={18} /> info@hlektrismos.gr</div>
                   <div className="contact-point"><Home size={18} /> Ζαλοκώστα 8, Αθήνα 10671</div>
                   <div className="contact-point"><Lock size={18} /> Χωρίς scraping. GDPR-first. Τα δεδομένα σου είναι ασφαλή.</div>
                 </div>
@@ -531,13 +542,13 @@ export default function LandingPage() {
             <div className="footer-col">
               <h4>Επικοινωνία</h4>
               <a href="tel:+302102255000">+30 210 22 55 000</a>
-              <a href="mailto:info@powerfor.gr">info@powerfor.gr</a>
+              <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
               <span>Ζαλοκώστα 8, Αθήνα 10671</span>
               <span>Δευ – Παρ · 09:00 – 18:00</span>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>© 2026 PowerFor. Με επιφύλαξη παντών δικαιωμάτων.</span>
+            <span>© 2026 Hlektrismos.gr. Με επιφύλαξη παντών δικαιωμάτων.</span>
             <span>Πολιτική Απορρήτου · Όροι Χρήσης · GDPR</span>
           </div>
         </div>

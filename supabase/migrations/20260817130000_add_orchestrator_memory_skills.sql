@@ -54,9 +54,12 @@ ALTER TABLE ai_agents
   ADD COLUMN IF NOT EXISTS handoff_condition text;
 
 -- Fix: Drop and recreate the select_all_agents policy to avoid conflicts
-DROP POLICY IF EXISTS "select_all_agents" ON ai_agents;
-CREATE POLICY "select_all_agents" ON ai_agents
-  FOR SELECT TO authenticated USING (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "select_all_agents" ON ai_agents;
+  CREATE POLICY "select_all_agents" ON ai_agents
+    FOR SELECT TO authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Agent memory: conversation history per agent
 CREATE TABLE IF NOT EXISTS agent_memory (

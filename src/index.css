@@ -1148,3 +1148,53 @@ img { display: block; max-width: 100%; }
 :root.dark .login-toggle { color: rgba(240,244,248,0.5); }
 :root.dark .login-back { color: rgba(240,244,248,0.4); }
 :root.dark .login-demo-hint { color: rgba(240,244,248,0.3); }
+
+/* ===== Light mode overrides for landing page ===== */
+:root:not(.dark) .section-heading h2 { color: #1a1a2e; }
+:root:not(.dark) .section-heading p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .service-card { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); backdrop-filter: blur(12px); }
+:root:not(.dark) .service-card:hover { background: #fff; border-color: rgba(0,200,120,0.3); }
+:root:not(.dark) .service-card h3 { color: #1a1a2e; }
+:root:not(.dark) .service-card p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .service-link { color: #0066cc; }
+:root:not(.dark) .faq-item { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
+:root:not(.dark) .faq-item:hover { border-color: rgba(0,0,0,0.15); }
+:root:not(.dark) .faq-item.open { background: #fff; border-color: rgba(0,200,120,0.4); }
+:root:not(.dark) .faq-q { color: #1a1a2e; }
+:root:not(.dark) .faq-chevron { color: rgba(26,26,46,0.4); }
+:root:not(.dark) .faq-a { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .contact-section { background: rgba(245,247,250,0.95); }
+:root:not(.dark) .contact-copy h2 { color: #1a1a2e; }
+:root:not(.dark) .contact-copy p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .contact-point { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .gdpr-section { background: rgba(245,247,250,0.9); border-top-color: rgba(0,0,0,0.06); border-bottom-color: rgba(0,0,0,0.06); }
+:root:not(.dark) .gdpr-inner h3 { color: #1a1a2e; }
+:root:not(.dark) .gdpr-inner p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .advantages-section { border-bottom-color: rgba(0,0,0,0.06); }
+:root:not(.dark) .advantage-card { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
+:root:not(.dark) .advantage-card:hover { border-color: rgba(0,200,120,0.3); }
+:root:not(.dark) .advantage-card h3 { color: #1a1a2e; }
+:root:not(.dark) .advantage-card p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .journey-stop h3 { color: #1a1a2e; }
+:root:not(.dark) .journey-stop p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .journey-stop strong { color: rgba(26,26,46,0.8); }
+:root:not(.dark) .journey-current-label { color: #1a1a2e; }
+:root:not(.dark) .stat-cell { background: rgba(255,255,255,0.8); }
+:root:not(.dark) .stat-cell span { color: rgba(26,26,46,0.5); }
+:root:not(.dark) .form-card { background: rgba(255,255,255,0.95); border-color: rgba(0,0,0,0.08); }
+:root:not(.dark) .form-card h3 { color: #1a1a2e; }
+:root:not(.dark) .form-card .form-sub { color: rgba(26,26,46,0.5); }
+:root:not(.dark) .form-field label { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .form-field input, :root:not(.dark) .form-field select, :root:not(.dark) .form-field textarea {
+  background: #fff; border-color: rgba(0,0,0,0.12); color: #1a1a2e;
+}
+:root:not(.dark) .form-field input:focus, :root:not(.dark) .form-field select:focus, :root:not(.dark) .form-field textarea:focus {
+  border-color: #0066cc;
+}
+:root:not(.dark) .consent-row label { color: rgba(26,26,46,0.5); }
+:root:not(.dark) .success-state h3 { color: #1a1a2e; }
+:root:not(.dark) .success-state p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .site-footer { background: rgba(245,247,250,0.95); border-top-color: rgba(0,0,0,0.06); }
+:root:not(.dark) .footer-brand p { color: rgba(26,26,46,0.4); }
+:root:not(.dark) .theme-toggle { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #1a1a2e; }
+:root:not(.dark) .theme-toggle:hover { background: rgba(0,0,0,0.1); }

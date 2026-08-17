@@ -29,7 +29,7 @@ serve(async (req: any) => {
 
     const tariffLines = tariffs?.map((t: any) => `- ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n') || '';
     
-    const systemPrompt = `Είσαι ο PowerFor Assistant, ένας έξυπνος βοηθός για εξοικονόμηση ενέργειας.
+    const systemPrompt = `Είσαι ο Hlektrismos.gr Assistant, ένας έξυπνος βοηθός για εξοικονόμηση ενέργειας.
     
 Ο ρόλος σου είναι να βοηθάς τους χρήστες να βρουν τα καλύτερα προγράμματα ρεύματος, φυσικού αερίου και φωτοβολταϊκών.
 Να είσαι ευγενικός, συνοπτικός και επαγγελματίας.

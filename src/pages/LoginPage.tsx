@@ -57,7 +57,7 @@ export default function LoginPage() {
         <div className="login-card">
           <h1>{mode === 'login' ? 'Σύνδεση Dashboard' : 'Δημιουργία Λογαριασμού'}</h1>
           <p className="login-sub">
-            {mode === 'login' ? 'Συνδεθείτε για να διαχειριστείτε τα AI agents και τα leads.' : 'Δημιουργήστε λογαριασμό για να ξεκινήσετε με το PowerFor.'}
+            {mode === 'login' ? 'Συνδεθείτε για να διαχειριστείτε τα AI agents και τα leads.' : 'Δημιουργήστε λογαριασμό για να ξεκινήσετε με το Hlektrismos.gr.'}
           </p>
           <form onSubmit={handleSubmit}>
             <div className="login-field">

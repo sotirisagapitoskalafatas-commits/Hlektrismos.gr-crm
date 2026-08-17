@@ -73,7 +73,7 @@ function findResponse(input: string): string {
 export default function ChatBot() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', text: 'Γεια σου! Είμαι ο PowerFor Assistant. Πώς μπορώ να σε βοηθήσω με τις ενεργειακές σου ανάγκες;' },
+    { role: 'bot', text: 'Γεια σου! Είμαι ο Hlektrismos.gr Assistant. Πώς μπορώ να σε βοηθήσω με τις ενεργειακές σου ανάγκες;' },
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);

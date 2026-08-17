@@ -21,7 +21,7 @@ serve(async (req: any) => {
 
     // 1. Fetch new leads that haven't been contacted yet
     const { data: leads, error: leadsError } = await supabaseAdmin
-      .from('powerfor_leads')
+      .from('hlektrismos_leads')
       .select('*')
       .eq('status', 'new')
       .limit(10); // Process in batches of 10
@@ -59,7 +59,7 @@ serve(async (req: any) => {
       let agent = agents.find(a => a.target_region === lead.region);
       if (!agent) agent = agents[0]; // Fallback to the first active agent
 
-      const systemPrompt = `Είσαι ο ${agent.name}, ένας εξειδικευμένος σύμβουλος της PowerFor.
+      const systemPrompt = `Είσαι ο ${agent.name}, ένας εξειδικευμένος σύμβουλος της Hlektrismos.gr.
 Κανάλι Επικοινωνίας: ${agent.channel} (Γράψε το μήνυμα ώστε να ταιριάζει σε ${agent.channel}).
 Οδηγίες: ${agent.base_prompt || 'Γράψε ένα φιλικό μήνυμα για να κλείσεις ένα ραντεβού σχετικά με το ρεύμα/αέριο.'}`;
 
@@ -86,7 +86,7 @@ serve(async (req: any) => {
 
       // 4. Update the lead status
       await supabaseAdmin
-        .from('powerfor_leads')
+        .from('hlektrismos_leads')
         .update({ status: 'contacted', pipeline_status: 'contacted' })
         .eq('id', lead.id);
 

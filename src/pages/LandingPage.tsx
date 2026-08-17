@@ -233,7 +233,7 @@ export default function LandingPage() {
 
       <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
         <div className="container nav-wrap">
-          <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Power<span>For</span></span></a>
+          <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
             <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
             <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
@@ -403,7 +403,7 @@ export default function LandingPage() {
               <div className="gdpr-shield"><ShieldCheck size={36} /></div>
               <div>
                 <h3>Το GDPR δεν είναι checkbox. Είναι η αρχιτεκτονική.</h3>
-                <p>Το PowerFor είναι χτισμένο privacy-first. Δεν κάνουμε ποτέ scraping third-party sites ή social platforms. Κάθε επαφή έχει τεκμηριωμένο lawful basis και μπορεί να ασκήσει τα δικαιώματά της από ένα self-service πάνελ.</p>
+                <p>Το Hlektrismos.gr είναι χτισμένο privacy-first. Δεν κάνουμε ποτέ scraping third-party sites ή social platforms. Κάθε επαφή έχει τεκμηριωμένο lawful basis και μπορεί να ασκήσει τα δικαιώματά της από ένα self-service πάνελ.</p>
               </div>
             </div>
           </div>
@@ -510,7 +510,7 @@ export default function LandingPage() {
         <div className="container">
           <div className="footer-grid">
             <div className="footer-brand">
-              <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Power<span>For</span></span></a>
+              <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
               <div className="footer-logo-wrap"><img src="/images/image.png" alt="Ηλεκτρισμός - Ενεργειακοί Σύμβουλοι" className="footer-logo" /></div>
               <p>Ο προσωπικός σου σύμβουλος ενέργειας. Συγκρίνουμε πάροχους και βρίσκουμε την καλύτερη λύση — δωρεάν.</p>
             </div>

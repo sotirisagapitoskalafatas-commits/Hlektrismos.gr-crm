@@ -10,12 +10,10 @@ import {
   Lock,
   Mail,
   Menu,
-  Moon,
   Phone,
   Plug,
   ShieldCheck,
   Sparkles,
-  Sun,
   TrendingUp,
   Users,
   X,
@@ -200,20 +198,17 @@ export default function LandingPage() {
   const [scrollPct, setScrollPct] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved ? saved === 'dark' : false;
-  });
   const [galleryModal, setGalleryModal] = useState<number | null>(null);
   const journeySectionRef = useRef<HTMLElement>(null);
   const [bgTransform, setBgTransform] = useState('');
   const journeyIndex = Math.min(greekJourney.length - 1, Math.floor((scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)) * greekJourney.length));
   const activeJourney = greekJourney[journeyIndex];
 
+  // Force light mode on the public landing page (CRM dashboard keeps its dark theme).
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-  }, [darkMode]);
+    document.documentElement.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
+  }, []);
 
   useScrollReveal();
 
@@ -324,9 +319,6 @@ export default function LandingPage() {
             <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
           </nav>
           <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
           <a href="#contact" className="header-cta">Ζητήστε κλήση <ArrowRight size={16} /></a>
         </div>
       </header>

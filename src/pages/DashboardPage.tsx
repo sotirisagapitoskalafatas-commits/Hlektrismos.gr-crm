@@ -884,6 +884,18 @@ export default function DashboardPage() {
                 setToast={setToast}
               />
             )}
+
+            {tab === 'orchestrator' && (
+              <OrchestratorDirectorTab
+                agents={agents}
+                leads={leads}
+                crmUsers={crmUsers}
+                toast={toast}
+                setToast={setToast}
+                setConfigAgent={setConfigAgent}
+                loadData={loadData}
+              />
+            )}
           </>
         )}
       </div>
@@ -1769,6 +1781,497 @@ function B2BScraperTab({ toast, setToast }: {
           <li>GDPR-compliant: Legitimate Interest lawful basis</li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, setConfigAgent, loadData }: {
+  agents: Agent[];
+  leads: Lead[];
+  crmUsers: CrmUser[];
+  toast: { msg: string; type: 'success' | 'info' } | null;
+  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+  setConfigAgent: (v: Agent | null) => void;
+  loadData: () => Promise<void>;
+}) {
+  const [selectedView, setSelectedView] = useState<'overview' | 'agents' | 'micro' | 'pipeline'>('overview');
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [showNewAgent, setShowNewAgent] = useState(false);
+  const [newAgent, setNewAgent] = useState({ name: '', channel: 'Email', status: 'inactive' });
+
+  const activeAgents = agents.filter(a => a.status === 'active');
+  const totalLeads = leads.filter(l => !l.deleted_at).length;
+  const totalContacted = agents.reduce((s, a) => s + (a.leads_contacted || 0), 0);
+  const totalReplies = agents.reduce((s, a) => s + (a.replies || 0), 0);
+  const totalMeetings = agents.reduce((s, a) => s + (a.meetings_booked || 0), 0);
+
+  const agentStats = agents.map(a => ({
+    ...a,
+    replyRate: a.leads_contacted > 0 ? ((a.replies / a.leads_contacted) * 100).toFixed(1) : '0',
+    meetingRate: a.replies > 0 ? ((a.meetings_booked / a.replies) * 100).toFixed(1) : '0',
+  }));
+
+  const toggleAgentStatus = async (agent: Agent) => {
+    const newStatus = agent.status === 'active' ? 'inactive' : 'active';
+    const { error } = await supabase.from('ai_agents').update({ status: newStatus }).eq('id', agent.id);
+    if (error) {
+      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
+    } else {
+      setToast({ msg: `${agent.name} ${newStatus === 'active' ? 'ενεργοποιήθηκε' : 'απενεργοποιήθηκε'}`, type: 'success' });
+      loadData();
+    }
+  };
+
+  const createAgent = async () => {
+    if (!newAgent.name.trim()) return;
+    const { error } = await supabase.from('ai_agents').insert({
+      name: newAgent.name,
+      channel: newAgent.channel,
+      status: newAgent.status,
+      leads_contacted: 0,
+      replies: 0,
+      meetings_booked: 0,
+    });
+    if (error) {
+      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
+    } else {
+      setToast({ msg: 'Το agent δημιουργήθηκε!', type: 'success' });
+      setShowNewAgent(false);
+      setNewAgent({ name: '', channel: 'Email', status: 'inactive' });
+      loadData();
+    }
+  };
+
+  const deleteAgent = async (id: string) => {
+    if (!confirm('Είσαι σίγουρος ότι θέλεις να διαγράψεις αυτό το agent;')) return;
+    const { error } = await supabase.from('ai_agents').delete().eq('id', id);
+    if (error) {
+      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
+    } else {
+      setToast({ msg: 'Το agent διαγράφηκε.', type: 'success' });
+      loadData();
+    }
+  };
+
+  return (
+    <div className="dash-content orchestrator-tab">
+      <div className="dash-content-header">
+        <p>Ολοκληρωμένη διαχείριση όλων των AI Agents και Micro Agents. Παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, και οργάνωση του pipeline επικοινωνίας.</p>
+      </div>
+
+      <div className="orchestrator-nav">
+        <button className={selectedView === 'overview' ? 'active' : ''} onClick={() => setSelectedView('overview')}>
+          <LayoutDashboard size={16} /> Επισκόπηση
+        </button>
+        <button className={selectedView === 'agents' ? 'active' : ''} onClick={() => setSelectedView('agents')}>
+          <Bot size={16} /> AI Agents ({agents.length})
+        </button>
+        <button className={selectedView === 'micro' ? 'active' : ''} onClick={() => setSelectedView('micro')}>
+          <Zap size={16} /> Micro Agents
+        </button>
+        <button className={selectedView === 'pipeline' ? 'active' : ''} onClick={() => setSelectedView('pipeline')}>
+          <Activity size={16} /> Pipeline Flow
+        </button>
+      </div>
+
+      {selectedView === 'overview' && (
+        <div className="orchestrator-overview">
+          <div className="dash-stats-grid">
+            <div className="dash-stat-card">
+              <div className="dash-stat-icon"><Bot size={20} /></div>
+              <div>
+                <strong>{agents.length}</strong>
+                <span>Σύνολο Agents</span>
+              </div>
+            </div>
+            <div className="dash-stat-card">
+              <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}><Activity size={20} /></div>
+              <div>
+                <strong>{activeAgents.length}</strong>
+                <span>Ενεργοί Agents</span>
+              </div>
+            </div>
+            <div className="dash-stat-card">
+              <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}><Users size={20} /></div>
+              <div>
+                <strong>{totalLeads}</strong>
+                <span>Leads στο Pipeline</span>
+              </div>
+            </div>
+            <div className="dash-stat-card">
+              <div className="dash-stat-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}><TrendingUp size={20} /></div>
+              <div>
+                <strong>{totalContacted}</strong>
+                <span>Επικοινωνίες</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="orchestrator-performance">
+            <h3>Απόδοση Agents</h3>
+            <div className="dash-table-wrap">
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Channel</th>
+                    <th>Status</th>
+                    <th>Επικοινωνίες</th>
+                    <th>Απαντήσεις</th>
+                    <th>Ρυθμός Απάντησης</th>
+                    <th>Ραντεβού</th>
+                    <th>Ρυθμός Ραντεβού</th>
+                    <th>Ενέργειες</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentStats.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        <div className="agent-name-cell">
+                          <Bot size={16} />
+                          <div>
+                            <strong>{a.name}</strong>
+                            {a.target_region && <span className="agent-region">{a.target_region}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td>{a.channel}</td>
+                      <td>
+                        <span className={`dash-status-pill ${a.status}`}>
+                          {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                        </span>
+                      </td>
+                      <td><strong>{a.leads_contacted || 0}</strong></td>
+                      <td><strong>{a.replies || 0}</strong></td>
+                      <td>
+                        <div className="progress-bar-wrap">
+                          <div className="progress-bar" style={{ width: `${Math.min(Number(a.replyRate), 100)}%` }} />
+                          <span>{a.replyRate}%</span>
+                        </div>
+                      </td>
+                      <td><strong>{a.meetings_booked || 0}</strong></td>
+                      <td>
+                        <div className="progress-bar-wrap">
+                          <div className="progress-bar" style={{ width: `${Math.min(Number(a.meetingRate), 100)}%`, background: '#00c878' }} />
+                          <span>{a.meetingRate}%</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="action-btns">
+                          <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={() => toggleAgentStatus(a)}>
+                            {a.status === 'active' ? <Eye size={14} /> : <EyeOff size={14} />}
+                          </button>
+                          <button className="icon-btn" title="Ρύθμιση" onClick={() => setConfigAgent(a)}>
+                            <Settings size={14} />
+                          </button>
+                          <button className="icon-btn delete" title="Διαγραφή" onClick={() => deleteAgent(a.id)}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="orchestrator-summary-cards">
+            <div className="summary-card">
+              <h4>Κατανομή Leads ανά Agent</h4>
+              <div className="lead-distribution">
+                {agentStats.filter(a => a.status === 'active').map(a => (
+                  <div key={a.id} className="distribution-item">
+                    <span className="dist-name">{a.name}</span>
+                    <div className="dist-bar-wrap">
+                      <div className="dist-bar" style={{ width: `${totalLeads > 0 ? ((a.leads_contacted || 0) / totalLeads) * 100 : 0}%` }} />
+                    </div>
+                    <span className="dist-count">{a.leads_contacted || 0}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <h4>Κατάσταση Pipeline</h4>
+              <div className="pipeline-stats">
+                <div className="pipeline-stat">
+                  <span className="pipeline-label">Νέα Leads</span>
+                  <span className="pipeline-value">{leads.filter(l => l.status === 'new' && !l.deleted_at).length}</span>
+                </div>
+                <div className="pipeline-stat">
+                  <span className="pipeline-label">Σε Εξέλιξη</span>
+                  <span className="pipeline-value" style={{ color: '#ffa500' }}>{leads.filter(l => l.status === 'contacted' && !l.deleted_at).length}</span>
+                </div>
+                <div className="pipeline-stat">
+                  <span className="pipeline-label">Ραντεβού</span>
+                  <span className="pipeline-value" style={{ color: '#00c878' }}>{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length}</span>
+                </div>
+                <div className="pipeline-stat">
+                  <span className="pipeline-label">Ολοκληρωμένα</span>
+                  <span className="pipeline-value" style={{ color: '#0066cc' }}>{leads.filter(l => l.status === 'converted' && !l.deleted_at).length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedView === 'agents' && (
+        <div className="orchestrator-agents-view">
+          <div className="orchestrator-agents-header">
+            <h3>AI Agents</h3>
+            <button className="btn btn-primary" onClick={() => setShowNewAgent(true)}>
+              <Plus size={16} /> Νέο Agent
+            </button>
+          </div>
+
+          {showNewAgent && (
+            <div className="new-agent-form">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Όνομα Agent</label>
+                  <input
+                    value={newAgent.name}
+                    onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
+                    placeholder="π.χ. Νέο Agent"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Channel</label>
+                  <select value={newAgent.channel} onChange={(e) => setNewAgent({ ...newAgent, channel: e.target.value })}>
+                    {channelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Κατάσταση</label>
+                  <select value={newAgent.status} onChange={(e) => setNewAgent({ ...newAgent, status: e.target.value })}>
+                    <option value="active">Ενεργός</option>
+                    <option value="inactive">Ανενεργός</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-actions">
+                <button className="btn btn-ghost" onClick={() => setShowNewAgent(false)}>Άκυρο</button>
+                <button className="btn btn-primary" onClick={createAgent}><CheckCircle2 size={16} /> Δημιουργία</button>
+              </div>
+            </div>
+          )}
+
+          <div className="agents-grid">
+            {agents.map((a) => (
+              <div key={a.id} className={`agent-card ${a.status}`}>
+                <div className="agent-card-header">
+                  <div className="agent-card-icon">
+                    <Bot size={24} />
+                  </div>
+                  <div className="agent-card-info">
+                    <h4>{a.name}</h4>
+                    <span className="agent-card-channel">{a.channel}</span>
+                  </div>
+                  <span className={`dash-status-pill ${a.status}`}>
+                    {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                  </span>
+                </div>
+                <div className="agent-card-stats">
+                  <div className="agent-stat">
+                    <span className="agent-stat-value">{a.leads_contacted || 0}</span>
+                    <span className="agent-stat-label">Επικοινωνίες</span>
+                  </div>
+                  <div className="agent-stat">
+                    <span className="agent-stat-value">{a.replies || 0}</span>
+                    <span className="agent-stat-label">Απαντήσεις</span>
+                  </div>
+                  <div className="agent-stat">
+                    <span className="agent-stat-value">{a.meetings_booked || 0}</span>
+                    <span className="agent-stat-label">Ραντεβού</span>
+                  </div>
+                </div>
+                {a.target_region && (
+                  <div className="agent-card-region">
+                    <Globe size={14} /> {a.target_region}
+                  </div>
+                )}
+                {a.base_prompt && (
+                  <div className="agent-card-prompt">
+                    <MessageSquare size={14} />
+                    <p>{a.base_prompt.substring(0, 100)}{a.base_prompt.length > 100 ? '...' : ''}</p>
+                  </div>
+                )}
+                <div className="agent-card-actions">
+                  <button className="btn btn-secondary btn-sm" onClick={() => toggleAgentStatus(a)}>
+                    {a.status === 'active' ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {a.status === 'active' ? 'Απενεργ.' : 'Ενεργ.'}
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={() => setConfigAgent(a)}>
+                    <Settings size={14} /> Ρύθμιση
+                  </button>
+                  <button className="btn btn-ghost btn-sm delete" onClick={() => deleteAgent(a.id)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedView === 'micro' && (
+        <div className="orchestrator-micro-view">
+          <div className="orchestrator-agents-header">
+            <h3>Micro Agents</h3>
+            <p className="text-muted">Micro Agents είναι μικροί εξειδικευμένοι agent που εκτελούν συγκεκριμένες εργασίες (π.χ. εξαγωγή δεδομένων, αυτόματη κατηγοριοποίηση, παρακολούθηση emails).</p>
+          </div>
+          
+          <div className="micro-agents-grid">
+            <div className="micro-agent-card">
+              <div className="micro-agent-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}><Radar size={24} /></div>
+              <h4>Lead Scraper</h4>
+              <p>Αυτόματη συλλογή leads από δημόσιους καταλόγους</p>
+              <span className="micro-agent-status active">Ενεργός</span>
+              <div className="micro-agent-stats">
+                <span>Τελευταία εκτέλεση: 2 λεπτά πριν</span>
+                <span>Επιτυχία: 98%</span>
+              </div>
+            </div>
+            <div className="micro-agent-card">
+              <div className="micro-agent-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}><Mail size={24} /></div>
+              <h4>Email Analyzer</h4>
+              <p>Ανάλυση και κατηγοριοποίηση εισερχόμενων emails</p>
+              <span className="micro-agent-status active">Ενεργός</span>
+              <div className="micro-agent-stats">
+                <span>Τελευταία εκτέλεση: 5 λεπτά πριν</span>
+                <span>Επιτυχία: 95%</span>
+              </div>
+            </div>
+            <div className="micro-agent-card">
+              <div className="micro-agent-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}><MessageSquare size={24} /></div>
+              <h4>Sentiment Detector</h4>
+              <p>Ανίχνευση συναισθήματος σε μηνύματα πελατών</p>
+              <span className="micro-agent-status active">Ενεργός</span>
+              <div className="micro-agent-stats">
+                <span>Τελευταία εκτέλεση: 1 λεπτό πριν</span>
+                <span>Επιτυχία: 92%</span>
+              </div>
+            </div>
+            <div className="micro-agent-card">
+              <div className="micro-agent-icon" style={{ background: 'rgba(138,43,226,0.1)', color: '#8a2be2' }}><TrendingUp size={24} /></div>
+              <h4>Lead Scorer</h4>
+              <p>Αυτόματη βαθμολόγηση leads βάση ενδιαφέροντος</p>
+              <span className="micro-agent-status active">Ενεργός</span>
+              <div className="micro-agent-stats">
+                <span>Τελευταία εκτέλεση: 3 λεπτά πριν</span>
+                <span>Επιτυχία: 89%</span>
+              </div>
+            </div>
+            <div className="micro-agent-card">
+              <div className="micro-agent-icon" style={{ background: 'rgba(231,76,60,0.1)', color: '#e74c3c' }}><AlertCircle size={24} /></div>
+              <h4>Notification Sender</h4>
+              <p>Αυτόματη αποστολή ειδοποιήσεων στην ομάδα</p>
+              <span className="micro-agent-status active">Ενεργός</span>
+              <div className="micro-agent-stats">
+                <span>Τελευταία εκτέλεση: 10 λεπτά πριν</span>
+                <span>Επιτυχία: 100%</span>
+              </div>
+            </div>
+            <div className="micro-agent-card">
+              <div className="micro-agent-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}><Database size={24} /></div>
+              <h4>Data Enricher</h4>
+              <p>Εμπλουτισμός δεδομένων lead με δημόσια πληροφορίες</p>
+              <span className="micro-agent-status inactive">Ανενεργός</span>
+              <div className="micro-agent-stats">
+                <span>Τελευταία εκτέλεση: 1 ώρα πριν</span>
+                <span>Επιτυχία: 85%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedView === 'pipeline' && (
+        <div className="orchestrator-pipeline-view">
+          <h3>Pipeline Flow</h3>
+          <p className="text-muted">Ροή εργασιών από την συλλογή leads μέχρι την μετατροπή σε πελάτη.</p>
+          
+          <div className="pipeline-flow">
+            <div className="pipeline-stage">
+              <div className="pipeline-stage-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}>
+                <Database size={24} />
+              </div>
+              <h4>1. Συλλογή</h4>
+              <p>B2B Scraper, Web Scraping, API Integrations</p>
+              <div className="pipeline-stage-count">{leads.filter(l => l.status === 'new' && !l.deleted_at).length} leads</div>
+            </div>
+            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-stage">
+              <div className="pipeline-stage-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}>
+                <Bot size={24} />
+              </div>
+              <h4>2. Επικοινωνία</h4>
+              <p>AI Agents στέλνουν αρχικό μήνυμα</p>
+              <div className="pipeline-stage-count">{leads.filter(l => l.status === 'contacted' && !l.deleted_at).length} leads</div>
+            </div>
+            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-stage">
+              <div className="pipeline-stage-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>
+                <MessageSquare size={24} />
+              </div>
+              <h4>3. Συζήτηση</h4>
+              <p>AI Agents διεξάγουν συζήτηση</p>
+              <div className="pipeline-stage-count">{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length} leads</div>
+            </div>
+            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-stage">
+              <div className="pipeline-stage-icon" style={{ background: 'rgba(138,43,226,0.1)', color: '#8a2be2' }}>
+                <Users size={24} />
+              </div>
+              <h4>4. Ραντεβού</h4>
+              <p>Κλείσιμο ραντεβού με πωλητή</p>
+              <div className="pipeline-stage-count">{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length} leads</div>
+            </div>
+            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-stage">
+              <div className="pipeline-stage-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}>
+                <CheckCircle2 size={24} />
+              </div>
+              <h4>5. Μετατροπή</h4>
+              <p>Ολοκλήρωση πωλησης</p>
+              <div className="pipeline-stage-count">{leads.filter(l => l.status === 'converted' && !l.deleted_at).length} leads</div>
+            </div>
+          </div>
+
+          <div className="pipeline-flow-details">
+            <h4>Agent Workflow Rules</h4>
+            <div className="workflow-rules">
+              <div className="workflow-rule">
+                <span className="rule-trigger">Trigger:</span> Νέο lead εισάγεται στη βάση
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-action">Action:</span> Auto-assign σε agent με λιγότερα active leads
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-trigger">Trigger:</span> Agent στέλνει μήνυμα
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-action">Action:</span> Ενημέρωση pipeline_status σε "contacted"
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-trigger">Trigger:</span> Lead απαντά
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-action">Action:</span> Αύξηση replies count, ενημέρωση sentiment
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-trigger">Trigger:</span> Handoff condition συμπληρώνεται
+              </div>
+              <div className="workflow-rule">
+                <span className="rule-action">Action:</span> Ειδοποίηση πωλητή, αλλαγή pipeline_status
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

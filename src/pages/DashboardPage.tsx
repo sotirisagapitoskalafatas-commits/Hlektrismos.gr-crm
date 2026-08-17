@@ -116,6 +116,8 @@ export default function DashboardPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [syncing, setSyncing] = useState(false);
 
+  const [runningAgents, setRunningAgents] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -140,6 +142,20 @@ export default function DashboardPage() {
     if (sourcesRes.data) setSources(sourcesRes.data as Source[]);
     if (tariffsRes.data) setTariffs(tariffsRes.data as Tariff[]);
     setLoading(false);
+  };
+
+  const runAgents = async () => {
+    setRunningAgents(true);
+    setToast({ msg: 'Εκκίνηση Agent Engine...', type: 'info' });
+    try {
+      const { data, error } = await supabase.functions.invoke('agent-worker');
+      if (error) throw error;
+      setToast({ msg: data.message || 'Οι AI Agents ολοκλήρωσαν την εκτέλεση.', type: 'success' });
+      loadData();
+    } catch (e) {
+      setToast({ msg: 'Σφάλμα κατά την εκτέλεση των Agents.', type: 'info' });
+    }
+    setRunningAgents(false);
   };
 
   const createAgent = async () => {
@@ -320,7 +336,12 @@ export default function DashboardPage() {
               <div className="dash-content">
                 <div className="dash-content-header">
                   <p>Διαχειριστείτε τα αυτόνομα AI agents που αναζητούν, προκριματίζουν και επικοινωνούν με leads.</p>
-                  <button className="btn btn-primary" onClick={() => setShowAddAgent(!showAddAgent)}><Plus size={16} /> Νέο Agent</button>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="btn btn-secondary" onClick={runAgents} disabled={runningAgents}>
+                      <Activity size={16} className={runningAgents ? 'spin' : ''} /> {runningAgents ? 'Εκτέλεση...' : 'Εκκίνηση AI Agents'}
+                    </button>
+                    <button className="btn btn-primary" onClick={() => setShowAddAgent(!showAddAgent)}><Plus size={16} /> Νέο Agent</button>
+                  </div>
                 </div>
                 {showAddAgent && (
                   <div className="dash-add-form">

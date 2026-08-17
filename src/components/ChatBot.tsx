@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Bot, Send, Sparkles, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 type Message = {
   role: 'bot' | 'user';

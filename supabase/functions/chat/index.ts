@@ -65,16 +65,21 @@ ${tariffLines}
       throw new Error(aiData.error?.message || 'Failed to fetch from Gemini API');
     }
 
-    const reply = aiData.candidates[0].content.parts[0].text;
+    const reply = aiData.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!reply) throw new Error('Empty response from Gemini API')
 
     return new Response(JSON.stringify({ reply }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error: any) {
+    const status = error.message?.includes('GEMINI_API_KEY') ? 500
+      : error.message?.includes('Gemini API error') || error.message?.includes('Failed to fetch') ? 502
+      : error.message?.includes('Empty response') ? 502
+      : 400
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status,
     })
   }
 })

@@ -109,7 +109,8 @@ Leads: ${targetAgent?.leads_contacted} | Replies: ${targetAgent?.replies} | Meet
       const aiData = await geminiResponse.json()
       if (!geminiResponse.ok) throw new Error(aiData.error?.message || 'Gemini API error')
 
-      const reportContent = aiData.candidates[0].content.parts[0].text
+      const reportContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text
+      if (!reportContent) throw new Error('Empty response from Gemini API')
 
       const metrics = {
         total_agents: agents?.length || 0,
@@ -205,7 +206,8 @@ Leads: ${targetAgent?.leads_contacted} | Replies: ${targetAgent?.replies} | Meet
       throw new Error(aiData.error?.message || 'Gemini API error')
     }
 
-    const reply = aiData.candidates[0].content.parts[0].text
+    const reply = aiData.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!reply) throw new Error('Empty response from Gemini API')
 
     // Save to agent_memory
     const memContextId = context_id || crypto.randomUUID()
@@ -228,9 +230,13 @@ Leads: ${targetAgent?.leads_contacted} | Replies: ${targetAgent?.replies} | Meet
     })
 
   } catch (error: any) {
+    const status = error.message?.includes('GEMINI_API_KEY') ? 500
+      : error.message?.includes('Gemini API error') ? 502
+      : error.message?.includes('Empty response') ? 502
+      : 400
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status,
     })
   }
 })

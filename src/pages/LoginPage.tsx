@@ -52,7 +52,7 @@ export default function LoginPage() {
       <div className="login-card-wrap">
         <a href="#/" className="login-brand">
           <span className="brand-mark"><Zap size={18} fill="currentColor" /></span>
-          <span>Power<span>For</span></span>
+          <span>Hlektrismos<span>.gr</span></span>
         </a>
         <div className="login-card">
           <h1>{mode === 'login' ? 'Σύνδεση Dashboard' : 'Δημιουργία Λογαριασμού'}</h1>

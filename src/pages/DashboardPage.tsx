@@ -1037,11 +1037,12 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
 
     try {
       const activeConv = conversations.find(c => c.id === activeConversationId);
+      const contextId = activeConv?.contextId || crypto.randomUUID();
       const { data, error } = await supabase.functions.invoke('orchestrator', {
         body: {
           message: userMsg,
           agent_id: hubSelectedAgents[0] || undefined,
-          context_id: activeConv?.contextId || undefined,
+          context_id: contextId,
           mode: 'chat',
           multi_agent: hubSelectedAgents.length > 1,
           agent_ids: hubSelectedAgents,
@@ -2131,8 +2132,8 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <p>Αυτόματη συλλογή leads από δημόσιους καταλόγους</p>
               <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Τελευταία εκτέλεση: 2 λεπτά πριν</span>
-                <span>Επιτυχία: 98%</span>
+                <span>Leads συλλέχθηκαν: {leads.filter(l => !l.deleted_at).length}</span>
+                <span>Κατηγορίες: B2B, B2C</span>
               </div>
             </div>
             <div className="micro-agent-card">
@@ -2141,8 +2142,8 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <p>Ανάλυση και κατηγοριοποίηση εισερχόμενων emails</p>
               <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Τελευταία εκτέλεση: 5 λεπτά πριν</span>
-                <span>Επιτυχία: 95%</span>
+                <span>Επικοινωνίες: {totalContacted}</span>
+                <span>Απαντήσεις: {totalReplies}</span>
               </div>
             </div>
             <div className="micro-agent-card">
@@ -2151,8 +2152,8 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <p>Ανίχνευση συναισθήματος σε μηνύματα πελατών</p>
               <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Τελευταία εκτέλεση: 1 λεπτό πριν</span>
-                <span>Επιτυχία: 92%</span>
+                <span>Αναλύσεις: {totalReplies}</span>
+                <span>Αυτόματη κατηγοριοποίηση</span>
               </div>
             </div>
             <div className="micro-agent-card">
@@ -2161,8 +2162,8 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <p>Αυτόματη βαθμολόγηση leads βάση ενδιαφέροντος</p>
               <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Τελευταία εκτέλεση: 3 λεπτά πριν</span>
-                <span>Επιτυχία: 89%</span>
+                <span>Βαθμολογήθηκαν: {leads.filter(l => !l.deleted_at).length}</span>
+                <span>Ραντεβού: {totalMeetings}</span>
               </div>
             </div>
             <div className="micro-agent-card">
@@ -2171,18 +2172,20 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <p>Αυτόματη αποστολή ειδοποιήσεων στην ομάδα</p>
               <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Τελευταία εκτέλεση: 10 λεπτά πριν</span>
-                <span>Επιτυχία: 100%</span>
+                <span>Ειδοποιήσεις: {totalMeetings}</span>
+                <span>Ροή: Αυτόματη</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}><Database size={24} /></div>
               <h4>Data Enricher</h4>
               <p>Εμπλουτισμός δεδομένων lead με δημόσια πληροφορίες</p>
-              <span className="micro-agent-status inactive">Ανενεργός</span>
+              <span className={`micro-agent-status ${crmUsers.length > 0 ? 'active' : 'inactive'}`}>
+                {crmUsers.length > 0 ? 'Ενεργός' : 'Ανενεργός'}
+              </span>
               <div className="micro-agent-stats">
-                <span>Τελευταία εκτέλεση: 1 ώρα πριν</span>
-                <span>Επιτυχία: 85%</span>
+                <span>Χρήστες CRM: {crmUsers.length}</span>
+                <span>Κατανομή: {crmUsers.filter(u => u.role === 'sales').length} πωλητές</span>
               </div>
             </div>
           </div>

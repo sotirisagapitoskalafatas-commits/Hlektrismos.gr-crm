@@ -1,7 +1,11 @@
 -- Add user roles to the CRM system
 -- Role types: secretary, sales, hr, it, management, admin
 
-CREATE TYPE crm_role AS ENUM ('admin', 'management', 'sales', 'hr', 'it', 'secretary');
+DO $$ BEGIN
+  CREATE TYPE crm_role AS ENUM ('admin', 'management', 'sales', 'hr', 'it', 'secretary');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add role column to hlektrismos_leads for assignment tracking
 ALTER TABLE hlektrismos_leads ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES auth.users(id);
@@ -24,14 +28,17 @@ CREATE TABLE IF NOT EXISTS crm_users (
 ALTER TABLE crm_users ENABLE ROW LEVEL SECURITY;
 
 -- Policy: authenticated users can read all CRM users
+DROP POLICY IF EXISTS "Authenticated can read CRM users" ON crm_users;
 CREATE POLICY "Authenticated can read CRM users" ON crm_users
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Policy: authenticated users can update their own profile
+DROP POLICY IF EXISTS "Users can update own profile" ON crm_users;
 CREATE POLICY "Users can update own profile" ON crm_users
   FOR UPDATE USING (auth.uid() = id);
 
 -- Policy: admins and management can manage all CRM users
+DROP POLICY IF EXISTS "Admins can manage CRM users" ON crm_users;
 CREATE POLICY "Admins can manage CRM users" ON crm_users
   FOR ALL USING (
     EXISTS (

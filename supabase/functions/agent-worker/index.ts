@@ -72,7 +72,7 @@ serve(async (req: any) => {
 Γράψε το πρώτο μήνυμα (outbound) που θα στείλεις σε αυτό το lead.`;
 
       // Call Gemini API to generate the message
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

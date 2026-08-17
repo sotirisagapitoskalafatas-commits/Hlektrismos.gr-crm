@@ -23,7 +23,6 @@ import {
   Zap,
 } from 'lucide-react';
 import ChatBot from '@/components/ChatBot';
-import MapBackground from '@/components/MapBackground';
 import { supabase } from '@/lib/supabase';
 
 type LeadForm = {
@@ -40,8 +39,6 @@ type LeadForm = {
   consent: boolean;
 };
 
-const GREECE_BG = 'https://images.pexels.com/photos/37844507/pexels-photo-37844507.jpeg?auto=compress&cs=tinysrgb&w=1920';
-
 const greekJourney = [
   { region: 'Αττική', city: 'Αθήνα', title: 'Η αφετηρία της εξοικονόμησης', text: 'Ξεκινάμε από την παροχή σου και συγκρίνουμε άμεσα τα διαθέσιμα προγράμματα για σπίτι, γραφείο ή κατάστημα.', x: 56, y: 34 },
   { region: 'Κεντρική Ελλάδα', city: 'Θεσσαλία', title: 'Λύσεις για κάθε κατανάλωση', text: 'Από μικρές κατοικίες μέχρι αγροτικές και επαγγελματικές εγκαταστάσεις, βρίσκουμε το σωστό ενεργειακό προφίλ.', x: 61, y: 28 },
@@ -49,15 +46,6 @@ const greekJourney = [
   { region: 'Νησιά Ιονίου', city: 'Κέρκυρα · Ζάκυνθος', title: 'Ενέργεια χωρίς σύνορα', text: 'Εξυπηρέτηση σε κάθε νησί, με προτάσεις που λαμβάνουν υπόψη εποχικότητα, τουρισμό και πραγματική χρήση.', x: 37, y: 45 },
   { region: 'Νησιά Αιγαίου', city: 'Κυκλάδες · Δωδεκάνησα', title: 'Έξυπνη ενέργεια στα νησιά', text: 'Προγράμματα ρεύματος, φωτοβολταϊκά και λύσεις ηλεκτροκίνησης για τις ανάγκες κάθε νησιωτικής κοινότητας.', x: 71, y: 52 },
   { region: 'Κρήτη', city: 'Ηράκλειο · Χανιά', title: 'Η πράσινη επόμενη μέρα', text: 'Σχεδιάζουμε το επόμενο βήμα με φωτοβολταϊκά, ενεργειακή αυτονομία και λύσεις για κατοικίες και τουριστικές μονάδες.', x: 63, y: 75 },
-];
-
-const mapStops = [
-  { lat: 37.9838, lng: 23.7275, zoom: 9, pitch: 45, bearing: -20 },
-  { lat: 39.6, lng: 22.4, zoom: 8.5, pitch: 50, bearing: 10 },
-  { lat: 40.6401, lng: 22.9444, zoom: 9, pitch: 40, bearing: -15 },
-  { lat: 39.6243, lng: 19.9217, zoom: 9.5, pitch: 55, bearing: 25 },
-  { lat: 37.4, lng: 25.4, zoom: 8.5, pitch: 45, bearing: -10 },
-  { lat: 35.2401, lng: 24.8093, zoom: 8.5, pitch: 50, bearing: 15 },
 ];
 
 const regions = [
@@ -287,10 +275,9 @@ export default function LandingPage() {
 
       <main id="top">
         <section className="hero">
-          <MapBackground activeStopIndex={journeyIndex} stops={mapStops} />
           <div className="hero-bg">
-            <div className="hero-greece-img" style={{ transform: heroBgTransform, opacity: heroOpacity }} />
-            <div className="hero-greece-overlay" />
+            <div className="hero-bg-image" style={{ transform: heroBgTransform, opacity: heroOpacity }} />
+            <div className="hero-bg-overlay" />
             <div className="hero-grid-bg" />
             <div className="hero-glow-1" />
             <div className="hero-glow-2" />
@@ -388,7 +375,43 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="section" id="services">
+        <section className="gallery-section">
+          <div className="container">
+            <div className="section-heading reveal">
+              <div className="eyebrow"><span className="eyebrow-dot" /> Gallery</div>
+              <h2>Η ενέργεια <span className="gradient-text">σε εικόνα</span></h2>
+              <p>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
+            </div>
+            <div className="gallery-grid">
+              <div className="gallery-item gallery-item-wide reveal stagger-1">
+                <img src="/images/energy1.jpg" alt="Ενεργειακή εγκατάσταση" loading="lazy" />
+                <div className="gallery-overlay"><span>Ρεύμα</span></div>
+              </div>
+              <div className="gallery-item reveal stagger-2">
+                <img src="/images/energy2.jpg" alt="Φωτοβολταϊκά" loading="lazy" />
+                <div className="gallery-overlay"><span>Φωτοβολταϊκά</span></div>
+              </div>
+              <div className="gallery-item reveal stagger-3">
+                <img src="/images/energy3.jpg" alt="Αέριο" loading="lazy" />
+                <div className="gallery-overlay"><span>Αέριο</span></div>
+              </div>
+              <div className="gallery-item reveal stagger-4">
+                <img src="/images/energy4.jpg" alt="Ηλεκτροκίνηση" loading="lazy" />
+                <div className="gallery-overlay"><span>Ηλεκτροκίνηση</span></div>
+              </div>
+              <div className="gallery-item gallery-item-wide reveal stagger-5">
+                <img src="/images/energy5.jpg" alt="Αποθήκευση ενέργειας" loading="lazy" />
+                <div className="gallery-overlay"><span>Αποθήκευση</span></div>
+              </div>
+              <div className="gallery-item reveal stagger-6">
+                <img src="/images/energy6.jpg" alt="Εξοικονόμηση" loading="lazy" />
+                <div className="gallery-overlay"><span>Εξοικονόμηση</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section section-bg-services" id="services">
           <div className="container">
             <div className="section-heading reveal">
               <div className="eyebrow"><span className="eyebrow-dot" /> Υπηρεσίες</div>
@@ -408,7 +431,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="section about-section" id="about">
+        <section className="section section-bg-about" id="about">
           <div className="container">
             <div className="about-grid">
               <div className="about-copy reveal-left">
@@ -436,7 +459,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="gdpr-section" id="gdpr">
+        <section className="gdpr-section section-bg-gdpr" id="gdpr">
           <div className="container">
             <div className="gdpr-inner reveal-scale">
               <div className="gdpr-shield"><ShieldCheck size={36} /></div>
@@ -448,7 +471,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="section" id="faq">
+        <section className="section section-bg-faq" id="faq">
           <div className="container">
             <div className="section-heading reveal">
               <div className="eyebrow"><span className="eyebrow-dot" /> Συχνές Ερωτήσεις</div>
@@ -466,7 +489,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="contact-section" id="contact">
+        <section className="contact-section section-bg-contact" id="contact">
           <div className="contact-glow" />
           <div className="container">
             <div className="contact-grid">

@@ -116,8 +116,6 @@ img { display: block; max-width: 100%; }
 /* ===== Hero ===== */
 .hero { position: relative; min-height: 100vh; display: flex; align-items: center; overflow: hidden; padding-top: 72px; }
 .hero-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
-.hero-greece-img { display: none; }
-.hero-greece-overlay { display: none; }
 .hero-grid-bg { position: absolute; inset: 0; background-image: linear-gradient(rgba(0,200,120,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,200,120,0.03) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
 .hero-glow-1 { position: absolute; width: 600px; height: 600px; top: -100px; right: -150px; border-radius: 50%; background: radial-gradient(circle, rgba(0,102,204,0.15), transparent 65%); filter: blur(60px); animation: float-glow 12s ease-in-out infinite; }
 .hero-glow-2 { position: absolute; width: 500px; height: 500px; bottom: -100px; left: -100px; border-radius: 50%; background: radial-gradient(circle, rgba(0,200,120,0.12), transparent 65%); filter: blur(60px); animation: float-glow 14s ease-in-out infinite reverse; }
@@ -945,41 +943,156 @@ img { display: block; max-width: 100%; }
 .report-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); text-align: center; gap: 16px; }
 .report-generate-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
 
-/* ===== Satellite Map Background (hero-contained) ===== */
-.satellite-map-bg {
+/* ===== Hero Background Image ===== */
+.hero-bg-image {
   position: absolute;
   inset: 0;
+  background: url('/images/energy1.jpg') center/cover no-repeat;
   z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
+  will-change: transform;
 }
-.satellite-map-container {
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.satellite-map-container .leaflet-container {
-  pointer-events: none;
-}
-.satellite-map-container .leaflet-tile-pane {
-  filter: brightness(0.45) contrast(1.2) saturate(1.4);
-  transition: filter 0.5s ease;
-}
-.satellite-overlay-earth-glow {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 45%, rgba(0,102,204,0.18) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 48% 42%, rgba(0,200,120,0.08) 0%, transparent 50%);
-  pointer-events: none;
-}
-.satellite-overlay-vignette {
+.hero-bg-overlay {
   position: absolute;
   inset: 0;
   background:
     radial-gradient(ellipse 70% 50% at 50% 50%, transparent 30%, rgba(6,10,18,0.85) 100%),
     linear-gradient(180deg, rgba(6,10,18,0.6) 0%, transparent 20%, transparent 80%, rgba(6,10,18,0.9) 100%);
+  z-index: 1;
   pointer-events: none;
+}
+
+/* ===== Section Background Images ===== */
+.section.section-bg-services {
+  background-image: url('/images/energy2.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+.section.section-bg-services::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6,10,18,0.92);
+  z-index: 0;
+}
+.section.section-bg-services > * { position: relative; z-index: 1; }
+
+.section.section-bg-about {
+  background-image: url('/images/energy3.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+.section.section-bg-about::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6,10,18,0.92);
+  z-index: 0;
+}
+.section.section-bg-about > * { position: relative; z-index: 1; }
+
+.section.section-bg-faq {
+  background-image: url('/images/energy5.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+.section.section-bg-faq::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6,10,18,0.92);
+  z-index: 0;
+}
+.section.section-bg-faq > * { position: relative; z-index: 1; }
+
+.gdpr-section.section-bg-gdpr {
+  background-image: url('/images/energy6.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+.gdpr-section.section-bg-gdpr::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6,10,18,0.92);
+  z-index: 0;
+}
+.gdpr-section.section-bg-gdpr > * { position: relative; z-index: 1; }
+
+.contact-section.section-bg-contact {
+  background-image: url('/images/energy7.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+.contact-section.section-bg-contact::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6,10,18,0.92);
+  z-index: 0;
+}
+.contact-section.section-bg-contact > * { position: relative; z-index: 1; }
+
+/* ===== Gallery ===== */
+.gallery-section { padding: 100px 0; position: relative; }
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.gallery-item {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  cursor: pointer;
+}
+.gallery-item-wide {
+  grid-column: span 2;
+}
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.gallery-item:hover img {
+  transform: scale(1.08);
+}
+.gallery-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(6,10,18,0.85) 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gallery-item:hover .gallery-overlay {
+  opacity: 1;
+}
+.gallery-overlay span {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Light mode gallery */
+:root:not(.dark) .gallery-overlay {
+  background: linear-gradient(180deg, transparent 40%, rgba(255,255,255,0.85) 100%);
+}
+:root:not(.dark) .gallery-overlay span {
+  color: #1a1a2e;
 }
 /* Stat-cell uses CSS variables from :root */
 
@@ -1217,6 +1330,11 @@ img { display: block; max-width: 100%; }
 :root:not(.dark) .stat-cell span { color: rgba(26,26,46,0.6); }
 :root:not(.dark) .eyebrow { background: rgba(0,200,120,0.15); border-color: rgba(0,200,120,0.25); }
 :root:not(.dark) .section { background: rgba(245,247,250,0.92); }
+:root:not(.dark) .section-bg-services::before,
+:root:not(.dark) .section-bg-about::before,
+:root:not(.dark) .section-bg-faq::before,
+:root:not(.dark) .gdpr-section.section-bg-gdpr::before,
+:root:not(.dark) .contact-section.section-bg-contact::before { background: rgba(245,247,250,0.92); }
 :root:not(.dark) .advantages-section { background: rgba(245,247,250,0.92); }
 :root:not(.dark) .gdpr-shield { background: rgba(0,200,120,0.1); color: #00c878; }
 :root:not(.dark) .about-copy h2 { color: #1a1a2e; }

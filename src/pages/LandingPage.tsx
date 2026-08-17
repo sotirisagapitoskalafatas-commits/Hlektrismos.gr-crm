@@ -107,6 +107,63 @@ const advantages = [
   { icon: Users, title: 'Εξατομικευμένη Λύση', text: 'Πρόταση φτιαγμένη ειδικά για τις δικές σου ανάγκες κατανάλωσης.' },
 ];
 
+const galleryItems = [
+  {
+    image: '/images/energy1.jpg',
+    title: 'Ρεύμα',
+    subtitle: 'Φθηνά Προγράμματα Ενέργειας',
+    description: 'Φθηνά προγράμματα ενέργειας ειδικά για σένα. Συγκρίνουμε πάροχους και βρίσκουμε τον φθηνότερο — δωρεάν.',
+    details: 'Στο δυναμικό περιβάλλον της αγοράς ενέργειας, είμαστε εδώ για να δώσουμε λύσεις. Με συνεχή έρευνα και αναζήτηση των βέλτιστων προσφορών, προσφέρουμε δωρεάν συμβουλές σε εκείνους που επιθυμούν την καλύτερη επιλογή ενέργειας για το σπίτι ή την επιχείρησή τους.',
+    wide: true,
+    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
+  },
+  {
+    image: '/images/energy2.jpg',
+    title: 'Αέριο',
+    subtitle: 'Εξατομικευμένες Λύσεις Φυσικού Αερίου',
+    description: 'Εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι με τα καλύτερα τιμολογικά πλάνα.',
+    details: 'Προσφέρουμε εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι και την επιχείρηση. Συγκρίνουμε τιμές και όρους για να βρούμε το πιο αποδοτικό πρόγραμμα για τις ανάγκες σου.',
+    wide: false,
+    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
+  },
+  {
+    image: '/images/energy3.jpg',
+    title: 'Φωτοβολταϊκά',
+    subtitle: 'Καινοτομία & Βιώσιμη Ανάπτυξη',
+    description: 'Καινοτομία και Βιώσιμη Ανάπτυξη, τώρα στο χώρο σου. Επένδυσε στην πράσινη ενέργεια.',
+    details: 'Εγκατεστημένα φωτοβολταϊκά συστήματα για κατοικίες και επιχειρήσεις. Αυτονομία, εξοικονόμηση και βιωσιμότητα σε ένα βήμα. Αξιοποιήστε την ηλιακή ενέργεια για να μειώσετε драстικά τον λογαριασμό σας.',
+    wide: false,
+    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
+  },
+  {
+    image: '/images/energy4.jpg',
+    title: 'Ηλεκτροκίνηση',
+    subtitle: 'Οδηγούμε Οικολογικά',
+    description: 'Οδηγούμε οικολογικά, κινούμαστε ηλεκτρικά. Λύσεις φόρτισης και EV για κάθε ανάγκη.',
+    details: 'Λύσεις ηλεκτρικής κίνησης: από την εγκατάσταση σταθμών φόρτισης έως η συμβουλευτική για επιλογή ηλεκτρικού οχήματος. Κινηθείτε βιώσιμα με χαμηλότερο κόστος.',
+    wide: true,
+    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
+  },
+  {
+    image: '/images/energy5.jpg',
+    title: 'Αποθήκευση Ενέργειας',
+    subtitle: 'Αυτονομία & Εξοικονόμηση',
+    description: 'Λύσεις αποθήκευσης ενέργειας με μπαταρίες για αυτονομία και εξοικονόμηση.',
+    details: 'Συστήματα αποθήκευσης ενέργειας για αυτονομία από το δίκτυο. Αποθηκεύστε πλεονάσματα από φωτοβολταϊκά και χρησιμοποιήστε τα όταν χρειάζεστε. Μειώστε το κόστος και αυξήστε την ασφάλεια ενέργειας.',
+    wide: false,
+    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
+  },
+  {
+    image: '/images/energy6.jpg',
+    title: 'Εξοικονόμηση Ενέργειας',
+    subtitle: 'Ανάλυση & Στρατηγική',
+    description: 'Ανάλυση κατανάλωσης και στρατηγικές για μείωση του λογαριασμού ρεύματος.',
+    details: 'Αναλύουμε την κατανάλωσή σου και σου προτείνουμε πραγματικές στρατηγικές για μείωση του λογαριασμού. Με δεδομένα και εμπειρία, βρίσκουμε πάντα τον καλύτερο τρόπο να εξοικονομήσεις.',
+    wide: false,
+    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
+  },
+];
+
 function useScrollReveal() {
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -147,6 +204,7 @@ export default function LandingPage() {
     const saved = localStorage.getItem('theme');
     return saved ? saved === 'dark' : false;
   });
+  const [galleryModal, setGalleryModal] = useState<number | null>(null);
   const journeySectionRef = useRef<HTMLElement>(null);
   const [bgTransform, setBgTransform] = useState('');
   const journeyIndex = Math.min(greekJourney.length - 1, Math.floor((scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)) * greekJourney.length));
@@ -375,7 +433,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="gallery-section">
+        <section className="gallery-section" id="gallery">
           <div className="container">
             <div className="section-heading reveal">
               <div className="eyebrow"><span className="eyebrow-dot" /> Gallery</div>
@@ -383,33 +441,51 @@ export default function LandingPage() {
               <p>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
             </div>
             <div className="gallery-grid">
-              <div className="gallery-item gallery-item-wide reveal stagger-1">
-                <img src="/images/energy1.jpg" alt="Ενεργειακή εγκατάσταση" loading="lazy" />
-                <div className="gallery-overlay"><span>Ρεύμα</span></div>
-              </div>
-              <div className="gallery-item reveal stagger-2">
-                <img src="/images/energy2.jpg" alt="Φωτοβολταϊκά" loading="lazy" />
-                <div className="gallery-overlay"><span>Φωτοβολταϊκά</span></div>
-              </div>
-              <div className="gallery-item reveal stagger-3">
-                <img src="/images/energy3.jpg" alt="Αέριο" loading="lazy" />
-                <div className="gallery-overlay"><span>Αέριο</span></div>
-              </div>
-              <div className="gallery-item reveal stagger-4">
-                <img src="/images/energy4.jpg" alt="Ηλεκτροκίνηση" loading="lazy" />
-                <div className="gallery-overlay"><span>Ηλεκτροκίνηση</span></div>
-              </div>
-              <div className="gallery-item gallery-item-wide reveal stagger-5">
-                <img src="/images/energy5.jpg" alt="Αποθήκευση ενέργειας" loading="lazy" />
-                <div className="gallery-overlay"><span>Αποθήκευση</span></div>
-              </div>
-              <div className="gallery-item reveal stagger-6">
-                <img src="/images/energy6.jpg" alt="Εξοικονόμηση" loading="lazy" />
-                <div className="gallery-overlay"><span>Εξοικονόμηση</span></div>
-              </div>
+              {galleryItems.map((item, i) => (
+                <div
+                  key={item.title}
+                  className={`gallery-item ${item.wide ? 'gallery-item-wide' : ''} reveal stagger-${i + 1}`}
+                  onClick={() => setGalleryModal(i)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <img src={item.image} alt={item.title} loading="lazy" />
+                  <div className="gallery-3d-card">
+                    <div className="gallery-card-inner">
+                      <h3>{item.title}</h3>
+                      <p>{item.subtitle}</p>
+                      <span className="gallery-card-cta">Μάθε περισσότερα →</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
+
+        {galleryModal !== null && (
+          <div className="gallery-modal-overlay" onClick={() => setGalleryModal(null)}>
+            <div className="gallery-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="gallery-modal-close" onClick={() => setGalleryModal(null)}><X size={24} /></button>
+              <div className="gallery-modal-image">
+                <img src={galleryItems[galleryModal].image} alt={galleryItems[galleryModal].title} />
+              </div>
+              <div className="gallery-modal-content">
+                <h2>{galleryItems[galleryModal].title}</h2>
+                <h3>{galleryItems[galleryModal].subtitle}</h3>
+                <p className="gallery-modal-desc">{galleryItems[galleryModal].description}</p>
+                <p className="gallery-modal-details">{galleryItems[galleryModal].details}</p>
+                <div className="gallery-modal-actions">
+                  <a href={galleryItems[galleryModal].link} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                    Μάθε Περισσότερα <ArrowRight size={16} />
+                  </a>
+                  <a href="tel:+302102255000" className="btn btn-ghost">
+                    <Phone size={16} /> Καλέστε μας
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <section className="section section-bg-services" id="services">
           <div className="container">

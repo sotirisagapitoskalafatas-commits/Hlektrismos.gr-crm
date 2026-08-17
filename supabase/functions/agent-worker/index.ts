@@ -16,7 +16,7 @@ serve(async (req: any) => {
     // bypass RLS to read all leads and update agent stats globally.
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     // 1. Fetch new leads that haven't been contacted yet

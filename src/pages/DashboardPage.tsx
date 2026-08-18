@@ -937,8 +937,19 @@ export default function DashboardPage() {
                               </td>
                               <td>
                                 <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
-                                  <button className="btn-delete-lead permanent" onClick={() => softDeleteLead(l.id)} title="Μεταφορά στα Διεγραμμένα">
-                                    <Trash2 size={14} />
+                                  <button
+                                    onClick={() => softDeleteLead(l.id)}
+                                    title="Μεταφορά στα Διεγραμμένα"
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                      padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(231,76,60,0.3)',
+                                      background: 'rgba(231,76,60,0.06)', color: '#e74c3c', cursor: 'pointer',
+                                      fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.15s',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(231,76,60,0.06)'; e.currentTarget.style.color = '#e74c3c'; }}
+                                  >
+                                    <Trash2 size={13} /> Διαγραφή
                                   </button>
                                 </div>
                               </td>

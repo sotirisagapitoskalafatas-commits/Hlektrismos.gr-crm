@@ -38,6 +38,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import SettingsPanel from '@/components/SettingsPanel';
+import DocumentGenerator from '@/components/DocumentGenerator';
 
 type Lead = {
   id: string;
@@ -105,7 +106,7 @@ type Tariff = {
   updated_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents';
 
 const greekRegions = [
   'ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
@@ -616,6 +617,7 @@ export default function DashboardPage() {
     reports: 'Reports',
     users: 'Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚',
     scraper: 'B2B Scraper',
+    documents: '\u0395\u03b3\u03b3\u03c1\u03b1\u03c6\u03ac',
   };
 
   return (
@@ -639,6 +641,7 @@ export default function DashboardPage() {
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
           <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> π“§ Email</button>
         </nav>
+          <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
         <div className="dash-sidebar-footer">
           <div className="dash-user">
             <div className="dash-user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
@@ -1232,6 +1235,9 @@ export default function DashboardPage() {
               <EmailTab toast={toast} setToast={setToast} />
             )}
           </>
+            {tab === 'documents' && (
+              <DocumentGenerator />
+            )}
         )}
       </div>
 
@@ -2825,6 +2831,851 @@ function DeveloperAgentChat() {
     </div>
   );
 }
+
+function EmailTab({ toast, setToast }: {
+  toast: { msg: string; type: 'success' | 'info' } | null;
+  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+}) {
+  const [emails, setEmails] = useState<Array<{
+    id: string; from_email: string; to_email: string; subject: string;
+    body: string; folder: string; is_read: boolean; starred: boolean;
+    important: boolean; spam: boolean; labels: string[]; lead_id?: string;
+    created_at: string; cc?: string; bcc?: string; thread_id?: string;
+  }>>([]);
+  const [labels, setLabels] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [emailSettings, setEmailSettings] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [activeFolder, setActiveFolder] = useState('inbox');
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showCompose, setShowCompose] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showLabelManager, setShowLabelManager] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showScheduleSend, setShowScheduleSend] = useState(false);
+  const [isPlainText, setIsPlainText] = useState(false);
+  const [importConfig, setImportConfig] = useState({ provider: 'gmail', email: '', password: '', imapHost: '', imapPort: '993' });
+  const [newLabel, setNewLabel] = useState({ name: '', color: '#0066cc' });
+  const [editingSettings, setEditingSettings] = useState<Record<string, any>>({});
+  const [leads, setLeads] = useState<Array<{ id: string; first_name: string; last_name: string; email: string }>>([]);
+
+  const folders = [
+    { id: 'inbox', label: '╬Χ╬╣╧Δ╬╡╧Β╧Θ╧Ν╬╝╬╡╬╜╬▒', icon: 'ΏθΥξ' },
+    { id: 'starred', label: '╬Σ╧Δ╧Ε╬φ╧Β╬╣╬▒', icon: 'έφΡ' },
+    { id: 'sent', label: '╬Σ╧Α╬╡╧Δ╧Ε╬▒╬╗╬╝╬φ╬╜╬▒', icon: 'ΏθΥν' },
+    { id: 'drafts', label: '╬ι╧Β╧Ν╧Θ╬╡╬╣╧Β╬▒', icon: 'ΏθΥζ' },
+    { id: 'important', label: '╬μ╬╖╬╝╬▒╬╜╧Ε╬╣╬║╬υ', icon: 'ΏθΠ╖Ύ╕Π' },
+    { id: 'archive', label: '╬Σ╧Β╧Θ╬╡╬ψ╬┐', icon: 'ΏθΥο' },
+    { id: 'spam', label: '╬Σ╬╜╬╡╧Α╬╣╬╕╧Ξ╬╝╬╖╧Ε╬▒', icon: 'έγιΎ╕Π' },
+    { id: 'trash', label: '╬Σ╧Α╬┐╧Β╧Β╬ψ╬╝╬╝╬▒╧Ε╬▒', icon: 'ΏθΩΣΎ╕Π' },
+  ];
+
+  const providers = [
+    { id: 'gmail', label: 'Gmail', icon: 'ΏθΥπ', host: 'imap.gmail.com', port: '993' },
+    { id: 'outlook', label: 'Outlook / Microsoft 365', icon: 'ΏθΥχ', host: 'outlook.office365.com', port: '993' },
+    { id: 'yahoo', label: 'Yahoo Mail', icon: 'ΏθΥυ', host: 'imap.mail.yahoo.com', port: '993' },
+    { id: 'custom', label: '╬ι╧Β╬┐╧Δ╬▒╧Β╬╝╬┐╧Δ╬╝╬φ╬╜╬┐ IMAP', icon: 'ΏθΦπ', host: '', port: '993' },
+  ];
+
+  const labelColors = ['#0066cc', '#00c878', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+  useEffect(() => {
+    (async () => {
+      const [emailsRes, labelsRes, settingsRes, leadsRes] = await Promise.all([
+        supabase.from('crm_emails').select('*').order('created_at', { ascending: false }),
+        supabase.from('crm_email_labels').select('*'),
+        supabase.from('crm_email_settings').select('*'),
+        supabase.from('hlektrismos_leads').select('id, first_name, last_name, email').is('deleted_at', null),
+      ]);
+      if (emailsRes.data) setEmails(emailsRes.data);
+      if (labelsRes.data) setLabels(labelsRes.data);
+      if (leadsRes.data) setLeads(leadsRes.data);
+      const settings: Record<string, any> = {};
+      settingsRes.data?.forEach(s => { settings[s.setting_key] = s.setting_value; });
+      setEmailSettings(settings);
+      setEditingSettings(settings);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filteredEmails = emails.filter(e => {
+    if (activeLabel) return (e.labels || []).includes(activeLabel);
+    if (activeFolder === 'starred') return e.starred;
+    if (activeFolder === 'important') return e.important;
+    if (activeFolder === 'spam') return e.spam;
+    return e.folder === activeFolder;
+  }).filter(e => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return e.subject.toLowerCase().includes(q) || e.from_email.toLowerCase().includes(q) || e.body.toLowerCase().includes(q);
+  });
+
+  const unreadCount = emails.filter(e => e.folder === 'inbox' && !e.is_read && !e.spam).length;
+  const draftCount = emails.filter(e => e.folder === 'drafts').length;
+  const selectedEmailData = emails.find(e => e.id === selectedEmail);
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredEmails.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEmails.map(e => e.id)));
+    }
+  };
+
+  const handleToggleStar = async (id: string) => {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+    await supabase.from('crm_emails').update({ starred: !email.starred }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, starred: !e.starred } : e));
+  };
+
+  const handleToggleImportant = async (id: string) => {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+    await supabase.from('crm_emails').update({ important: !email.important }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, important: !e.important } : e));
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await supabase.from('crm_emails').update({ is_read: true }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: true } : e));
+  };
+
+  const handleMarkUnread = async (id: string) => {
+    await supabase.from('crm_emails').update({ is_read: false }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: false } : e));
+  };
+
+  const handleBulkMarkRead = async () => {
+    const ids = Array.from(selectedIds);
+    await supabase.from('crm_emails').update({ is_read: true }).in('id', ids);
+    setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, is_read: true } : e));
+    setSelectedIds(new Set());
+    setToast({ msg: `${ids.length} emails ╧Δ╬╖╬╝╬υ╬╜╬╕╬╖╬║╬▒╬╜ ╧Κ╧Γ ╬▒╬╜╬▒╬│╬╜╧Κ╧Δ╬╝╬φ╬╜╬▒.`, type: 'success' });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    await supabase.from('crm_emails').update({ folder: 'trash' }).in('id', ids);
+    setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, folder: 'trash' } : e));
+    setSelectedIds(new Set());
+    setToast({ msg: `${ids.length} emails ╬╝╬╡╧Ε╬▒╧Η╬φ╧Β╬╕╬╖╬║╬▒╬╜ ╧Δ╧Ε╬▒ ╬▒╧Α╬┐╧Β╧Β╬ψ╬╝╬╝╬▒╧Ε╬▒.`, type: 'info' });
+  };
+
+  const handleDeleteEmail = async (id: string) => {
+    await supabase.from('crm_emails').update({ folder: 'trash' }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: 'trash' } : e));
+    if (selectedEmail === id) setSelectedEmail(null);
+    setToast({ msg: '╬ν╬┐ email ╬╝╬╡╧Ε╬▒╧Η╬φ╧Β╬╕╬╖╬║╬╡ ╧Δ╧Ε╬▒ ╬▒╧Α╬┐╧Β╧Β╬ψ╬╝╬╝╬▒╧Ε╬▒.', type: 'info' });
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    await supabase.from('crm_emails').delete().eq('id', id);
+    setEmails(prev => prev.filter(e => e.id !== id));
+    if (selectedEmail === id) setSelectedEmail(null);
+  };
+
+  const handleMoveToSpam = async (id: string) => {
+    await supabase.from('crm_emails').update({ spam: true, folder: 'inbox' }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, spam: true } : e));
+  };
+
+  const handleAddLabel = async (emailId: string, labelName: string) => {
+    const email = emails.find(e => e.id === emailId);
+    if (!email) return;
+    const newLabels = [...(email.labels || []), labelName];
+    await supabase.from('crm_emails').update({ labels: newLabels }).eq('id', emailId);
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, labels: newLabels } : e));
+  };
+
+  const handleRemoveLabel = async (emailId: string, labelName: string) => {
+    const email = emails.find(e => e.id === emailId);
+    if (!email) return;
+    const newLabels = (email.labels || []).filter(l => l !== labelName);
+    await supabase.from('crm_emails').update({ labels: newLabels }).eq('id', emailId);
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, labels: newLabels } : e));
+  };
+
+  const handleCreateLabel = async () => {
+    if (!newLabel.name) return;
+    const { data } = await supabase.from('crm_email_labels').insert({ name: newLabel.name, color: newLabel.color }).select();
+    if (data) setLabels(prev => [...prev, data[0]]);
+    setNewLabel({ name: '', color: '#0066cc' });
+    setToast({ msg: '╬Ω ╬╡╧Ε╬╣╬║╬φ╧Ε╬▒ ╬┤╬╖╬╝╬╣╬┐╧Ζ╧Β╬│╬χ╬╕╬╖╬║╬╡!', type: 'success' });
+  };
+
+  const handleDeleteLabel = async (id: string) => {
+    await supabase.from('crm_email_labels').delete().eq('id', id);
+    setLabels(prev => prev.filter(l => l.id !== id));
+  };
+
+  const handleSendEmail = async () => {
+    if (!composeData.to || !composeData.subject) return;
+    const newEmail = {
+      id: 'email_' + Date.now(),
+      from_email: 'info@hlektrismos.gr',
+      to_email: composeData.to,
+      cc: composeData.cc,
+      bcc: composeData.bcc,
+      subject: composeData.subject,
+      body: composeData.body,
+      folder: 'sent',
+      is_read: true,
+      starred: false,
+      important: false,
+      spam: false,
+      labels: [],
+      reply_to: composeData.replyTo,
+      created_at: new Date().toISOString(),
+    };
+    await supabase.from('crm_emails').insert(newEmail);
+    setEmails(prev => [newEmail, ...prev]);
+    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
+    setShowCompose(false);
+    setToast({ msg: '╬ν╬┐ email ╧Δ╧Ε╬υ╬╗╬╕╬╖╬║╬╡!', type: 'success' });
+  };
+
+  const handleSaveDraft = async () => {
+    const draft = {
+      id: 'draft_' + Date.now(),
+      from_email: 'info@hlektrismos.gr',
+      to_email: composeData.to,
+      cc: composeData.cc,
+      bcc: composeData.bcc,
+      subject: composeData.subject || '(╬π╧Κ╧Β╬ψ╧Γ ╬╕╬φ╬╝╬▒)',
+      body: composeData.body,
+      folder: 'drafts',
+      is_read: true,
+      starred: false,
+      important: false,
+      spam: false,
+      labels: [],
+      created_at: new Date().toISOString(),
+    };
+    await supabase.from('crm_emails').insert(draft);
+    setEmails(prev => [draft, ...prev]);
+    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
+    setShowCompose(false);
+    setToast({ msg: '╬ν╬┐ ╧Α╧Β╧Ν╧Θ╬╡╬╣╧Β╬┐ ╬▒╧Α╬┐╬╕╬╖╬║╬╡╧Ξ╧Ε╬╖╬║╬╡.', type: 'info' });
+  };
+
+  const handleImportEmails = async () => {
+    if (!importConfig.email) return;
+    setSyncing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setSyncing(false);
+    setShowImport(false);
+    setToast({ msg: `Emails ╬▒╧Α╧Ν ${importConfig.provider} ╬╡╬╣╧Δ╬χ╧Θ╬╕╬╖╧Δ╬▒╬╜ ╬╡╧Α╬╣╧Ε╧Ζ╧Θ╧Ο╧Γ!`, type: 'success' });
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setSyncing(false);
+    setToast({ msg: '╬ν╬▒ emails ╧Δ╧Ζ╬│╧Θ╧Β╬┐╬╜╬ψ╧Δ╧Ε╬╖╬║╬▒╬╜ ╬╡╧Α╬╣╧Ε╧Ζ╧Θ╧Ο╧Γ!', type: 'success' });
+  };
+
+  const handleSaveSettings = async () => {
+    for (const [key, value] of Object.entries(editingSettings)) {
+      await supabase.from('crm_email_settings').upsert({ setting_key: key, setting_value: value, updated_at: new Date().toISOString() });
+    }
+    setEmailSettings(editingSettings);
+    setShowSettings(false);
+    setToast({ msg: '╬θ╬╣ ╧Β╧Ζ╬╕╬╝╬ψ╧Δ╬╡╬╣╧Γ ╬▒╧Α╬┐╬╕╬╖╬║╬╡╧Ξ╧Ε╬╖╬║╬▒╬╜!', type: 'success' });
+  };
+
+  const handleLinkToLead = async (emailId: string, leadId: string) => {
+    await supabase.from('crm_emails').update({ lead_id: leadId }).eq('id', emailId);
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, lead_id: leadId } : e));
+    setToast({ msg: '╬ν╬┐ email ╧Δ╧Ζ╬╜╬┤╬φ╬╕╬╖╬║╬╡ ╬╝╬╡ ╧Ε╬┐ lead!', type: 'success' });
+  };
+
+  const folderLabelCounts: Record<string, number> = {};
+  folders.forEach(f => {
+    if (f.id === 'starred') folderLabelCounts[f.id] = emails.filter(e => e.starred).length;
+    else if (f.id === 'important') folderLabelCounts[f.id] = emails.filter(e => e.important).length;
+    else if (f.id === 'spam') folderLabelCounts[f.id] = emails.filter(e => e.spam).length;
+    else folderLabelCounts[f.id] = emails.filter(e => e.folder === f.id).length;
+  });
+
+  return (
+    <div className="dash-content" style={{ padding: 0 }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 120px)', minHeight: '600px' }}>
+        {/* Sidebar */}
+        <div style={{ width: '220px', flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '16px' }}>
+            <button className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', borderRadius: '24px', fontSize: '14px', fontWeight: 600 }}
+              onClick={() => { setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false }); setShowCompose(true); }}>
+              έεΚΎ╕Π ╬μ╧Ξ╬╜╧Ε╬▒╬╛╬╖
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
+            {folders.map(f => (
+              <button key={f.id} onClick={() => { setActiveFolder(f.id); setActiveLabel(null); setSelectedEmail(null); setSelectedIds(new Set()); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: activeFolder === f.id && !activeLabel ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent',
+                  color: activeFolder === f.id && !activeLabel ? 'var(--primary)' : 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left', marginBottom: '2px', fontWeight: activeFolder === f.id && !activeLabel ? 600 : 400 }}>
+                <span style={{ fontSize: '16px' }}>{f.icon}</span>
+                <span style={{ flex: 1 }}>{f.label}</span>
+                {folderLabelCounts[f.id] > 0 && f.id === 'inbox' && unreadCount > 0 && (
+                  <span style={{ fontWeight: 700, fontSize: '12px' }}>{unreadCount}</span>
+                )}
+                {folderLabelCounts[f.id] > 0 && f.id !== 'inbox' && f.id !== 'starred' && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{folderLabelCounts[f.id]}</span>
+                )}
+              </button>
+            ))}
+            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>╬Χ╧Ε╬╣╬║╬φ╧Ε╬╡╧Γ</span>
+                <button onClick={() => setShowLabelManager(!showLabelManager)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '16px', padding: '0 4px' }}>+</button>
+              </div>
+              {labels.map(l => (
+                <button key={l.id} onClick={() => { setActiveLabel(l.name); setActiveFolder('inbox'); setSelectedEmail(null); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '6px 12px', background: activeLabel === l.name ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent',
+                    color: activeLabel === l.name ? 'var(--primary)' : 'var(--text)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left', marginBottom: '2px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: l.color, flexShrink: 0 }} />
+                  <span style={{ flex: 1 }}>{l.name}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
+              <button onClick={() => { setShowImport(true); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
+                <span>ΏθΥξ</span> ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ Email
+              </button>
+              <button onClick={() => { setShowSettings(true); setEditingSettings({ ...emailSettings }); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
+                <span>έγβΎ╕Π</span> ╬κ╧Ζ╬╕╬╝╬ψ╧Δ╬╡╬╣╧Γ
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+            <input type="checkbox" checked={selectedIds.size === filteredEmails.length && filteredEmails.length > 0} onChange={handleSelectAll}
+              style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }} />
+            {selectedIds.size > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedIds.size} ╬╡╧Α╬╣╬╗╬╡╬│╬╝╬φ╬╜╬▒</span>
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px' }} onClick={handleBulkMarkRead}>ΏθΥΨ ╬Σ╬╜╬▒╬│╬╜╧Κ╧Δ╬╝╬φ╬╜╬┐</button>
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px', color: '#ef4444' }} onClick={handleBulkDelete}>ΏθΩΣΎ╕Π ╬Φ╬╣╬▒╬│╧Β╬▒╧Η╬χ</button>
+              </div>
+            ) : (
+              <input type="text" placeholder="ΏθΦΞ ╬Σ╬╜╬▒╬╢╬χ╧Ε╬╖╧Δ╬╖ emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ flex: 1, padding: '8px 14px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '20px', color: 'var(--text)', fontSize: '13px', outline: 'none' }} />
+            )}
+            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+              <button className="btn btn-ghost" onClick={handleSync} disabled={syncing} style={{ fontSize: '13px', padding: '6px 12px' }}>
+                {syncing ? 'έΠ│' : 'ΏθΦΕ'} ╬μ╧Ζ╬│╧Θ╧Β╧Ν╬╜╬╣╧Δ╬╖
+              </button>
+            </div>
+          </div>
+
+          {/* Email list + reading pane */}
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* Email list */}
+            <div style={{ width: selectedEmail ? '380px' : '100%', borderRight: selectedEmail ? '1px solid var(--border)' : 'none', overflowY: 'auto' }}>
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>╬ο╧Ν╧Β╧Ε╧Κ╧Δ╬╖...</div>
+              ) : filteredEmails.length === 0 ? (
+                <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>ΏθΥφ</div>
+                  <p style={{ fontSize: '16px', margin: 0 }}>╬Φ╬╡╬╜ ╧Ζ╧Α╬υ╧Β╧Θ╬┐╧Ζ╬╜ emails</p>
+                  <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
+                    {activeFolder === 'inbox' ? '╬ν╬┐ inbox ╧Δ╬▒╧Γ ╬╡╬ψ╬╜╬▒╬╣ ╬υ╬┤╬╡╬╣╬┐.' : '╬Φ╬╡╬╜ ╬▓╧Β╬φ╬╕╬╖╬║╬▒╬╜ emails ╧Δ╬╡ ╬▒╧Ζ╧Ε╧Ν╬╜ ╧Ε╬┐╬╜ ╧Η╬υ╬║╬╡╬╗╬┐.'}
+                  </p>
+                </div>
+              ) : filteredEmails.map(email => (
+                <div key={email.id} onClick={() => { setSelectedEmail(email.id); handleMarkRead(email.id); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                    background: selectedEmail === email.id ? 'var(--primary-10, rgba(0,102,204,0.08))' : email.is_read ? 'transparent' : 'rgba(0,102,204,0.03)',
+                    borderLeft: email.is_read ? '3px solid transparent' : '3px solid var(--primary)' }}>
+                  <input type="checkbox" checked={selectedIds.has(email.id)} onClick={(e) => e.stopPropagation()}
+                    onChange={() => handleToggleSelect(email.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
+                  <button onClick={(e) => { e.stopPropagation(); handleToggleStar(email.id); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: 0, flexShrink: 0, opacity: email.starred ? 1 : 0.3 }}>
+                    {email.starred ? 'έφΡ' : 'έαΗ'}
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: email.is_read ? 400 : 700, fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {email.from_email}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
+                        {email.important && <span style={{ fontSize: '12px' }}>ΏθΠ╖Ύ╕Π</span>}
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {new Date(email.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: email.is_read ? 400 : 600, color: 'var(--text)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {email.subject}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {email.body.substring(0, 80)}...
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {(email.labels || []).map(l => {
+                        const lbl = labels.find(ll => ll.name === l);
+                        return <span key={l} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>{l}</span>;
+                      })}
+                      {email.lead_id && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>ΏθΦΩ Lead</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Reading pane */}
+            {selectedEmail && selectedEmailData && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div>
+                    <h2 style={{ margin: '0 0 8px', fontSize: '20px', color: 'var(--text)' }}>{selectedEmailData.subject}</h2>
+                    <div style={{ display: 'flex', gap: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <span><strong>╬Σ╧Α╧Ν:</strong> {selectedEmailData.from_email}</span>
+                      <span><strong>╬ι╧Β╬┐╧Γ:</strong> {selectedEmailData.to_email}</span>
+                      {selectedEmailData.cc && <span><strong>CC:</strong> {selectedEmailData.cc}</span>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      {new Date(selectedEmailData.created_at).toLocaleString('el-GR')}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <button onClick={() => handleToggleStar(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                      {selectedEmailData.starred ? 'έφΡ' : 'έαΗ'}
+                    </button>
+                    <button onClick={() => handleToggleImportant(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                      {selectedEmailData.important ? 'ΏθΠ╖Ύ╕Π' : 'ΏθΦΨ'}
+                    </button>
+                    <select value="" onChange={(e) => { if (e.target.value) handleAddLabel(selectedEmail, e.target.value); e.target.value = ''; }}
+                      style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
+                      <option value="">ΏθΠ╖Ύ╕Π +╬Χ╧Ε╬╣╬║╬φ╧Ε╬▒</option>
+                      {labels.filter(l => !(selectedEmailData.labels || []).includes(l.name)).map(l => (
+                        <option key={l.id} value={l.name}>{l.name}</option>
+                      ))}
+                    </select>
+                    <select value={selectedEmailData.lead_id || ''} onChange={(e) => handleLinkToLead(selectedEmail, e.target.value)}
+                      style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
+                      <option value="">ΏθΦΩ Lead</option>
+                      {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name}</option>)}
+                    </select>
+                    <button className="btn btn-ghost" onClick={() => handleMarkUnread(selectedEmail)} style={{ fontSize: '12px', padding: '4px 8px' }}>ΏθΥσ</button>
+                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmail)} style={{ color: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>ΏθΩΣΎ╕Π</button>
+                  </div>
+                </div>
+                {(selectedEmailData.labels || []).length > 0 && (
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    {(selectedEmailData.labels || []).map(l => {
+                      const lbl = labels.find(ll => ll.name === l);
+                      return (
+                        <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>
+                          {l}
+                          <button onClick={() => handleRemoveLabel(selectedEmail, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '10px', padding: 0 }}>έεΧ</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{ background: 'var(--bg-2)', borderRadius: '12px', padding: '20px', fontSize: '14px', color: 'var(--text)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                  {selectedEmailData.body}
+                </div>
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary" onClick={() => {
+                    setComposeData({ to: selectedEmailData.from_email, cc: '', bcc: '', subject: `RE: ${selectedEmailData.subject}`, body: '', replyTo: selectedEmailData.id });
+                    setShowCompose(true);
+                  }}>έΗσΎ╕Π ╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖</button>
+                  <button className="btn btn-ghost" onClick={() => {
+                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- ╬ι╧Β╧Κ╧Ε╧Ν╧Ε╧Ζ╧Α╬┐ ╬╝╬χ╬╜╧Ζ╬╝╬▒ ---\n╬Σ╧Α╧Ν: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
+                    setShowCompose(true);
+                  }}>έΗςΎ╕Π ╬ι╧Β╬┐╧Ο╬╕╬╖╧Δ╬╖</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Compose Modal έΑΦ Gmail-Style Enhanced */}
+      {showCompose && (
+        <div style={{
+          position: 'fixed',
+          bottom: isFullScreen ? '0' : '0',
+          right: isFullScreen ? '0' : '60px',
+          top: isFullScreen ? '0' : 'auto',
+          left: isFullScreen ? '0' : 'auto',
+          width: isFullScreen ? '100vw' : '580px',
+          height: isFullScreen ? '100vh' : '520px',
+          background: 'var(--bg)',
+          borderRadius: isFullScreen ? '0' : '12px 12px 0 0',
+          boxShadow: '0 -4px 24px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          border: '1px solid var(--border)',
+          overflow: 'hidden'
+        }}>
+          {/* Modal Header */}
+          <div style={{ padding: '10px 16px', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>╬ζ╬φ╬┐ ╬ε╬χ╬╜╧Ζ╬╝╬▒</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button onClick={() => setIsFullScreen(!isFullScreen)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="╬ι╬╗╬χ╧Β╬╖╧Γ ╬┐╬╕╧Ν╬╜╬╖">
+                {isFullScreen ? 'ΏθΩΩ' : 'ΏθΩΨ'}
+              </button>
+              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="╬γ╬╗╬╡╬ψ╧Δ╬╣╬╝╬┐">έεΨ</button>
+            </div>
+          </div>
+
+          {/* Form Inputs */}
+          <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>╬ι╧Β╬┐╧Γ</span>
+              <input
+                value={composeData.to}
+                onChange={e => setComposeData({...composeData, to: e.target.value})}
+                style={{ flex: 1, padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px' }}
+              />
+              <span style={{ fontSize: '12px', color: 'var(--primary)', cursor: 'pointer', marginLeft: '8px' }} onClick={() => setComposeData({...composeData, showCcBcc: !composeData.showCcBcc})}>
+                Cc Bcc
+              </span>
+            </div>
+
+            {composeData.showCcBcc && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Cc</span>
+                  <input value={composeData.cc} onChange={e => setComposeData({...composeData, cc: e.target.value})} style={{ flex: 1, padding: '6px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '13px' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Bcc</span>
+                  <input value={composeData.bcc} onChange={e => setComposeData({...composeData, bcc: e.target.value})} style={{ flex: 1, padding: '6px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '13px' }} />
+                </div>
+              </>
+            )}
+
+            <div style={{ borderBottom: '1px solid var(--border)' }}>
+              <input
+                placeholder="╬α╬φ╬╝╬▒"
+                value={composeData.subject}
+                onChange={e => setComposeData({...composeData, subject: e.target.value})}
+                style={{ width: '100%', padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}
+              />
+            </div>
+
+            {/* Rich Text Formatting Bar */}
+            {showFormattingToolbar && (
+              <div style={{ display: 'flex', gap: '6px', padding: '6px 8px', background: 'var(--bg-2)', borderRadius: '6px', border: '1px solid var(--border)', margin: '4px 0', alignItems: 'center' }}>
+                <button style={{ fontWeight: 'bold', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>B</button>
+                <button style={{ fontStyle: 'italic', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>I</button>
+                <button style={{ textDecoration: 'underline', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>U</button>
+                <div style={{ height: '16px', width: '1px', background: 'var(--border)' }}></div>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>ΏθΟρ</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>έΚκ</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>1.</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>έΑλ</button>
+              </div>
+            )}
+
+            {/* Body Input Area */}
+            <textarea
+              placeholder="╬Υ╧Β╬υ╧Ι╧Ε╬╡ ╧Ε╬┐ ╬╝╬χ╬╜╧Ζ╬╝╬υ ╧Δ╬▒╧Γ..."
+              value={composeData.body}
+              onChange={e => setComposeData({...composeData, body: e.target.value})}
+              style={{
+                width: '100%', flex: 1, padding: '10px 0', border: 'none', outline: 'none',
+                background: 'transparent', color: 'var(--text)', resize: 'none', fontFamily: isPlainText ? 'monospace' : 'inherit', fontSize: '14px', lineHeight: '1.5'
+              }}
+            />
+          </div>
+
+          {/* Bottom Gmail Action Bar */}
+          <div style={{ padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', background: 'var(--bg)', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+
+              {/* Send Split Button */}
+              <div style={{ display: 'inline-flex', borderRadius: '20px', overflow: 'hidden', background: '#0066cc', marginRight: '8px' }}>
+                <button onClick={handleSendEmail} style={{ padding: '8px 16px', background: 'transparent', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>
+                  ╬Σ╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ
+                </button>
+                <button onClick={() => setShowScheduleSend(!showScheduleSend)} style={{ padding: '8px 8px', background: '#0052a3', color: '#fff', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '10px' }}>
+                  έΨ╝
+                </button>
+              </div>
+
+              {/* Toolbar Control Buttons */}
+              <button title="╬Χ╧Α╬╣╬╗╬┐╬│╬φ╧Γ ╬╝╬┐╧Β╧Η╬┐╧Α╬┐╬ψ╬╖╧Δ╬╖╧Γ" onClick={() => setShowFormattingToolbar(!showFormattingToolbar)} style={{ background: showFormattingToolbar ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }}>Aa</button>
+              <button title="╬Χ╧Α╬╣╧Δ╧Ξ╬╜╬▒╧Ι╬╖ ╬▒╧Β╧Θ╬╡╬ψ╧Κ╬╜" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΥΟ</button>
+              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Δ╧Ζ╬╜╬┤╬φ╧Δ╬╝╬┐╧Ζ" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΦΩ</button>
+              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθαΑ</button>
+              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╬▒╧Β╧Θ╬╡╬ψ╧Κ╬╜ CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΥΒ</button>
+              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Η╧Κ╧Ε╬┐╬│╧Β╬▒╧Η╬ψ╬▒╧Γ" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΨ╝Ύ╕Π</button>
+              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Ζ╧Α╬┐╬│╧Β╬▒╧Η╬χ╧Γ" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΨΛΎ╕Π</button>
+
+              {/* Context Menu Toggle */}
+              <button title="╬ι╬╡╧Β╬╣╧Δ╧Δ╧Ν╧Ε╬╡╧Β╬╡╧Γ ╬╡╧Α╬╣╬╗╬┐╬│╬φ╧Γ" onClick={() => setShowMoreOptions(!showMoreOptions)} style={{ background: showMoreOptions ? 'var(--bg-2)' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>έΜχ</button>
+            </div>
+
+            {/* Discard Draft Button */}
+            <button title="╬Σ╧Α╧Ν╧Β╧Β╬╣╧Ι╬╖ ╧Α╧Β╬┐╧Δ╧Θ╬╡╬┤╬ψ╬┐╧Ζ" onClick={() => setShowCompose(false)} style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)' }}>ΏθΩΣΎ╕Π</button>
+
+            {/* Schedule Send Dropdown Menu */}
+            {showScheduleSend && (
+              <div style={{ position: 'absolute', bottom: '50px', left: '16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '8px 0', width: '200px' }}>
+                <div style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬╣╧Δ╬╝╧Ν╧Γ ╬▒╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ╧Γ</div>
+                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: '╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬ψ╧Δ╧Ε╬╖╬║╬╡ ╬│╬╣╬▒ ╬▒╧Ξ╧Β╬╣╬┐ 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΝΖ ╬Σ╧Ξ╧Β╬╣╬┐ ╧Ε╬┐ ╧Α╧Β╧Κ╬ψ (08:00)
+                </button>
+                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: '╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬ψ╧Δ╧Ε╬╖╬║╬╡ ╬│╬╣╬▒ ╧Ε╬╖ ╬Φ╬╡╧Ζ╧Ε╬φ╧Β╬▒ 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΥΖ ╬Φ╬╡╧Ζ╧Ε╬φ╧Β╬▒ ╧Ε╬┐ ╧Α╧Β╧Κ╬ψ (08:00)
+                </button>
+              </div>
+            )}
+
+            {/* Gmail Options Popover Menu */}
+            {showMoreOptions && (
+              <div style={{ position: 'absolute', bottom: '50px', left: '210px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '6px 0', width: '220px' }}>
+                <button onClick={() => { setIsFullScreen(!isFullScreen); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΩΨ ╬ι╧Β╬┐╬╡╧Α╬╣╬╗╬┐╬│╬χ ╧Δ╬╡ ╧Α╬╗╬χ╧Β╬╖ ╬┐╬╕╧Ν╬╜╬╖
+                </button>
+                <button onClick={() => { setIsPlainText(!isPlainText); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  {isPlainText ? 'έεΥ ╬δ╬╡╬╣╧Ε╬┐╧Ζ╧Β╬│╬ψ╬▒ ╬▒╧Α╬╗╬┐╧Ξ ╬║╬╡╬╣╬╝╬φ╬╜╬┐╧Ζ' : 'ΏθΥζ ╬δ╬╡╬╣╧Ε╬┐╧Ζ╧Β╬│╬ψ╬▒ ╬▒╧Α╬╗╬┐╧Ξ ╬║╬╡╬╣╬╝╬φ╬╜╬┐╧Ζ'}
+                </button>
+                <button onClick={() => { window.print(); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΨρΎ╕Π ╬Χ╬║╧Ε╧Ξ╧Α╧Κ╧Δ╬╖
+                </button>
+                <button onClick={() => { setShowLabelManager(true); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΠ╖Ύ╕Π ╬Χ╧Ε╬╣╬║╬φ╧Ε╬▒...
+                </button>
+                <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }}></div>
+                <button onClick={() => { setToast({ msg: '╬Φ╬╖╬╝╬╣╬┐╧Ζ╧Β╬│╬χ╬╕╬╖╬║╬╡ ╧Δ╧Ξ╬╜╬┤╬╡╧Δ╬╝╬┐╧Γ ╧Δ╧Ζ╬╜╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ', type: 'info' }); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΥΖ ╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬╣╧Δ╬╝╧Ν╧Γ ╧Δ╧Ζ╬╜╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <div className="modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h3>ΏθΥξ ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
+                ╬μ╧Ζ╬╜╬┤╬φ╧Δ╧Ε╬╡ ╧Ε╬┐╬╜ email ╬╗╬┐╬│╬▒╧Β╬╣╬▒╧Δ╬╝╧Ν ╧Δ╬▒╧Γ ╬│╬╣╬▒ ╬╡╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Ζ╧Α╬▒╧Β╧Θ╧Ν╬╜╧Ε╧Κ╬╜ emails ╧Δ╧Ε╬┐ CRM.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                {providers.map(p => (
+                  <button key={p.id} onClick={() => { const pp = providers.find(pr => pr.id === p.id); setImportConfig({ ...importConfig, provider: p.id, imapHost: pp?.host || '', imapPort: pp?.port || '993' }); }}
+                    style={{ padding: '16px', background: importConfig.provider === p.id ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'var(--bg-2)', border: `2px solid ${importConfig.provider === p.id ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '6px' }}>{p.icon}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{p.label}</div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input placeholder="Email address" value={importConfig.email} onChange={(e) => setImportConfig({ ...importConfig, email: e.target.value })} />
+                <input type="password" placeholder="Password / App Password" value={importConfig.password} onChange={(e) => setImportConfig({ ...importConfig, password: e.target.value })} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input placeholder="IMAP Server" value={importConfig.imapHost} onChange={(e) => setImportConfig({ ...importConfig, imapHost: e.target.value })} style={{ flex: 2 }} />
+                  <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
+                </div>
+                <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing} style={{ width: '100%', padding: '12px' }}>
+                  {syncing ? 'έΠ│ ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ...' : 'ΏθΥξ ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ Emails'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Label Manager Modal */}
+      {showLabelManager && (
+        <div className="modal-overlay" onClick={() => setShowLabelManager(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-header"><h3>ΏθΠ╖Ύ╕Π ╬Φ╬╣╬▒╧Θ╬╡╬ψ╧Β╬╣╧Δ╬╖ ╬Χ╧Ε╬╣╬║╬╡╧Ε╧Ο╬╜</h3><button className="modal-close" onClick={() => setShowLabelManager(false)}>x</button></div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <input placeholder="╬ζ╬φ╬▒ ╬╡╧Ε╬╣╬║╬φ╧Ε╬▒..." value={newLabel.name} onChange={(e) => setNewLabel({ ...newLabel, name: e.target.value })}
+                  style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+                <input type="color" value={newLabel.color} onChange={(e) => setNewLabel({ ...newLabel, color: e.target.value })}
+                  style={{ width: '40px', height: '36px', padding: '2px', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer' }} />
+                <button className="btn btn-primary" onClick={handleCreateLabel}>╬ι╧Β╬┐╧Δ╬╕╬χ╬║╬╖</button>
+              </div>
+              {labels.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: l.color }} />
+                  <span style={{ flex: 1, fontSize: '14px', color: 'var(--text)' }}>{l.name}</span>
+                  <button onClick={() => handleDeleteLabel(l.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>ΏθΩΣΎ╕Π</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && editingSettings.general && (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflow: 'auto' }}>
+            <div className="modal-header"><h3>έγβΎ╕Π ╬κ╧Ζ╬╕╬╝╬ψ╧Δ╬╡╬╣╧Γ Email</h3><button className="modal-close" onClick={() => setShowSettings(false)}>x</button></div>
+            <div className="modal-body">
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>╬Υ╬╡╬╜╬╣╬║╬υ</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ι╧Ζ╬║╬╜╧Ν╧Ε╬╖╧Ε╬▒</label>
+                  <select value={editingSettings.general.density} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, density: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="default">Default</option>
+                    <option value="comfortable">╬Η╬╜╬╡╧Ε╬╖</option>
+                    <option value="compact">╬μ╧Ζ╬╝╧Α╬▒╬│╬χ╧Γ</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ν╧Ξ╧Α╬┐╧Γ Inbox</label>
+                  <select value={editingSettings.general.inbox_type} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, inbox_type: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="default">Default</option>
+                    <option value="important">╬μ╬╖╬╝╬▒╬╜╧Ε╬╣╬║╬υ ╧Α╧Β╧Ο╧Ε╬▒</option>
+                    <option value="unread">╬ε╬╖ ╬▒╬╜╬▒╬│╬╜╧Κ╧Δ╬╝╬φ╬╜╬▒ ╧Α╧Β╧Ο╧Ε╬▒</option>
+                    <option value="starred">╬Σ╧Δ╧Ε╬φ╧Β╬╣╬▒ ╧Α╧Β╧Ο╧Ε╬▒</option>
+                    <option value="priority">Priority Inbox</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ι╬▒╧Β╬υ╬╕╧Ζ╧Β╬┐ ╬▒╬╜╬υ╬│╬╜╧Κ╧Δ╬╖╧Γ</label>
+                  <select value={editingSettings.general.reading_pane} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, reading_pane: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="no_split">╬π╧Κ╧Β╬ψ╧Γ ╬┤╬╣╬▒╬ψ╧Β╬╡╧Δ╬╖</option>
+                    <option value="right">╬Φ╬╡╬╛╬╣╬υ ╧Ε╬┐╧Ζ inbox</option>
+                    <option value="below">╬γ╬υ╧Ε╧Κ ╬▒╧Α╧Ν ╧Ε╬┐ inbox</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬Σ╬║╧Ξ╧Β╧Κ╧Δ╬╖ ╬▒╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ╧Γ (╬┤╬╡╧Ζ╧Ε.)</label>
+                  <select value={editingSettings.general.undo_send} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, undo_send: parseInt(e.target.value) } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value={5}>5 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
+                    <option value={10}>10 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
+                    <option value={20}>20 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
+                    <option value={30}>30 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ι╧Β╬┐╬╡╧Α╬╣╬╗╬╡╬│╬╝╬φ╬╜╬╖ ╬▒╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖</label>
+                  <select value={editingSettings.general.default_reply} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, default_reply: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="reply">╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖</option>
+                    <option value="reply_all">╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖ ╧Δ╬╡ ╧Ν╬╗╬┐╧Ζ╧Γ</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ε╬φ╬│╬╣╧Δ╧Ε╬┐ ╧Δ╬╡╬╗╬ψ╬┤╬▒╧Γ</label>
+                  <select value={editingSettings.general.max_page_size} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, max_page_size: parseInt(e.target.value) } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                {[
+                  { key: 'hover_actions', label: '╬Χ╬╜╬φ╧Β╬│╬╡╬╣╬╡╧Γ hover' },
+                  { key: 'send_archive', label: '╬γ╬┐╧Ζ╬╝╧Α╬ψ "╬Σ╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ & ╬Σ╧Β╧Θ╬╡╬╣╬┐╬╕╬φ╧Ε╬╖╧Δ╬╖"' },
+                  { key: 'snippets', label: '╬Σ╧Α╬┐╧Δ╧Α╬υ╧Δ╬╝╬▒╧Ε╬▒ ╬╝╬╖╬╜╧Ζ╬╝╬υ╧Ε╧Κ╬╜' },
+                  { key: 'conversation_view', label: '╬ι╧Β╬┐╬▓╬┐╬╗╬χ ╧Δ╧Ζ╬╢╬χ╧Ε╬╖╧Δ╬╖╧Γ (threading)' },
+                  { key: 'keyboard_shortcuts', label: '╬ι╬╗╬χ╬║╧Ε╧Β╬▒ ╧Δ╧Ζ╬╜╧Ε╬┐╬╝╬╡╧Ξ╧Δ╬╡╧Κ╬╜' },
+                ].map(opt => (
+                  <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                    <input type="checkbox" checked={editingSettings.general[opt.key]}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, [opt.key]: e.target.checked } })}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>╬ξ╧Α╬┐╬│╧Β╬▒╧Η╬χ</h4>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
+                  <input type="checkbox" checked={editingSettings.signature?.enabled || false}
+                    onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, enabled: e.target.checked } })}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                  ╬Χ╬╜╬╡╧Β╬│╬┐╧Α╬┐╬ψ╬╖╧Δ╬╖ ╧Ζ╧Α╬┐╬│╧Β╬▒╧Η╬χ╧Γ
+                </label>
+                {editingSettings.signature?.enabled && (
+                  <textarea value={editingSettings.signature?.content || ''} onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, content: e.target.value } })}
+                    placeholder="╬ν╧Β╬φ╧Θ╬┐╧Ζ╧Δ╬▒ ╧Ζ╧Α╬┐╬│╧Β╬▒╧Η╬χ..."
+                    style={{ width: '100%', minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
+                )}
+              </div>
+
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>╬Σ╧Ζ╧Ε╧Ν╬╝╬▒╧Ε╬╖ ╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖ (Vacation Responder)</h4>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
+                  <input type="checkbox" checked={editingSettings.vacation?.enabled || false}
+                    onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, enabled: e.target.checked } })}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                  ╬Χ╬╜╬╡╧Β╬│╬┐╧Α╬┐╬ψ╬╖╧Δ╬╖ ╬▒╧Ζ╧Ε╧Ν╬╝╬▒╧Ε╬╖╧Γ ╬▒╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ
+                </label>
+                {editingSettings.vacation?.enabled && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input placeholder="╬α╬φ╬╝╬▒" value={editingSettings.vacation?.subject || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, subject: e.target.value } })} />
+                    <textarea value={editingSettings.vacation?.message || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, message: e.target.value } })}
+                      placeholder="╬ε╬χ╬╜╧Ζ╬╝╬▒ ╬▒╧Ζ╧Ε╧Ν╬╝╬▒╧Ε╬╖╧Γ ╬▒╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ..."
+                      style={{ minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬Σ╧Α╧Ν</label>
+                        <input type="date" value={editingSettings.vacation?.start_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, start_date: e.target.value } })}
+                          style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬Ι╧Κ╧Γ</label>
+                        <input type="date" value={editingSettings.vacation?.end_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, end_date: e.target.value } })}
+                          style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+                      </div>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>
+                      <input type="checkbox" checked={editingSettings.vacation?.contacts_only || false}
+                        onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, contacts_only: e.target.checked } })}
+                        style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
+                      ╬Σ╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ ╬╝╧Ν╬╜╬┐ ╧Δ╬╡ ╬╡╧Α╬▒╧Η╬φ╧Γ
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>╬Η╬║╧Ζ╧Β╬┐</button>
+                <button className="btn btn-primary" onClick={handleSaveSettings}>╬Σ╧Α╬┐╬╕╬χ╬║╬╡╧Ζ╧Δ╬╖ ╬κ╧Ζ╬╕╬╝╬ψ╧Δ╬╡╧Κ╬╜</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, setConfigAgent, loadData }: {
   agents: Agent[];

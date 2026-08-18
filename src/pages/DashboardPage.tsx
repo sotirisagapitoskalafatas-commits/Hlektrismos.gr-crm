@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useState, useRef } from 'react';
 import {
   Activity,
   Bot,
@@ -108,65 +108,65 @@ type Tariff = {
 type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email';
 
 const greekRegions = [
-  'Όλη η Ελλάδα',
-  'Αττική',
-  'Αθήνα',
-  'Πειραιάς',
-  'Θεσσαλονίκη',
-  'Κεντρική Μακεδονία',
-  'Δυτική Μακεδονία',
-  'Ανατολική Μακεδονία & Θράκη',
-  'Ήπειρος',
-  'Θεσσαλία',
-  'Ιόνια Νησιά',
-  'Κέρκυρα',
-  'Ζάκυνθος',
-  'Λευκάδα',
-  'Κεφαλλονιά',
-  'Ιθάκη',
-  'Παξοί',
-  'Αντικέρα',
-  'Δυτική Ελλάδα',
-  'Πάτρα',
-  'Αιγαλεώ',
-  'Στερεά Ελλάδα',
-  'Λιβαδειά',
-  'Χαλκίδα',
-  'Πελοπόννησος',
-  'Νησιά Αιγαίου',
-  'Μύκονος',
-  'Σαντορίνη',
-  'Πάρος',
-  'Νάξος',
-  'Μήλος',
-  'Κρήτη',
-  'Ηράκλειο',
-  'Χανιά',
-  'Ρέθυμνο',
-  'Λασίθι',
-  'Βόρειο Αιγαίο',
-  'Λέσβος',
-  'Χίος',
-  'Σάμος',
-  'Δωδεκάνησα',
-  'Ρόδος',
-  'Κως',
-  'Καλύμνος',
+  'ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
+  'Ξ‘Ο„Ο„ΞΉΞΊΞ®',
+  'Ξ‘ΞΈΞ®Ξ½Ξ±',
+  'Ξ ΞµΞΉΟΞ±ΞΉΞ¬Ο‚',
+  'ΞΞµΟƒΟƒΞ±Ξ»ΞΏΞ½Ξ―ΞΊΞ·',
+  'ΞΞµΞ½Ο„ΟΞΉΞΊΞ® ΞΞ±ΞΊΞµΞ΄ΞΏΞ½Ξ―Ξ±',
+  'Ξ”Ο…Ο„ΞΉΞΊΞ® ΞΞ±ΞΊΞµΞ΄ΞΏΞ½Ξ―Ξ±',
+  'Ξ‘Ξ½Ξ±Ο„ΞΏΞ»ΞΉΞΊΞ® ΞΞ±ΞΊΞµΞ΄ΞΏΞ½Ξ―Ξ± & ΞΟΞ¬ΞΊΞ·',
+  'Ξ‰Ο€ΞµΞΉΟΞΏΟ‚',
+  'ΞΞµΟƒΟƒΞ±Ξ»Ξ―Ξ±',
+  'Ξ™ΟΞ½ΞΉΞ± ΞΞ·ΟƒΞΉΞ¬',
+  'ΞΞ­ΟΞΊΟ…ΟΞ±',
+  'Ξ–Ξ¬ΞΊΟ…Ξ½ΞΈΞΏΟ‚',
+  'Ξ›ΞµΟ…ΞΊΞ¬Ξ΄Ξ±',
+  'ΞΞµΟ†Ξ±Ξ»Ξ»ΞΏΞ½ΞΉΞ¬',
+  'Ξ™ΞΈΞ¬ΞΊΞ·',
+  'Ξ Ξ±ΞΎΞΏΞ―',
+  'Ξ‘Ξ½Ο„ΞΉΞΊΞ­ΟΞ±',
+  'Ξ”Ο…Ο„ΞΉΞΊΞ® Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
+  'Ξ Ξ¬Ο„ΟΞ±',
+  'Ξ‘ΞΉΞ³Ξ±Ξ»ΞµΟ',
+  'Ξ£Ο„ΞµΟΞµΞ¬ Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
+  'Ξ›ΞΉΞ²Ξ±Ξ΄ΞµΞΉΞ¬',
+  'Ξ§Ξ±Ξ»ΞΊΞ―Ξ΄Ξ±',
+  'Ξ ΞµΞ»ΞΏΟ€ΟΞ½Ξ½Ξ·ΟƒΞΏΟ‚',
+  'ΞΞ·ΟƒΞΉΞ¬ Ξ‘ΞΉΞ³Ξ±Ξ―ΞΏΟ…',
+  'ΞΟΞΊΞΏΞ½ΞΏΟ‚',
+  'Ξ£Ξ±Ξ½Ο„ΞΏΟΞ―Ξ½Ξ·',
+  'Ξ Ξ¬ΟΞΏΟ‚',
+  'ΞΞ¬ΞΎΞΏΟ‚',
+  'ΞΞ®Ξ»ΞΏΟ‚',
+  'ΞΟΞ®Ο„Ξ·',
+  'Ξ—ΟΞ¬ΞΊΞ»ΞµΞΉΞΏ',
+  'Ξ§Ξ±Ξ½ΞΉΞ¬',
+  'Ξ΅Ξ­ΞΈΟ…ΞΌΞ½ΞΏ',
+  'Ξ›Ξ±ΟƒΞ―ΞΈΞΉ',
+  'Ξ’ΟΟΞµΞΉΞΏ Ξ‘ΞΉΞ³Ξ±Ξ―ΞΏ',
+  'Ξ›Ξ­ΟƒΞ²ΞΏΟ‚',
+  'Ξ§Ξ―ΞΏΟ‚',
+  'Ξ£Ξ¬ΞΌΞΏΟ‚',
+  'Ξ”Ο‰Ξ΄ΞµΞΊΞ¬Ξ½Ξ·ΟƒΞ±',
+  'Ξ΅ΟΞ΄ΞΏΟ‚',
+  'ΞΟ‰Ο‚',
+  'ΞΞ±Ξ»ΟΞΌΞ½ΞΏΟ‚',
 ];
 
 const handoffOptions = [
-  { value: 'Interest Confirmed', label: 'Ενδιαφέρον Επιβεβαιώθηκε' },
-  { value: 'Pricing Requested', label: 'Αίτημα Τιμολόγησης' },
-  { value: 'Meeting Booked', label: 'Ραντεβού Κλείστηκε' },
-  { value: 'Contract Ready', label: 'Έτοιμο για Σύμβαση' },
-  { value: 'Complex Inquiry', label: 'Σύνθετο Αίτημα' },
-  { value: 'Technical Issue', label: 'Τεχνικό Πρόβλημα' },
-  { value: 'Angry Lead', label: 'Ενόχληση/Δυσαρέσκεια' },
-  { value: 'Budget Discussion', label: 'Συζήτηση Προϋπολογισμού' },
-  { value: 'Multi-property', label: 'Πολλαπλά Ακίνητα' },
+  { value: 'Interest Confirmed', label: 'Ξ•Ξ½Ξ΄ΞΉΞ±Ο†Ξ­ΟΞΏΞ½ Ξ•Ο€ΞΉΞ²ΞµΞ²Ξ±ΞΉΟΞΈΞ·ΞΊΞµ' },
+  { value: 'Pricing Requested', label: 'Ξ‘Ξ―Ο„Ξ·ΞΌΞ± Ξ¤ΞΉΞΌΞΏΞ»ΟΞ³Ξ·ΟƒΞ·Ο‚' },
+  { value: 'Meeting Booked', label: 'Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ ΞΞ»ΞµΞ―ΟƒΟ„Ξ·ΞΊΞµ' },
+  { value: 'Contract Ready', label: 'ΞΟ„ΞΏΞΉΞΌΞΏ Ξ³ΞΉΞ± Ξ£ΟΞΌΞ²Ξ±ΟƒΞ·' },
+  { value: 'Complex Inquiry', label: 'Ξ£ΟΞ½ΞΈΞµΟ„ΞΏ Ξ‘Ξ―Ο„Ξ·ΞΌΞ±' },
+  { value: 'Technical Issue', label: 'Ξ¤ΞµΟ‡Ξ½ΞΉΞΊΟ Ξ ΟΟΞ²Ξ»Ξ·ΞΌΞ±' },
+  { value: 'Angry Lead', label: 'Ξ•Ξ½ΟΟ‡Ξ»Ξ·ΟƒΞ·/Ξ”Ο…ΟƒΞ±ΟΞ­ΟƒΞΊΞµΞΉΞ±' },
+  { value: 'Budget Discussion', label: 'Ξ£Ο…Ξ¶Ξ®Ο„Ξ·ΟƒΞ· Ξ ΟΞΏΟ‹Ο€ΞΏΞ»ΞΏΞ³ΞΉΟƒΞΌΞΏΟ' },
+  { value: 'Multi-property', label: 'Ξ ΞΏΞ»Ξ»Ξ±Ο€Ξ»Ξ¬ Ξ‘ΞΊΞ―Ξ½Ξ·Ο„Ξ±' },
   { value: 'B2B Decision Maker', label: 'B2B Decision Maker' },
-  { value: 'VIP Customer', label: 'VIP Πελάτης' },
-  { value: 'Legal/Compliance', label: 'Νομικό/Compliance' },
+  { value: 'VIP Customer', label: 'VIP Ξ ΞµΞ»Ξ¬Ο„Ξ·Ο‚' },
+  { value: 'Legal/Compliance', label: 'ΞΞΏΞΌΞΉΞΊΟ/Compliance' },
 ];
 
 function canActivateAI(lead: Lead): boolean {
@@ -265,7 +265,7 @@ export default function DashboardPage() {
     const filesToLoad = openLead.bill_files && openLead.bill_files.length > 0
       ? openLead.bill_files
       : openLead.bill_file_path
-        ? [{ path: openLead.bill_file_path, name: openLead.bill_file_name || 'Λογαριασμός', type: 'application/pdf', size: 0 }]
+        ? [{ path: openLead.bill_file_path, name: openLead.bill_file_name || 'Ξ›ΞΏΞ³Ξ±ΟΞΉΞ±ΟƒΞΌΟΟ‚', type: 'application/pdf', size: 0 }]
         : [];
 
     if (filesToLoad.length === 0) {
@@ -296,8 +296,8 @@ export default function DashboardPage() {
   const createNewConversation = () => {
     const newConv = {
       id: crypto.randomUUID(),
-      title: `Νέα Συνομιλία ${hubConversations.length + 1}`,
-      messages: [{ role: 'assistant' as const, text: 'Γεια σου! Είμαι ο Master Orchestrator της Hlektrismos.gr. Πώς μπορώ να σε βοηθήσω με τα AI agents;' }],
+      title: `ΞΞ­Ξ± Ξ£Ο…Ξ½ΞΏΞΌΞΉΞ»Ξ―Ξ± ${hubConversations.length + 1}`,
+      messages: [{ role: 'assistant' as const, text: 'Ξ“ΞµΞΉΞ± ΟƒΞΏΟ…! Ξ•Ξ―ΞΌΞ±ΞΉ ΞΏ Master Orchestrator Ο„Ξ·Ο‚ Hlektrismos.gr. Ξ ΟΟ‚ ΞΌΟ€ΞΏΟΟ Ξ½Ξ± ΟƒΞµ Ξ²ΞΏΞ·ΞΈΞ®ΟƒΟ‰ ΞΌΞµ Ο„Ξ± AI agents;' }],
       selectedAgents: [],
       contextId: null,
       createdAt: new Date(),
@@ -343,7 +343,7 @@ export default function DashboardPage() {
       // Create conversation objects from history
       const historyConvs = Array.from(convMap.entries()).map(([ctxId, msgs]) => ({
         id: ctxId,
-        title: msgs[0]?.content?.slice(0, 50) || `Ιστορικό ${ctxId.slice(0, 8)}`,
+        title: msgs[0]?.content?.slice(0, 50) || `Ξ™ΟƒΟ„ΞΏΟΞΉΞΊΟ ${ctxId.slice(0, 8)}`,
         messages: msgs.map(m => ({ role: m.role as 'user' | 'assistant', text: m.content })),
         selectedAgents: [],
         contextId: ctxId,
@@ -377,14 +377,14 @@ export default function DashboardPage() {
 
   const runAgents = async () => {
     setRunningAgents(true);
-    setToast({ msg: 'Εκκίνηση Agent Engine...', type: 'info' });
+    setToast({ msg: 'Ξ•ΞΊΞΊΞ―Ξ½Ξ·ΟƒΞ· Agent Engine...', type: 'info' });
     try {
       const { data, error } = await supabase.functions.invoke('agent-worker');
       if (error) throw error;
-      setToast({ msg: data.message || 'Οι AI Agents ολοκλήρωσαν την εκτέλεση.', type: 'success' });
+      setToast({ msg: data.message || 'ΞΞΉ AI Agents ΞΏΞ»ΞΏΞΊΞ»Ξ®ΟΟ‰ΟƒΞ±Ξ½ Ο„Ξ·Ξ½ ΞµΞΊΟ„Ξ­Ξ»ΞµΟƒΞ·.', type: 'success' });
       loadData();
     } catch (e) {
-      setToast({ msg: 'Σφάλμα κατά την εκτέλεση των Agents.', type: 'info' });
+      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ± ΞΊΞ±Ο„Ξ¬ Ο„Ξ·Ξ½ ΞµΞΊΟ„Ξ­Ξ»ΞµΟƒΞ· Ο„Ο‰Ξ½ Agents.', type: 'info' });
     }
     setRunningAgents(false);
   };
@@ -408,7 +408,7 @@ export default function DashboardPage() {
     await supabase.from('ai_agents').update(updates).eq('id', configAgent.id);
     setConfigAgent({ ...configAgent, ...updates });
     loadData();
-    setToast({ msg: 'Η διαμόρφωση του agent αποθηκεύτηκε.', type: 'success' });
+    setToast({ msg: 'Ξ— Ξ΄ΞΉΞ±ΞΌΟΟΟ†Ο‰ΟƒΞ· Ο„ΞΏΟ… agent Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΟ„Ξ·ΞΊΞµ.', type: 'success' });
   };
 
   const createSource = async () => {
@@ -432,20 +432,20 @@ export default function DashboardPage() {
   const softDeleteLead = async (leadId: string) => {
     await supabase.from('hlektrismos_leads').update({ deleted_at: new Date().toISOString() }).eq('id', leadId);
     setConfirmDeleteId(null);
-    setToast({ msg: 'Το lead μεταφέρθηκε στα διεγραμμένα.', type: 'success' });
+    setToast({ msg: 'Ξ¤ΞΏ lead ΞΌΞµΟ„Ξ±Ο†Ξ­ΟΞΈΞ·ΞΊΞµ ΟƒΟ„Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±.', type: 'success' });
     loadData();
   };
 
   const restoreLead = async (leadId: string) => {
     await supabase.from('hlektrismos_leads').update({ deleted_at: null }).eq('id', leadId);
-    setToast({ msg: 'Το lead αποκαταστάθηκε.', type: 'success' });
+    setToast({ msg: 'Ξ¤ΞΏ lead Ξ±Ο€ΞΏΞΊΞ±Ο„Ξ±ΟƒΟ„Ξ¬ΞΈΞ·ΞΊΞµ.', type: 'success' });
     loadData();
   };
 
   const permanentDeleteLead = async (leadId: string) => {
     await supabase.from('hlektrismos_leads').delete().eq('id', leadId);
     setConfirmDeleteId(null);
-    setToast({ msg: 'Το lead διαγράφηκε μόνιμα.', type: 'success' });
+    setToast({ msg: 'Ξ¤ΞΏ lead Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ ΞΌΟΞ½ΞΉΞΌΞ±.', type: 'success' });
     loadData();
   };
 
@@ -454,7 +454,7 @@ export default function DashboardPage() {
     const ids = Array.from(selectedLeads);
     await supabase.from('hlektrismos_leads').update({ deleted_at: new Date().toISOString() }).in('id', ids);
     setSelectedLeads(new Set());
-    setToast({ msg: `${ids.length} leads μεταφέρθηκαν στα διεγραμμένα.`, type: 'success' });
+    setToast({ msg: `${ids.length} leads ΞΌΞµΟ„Ξ±Ο†Ξ­ΟΞΈΞ·ΞΊΞ±Ξ½ ΟƒΟ„Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±.`, type: 'success' });
     loadData();
   };
 
@@ -478,20 +478,20 @@ export default function DashboardPage() {
   const softDeleteAgent = async (agentId: string) => {
     await supabase.from('ai_agents').update({ deleted_at: new Date().toISOString() }).eq('id', agentId);
     setConfirmDeleteAgentId(null);
-    setToast({ msg: 'Το agent μεταφέρθηκε στα διεγραμμένα.', type: 'success' });
+    setToast({ msg: 'Ξ¤ΞΏ agent ΞΌΞµΟ„Ξ±Ο†Ξ­ΟΞΈΞ·ΞΊΞµ ΟƒΟ„Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±.', type: 'success' });
     loadData();
   };
 
   const restoreAgent = async (agentId: string) => {
     await supabase.from('ai_agents').update({ deleted_at: null }).eq('id', agentId);
-    setToast({ msg: 'Το agent αποκαταστάθηκε.', type: 'success' });
+    setToast({ msg: 'Ξ¤ΞΏ agent Ξ±Ο€ΞΏΞΊΞ±Ο„Ξ±ΟƒΟ„Ξ¬ΞΈΞ·ΞΊΞµ.', type: 'success' });
     loadData();
   };
 
   const permanentDeleteAgent = async (agentId: string) => {
     await supabase.from('ai_agents').delete().eq('id', agentId);
     setConfirmDeleteAgentId(null);
-    setToast({ msg: 'Το agent διαγράφηκε μόνιμα.', type: 'success' });
+    setToast({ msg: 'Ξ¤ΞΏ agent Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ ΞΌΟΞ½ΞΉΞΌΞ±.', type: 'success' });
     loadData();
   };
 
@@ -500,16 +500,16 @@ export default function DashboardPage() {
     const now = new Date().toISOString();
     await supabase.from('market_tariffs').update({ updated_at: now }).in('resource', ['Electricity', 'Natural Gas', 'Photovoltaic']);
     setSyncing(false);
-    setToast({ msg: 'Η βάση γνώσης ενημερώθηκε.', type: 'success' });
+    setToast({ msg: 'Ξ— Ξ²Ξ¬ΟƒΞ· Ξ³Ξ½ΟΟƒΞ·Ο‚ ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ.', type: 'success' });
     loadData();
   };
 
   const updateTariffPrice = async (t: Tariff) => {
-    const newPrice = prompt(`Εισάγετε νέα τιμή για το ${t.tariff_name}:`, t.price_eur.toString());
+    const newPrice = prompt(`Ξ•ΞΉΟƒΞ¬Ξ³ΞµΟ„Ξµ Ξ½Ξ­Ξ± Ο„ΞΉΞΌΞ® Ξ³ΞΉΞ± Ο„ΞΏ ${t.tariff_name}:`, t.price_eur.toString());
     if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
       await supabase.from('market_tariffs').update({ price_eur: parseFloat(newPrice), updated_at: new Date().toISOString() }).eq('id', t.id);
       loadData();
-      setToast({ msg: 'Η τιμή ενημερώθηκε.', type: 'success' });
+      setToast({ msg: 'Ξ— Ο„ΞΉΞΌΞ® ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ.', type: 'success' });
     }
   };
 
@@ -600,21 +600,21 @@ export default function DashboardPage() {
     const activeAgent = configAgent || agents[0];
     if (!activeAgent) return '';
     const tariffLines = tariffs.map((t) => `  - ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n');
-    return `Είσαι ο ${activeAgent.name}, ένας αυτόνομος ${activeAgent.channel} agent της Hlektrismos.gr.\n\nΒΑΣΙΚΟ PROMPT:\n${activeAgent.base_prompt || '(Δεν έχει οριστεί base prompt)'}\n\nΣΤΟΧΟΣ: ${activeAgent.target_region || 'Όλη η Ελλάδα'}\n\nΠΑΡΑΔΟΣΗ ΣΕ ΑΝΘΡΩΠΟ: ${activeAgent.handoff_condition || 'Interest Confirmed'}\n\nΖΩΝΤΑΝΑ ΤΑΡΙΦΑ (RAG Knowledge Base):\n${tariffLines}\n\nΟδηγίες: Επικοινώνησε με leads στην περιοχή στόχου, πρότεινε τα παραπάνω τιμολόγια, και παράδωσε σε άνθρωπο όταν: ${activeAgent.handoff_condition || 'Interest Confirmed'}.`;
+    return `Ξ•Ξ―ΟƒΞ±ΞΉ ΞΏ ${activeAgent.name}, Ξ­Ξ½Ξ±Ο‚ Ξ±Ο…Ο„ΟΞ½ΞΏΞΌΞΏΟ‚ ${activeAgent.channel} agent Ο„Ξ·Ο‚ Hlektrismos.gr.\n\nΞ’Ξ‘Ξ£Ξ™ΞΞ PROMPT:\n${activeAgent.base_prompt || '(Ξ”ΞµΞ½ Ξ­Ο‡ΞµΞΉ ΞΏΟΞΉΟƒΟ„ΞµΞ― base prompt)'}\n\nΞ£Ξ¤ΞΞ§ΞΞ£: ${activeAgent.target_region || 'ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±'}\n\nΞ Ξ‘Ξ΅Ξ‘Ξ”ΞΞ£Ξ— Ξ£Ξ• Ξ‘ΞΞΞ΅Ξ©Ξ Ξ: ${activeAgent.handoff_condition || 'Interest Confirmed'}\n\nΞ–Ξ©ΞΞ¤Ξ‘ΞΞ‘ Ξ¤Ξ‘Ξ΅Ξ™Ξ¦Ξ‘ (RAG Knowledge Base):\n${tariffLines}\n\nΞΞ΄Ξ·Ξ³Ξ―ΞµΟ‚: Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½ΟΞ½Ξ·ΟƒΞµ ΞΌΞµ leads ΟƒΟ„Ξ·Ξ½ Ο€ΞµΟΞΉΞΏΟ‡Ξ® ΟƒΟ„ΟΟ‡ΞΏΟ…, Ο€ΟΟΟ„ΞµΞΉΞ½Ξµ Ο„Ξ± Ο€Ξ±ΟΞ±Ο€Ξ¬Ξ½Ο‰ Ο„ΞΉΞΌΞΏΞ»ΟΞ³ΞΉΞ±, ΞΊΞ±ΞΉ Ο€Ξ±ΟΞ¬Ξ΄Ο‰ΟƒΞµ ΟƒΞµ Ξ¬Ξ½ΞΈΟΟ‰Ο€ΞΏ ΟΟ„Ξ±Ξ½: ${activeAgent.handoff_condition || 'Interest Confirmed'}.`;
   };
 
   const tabLabels: Record<Tab, string> = {
-    overview: 'Επισκόπηση',
+    overview: 'Ξ•Ο€ΞΉΟƒΞΊΟΟ€Ξ·ΟƒΞ·',
     agents: 'AI Agents',
     leads: 'Leads',
-    sources: 'Πηγές Leads',
+    sources: 'Ξ Ξ·Ξ³Ξ­Ο‚ Leads',
     market: 'Market RAG',
     hub: 'Agent Hub',
     orchestrator: 'Orchestrator Director',
-    settings: 'Ρυθμίσεις & Integrations',
-    email: '📧 Email',
+    settings: 'Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ & Integrations',
+    email: 'π“§ Email',
     reports: 'Reports',
-    users: 'Χρήστες',
+    users: 'Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚',
     scraper: 'B2B Scraper',
   };
 
@@ -626,25 +626,25 @@ export default function DashboardPage() {
           <span>Hlektrismos<span>.gr</span></span>
         </a>
         <nav className="dash-nav">
-          <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><LayoutDashboard size={18} /> Επισκόπηση</button>
+          <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><LayoutDashboard size={18} /> Ξ•Ο€ΞΉΟƒΞΊΟΟ€Ξ·ΟƒΞ·</button>
           <button className={tab === 'agents' ? 'active' : ''} onClick={() => setTab('agents')}><Bot size={18} /> AI Agents</button>
           <button className={tab === 'leads' ? 'active' : ''} onClick={() => setTab('leads')}><Users size={18} /> Leads</button>
-          <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={18} /> Πηγές Leads</button>
+          <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={18} /> Ξ Ξ·Ξ³Ξ­Ο‚ Leads</button>
           <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}><Globe size={18} /> Market RAG</button>
           <button className={tab === 'hub' ? 'active' : ''} onClick={() => setTab('hub')}><Sparkles size={18} /> Agent Hub</button>
           <button className={tab === 'orchestrator' ? 'active' : ''} onClick={() => setTab('orchestrator')}><Activity size={18} /> Orchestrator Director</button>
-          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Settings size={18} /> Ρυθμίσεις</button>
+          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Settings size={18} /> Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚</button>
           <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}><FileText size={18} /> Reports</button>
-          <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Χρήστες</button>
+          <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚</button>
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
-          <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
+          <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> π“§ Email</button>
         </nav>
         <div className="dash-sidebar-footer">
           <div className="dash-user">
             <div className="dash-user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
             <span>{user?.email}</span>
           </div>
-          <button className="dash-logout" onClick={signOut}><LogOut size={16} /> Αποσύνδεση</button>
+          <button className="dash-logout" onClick={signOut}><LogOut size={16} /> Ξ‘Ο€ΞΏΟƒΟΞ½Ξ΄ΞµΟƒΞ·</button>
         </div>
       </aside>
 
@@ -664,7 +664,7 @@ export default function DashboardPage() {
         )}
 
         {loading ? (
-          <div className="dash-loading">Φόρτωση δεδομένων...</div>
+          <div className="dash-loading">Ξ¦ΟΟΟ„Ο‰ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½...</div>
         ) : (
           <>
             {tab === 'overview' && (
@@ -672,15 +672,15 @@ export default function DashboardPage() {
                 <div className="dash-stats-grid">
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,200,120,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(0,200,120,0.15)', cursor: 'pointer' }} onClick={() => setTab('leads')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.15)', color: '#00c878' }}><Users size={24} /></div>
-                    <div><strong style={{ fontSize: 32 }}>{leads.filter(l => !l.deleted_at).length}</strong><span>Σύνολο Leads</span></div>
+                    <div><strong style={{ fontSize: 32 }}>{leads.filter(l => !l.deleted_at).length}</strong><span>Ξ£ΟΞ½ΞΏΞ»ΞΏ Leads</span></div>
                   </div>
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,102,204,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(0,102,204,0.15)', cursor: 'pointer' }} onClick={() => setTab('agents')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.15)', color: '#0066cc' }}><Bot size={24} /></div>
-                    <div><strong style={{ fontSize: 32 }}>{agents.filter(a => !a.deleted_at && a.status === 'active').length}</strong><span>Ενεργά AI Agents</span></div>
+                    <div><strong style={{ fontSize: 32 }}>{agents.filter(a => !a.deleted_at && a.status === 'active').length}</strong><span>Ξ•Ξ½ΞµΟΞ³Ξ¬ AI Agents</span></div>
                   </div>
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(147,51,234,0.15)', cursor: 'pointer' }} onClick={() => setTab('email')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(147,51,234,0.15)', color: '#9333ea' }}><Mail size={24} /></div>
-                    <div><strong style={{ fontSize: 32 }}>{totalLeadsContacted}</strong><span>Επικοινωνίες</span></div>
+                    <div><strong style={{ fontSize: 32 }}>{totalLeadsContacted}</strong><span>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</span></div>
                   </div>
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)', cursor: 'pointer' }} onClick={() => setTab('reports')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><TrendingUp size={24} /></div>
@@ -691,8 +691,8 @@ export default function DashboardPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '24px' }}>
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>📋 Πρόσφατα Leads</h3>
-                      <button onClick={() => setTab('leads')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Προβολή όλων →</button>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>π“‹ Ξ ΟΟΟƒΟ†Ξ±Ο„Ξ± Leads</h3>
+                      <button onClick={() => setTab('leads')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Ξ ΟΞΏΞ²ΞΏΞ»Ξ® ΟΞ»Ο‰Ξ½ β†’</button>
                     </div>
                     {leads.filter(l => !l.deleted_at).slice(0, 5).map(l => (
                       <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -703,13 +703,13 @@ export default function DashboardPage() {
                         <span className={`dash-status-pill ${l.status}`}>{l.status}</span>
                       </div>
                     ))}
-                    {leads.filter(l => !l.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν leads.</p>}
+                    {leads.filter(l => !l.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ leads.</p>}
                   </div>
 
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>🤖 AI Agents Status</h3>
-                      <button onClick={() => setTab('agents')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Διαχείριση →</button>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>π¤– AI Agents Status</h3>
+                      <button onClick={() => setTab('agents')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· β†’</button>
                     </div>
                     {agents.filter(a => !a.deleted_at).slice(0, 5).map(a => (
                       <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -721,21 +721,21 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <span className={`dash-status-pill ${a.status}`}>
-                          {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                          {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
                         </span>
                       </div>
                     ))}
-                    {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν agents.</p>}
+                    {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ agents.</p>}
                   </div>
                 </div>
 
                 {/* Quick Actions */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '24px' }}>
                   {[
-                    { icon: '🤖', label: 'Agent Hub', tab: 'hub', desc: 'AI συνομιλία' },
-                    { icon: '🔍', label: 'B2B Scraper', tab: 'scraper', desc: 'Αναζήτηση leads' },
-                    { icon: '📊', label: 'Orchestrator', tab: 'orchestrator', desc: 'Director view' },
-                    { icon: '📈', label: 'Email', tab: 'email', desc: 'Διαχείριση email' },
+                    { icon: 'π¤–', label: 'Agent Hub', tab: 'hub', desc: 'AI ΟƒΟ…Ξ½ΞΏΞΌΞΉΞ»Ξ―Ξ±' },
+                    { icon: 'π”', label: 'B2B Scraper', tab: 'scraper', desc: 'Ξ‘Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ· leads' },
+                    { icon: 'π“', label: 'Orchestrator', tab: 'orchestrator', desc: 'Director view' },
+                    { icon: 'π“', label: 'Email', tab: 'email', desc: 'Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· email' },
                   ].map((action) => (
                     <button
                       key={action.tab}
@@ -759,14 +759,14 @@ export default function DashboardPage() {
             {tab === 'agents' && (
               <div className="dash-content">
                 <div className="dash-content-header">
-                  <p>Διαχείριση AI Agents — παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, ενεργοποίηση/απενεργοποίηση.</p>
-                  <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> Νέο Agent</button>
+                  <p>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· AI Agents β€” Ο€Ξ±ΟΞ±ΞΊΞΏΞ»ΞΏΟΞΈΞ·ΟƒΞ· Ξ±Ο€ΟΞ΄ΞΏΟƒΞ·Ο‚, ΟΟΞΈΞΌΞΉΟƒΞ· Ο€Ξ±ΟΞ±ΞΌΞ­Ο„ΟΟ‰Ξ½, ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·/Ξ±Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·.</p>
+                  <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> ΞΞ­ΞΏ Agent</button>
                 </div>
                 <div className="dash-table-wrap">
                   <table className="dash-table">
                     <thead>
                       <tr>
-                        <th>Agent</th><th>Channel</th><th>Status</th><th>Περιοχή</th><th>Επικοινωνίες</th><th>Απαντήσεις</th><th>Ραντεβού</th><th>Ενέργεια</th>
+                        <th>Agent</th><th>Channel</th><th>Status</th><th>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</th><th>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</th><th>Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚</th><th>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -784,26 +784,26 @@ export default function DashboardPage() {
                           <td>{a.channel}</td>
                           <td>
                             <span className={`dash-status-pill ${a.status}`}>
-                              {a.status === 'active' ? 'Ενεργός' : a.status === 'paused' ? 'Παυμένος' : a.status}
+                              {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : a.status === 'paused' ? 'Ξ Ξ±Ο…ΞΌΞ­Ξ½ΞΏΟ‚' : a.status}
                             </span>
                           </td>
-                          <td>{a.target_region || '—'}</td>
+                          <td>{a.target_region || 'β€”'}</td>
                           <td><strong>{a.leads_contacted || 0}</strong></td>
                           <td><strong>{a.replies || 0}</strong></td>
                           <td><strong>{a.meetings_booked || 0}</strong></td>
                           <td>
                             <div className="dash-lead-actions">
-                              <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={async () => {
+                              <button className="icon-btn" title="Ξ•Ξ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·/Ξ‘Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·" onClick={async () => {
                                 const newStatus = a.status === 'active' ? 'paused' : 'active';
                                 await supabase.from('ai_agents').update({ status: newStatus }).eq('id', a.id);
                                 loadData();
                               }}>
                                 {a.status === 'active' ? <EyeOff size={14} /> : <Eye size={14} />}
                               </button>
-                              <button className="icon-btn" title="Ρυθμίσεις" onClick={() => setConfigAgent(a)}>
+                              <button className="icon-btn" title="Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚" onClick={() => setConfigAgent(a)}>
                                 <Settings size={14} />
                               </button>
-                              <button className="icon-btn" title="Διαγραφή" onClick={async () => {
+                              <button className="icon-btn" title="Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®" onClick={async () => {
                                 await supabase.from('ai_agents').update({ deleted_at: new Date().toISOString() }).eq('id', a.id);
                                 loadData();
                               }}>
@@ -814,7 +814,7 @@ export default function DashboardPage() {
                         </tr>
                       ))}
                       {agents.filter(a => !a.deleted_at).length === 0 && (
-                        <tr><td colSpan={8} className="dash-empty">Δεν υπάρχουν agents. Πατήστε "Νέο Agent" για να δημιουργήσετε.</td></tr>
+                        <tr><td colSpan={8} className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ agents. Ξ Ξ±Ο„Ξ®ΟƒΟ„Ξµ "ΞΞ­ΞΏ Agent" Ξ³ΞΉΞ± Ξ½Ξ± Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΟƒΞµΟ„Ξµ.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -827,7 +827,7 @@ export default function DashboardPage() {
                 {/* Content Header */}
                 <div className="dash-content-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ margin: 0 }}>Διαχείριση Leads — αναζήτηση, φίλτρα, ανάθεση σε AI agents.</p>
+                    <p style={{ margin: 0 }}>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· Leads β€” Ξ±Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ·, Ο†Ξ―Ξ»Ο„ΟΞ±, Ξ±Ξ½Ξ¬ΞΈΞµΟƒΞ· ΟƒΞµ AI agents.</p>
                     {selectedLeads.size > 0 ? (
                       <button
                         onClick={bulkSoftDeleteLeads}
@@ -837,11 +837,11 @@ export default function DashboardPage() {
                           display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.15s',
                         }}
                       >
-                        <Trash2 size={14} /> Διαγραφή ({selectedLeads.size})
+                        <Trash2 size={14} /> Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ® ({selectedLeads.size})
                       </button>
                     ) : (
                       <button className="btn btn-primary" onClick={() => { setSearch(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setLeadsSubTab('all'); }}>
-                        <RefreshCw size={14} /> Επαναφορά Φίλτρων
+                        <RefreshCw size={14} /> Ξ•Ο€Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ¦Ξ―Ξ»Ο„ΟΟ‰Ξ½
                       </button>
                     )}
                   </div>
@@ -849,13 +849,13 @@ export default function DashboardPage() {
                   {/* Sub-tabs (folders) */}
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                     {[
-                      { key: 'all', label: 'Όλα', icon: '📁' },
-                      { key: 'new', label: 'Νέα', icon: '🆕' },
-                      { key: 'contacted', label: 'Επικοινωνήθηκε', icon: '📞' },
-                      { key: 'qualified', label: 'Qualified', icon: '✅' },
-                      { key: 'converted', label: 'Μετατράπηκε', icon: '🎉' },
-                      { key: 'lost', label: 'Χαμένα', icon: '❌' },
-                      { key: 'deleted', label: 'Διεγραμμένα', icon: '🗑️' },
+                      { key: 'all', label: 'ΞΞ»Ξ±', icon: 'π“' },
+                      { key: 'new', label: 'ΞΞ­Ξ±', icon: 'π†•' },
+                      { key: 'contacted', label: 'Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ®ΞΈΞ·ΞΊΞµ', icon: 'π“' },
+                      { key: 'qualified', label: 'Qualified', icon: 'β…' },
+                      { key: 'converted', label: 'ΞΞµΟ„Ξ±Ο„ΟΞ¬Ο€Ξ·ΞΊΞµ', icon: 'π‰' },
+                      { key: 'lost', label: 'Ξ§Ξ±ΞΌΞ­Ξ½Ξ±', icon: 'β' },
+                      { key: 'deleted', label: 'Ξ”ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±', icon: 'π—‘οΈ' },
                     ].map((folder) => (
                       <button
                         key={folder.key}
@@ -887,13 +887,13 @@ export default function DashboardPage() {
                       <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                       <input
                         type="text"
-                        placeholder="Αναζήτηση με όνομα, email, τηλέφωνο ή περιοχή..."
+                        placeholder="Ξ‘Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ· ΞΌΞµ ΟΞ½ΞΏΞΌΞ±, email, Ο„Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ Ξ® Ο€ΞµΟΞΉΞΏΟ‡Ξ®..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)' }}
                       />
                       {search && (
-                        <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>✕</button>
+                        <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>β•</button>
                       )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -902,21 +902,21 @@ export default function DashboardPage() {
                         type="date"
                         value={dateFrom}
                         onChange={(e) => setDateFrom(e.target.value)}
-                        title="Από"
+                        title="Ξ‘Ο€Ο"
                         style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }}
                       />
-                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>—</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>β€”</span>
                       <input
                         type="date"
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}
-                        title="Έως"
+                        title="ΞΟ‰Ο‚"
                         style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }}
                       />
                     </div>
                     {(search || dateFrom || dateTo) && (
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        {filteredLeads.length} αποτελέσματα
+                        {filteredLeads.length} Ξ±Ο€ΞΏΟ„ΞµΞ»Ξ­ΟƒΞΌΞ±Ο„Ξ±
                       </span>
                     )}
                   </div>
@@ -936,7 +936,7 @@ export default function DashboardPage() {
                               style={{ accentColor: '#0066cc', cursor: 'pointer' }}
                             />
                           </th>
-                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
+                          <th>ΞΞ½ΞΏΞΌΞ±</th><th>Email</th><th>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</th><th>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</th><th>Ξ¤ΟΟ€ΞΏΟ‚</th><th>ΞΞ±Ο„Ξ·Ξ³ΞΏΟΞ―Ξ±</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -963,7 +963,7 @@ export default function DashboardPage() {
                               <td>{l.customer_type}</td>
                               <td>
                                 <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                  <option value="" disabled>—</option>
+                                  <option value="" disabled>β€”</option>
                                   <option value="B2C_Household">B2C</option>
                                   <option value="B2B_Corporate">B2B</option>
                                 </select>
@@ -971,7 +971,7 @@ export default function DashboardPage() {
                               <td>
                                 <div className="gdpr-badge-wrap">
                                   <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                    <option value="" disabled>—</option>
+                                    <option value="" disabled>β€”</option>
                                     <option value="Consent">Consent</option>
                                     <option value="Legitimate_Interest">Leg. Interest</option>
                                   </select>
@@ -996,7 +996,7 @@ export default function DashboardPage() {
                                 <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
                                   <button
                                     onClick={() => softDeleteLead(l.id)}
-                                    title="Μεταφορά στα Διεγραμμένα"
+                                    title="ΞΞµΟ„Ξ±Ο†ΞΏΟΞ¬ ΟƒΟ„Ξ± Ξ”ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±"
                                     style={{
                                       display: 'inline-flex', alignItems: 'center', gap: '4px',
                                       padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(231,76,60,0.3)',
@@ -1006,7 +1006,7 @@ export default function DashboardPage() {
                                     onMouseEnter={(e) => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(231,76,60,0.06)'; e.currentTarget.style.color = '#e74c3c'; }}
                                   >
-                                    <Trash2 size={13} /> Διαγραφή
+                                    <Trash2 size={13} /> Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®
                                   </button>
                                 </div>
                               </td>
@@ -1015,7 +1015,7 @@ export default function DashboardPage() {
                         })}
                       </tbody>
                     </table>
-                    {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads σε αυτόν τον φάκελο.</p>}
+                    {filteredLeads.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ξ²ΟΞ­ΞΈΞ·ΞΊΞ±Ξ½ leads ΟƒΞµ Ξ±Ο…Ο„ΟΞ½ Ο„ΞΏΞ½ Ο†Ξ¬ΞΊΞµΞ»ΞΏ.</p>}
                   </div>
                 )}
 
@@ -1024,12 +1024,12 @@ export default function DashboardPage() {
                   <div className="dash-table-wrap">
                     <div className="dash-deleted-notice">
                       <AlertCircle size={16} />
-                      <span>Τα διεγραμμένα leads αποθηκεύονται εδώ. Μπορείτε να τα αποκαταστήσετε ή να τα διαγράψετε μόνιμα.</span>
+                      <span>Ξ¤Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ± leads Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΞΏΞ½Ο„Ξ±ΞΉ ΞµΞ΄Ο. ΞΟ€ΞΏΟΞµΞ―Ο„Ξµ Ξ½Ξ± Ο„Ξ± Ξ±Ο€ΞΏΞΊΞ±Ο„Ξ±ΟƒΟ„Ξ®ΟƒΞµΟ„Ξµ Ξ® Ξ½Ξ± Ο„Ξ± Ξ΄ΞΉΞ±Ξ³ΟΞ¬ΟΞµΟ„Ξµ ΞΌΟΞ½ΞΉΞΌΞ±.</span>
                     </div>
                     <table className="dash-table">
                       <thead>
                         <tr>
-                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Status</th><th>Διαγράφηκε</th><th>Ενέργεια</th>
+                          <th>ΞΞ½ΞΏΞΌΞ±</th><th>Email</th><th>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</th><th>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</th><th>Ξ¤ΟΟ€ΞΏΟ‚</th><th>Status</th><th>Ξ”ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1041,21 +1041,21 @@ export default function DashboardPage() {
                             <td>{l.region}</td>
                             <td>{l.customer_type}</td>
                             <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
-                            <td>{l.deleted_at ? new Date(l.deleted_at).toLocaleDateString('el-GR') : '—'}</td>
+                            <td>{l.deleted_at ? new Date(l.deleted_at).toLocaleDateString('el-GR') : 'β€”'}</td>
                             <td>
                               <div className="dash-lead-actions">
-                                <button className="btn-restore-lead" onClick={() => restoreLead(l.id)} title="Αποκατάσταση">
-                                  <RefreshCw size={14} /> Αποκατάσταση
+                                <button className="btn-restore-lead" onClick={() => restoreLead(l.id)} title="Ξ‘Ο€ΞΏΞΊΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·">
+                                  <RefreshCw size={14} /> Ξ‘Ο€ΞΏΞΊΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·
                                 </button>
                                 {confirmDeleteId === l.id ? (
                                   <div className="dash-delete-confirm">
-                                    <span>Μόνιμη;</span>
-                                    <button className="btn-delete-yes permanent" onClick={() => permanentDeleteLead(l.id)}>Ναι</button>
-                                    <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>Όχι</button>
+                                    <span>ΞΟΞ½ΞΉΞΌΞ·;</span>
+                                    <button className="btn-delete-yes permanent" onClick={() => permanentDeleteLead(l.id)}>ΞΞ±ΞΉ</button>
+                                    <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>ΞΟ‡ΞΉ</button>
                                   </div>
                                 ) : (
-                                  <button className="btn-delete-lead permanent" onClick={() => setConfirmDeleteId(l.id)} title="Μόνιμη διαγραφή">
-                                    <X size={14} /> Μόνιμη Διαγραφή
+                                  <button className="btn-delete-lead permanent" onClick={() => setConfirmDeleteId(l.id)} title="ΞΟΞ½ΞΉΞΌΞ· Ξ΄ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®">
+                                    <X size={14} /> ΞΟΞ½ΞΉΞΌΞ· Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®
                                   </button>
                                 )}
                               </div>
@@ -1064,7 +1064,7 @@ export default function DashboardPage() {
                         ))}
                       </tbody>
                     </table>
-                    {deletedLeads.length === 0 && <p className="dash-empty">Δεν υπάρχουν διεγραμμένα leads.</p>}
+                    {deletedLeads.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ± leads.</p>}
                   </div>
                 )}
               </div>
@@ -1073,12 +1073,12 @@ export default function DashboardPage() {
             {tab === 'sources' && (
               <div className="dash-content">
                 <div className="dash-content-header">
-                  <p>Πηγές leads με GDPR-compliant lawful basis. Καμία εξαγωγή από third-party sites.</p>
-                  <button className="btn btn-primary" onClick={() => setShowAddSource(!showAddSource)}><Plus size={16} /> Νέα Πηγή</button>
+                  <p>Ξ Ξ·Ξ³Ξ­Ο‚ leads ΞΌΞµ GDPR-compliant lawful basis. ΞΞ±ΞΌΞ―Ξ± ΞµΞΎΞ±Ξ³Ο‰Ξ³Ξ® Ξ±Ο€Ο third-party sites.</p>
+                  <button className="btn btn-primary" onClick={() => setShowAddSource(!showAddSource)}><Plus size={16} /> ΞΞ­Ξ± Ξ Ξ·Ξ³Ξ®</button>
                 </div>
                 {showAddSource && (
                   <div className="dash-add-form">
-                    <input placeholder="Όνομα πηγής" value={newSource.name} onChange={(e) => setNewSource({ ...newSource, name: e.target.value })} />
+                    <input placeholder="ΞΞ½ΞΏΞΌΞ± Ο€Ξ·Ξ³Ξ®Ο‚" value={newSource.name} onChange={(e) => setNewSource({ ...newSource, name: e.target.value })} />
                     <select value={newSource.type} onChange={(e) => setNewSource({ ...newSource, type: e.target.value })}>
                       <option value="opt-in">Opt-in</option>
                       <option value="partner">Partner</option>
@@ -1088,7 +1088,7 @@ export default function DashboardPage() {
                       <option value="consent">Consent</option>
                       <option value="legitimate-interest">Legitimate Interest</option>
                     </select>
-                    <button className="btn btn-primary" onClick={createSource}>Δημιουργία</button>
+                    <button className="btn btn-primary" onClick={createSource}>Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ±</button>
                   </div>
                 )}
                 <div className="dash-sources-grid">
@@ -1101,11 +1101,11 @@ export default function DashboardPage() {
                       </div>
                       <div className="dash-source-meta">
                         <div><span>Lawful Basis</span><strong>{s.lawful_basis}</strong></div>
-                        <div><span>Leads αυτόν τον μήνα</span><strong>{s.leads_this_month}</strong></div>
+                        <div><span>Leads Ξ±Ο…Ο„ΟΞ½ Ο„ΞΏΞ½ ΞΌΞ®Ξ½Ξ±</span><strong>{s.leads_this_month}</strong></div>
                       </div>
                     </div>
                   ))}
-                  {sources.length === 0 && <p className="dash-empty">Δεν υπάρχουν πηγές. Προσθέστε την πρώτη σας πηγή.</p>}
+                  {sources.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ο€Ξ·Ξ³Ξ­Ο‚. Ξ ΟΞΏΟƒΞΈΞ­ΟƒΟ„Ξµ Ο„Ξ·Ξ½ Ο€ΟΟΟ„Ξ· ΟƒΞ±Ο‚ Ο€Ξ·Ξ³Ξ®.</p>}
                 </div>
               </div>
             )}
@@ -1113,9 +1113,9 @@ export default function DashboardPage() {
             {tab === 'market' && (
               <div className="dash-content">
                 <div className="dash-content-header">
-                  <p>Δυναμικά τιμολόγια αγοράς που τροφοδοτούν τη βάση γνώσης των AI agents (RAG pipeline).</p>
+                  <p>Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΞ¬ Ο„ΞΉΞΌΞΏΞ»ΟΞ³ΞΉΞ± Ξ±Ξ³ΞΏΟΞ¬Ο‚ Ο€ΞΏΟ… Ο„ΟΞΏΟ†ΞΏΞ΄ΞΏΟ„ΞΏΟΞ½ Ο„Ξ· Ξ²Ξ¬ΟƒΞ· Ξ³Ξ½ΟΟƒΞ·Ο‚ Ο„Ο‰Ξ½ AI agents (RAG pipeline).</p>
                   <button className="btn btn-primary" onClick={syncTariffs} disabled={syncing}>
-                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Συγχρονισμός...' : 'Sync Data'}
+                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Ξ£Ο…Ξ³Ο‡ΟΞΏΞ½ΞΉΟƒΞΌΟΟ‚...' : 'Sync Data'}
                   </button>
                 </div>
                 <div className="rag-layout">
@@ -1124,26 +1124,26 @@ export default function DashboardPage() {
                     <div className="dash-table-wrap">
                       <table className="dash-table">
                         <thead>
-                          <tr><th>Πόρος</th><th>Ταρίφα</th><th>Τιμή</th><th>Μονάδα</th><th>Ενημέρωση</th></tr>
+                          <tr><th>Ξ ΟΟΞΏΟ‚</th><th>Ξ¤Ξ±ΟΞ―Ο†Ξ±</th><th>Ξ¤ΞΉΞΌΞ®</th><th>ΞΞΏΞ½Ξ¬Ξ΄Ξ±</th><th>Ξ•Ξ½Ξ·ΞΌΞ­ΟΟ‰ΟƒΞ·</th></tr>
                         </thead>
                         <tbody>
                           {tariffs.map((t) => (
                             <tr key={t.id}>
                               <td><span className={`rag-resource-tag ${t.resource.toLowerCase().replace(/\s/g, '-')}`}>{t.resource}</span></td>
                               <td>{t.tariff_name}</td>
-                              <td style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => updateTariffPrice(t)} title="Κλικ για επεξεργασία"><strong>{t.price_eur.toFixed(4)}</strong></td>
+                              <td style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => updateTariffPrice(t)} title="ΞΞ»ΞΉΞΊ Ξ³ΞΉΞ± ΞµΟ€ΞµΞΎΞµΟΞ³Ξ±ΟƒΞ―Ξ±"><strong>{t.price_eur.toFixed(4)}</strong></td>
                               <td>{t.unit}</td>
                               <td>{new Date(t.updated_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      {tariffs.length === 0 && <p className="dash-empty">Δεν υπάρχουν τιμολόγια.</p>}
+                      {tariffs.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ο„ΞΉΞΌΞΏΞ»ΟΞ³ΞΉΞ±.</p>}
                     </div>
                   </div>
                   <div className="rag-context-panel">
                     <h3 className="rag-section-title"><Bot size={18} /> Agent Context (RAG Output)</h3>
-                    <p className="rag-context-desc">Το ακριβές system prompt που δημιουργείται από τον συνδυασμό Live Tariffs + Base Prompt Template.</p>
+                    <p className="rag-context-desc">Ξ¤ΞΏ Ξ±ΞΊΟΞΉΞ²Ξ­Ο‚ system prompt Ο€ΞΏΟ… Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³ΞµΞ―Ο„Ξ±ΞΉ Ξ±Ο€Ο Ο„ΞΏΞ½ ΟƒΟ…Ξ½Ξ΄Ο…Ξ±ΟƒΞΌΟ Live Tariffs + Base Prompt Template.</p>
                     <div className="rag-agent-select">
                       <label>Agent</label>
                       <select value={configAgent?.id || agents[0]?.id || ''} onChange={(e) => { const found = agents.find((a) => a.id === e.target.value); if (found) setConfigAgent(found); }}>
@@ -1248,31 +1248,31 @@ export default function DashboardPage() {
             </div>
             <div className="modal-body">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                <div className="detail-group"><label>Email</label><span>{openLead.email || '—'}</span></div>
-                <div className="detail-group"><label>Τηλέφωνο</label><span>{openLead.phone || '—'}</span></div>
-                <div className="detail-group"><label>Περιοχή</label><span>{openLead.region || '—'}</span></div>
-                <div className="detail-group"><label>Τύπος</label><span>{openLead.customer_type || '—'}</span></div>
-                <div className="detail-group"><label>Κατηγορία</label><span>{openLead.customer_category || '—'}</span></div>
-                <div className="detail-group"><label>Πάροχος</label><span>{openLead.provider || '—'}</span></div>
+                <div className="detail-group"><label>Email</label><span>{openLead.email || 'β€”'}</span></div>
+                <div className="detail-group"><label>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</label><span>{openLead.phone || 'β€”'}</span></div>
+                <div className="detail-group"><label>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</label><span>{openLead.region || 'β€”'}</span></div>
+                <div className="detail-group"><label>Ξ¤ΟΟ€ΞΏΟ‚</label><span>{openLead.customer_type || 'β€”'}</span></div>
+                <div className="detail-group"><label>ΞΞ±Ο„Ξ·Ξ³ΞΏΟΞ―Ξ±</label><span>{openLead.customer_category || 'β€”'}</span></div>
+                <div className="detail-group"><label>Ξ Ξ¬ΟΞΏΟ‡ΞΏΟ‚</label><span>{openLead.provider || 'β€”'}</span></div>
                 <div className="detail-group"><label>Status</label><span className={`dash-status-pill ${openLead.status}`}>{openLead.status}</span></div>
-                <div className="detail-group"><label>Δημιουργήθηκε</label><span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span></div>
-                {openLead.assigned_to && <div className="detail-group"><label>Αντιπρόσωπος</label><span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span></div>}
-                {openLead.comments && <div className="detail-group" style={{ gridColumn: '1 / -1' }}><label>Σχόλια</label><span>{openLead.comments}</span></div>}
+                <div className="detail-group"><label>Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ</label><span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span></div>
+                {openLead.assigned_to && <div className="detail-group"><label>Ξ‘Ξ½Ο„ΞΉΟ€ΟΟΟƒΟ‰Ο€ΞΏΟ‚</label><span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span></div>}
+                {openLead.comments && <div className="detail-group" style={{ gridColumn: '1 / -1' }}><label>Ξ£Ο‡ΟΞ»ΞΉΞ±</label><span>{openLead.comments}</span></div>}
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                <h4 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={18} /> Ανεβασμένα Αρχεία</h4>
-                {billLoading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Φόρτωση...</div>}
+                <h4 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={18} /> Ξ‘Ξ½ΞµΞ²Ξ±ΟƒΞΌΞ­Ξ½Ξ± Ξ‘ΟΟ‡ΞµΞ―Ξ±</h4>
+                {billLoading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Ξ¦ΟΟΟ„Ο‰ΟƒΞ·...</div>}
                 {billError && <div style={{ padding: 12, background: 'rgba(231,76,60,0.1)', borderRadius: 8, color: '#e74c3c', fontSize: 13 }}><AlertCircle size={14} /> {billError}</div>}
-                {!billLoading && !billError && billUrls.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}><FolderOpen size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />Δεν υπάρχουν ανεβασμένα αρχεία</div>}
+                {!billLoading && !billError && billUrls.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}><FolderOpen size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ξ±Ξ½ΞµΞ²Ξ±ΟƒΞΌΞ­Ξ½Ξ± Ξ±ΟΟ‡ΞµΞ―Ξ±</div>}
                 {billUrls.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{billUrls.map((file, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
                     {file.type === 'application/pdf' ? <FileText size={24} style={{ color: '#e74c3c', flexShrink: 0 }} /> : <ImageIcon size={24} style={{ color: '#00c878', flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 500, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}{file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}{file.size > 0 ? ` Β· ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}</div>
                     </div>
-                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><ExternalLink size={14} /> Προβολή</a>
-                    <a href={file.url} download={file.name} className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><Download size={14} /> Λήψη</a>
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><ExternalLink size={14} /> Ξ ΟΞΏΞ²ΞΏΞ»Ξ®</a>
+                    <a href={file.url} download={file.name} className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><Download size={14} /> Ξ›Ξ®ΟΞ·</a>
                   </div>
                 ))}</div>}
               </div>
@@ -1304,7 +1304,7 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
     <div className="drawer-overlay" onClick={onClose}>
       <div className="drawer" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
-          <h2><Settings size={20} /> Διαμόρφωση Agent</h2>
+          <h2><Settings size={20} /> Ξ”ΞΉΞ±ΞΌΟΟΟ†Ο‰ΟƒΞ· Agent</h2>
           <button className="drawer-close" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="drawer-body">
@@ -1312,11 +1312,11 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
             <h3 className="drawer-agent-name">{agent.name}</h3>
           </div>
           <div className="drawer-field">
-            <label>Τύπος Καναλιού</label>
+            <label>Ξ¤ΟΟ€ΞΏΟ‚ ΞΞ±Ξ½Ξ±Ξ»ΞΉΞΏΟ</label>
             <select value={channel} onChange={(e) => setChannel(e.target.value)}>
               <option value="email">Email</option>
               <option value="sms">SMS</option>
-              <option value="voice">Φωνή</option>
+              <option value="voice">Ξ¦Ο‰Ξ½Ξ®</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="telegram">Telegram</option>
               <option value="viber">Viber</option>
@@ -1325,14 +1325,14 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
             </select>
           </div>
           <div className="drawer-field">
-            <label>Περιοχή Στόχου</label>
+            <label>Ξ ΞµΟΞΉΞΏΟ‡Ξ® Ξ£Ο„ΟΟ‡ΞΏΟ…</label>
             <select value={region} onChange={(e) => setRegion(e.target.value)}>
-              <option value="">Όλη η Ελλάδα</option>
+              <option value="">ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±</option>
               {greekRegions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div className="drawer-field">
-            <label>Κατάσταση</label>
+            <label>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·</label>
             <div className="drawer-toggle-row">
               <button className={`drawer-toggle ${status === 'active' ? 'on' : ''}`} onClick={() => setStatus('active')}>Live</button>
               <button className={`drawer-toggle ${status === 'paused' ? 'off' : ''}`} onClick={() => setStatus('paused')}>Paused</button>
@@ -1340,27 +1340,27 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
           </div>
           <div className="drawer-field">
             <label>Base Prompt Template</label>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Γράψε τις οδηγίες για το LLM στα ελληνικά..." rows={6} />
+            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ξ“ΟΞ¬ΟΞµ Ο„ΞΉΟ‚ ΞΏΞ΄Ξ·Ξ³Ξ―ΞµΟ‚ Ξ³ΞΉΞ± Ο„ΞΏ LLM ΟƒΟ„Ξ± ΞµΞ»Ξ»Ξ·Ξ½ΞΉΞΊΞ¬..." rows={6} />
           </div>
           <div className="drawer-field">
-            <label>Παράδοση σε Άνθρωπο Όταν:</label>
+            <label>Ξ Ξ±ΟΞ¬Ξ΄ΞΏΟƒΞ· ΟƒΞµ Ξ†Ξ½ΞΈΟΟ‰Ο€ΞΏ ΞΟ„Ξ±Ξ½:</label>
             <select value={handoff} onChange={(e) => setHandoff(e.target.value)}>
               {handoffOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         </div>
         <div className="drawer-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Άκυρο</button>
-          <button className="btn btn-primary" onClick={handleSave}><CheckCircle2 size={16} /> Αποθήκευση</button>
+          <button className="btn btn-ghost" onClick={onClose}>Ξ†ΞΊΟ…ΟΞΏ</button>
+          <button className="btn btn-primary" onClick={handleSave}><CheckCircle2 size={16} /> Ξ‘Ο€ΞΏΞΈΞ®ΞΊΞµΟ…ΟƒΞ·</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   AGENT HUB — Chat Input Toolbar (Claude-style + menu, mic, voice)
-   ═══════════════════════════════════════════════════════════════ */
+/* β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
+   AGENT HUB β€” Chat Input Toolbar (Claude-style + menu, mic, voice)
+   β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β• */
 
 function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
   onSendMessage: (msg: string) => void;
@@ -1400,29 +1400,29 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
           color: 'var(--text)', fontSize: '13px'
         }}>
           <button onClick={() => fileInputRef.current?.click()} style={menuItemStyle}>
-            <span>📎 Προσθήκη αρχείων ή φωτογραφιών</span>
+            <span>π“ Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· Ξ±ΟΟ‡ΞµΞ―Ο‰Ξ½ Ξ® Ο†Ο‰Ο„ΞΏΞ³ΟΞ±Ο†ΞΉΟΞ½</span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-2)', padding: '2px 6px', borderRadius: '4px' }}>Ctrl+U</span>
           </button>
           <button onClick={() => onOpenSettings('skills')} style={menuItemStyle}>
-            <span>📁 Προσθήκη σε project</span><span>›</span>
+            <span>π“ Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· ΟƒΞµ project</span><span>β€Ί</span>
           </button>
           <button onClick={() => onOpenSettings('connectors')} style={menuItemStyle}>
-            <span>🐙 Προσθήκη από GitHub</span>
+            <span>π™ Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· Ξ±Ο€Ο GitHub</span>
           </button>
           <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
           <button onClick={() => onOpenSettings('skills')} style={menuItemStyle}>
-            <span>🛠️ Skills (Δεξιότητες)</span><span>›</span>
+            <span>π› οΈ Skills (Ξ”ΞµΞΎΞΉΟΟ„Ξ·Ο„ΞµΟ‚)</span><span>β€Ί</span>
           </button>
           <button onClick={() => onOpenSettings('connectors')} style={menuItemStyle}>
-            <span>🔌 Connectors (Συνδέσεις)</span><span>›</span>
+            <span>π” Connectors (Ξ£Ο…Ξ½Ξ΄Ξ­ΟƒΞµΞΉΟ‚)</span><span>β€Ί</span>
           </button>
           <button onClick={() => onOpenSettings('plugins')} style={menuItemStyle}>
-            <span>🧩 Plugins (Πρόσθετα)</span><span>›</span>
+            <span>π§© Plugins (Ξ ΟΟΟƒΞΈΞµΟ„Ξ±)</span><span>β€Ί</span>
           </button>
           <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
           <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} style={{ ...menuItemStyle, justifyContent: 'space-between' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>🌐 Αναζήτηση στο Web</span>
-            {webSearchEnabled && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span>}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>π Ξ‘Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ· ΟƒΟ„ΞΏ Web</span>
+            {webSearchEnabled && <span style={{ color: '#10b981', fontWeight: 'bold' }}>β“</span>}
           </button>
         </div>
       )}
@@ -1439,11 +1439,11 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
           border: 'none', borderRadius: '50%', width: '32px', height: '32px',
           color: 'var(--text)', cursor: 'pointer', fontSize: '18px',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }} title="Προσθήκη υλικού & εργαλείων">+</button>
+        }} title="Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· Ο…Ξ»ΞΉΞΊΞΏΟ & ΞµΟΞ³Ξ±Ξ»ΞµΞ―Ο‰Ξ½">+</button>
 
         <textarea
           value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown}
-          placeholder="Στείλτε μήνυμα στον Agent Hub..." rows={1}
+          placeholder="Ξ£Ο„ΞµΞ―Ξ»Ο„Ξµ ΞΌΞ®Ξ½Ο…ΞΌΞ± ΟƒΟ„ΞΏΞ½ Agent Hub..." rows={1}
           style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '14px', resize: 'none', fontFamily: 'inherit' }}
         />
 
@@ -1452,11 +1452,11 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
             background: isRecording ? 'rgba(239,68,68,0.15)' : 'transparent',
             border: 'none', borderRadius: '50%', width: '32px', height: '32px',
             color: isRecording ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
-          }} title="Φωνητική υπαγόρευση">🎙️</button>
+          }} title="Ξ¦Ο‰Ξ½Ξ·Ο„ΞΉΞΊΞ® Ο…Ο€Ξ±Ξ³ΟΟΞµΟ…ΟƒΞ·">π™οΈ</button>
           <button style={{
             background: 'transparent', border: 'none', borderRadius: '50%', width: '32px', height: '32px',
             color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
-          }} title="Live Voice Assistant Stream">📊</button>
+          }} title="Live Voice Assistant Stream">π“</button>
           <button
             onClick={() => {
               if (message.trim()) {
@@ -1474,7 +1474,7 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
               fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.15s',
             }}
-            title="Αποστολή μηνύματος"
+            title="Ξ‘Ο€ΞΏΟƒΟ„ΞΏΞ»Ξ® ΞΌΞ·Ξ½ΟΞΌΞ±Ο„ΞΏΟ‚"
           >
             <Send size={15} />
           </button>
@@ -1484,9 +1484,9 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   AGENT HUB — Settings Modal (Claude-inspired, 6 tabs)
-   ═══════════════════════════════════════════════════════════════ */
+/* β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
+   AGENT HUB β€” Settings Modal (Claude-inspired, 6 tabs)
+   β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β• */
 
 function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
   isOpen: boolean; onClose: () => void; initialTab?: string;
@@ -1541,19 +1541,19 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
       <div style={{ width: '980px', height: '720px', background: 'var(--bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)', color: 'var(--text)' }}>
         {/* Left Sidebar Navigation */}
         <div style={{ width: '240px', background: 'var(--bg-2)', borderRight: '1px solid var(--border)', padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
-          <div style={{ fontSize: '15px', fontWeight: 'bold', padding: '0 8px', color: 'var(--text)' }}>Ρυθμίσεις Agent</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', padding: '0 8px', color: 'var(--text)' }}>Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ Agent</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div style={navSectionHeader}>ΓΕΝΙΚΑ</div>
-            <button onClick={() => setActiveCategory('general')} style={navItemStyle(activeCategory === 'general')}>⚙️ General</button>
-            <button onClick={() => setActiveCategory('visuals')} style={navItemStyle(activeCategory === 'visuals')}>🎨 Appearance & Visuals</button>
+            <div style={navSectionHeader}>Ξ“Ξ•ΞΞ™ΞΞ‘</div>
+            <button onClick={() => setActiveCategory('general')} style={navItemStyle(activeCategory === 'general')}>β™οΈ General</button>
+            <button onClick={() => setActiveCategory('visuals')} style={navItemStyle(activeCategory === 'visuals')}>π¨ Appearance & Visuals</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={navSectionHeader}>CAPABILITIES</div>
-            <button onClick={() => setActiveCategory('code')} style={navItemStyle(activeCategory === 'code')}>💻 Code & Execution</button>
-            <button onClick={() => setActiveCategory('connectors')} style={navItemStyle(activeCategory === 'connectors')}>🔌 Connectors</button>
-            <button onClick={() => setActiveCategory('security')} style={navItemStyle(activeCategory === 'security')}>🔒 Security & Tokens</button>
+            <button onClick={() => setActiveCategory('code')} style={navItemStyle(activeCategory === 'code')}>π’» Code & Execution</button>
+            <button onClick={() => setActiveCategory('connectors')} style={navItemStyle(activeCategory === 'connectors')}>π” Connectors</button>
+            <button onClick={() => setActiveCategory('security')} style={navItemStyle(activeCategory === 'security')}>π”’ Security & Tokens</button>
           </div>
-          <button onClick={onClose} style={{ marginTop: 'auto', padding: '10px', background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer' }}>✖ Κλείσιμο</button>
+          <button onClick={onClose} style={{ marginTop: 'auto', padding: '10px', background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer' }}>β– ΞΞ»ΞµΞ―ΟƒΞΉΞΌΞΏ</button>
         </div>
 
         {/* Right Content Pane */}
@@ -1605,7 +1605,7 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
               <div style={sectionContainer}>
                 <h3 style={sectionTitleStyle}>Code Execution & File Creation</h3>
                 <ToggleRow label="Code execution and file creation" description="The Agent can execute code and create and edit docs, spreadsheets, presentations, PDFs, and data reports." checked={codeExecution} onChange={setCodeExecution} />
-                <ToggleRow label="Allow network egress ⚠️" description="Allow the Agent to access common package managers to install packages and libraries." checked={networkEgress} onChange={setNetworkEgress} />
+                <ToggleRow label="Allow network egress β οΈ" description="Allow the Agent to access common package managers to install packages and libraries." checked={networkEgress} onChange={setNetworkEgress} />
               </div>
               <div style={sectionContainer}>
                 <h3 style={sectionTitleStyle}>Pull Requests</h3>
@@ -1621,15 +1621,15 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
           {activeCategory === 'connectors' && (
             <div>
               <h2 style={tabHeaderStyle}>Connectors</h2>
-              <p style={subTextStyle}>Συνδέστε εξωτερικές πλατφόρμες για αυτόματη ανάκτηση δεδομένων.</p>
+              <p style={subTextStyle}>Ξ£Ο…Ξ½Ξ΄Ξ­ΟƒΟ„Ξµ ΞµΞΎΟ‰Ο„ΞµΟΞΉΞΊΞ­Ο‚ Ο€Ξ»Ξ±Ο„Ο†ΟΟΞΌΞµΟ‚ Ξ³ΞΉΞ± Ξ±Ο…Ο„ΟΞΌΞ±Ο„Ξ· Ξ±Ξ½Ξ¬ΞΊΟ„Ξ·ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '20px' }}>
                 {[
-                  { name: 'GitHub Integration', status: 'Connected', icon: '🐙', type: 'Web' },
-                  { name: 'Supabase Database', status: 'Connected', icon: '⚡', type: 'Database' },
-                  { name: 'Vercel Deployments', status: 'Connected', icon: '▲', type: 'Web' },
-                  { name: 'Gmail Workspace', status: 'Disconnected', icon: '📧', type: 'Email' },
-                  { name: 'Google Drive', status: 'Disconnected', icon: '📁', type: 'Storage' },
-                  { name: 'Railway App', status: 'Connected', icon: '🚂', type: 'Web' },
+                  { name: 'GitHub Integration', status: 'Connected', icon: 'π™', type: 'Web' },
+                  { name: 'Supabase Database', status: 'Connected', icon: 'β΅', type: 'Database' },
+                  { name: 'Vercel Deployments', status: 'Connected', icon: 'β–²', type: 'Web' },
+                  { name: 'Gmail Workspace', status: 'Disconnected', icon: 'π“§', type: 'Email' },
+                  { name: 'Google Drive', status: 'Disconnected', icon: 'π“', type: 'Storage' },
+                  { name: 'Railway App', status: 'Connected', icon: 'π‚', type: 'Web' },
                 ].map((conn, idx) => (
                   <div key={idx} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1651,7 +1651,7 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
                 <div style={helpTextStyle}>Created when you sign in to the Agent Hub. Revoke a token to sign out from that device.</div>
                 <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-2)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div><div style={{ fontWeight: 'bold', fontSize: '14px' }}>Agent Hub Web Session</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Created: 18 Aug 2026 • Last used: Just now</div></div>
+                    <div><div style={{ fontWeight: 'bold', fontSize: '14px' }}>Agent Hub Web Session</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Created: 18 Aug 2026 β€Ά Last used: Just now</div></div>
                     <button style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Revoke</button>
                   </div>
                 </div>
@@ -1669,9 +1669,9 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   AGENT HUB TAB — Full Layout (Sidebar + Header + Chat + Input)
-   ═══════════════════════════════════════════════════════════════ */
+/* β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
+   AGENT HUB TAB β€” Full Layout (Sidebar + Header + Chat + Input)
+   β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β• */
 
 function AgentHubTab({ agents, conversations, activeConversationId, setActiveConversationId, hubMessages, setHubConversations, hubInput, setHubInput, hubLoading, setHubLoading, hubSelectedAgents, setHubSelectedAgents, endRef, toast, setToast, createNewConversation, deleteConversation, updateConversationTitle, toggleAgentInConversation }: {
   agents: Agent[];
@@ -1708,13 +1708,13 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   const [showHubSettings, setShowHubSettings] = useState(false);
 
   const GEMINI_MODELS = [
-    { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Latest)', desc: 'Το πιο πρόσφατο & ταχύ' },
-    { value: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro', desc: 'Το πιο πρόσφατο & έξυπνο' },
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Ταχύ, stable' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'Έξυπνο, αργότερο' },
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Γρήγορο, παλαιότερο' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Ελαφρύ, budget-friendly' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', desc: 'Κλασικό pro μοντέλο' },
+    { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Latest)', desc: 'Ξ¤ΞΏ Ο€ΞΉΞΏ Ο€ΟΟΟƒΟ†Ξ±Ο„ΞΏ & Ο„Ξ±Ο‡Ο' },
+    { value: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro', desc: 'Ξ¤ΞΏ Ο€ΞΉΞΏ Ο€ΟΟΟƒΟ†Ξ±Ο„ΞΏ & Ξ­ΞΎΟ…Ο€Ξ½ΞΏ' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Ξ¤Ξ±Ο‡Ο, stable' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'ΞΞΎΟ…Ο€Ξ½ΞΏ, Ξ±ΟΞ³ΟΟ„ΞµΟΞΏ' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Ξ“ΟΞ®Ξ³ΞΏΟΞΏ, Ο€Ξ±Ξ»Ξ±ΞΉΟΟ„ΞµΟΞΏ' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Ξ•Ξ»Ξ±Ο†ΟΟ, budget-friendly' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', desc: 'ΞΞ»Ξ±ΟƒΞΉΞΊΟ pro ΞΌΞΏΞ½Ο„Ξ­Ξ»ΞΏ' },
   ];
 
   useEffect(() => {
@@ -1774,7 +1774,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         if (c.id === activeConversationId) {
           return {
             ...c,
-            messages: [...c.messages, { role: 'assistant', text: 'Σφάλμα: ' + (e.message || 'Άγνωστο σφάλμα') }],
+            messages: [...c.messages, { role: 'assistant', text: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + (e.message || 'Ξ†Ξ³Ξ½Ο‰ΟƒΟ„ΞΏ ΟƒΟ†Ξ¬Ξ»ΞΌΞ±') }],
           };
         }
         return c;
@@ -1786,16 +1786,16 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   return (
     <div style={{ display: 'flex', height: '100%', width: '100%', background: 'var(--bg)', color: 'var(--text)' }}>
 
-      {/* ═══ INNER SIDEBAR: ΙΣΤΟΡΙΚΟ ΣΥΝΟΜΙΛΙΩΝ ═══ */}
+      {/* β•β•β• INNER SIDEBAR: Ξ™Ξ£Ξ¤ΞΞ΅Ξ™ΞΞ Ξ£Ξ¥ΞΞΞΞ™Ξ›Ξ™Ξ©Ξ β•β•β• */}
       <div style={{ width: '260px', borderRight: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
           <button onClick={createNewConversation} style={{ width: '100%', padding: '10px', background: 'var(--text)', color: 'var(--bg)', borderRadius: '8px', fontWeight: '600', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px' }}>
-            <Plus size={14} /> Νέα Συνομιλία
+            <Plus size={14} /> ΞΞ­Ξ± Ξ£Ο…Ξ½ΞΏΞΌΞΉΞ»Ξ―Ξ±
           </button>
         </div>
 
         <div style={{ padding: '12px', flex: 1, overflowY: 'auto' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontWeight: 600 }}>Ιστορικό Συνομιλιών</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontWeight: 600 }}>Ξ™ΟƒΟ„ΞΏΟΞΉΞΊΟ Ξ£Ο…Ξ½ΞΏΞΌΞΉΞ»ΞΉΟΞ½</div>
           {conversations.map((conv) => (
             <div
               key={conv.id}
@@ -1811,16 +1811,16 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             >
               <div style={{ overflow: 'hidden' }}>
                 <div style={{ fontWeight: activeConversationId === conv.id ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                  💬 {conv.title}
+                  π’¬ {conv.title}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{conv.messages.length} μηνύματα · {conv.updatedAt.toLocaleDateString('el-GR')}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{conv.messages.length} ΞΌΞ·Ξ½ΟΞΌΞ±Ο„Ξ± Β· {conv.updatedAt.toLocaleDateString('el-GR')}</div>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '12px', opacity: 0.6 }}>🗑️</button>
+              <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '12px', opacity: 0.6 }}>π—‘οΈ</button>
             </div>
           ))}
           {conversations.length === 0 && (
             <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '20px', padding: '20px', background: 'rgba(0,0,0,0.03)', borderRadius: '8px' }}>
-              Δεν υπάρχουν συνομιλίες.<br/>Ξεκίνα μια νέα!
+              Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ ΟƒΟ…Ξ½ΞΏΞΌΞΉΞ»Ξ―ΞµΟ‚.<br/>ΞΞµΞΊΞ―Ξ½Ξ± ΞΌΞΉΞ± Ξ½Ξ­Ξ±!
             </div>
           )}
         </div>
@@ -1828,20 +1828,20 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         {/* Settings Trigger */}
         <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
           <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            ⚙️ Ρυθμίσεις Agent
+            β™οΈ Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ Agent
           </button>
         </div>
       </div>
 
-      {/* ═══ KENTRIKO PARATHYRO CHAT ═══ */}
+      {/* β•β•β• KENTRIKO PARATHYRO CHAT β•β•β• */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
-        {/* HEADER: ΕΠΙΛΟΓΗ ΜΟΝΤΕΛΟΥ */}
+        {/* HEADER: Ξ•Ξ Ξ™Ξ›ΞΞ“Ξ— ΞΞΞΞ¤Ξ•Ξ›ΞΞ¥ */}
         <div style={{ padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '18px', fontWeight: 'bold' }}>Agent Hub</span>
             <span style={{ fontSize: '11px', background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '3px 10px', borderRadius: '12px' }}>
-              {hubLoading ? '⏳ Processing...' : '● Online'}
+              {hubLoading ? 'β³ Processing...' : 'β— Online'}
             </span>
             {hubApiKey && (
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -1850,7 +1850,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             )}
             {!hubApiKey && (
               <span style={{ fontSize: '11px', color: '#f59e0b' }}>
-                ⚠️ Χωρίς API Key
+                β οΈ Ξ§Ο‰ΟΞ―Ο‚ API Key
               </span>
             )}
           </div>
@@ -1862,26 +1862,26 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             >
               {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
-            <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }} title="Ρυθμίσεις">⚙️</button>
+            <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }} title="Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚">β™οΈ</button>
           </div>
         </div>
 
         {/* API Key Settings Panel (toggled) */}
         {showHubSettings && (
           <div style={{ padding: '16px 24px', background: 'var(--bg-2)', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>⚙️ Ρυθμίσεις API & Μοντέλου</div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>β™οΈ Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ API & ΞΞΏΞ½Ο„Ξ­Ξ»ΞΏΟ…</div>
             <div className="drawer-field">
               <label style={{ fontWeight: 500, fontSize: '12px' }}>Google Gemini API Key</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input type="password" value={hubApiKey} onChange={(e) => { setHubApiKey(e.target.value); localStorage.setItem('hub_api_key', e.target.value); }} placeholder="AIzaSy..." style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }} />
-                {hubApiKey && <button onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ padding: '6px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>Καθαρισμός</button>}
+                {hubApiKey && <button onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ padding: '6px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>ΞΞ±ΞΈΞ±ΟΞΉΟƒΞΌΟΟ‚</button>}
               </div>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                Λήψη από: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Google AI Studio</a> · Το κλειδί αποθηκεύεται μόνο στον browser σου
+                Ξ›Ξ®ΟΞ· Ξ±Ο€Ο: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Google AI Studio</a> Β· Ξ¤ΞΏ ΞΊΞ»ΞµΞΉΞ΄Ξ― Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΞµΟ„Ξ±ΞΉ ΞΌΟΞ½ΞΏ ΟƒΟ„ΞΏΞ½ browser ΟƒΞΏΟ…
               </span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(0,102,204,0.08)', padding: '8px 12px', borderRadius: '8px' }}>
-              💡 <strong>Πώς δουλεύει:</strong> Το API key σου χρησιμοποιείται απευθείας στη κλήση προς Google. Δεν αποθηκεύεται στον server.
+              π’΅ <strong>Ξ ΟΟ‚ Ξ΄ΞΏΟ…Ξ»ΞµΟΞµΞΉ:</strong> Ξ¤ΞΏ API key ΟƒΞΏΟ… Ο‡ΟΞ·ΟƒΞΉΞΌΞΏΟ€ΞΏΞΉΞµΞ―Ο„Ξ±ΞΉ Ξ±Ο€ΞµΟ…ΞΈΞµΞ―Ξ±Ο‚ ΟƒΟ„Ξ· ΞΊΞ»Ξ®ΟƒΞ· Ο€ΟΞΏΟ‚ Google. Ξ”ΞµΞ½ Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΞµΟ„Ξ±ΞΉ ΟƒΟ„ΞΏΞ½ server.
             </div>
           </div>
         )}
@@ -1904,7 +1904,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
               <div key={i} style={{ display: 'flex', gap: '12px', maxWidth: '800px', width: '100%', margin: '0 auto', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
                 {/* Avatar */}
                 <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: m.role === 'assistant' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, border: '1px solid var(--border)' }}>
-                  {m.role === 'assistant' ? '🤖' : '👤'}
+                  {m.role === 'assistant' ? 'π¤–' : 'π‘¤'}
                 </div>
                 {/* Message Bubble */}
                 <div style={{
@@ -1919,9 +1919,9 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             ))}
             {hubLoading && (
               <div style={{ display: 'flex', gap: '12px', maxWidth: '800px', width: '100%', margin: '0 auto' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>🤖</div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>π¤–</div>
                 <div style={{ padding: '12px 16px', background: 'var(--bg-2)', borderRadius: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>
-                  Σκέφτομαι<span className="dot-anim">...</span>
+                  Ξ£ΞΊΞ­Ο†Ο„ΞΏΞΌΞ±ΞΉ<span className="dot-anim">...</span>
                 </div>
               </div>
             )}
@@ -1930,18 +1930,18 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         ) : (
           /* EMPTY STATE */
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '40px' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🤖</div>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text)', margin: 0 }}>Γεια σου! Είμαι ο AI Agent</h3>
+            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>π¤–</div>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text)', margin: 0 }}>Ξ“ΞµΞΉΞ± ΟƒΞΏΟ…! Ξ•Ξ―ΞΌΞ±ΞΉ ΞΏ AI Agent</h3>
             <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '400px', margin: 0 }}>
-              Πώς μπορώ να σας βοηθήσω σήμερα; Δοκιμάστε μία από τις παρακάτω ενέργειες:
+              Ξ ΟΟ‚ ΞΌΟ€ΞΏΟΟ Ξ½Ξ± ΟƒΞ±Ο‚ Ξ²ΞΏΞ·ΞΈΞ®ΟƒΟ‰ ΟƒΞ®ΞΌΞµΟΞ±; Ξ”ΞΏΞΊΞΉΞΌΞ¬ΟƒΟ„Ξµ ΞΌΞ―Ξ± Ξ±Ο€Ο Ο„ΞΉΟ‚ Ο€Ξ±ΟΞ±ΞΊΞ¬Ο„Ο‰ ΞµΞ½Ξ­ΟΞ³ΞµΞΉΞµΟ‚:
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '8px' }}>
               {[
-                '📊 Ανάλυση των Leads μου',
-                '📋 Δημιουργία Report για Market RAG',
-                '🔍 Βρες νέα B2B leads στην Αττική',
-                '💰 Τιμές ρεύματος σήμερα',
-                '📧 Στείλε email σε lead',
+                'π“ Ξ‘Ξ½Ξ¬Ξ»Ο…ΟƒΞ· Ο„Ο‰Ξ½ Leads ΞΌΞΏΟ…',
+                'π“‹ Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ± Report Ξ³ΞΉΞ± Market RAG',
+                'π” Ξ’ΟΞµΟ‚ Ξ½Ξ­Ξ± B2B leads ΟƒΟ„Ξ·Ξ½ Ξ‘Ο„Ο„ΞΉΞΊΞ®',
+                'π’° Ξ¤ΞΉΞΌΞ­Ο‚ ΟΞµΟΞΌΞ±Ο„ΞΏΟ‚ ΟƒΞ®ΞΌΞµΟΞ±',
+                'π“§ Ξ£Ο„ΞµΞ―Ξ»Ξµ email ΟƒΞµ lead',
               ].map((suggestion, idx) => (
                 <button key={idx} onClick={() => { setHubInput(suggestion); createNewConversation(); }} style={{
                   padding: '8px 16px', background: 'var(--bg-2)', border: '1px solid var(--border)',
@@ -1962,7 +1962,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             onOpenSettings={(tab) => setShowHubSettings(true)}
           />
           <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Ο Agent Hub μπορεί να κάνει λάθη. Παρακαλώ ελέγχετε τις πληροφορίες.
+            Ξ Agent Hub ΞΌΟ€ΞΏΟΞµΞ― Ξ½Ξ± ΞΊΞ¬Ξ½ΞµΞΉ Ξ»Ξ¬ΞΈΞ·. Ξ Ξ±ΟΞ±ΞΊΞ±Ξ»Ο ΞµΞ»Ξ­Ξ³Ο‡ΞµΟ„Ξµ Ο„ΞΉΟ‚ Ο€Ξ»Ξ·ΟΞΏΟ†ΞΏΟΞ―ΞµΟ‚.
           </div>
         </div>
       </div>
@@ -2000,46 +2000,46 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
 
   const generateReport = async (reportType: 'master' | 'on_demand', agentId?: string) => {
     setGenerating(true);
-    setToast({ msg: 'Δημιουργία αναφοράς...', type: 'info' });
+    setToast({ msg: 'Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ± Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬Ο‚...', type: 'info' });
     try {
       const { data, error } = await supabase.functions.invoke('orchestrator', {
         body: { mode: 'report', report_type: reportType, agent_id: agentId },
       });
       if (error) throw error;
-      setToast({ msg: 'Η αναφορά δημιουργήθηκε!', type: 'success' });
+      setToast({ msg: 'Ξ— Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ!', type: 'success' });
       loadReports();
       if (data.report) setSelectedReport({ content: data.report, title: reportType === 'master' ? 'Master Report' : `Agent Report`, metrics: data.metrics });
     } catch (e: any) {
-      setToast({ msg: 'Σφάλμα: ' + e.message, type: 'info' });
+      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + e.message, type: 'info' });
     }
     setGenerating(false);
   };
 
   const markAsRead = async (report: any) => {
     await supabase.from('agent_reports').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', report.id);
-    setToast({ msg: 'Η αναφορά σημάνθηκε ως αναγνωσμένη.', type: 'success' });
+    setToast({ msg: 'Ξ— Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ ΟƒΞ·ΞΌΞ¬Ξ½ΞΈΞ·ΞΊΞµ Ο‰Ο‚ Ξ±Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½Ξ·.', type: 'success' });
     loadReports();
   };
 
   const deleteReport = async (reportId: string) => {
-    if (!confirm('Είσαι σίγουρος ότι θέλεις να διαγράψεις αυτή την αναφορά;')) return;
+    if (!confirm('Ξ•Ξ―ΟƒΞ±ΞΉ ΟƒΞ―Ξ³ΞΏΟ…ΟΞΏΟ‚ ΟΟ„ΞΉ ΞΈΞ­Ξ»ΞµΞΉΟ‚ Ξ½Ξ± Ξ΄ΞΉΞ±Ξ³ΟΞ¬ΟΞµΞΉΟ‚ Ξ±Ο…Ο„Ξ® Ο„Ξ·Ξ½ Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬;')) return;
     await supabase.from('agent_reports').delete().eq('id', reportId);
     setSelectedReport(null);
-    setToast({ msg: 'Η αναφορά διαγράφηκε.', type: 'success' });
+    setToast({ msg: 'Ξ— Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ.', type: 'success' });
     loadReports();
   };
 
   const saveNotes = async () => {
     if (!selectedReport) return;
     await supabase.from('agent_reports').update({ notes: reportNotes }).eq('id', selectedReport.id);
-    setToast({ msg: 'Οι σημειώσεις αποθηκεύτηκαν.', type: 'success' });
+    setToast({ msg: 'ΞΞΉ ΟƒΞ·ΞΌΞµΞΉΟΟƒΞµΞΉΟ‚ Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΟ„Ξ·ΞΊΞ±Ξ½.', type: 'success' });
   };
 
   const updatePriority = async (priority: string) => {
     if (!selectedReport) return;
     await supabase.from('agent_reports').update({ priority }).eq('id', selectedReport.id);
     setReportPriority(priority);
-    setToast({ msg: `Η προτεραιότητα άλλαξε σε ${priority}.`, type: 'success' });
+    setToast({ msg: `Ξ— Ο€ΟΞΏΟ„ΞµΟΞ±ΞΉΟΟ„Ξ·Ο„Ξ± Ξ¬Ξ»Ξ»Ξ±ΞΎΞµ ΟƒΞµ ${priority}.`, type: 'success' });
     loadReports();
   };
 
@@ -2048,10 +2048,10 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
   return (
     <div className="dash-content reports-tab">
       <div className="dash-content-header">
-        <p>Αναφορές απόδοσης AI agents και Master Orchestrator summary. {unreadCount > 0 && <span style={{ color: '#e74c3c', fontWeight: 600 }}>({unreadCount} μη αναγνωσμένες)</span>}</p>
+        <p>Ξ‘Ξ½Ξ±Ο†ΞΏΟΞ­Ο‚ Ξ±Ο€ΟΞ΄ΞΏΟƒΞ·Ο‚ AI agents ΞΊΞ±ΞΉ Master Orchestrator summary. {unreadCount > 0 && <span style={{ color: '#e74c3c', fontWeight: 600 }}>({unreadCount} ΞΌΞ· Ξ±Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½ΞµΟ‚)</span>}</p>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={loadReports} disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'spin' : ''} /> Ανανέωση
+            <RefreshCw size={16} className={loading ? 'spin' : ''} /> Ξ‘Ξ½Ξ±Ξ½Ξ­Ο‰ΟƒΞ·
           </button>
           <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
             <FileText size={16} /> Master Report
@@ -2061,7 +2061,7 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
 
       <div className="reports-layout">
         <div className="reports-sidebar">
-          <h3>Αποθηκευμένες Αναφορές</h3>
+          <h3>Ξ‘Ο€ΞΏΞΈΞ·ΞΊΞµΟ…ΞΌΞ­Ξ½ΞµΟ‚ Ξ‘Ξ½Ξ±Ο†ΞΏΟΞ­Ο‚</h3>
           {reports.map((r) => (
             <div key={r.id} className={`report-item ${selectedReport?.id === r.id ? 'active' : ''}`} onClick={() => {
               setSelectedReport(r);
@@ -2072,12 +2072,12 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
               <div className="report-item-icon"><FileText size={14} /></div>
               <div>
                 <strong>{r.title}</strong>
-                <span>{new Date(r.created_at).toLocaleDateString('el-GR')} · {r.report_type}</span>
-                {!r.is_read && <span className="report-is-read unread" style={{ marginLeft: '6px' }}>●</span>}
+                <span>{new Date(r.created_at).toLocaleDateString('el-GR')} Β· {r.report_type}</span>
+                {!r.is_read && <span className="report-is-read unread" style={{ marginLeft: '6px' }}>β—</span>}
               </div>
             </div>
           ))}
-          {reports.length === 0 && <p className="dash-empty">Δεν υπάρχουν αναφορές.</p>}
+          {reports.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ξ±Ξ½Ξ±Ο†ΞΏΟΞ­Ο‚.</p>}
         </div>
 
         <div className="reports-main">
@@ -2090,7 +2090,7 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
                     <span>{new Date(selectedReport.created_at).toLocaleString('el-GR')}</span>
                     <span className="report-type-badge">{selectedReport.report_type}</span>
                     <span className={`report-priority ${selectedReport.priority || 'normal'}`}>
-                      {selectedReport.priority === 'high' ? 'Υψηλή' : selectedReport.priority === 'low' ? 'Χαμηλή' : 'Κανονική'}
+                      {selectedReport.priority === 'high' ? 'Ξ¥ΟΞ·Ξ»Ξ®' : selectedReport.priority === 'low' ? 'Ξ§Ξ±ΞΌΞ·Ξ»Ξ®' : 'ΞΞ±Ξ½ΞΏΞ½ΞΉΞΊΞ®'}
                     </span>
                   </div>
                 </div>
@@ -2100,15 +2100,15 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
                     value={selectedReport.priority || 'normal'} 
                     onChange={(e) => updatePriority(e.target.value)}
                   >
-                    <option value="low">Χαμηλή Προτεραιότητα</option>
-                    <option value="normal">Κανονική</option>
-                    <option value="high">Υψηλή Προτεραιότητα</option>
+                    <option value="low">Ξ§Ξ±ΞΌΞ·Ξ»Ξ® Ξ ΟΞΏΟ„ΞµΟΞ±ΞΉΟΟ„Ξ·Ο„Ξ±</option>
+                    <option value="normal">ΞΞ±Ξ½ΞΏΞ½ΞΉΞΊΞ®</option>
+                    <option value="high">Ξ¥ΟΞ·Ξ»Ξ® Ξ ΟΞΏΟ„ΞµΟΞ±ΞΉΟΟ„Ξ·Ο„Ξ±</option>
                   </select>
                   <button className="report-action-btn" onClick={() => markAsRead(selectedReport)}>
-                    <Eye size={14} /> {selectedReport.is_read ? 'Αναγνωσμένη' : 'Σήμανση ως Αναγνωσμένη'}
+                    <Eye size={14} /> {selectedReport.is_read ? 'Ξ‘Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½Ξ·' : 'Ξ£Ξ®ΞΌΞ±Ξ½ΟƒΞ· Ο‰Ο‚ Ξ‘Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½Ξ·'}
                   </button>
                   <button className="report-action-btn delete" onClick={() => deleteReport(selectedReport.id)}>
-                    <Trash2 size={14} /> Διαγραφή
+                    <Trash2 size={14} /> Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®
                   </button>
                 </div>
               </div>
@@ -2117,21 +2117,21 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
                 <div className="report-metrics">
                   <div><strong>{selectedReport.metrics.total_agents}</strong><span>Agents</span></div>
                   <div><strong>{selectedReport.metrics.total_leads}</strong><span>Leads</span></div>
-                  <div><strong>{selectedReport.metrics.total_meetings}</strong><span>Ραντεβού</span></div>
+                  <div><strong>{selectedReport.metrics.total_meetings}</strong><span>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</span></div>
                 </div>
               )}
               
               <div className="report-content">{selectedReport.content}</div>
               
               <div className="report-notes">
-                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>Σημειώσεις</h4>
+                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>Ξ£Ξ·ΞΌΞµΞΉΟΟƒΞµΞΉΟ‚</h4>
                 <textarea 
                   value={reportNotes} 
                   onChange={(e) => setReportNotes(e.target.value)}
-                  placeholder="Προσθέστε σημειώσεις για αυτή την αναφορά..."
+                  placeholder="Ξ ΟΞΏΟƒΞΈΞ­ΟƒΟ„Ξµ ΟƒΞ·ΞΌΞµΞΉΟΟƒΞµΞΉΟ‚ Ξ³ΞΉΞ± Ξ±Ο…Ο„Ξ® Ο„Ξ·Ξ½ Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬..."
                 />
                 <button className="btn btn-secondary" onClick={saveNotes} style={{ marginTop: '8px' }}>
-                  Αποθήκευση Σημειώσεων
+                  Ξ‘Ο€ΞΏΞΈΞ®ΞΊΞµΟ…ΟƒΞ· Ξ£Ξ·ΞΌΞµΞΉΟΟƒΞµΟ‰Ξ½
                 </button>
               </div>
               
@@ -2148,10 +2148,10 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
           ) : (
             <div className="report-placeholder">
               <FileText size={48} />
-              <p>Επιλέξτε μια αναφορά ή δημιουργήστε μια νέα.</p>
+              <p>Ξ•Ο€ΞΉΞ»Ξ­ΞΎΟ„Ξµ ΞΌΞΉΞ± Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ® Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΟƒΟ„Ξµ ΞΌΞΉΞ± Ξ½Ξ­Ξ±.</p>
               <div className="report-generate-grid">
                 <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
-                  <Sparkles size={16} /> Master Report (Όλοι οι Agents)
+                  <Sparkles size={16} /> Master Report (ΞΞ»ΞΏΞΉ ΞΏΞΉ Agents)
                 </button>
                 {agents.filter(a => a.status === 'active').map((a) => (
                   <button key={a.id} className="btn btn-secondary" onClick={() => generateReport('on_demand', a.id)} disabled={generating}>
@@ -2180,12 +2180,12 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const [editingUser, setEditingUser] = useState<CrmUser | null>(null);
 
   const roleLabels: Record<string, string> = {
-    admin: 'Διαχειριστής',
-    management: 'Διοίκηση',
-    sales: 'Πωλήσεις',
-    hr: 'Ανθρώπινο Δυναμικό',
-    it: 'Τεχνολογία',
-    secretary: 'Γραμματεία',
+    admin: 'Ξ”ΞΉΞ±Ο‡ΞµΞΉΟΞΉΟƒΟ„Ξ®Ο‚',
+    management: 'Ξ”ΞΉΞΏΞ―ΞΊΞ·ΟƒΞ·',
+    sales: 'Ξ Ο‰Ξ»Ξ®ΟƒΞµΞΉΟ‚',
+    hr: 'Ξ‘Ξ½ΞΈΟΟΟ€ΞΉΞ½ΞΏ Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΟ',
+    it: 'Ξ¤ΞµΟ‡Ξ½ΞΏΞ»ΞΏΞ³Ξ―Ξ±',
+    secretary: 'Ξ“ΟΞ±ΞΌΞΌΞ±Ο„ΞµΞ―Ξ±',
   };
 
   const roleColors: Record<string, string> = {
@@ -2204,7 +2204,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const toggleUserActive = async (user: CrmUser) => {
     const { error } = await supabase.from('crm_users').update({ is_active: !user.is_active }).eq('id', user.id);
     if (!error) {
-      setToast({ msg: `Ο χρήστης ${user.is_active ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'}.`, type: 'success' });
+      setToast({ msg: `Ξ Ο‡ΟΞ®ΟƒΟ„Ξ·Ο‚ ${user.is_active ? 'Ξ±Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ' : 'ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ'}.`, type: 'success' });
       loadData();
     }
   };
@@ -2212,7 +2212,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const updateUserRole = async (user: CrmUser, newRole: string) => {
     const { error } = await supabase.from('crm_users').update({ role: newRole }).eq('id', user.id);
     if (!error) {
-      setToast({ msg: `Ο ρόλος ενημερώθηκε σε ${roleLabels[newRole]}.`, type: 'success' });
+      setToast({ msg: `Ξ ΟΟΞ»ΞΏΟ‚ ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ ΟƒΞµ ${roleLabels[newRole]}.`, type: 'success' });
       loadData();
     }
   };
@@ -2220,7 +2220,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const updateUserMaxLeads = async (user: CrmUser, maxLeads: number) => {
     const { error } = await supabase.from('crm_users').update({ max_leads: maxLeads }).eq('id', user.id);
     if (!error) {
-      setToast({ msg: `Το μέγιστο πλήθος leads ενημερώθηκε.`, type: 'success' });
+      setToast({ msg: `Ξ¤ΞΏ ΞΌΞ­Ξ³ΞΉΟƒΟ„ΞΏ Ο€Ξ»Ξ®ΞΈΞΏΟ‚ leads ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ.`, type: 'success' });
       loadData();
     }
   };
@@ -2228,26 +2228,26 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Διαχείριση χρηστών CRM με ρόλους και αυτόματη κατανομή leads στους πωλητές.</p>
+        <p>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· Ο‡ΟΞ·ΟƒΟ„ΟΞ½ CRM ΞΌΞµ ΟΟΞ»ΞΏΟ…Ο‚ ΞΊΞ±ΞΉ Ξ±Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΞΊΞ±Ο„Ξ±Ξ½ΞΏΞΌΞ® leads ΟƒΟ„ΞΏΟ…Ο‚ Ο€Ο‰Ξ»Ξ·Ο„Ξ­Ο‚.</p>
         <button className="btn btn-primary" onClick={() => setShowAddUser(!showAddUser)}>
-          <Plus size={16} /> Νέος Χρήστης
+          <Plus size={16} /> ΞΞ­ΞΏΟ‚ Ξ§ΟΞ®ΟƒΟ„Ξ·Ο‚
         </button>
       </div>
 
       {showAddUser && (
         <div className="dash-add-form">
-          <input placeholder="Πλήρες όνομα" value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} />
+          <input placeholder="Ξ Ξ»Ξ®ΟΞµΟ‚ ΟΞ½ΞΏΞΌΞ±" value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} />
           <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
-            <option value="sales">Πωλήσεις</option>
-            <option value="secretary">Γραμματεία</option>
-            <option value="hr">Ανθρώπινο Δυναμικό</option>
-            <option value="it">Τεχνολογία</option>
-            <option value="management">Διοίκηση</option>
-            <option value="admin">Διαχειριστής</option>
+            <option value="sales">Ξ Ο‰Ξ»Ξ®ΟƒΞµΞΉΟ‚</option>
+            <option value="secretary">Ξ“ΟΞ±ΞΌΞΌΞ±Ο„ΞµΞ―Ξ±</option>
+            <option value="hr">Ξ‘Ξ½ΞΈΟΟΟ€ΞΉΞ½ΞΏ Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΟ</option>
+            <option value="it">Ξ¤ΞµΟ‡Ξ½ΞΏΞ»ΞΏΞ³Ξ―Ξ±</option>
+            <option value="management">Ξ”ΞΉΞΏΞ―ΞΊΞ·ΟƒΞ·</option>
+            <option value="admin">Ξ”ΞΉΞ±Ο‡ΞµΞΉΟΞΉΟƒΟ„Ξ®Ο‚</option>
           </select>
-          <input placeholder="Τηλέφωνο" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} />
+          <input placeholder="Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} />
           <input placeholder="Email" type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-          <input placeholder="Κωδικός" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+          <input placeholder="ΞΟ‰Ξ΄ΞΉΞΊΟΟ‚" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
           <button className="btn btn-primary" onClick={async () => {
             if (!newUser.full_name || !newUser.email || !newUser.password) return;
             const { error } = await supabase.rpc('create_crm_user', {
@@ -2257,31 +2257,31 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
               p_email: newUser.email,
               p_password: newUser.password,
             });
-            if (error) { setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' }); return; }
+            if (error) { setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' }); return; }
             setNewUser({ full_name: '', role: 'sales', phone: '', email: '', password: '' });
             setShowAddUser(false);
             loadData();
-            setToast({ msg: 'Ο χρήστης δημιουργήθηκε.', type: 'success' });
-          }}>Δημιουργία</button>
+            setToast({ msg: 'Ξ Ο‡ΟΞ®ΟƒΟ„Ξ·Ο‚ Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ.', type: 'success' });
+          }}>Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ±</button>
         </div>
       )}
 
       <div className="dash-users-stats">
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><Users size={20} /></div>
-          <div><strong>{crmUsers.length}</strong><span>Σύνολο Χρηστών</span></div>
+          <div><strong>{crmUsers.length}</strong><span>Ξ£ΟΞ½ΞΏΞ»ΞΏ Ξ§ΟΞ·ΟƒΟ„ΟΞ½</span></div>
         </div>
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><CheckCircle2 size={20} /></div>
-          <div><strong>{crmUsers.filter(u => u.is_active).length}</strong><span>Ενεργοί</span></div>
+          <div><strong>{crmUsers.filter(u => u.is_active).length}</strong><span>Ξ•Ξ½ΞµΟΞ³ΞΏΞ―</span></div>
         </div>
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><Bot size={20} /></div>
-          <div><strong>{crmUsers.filter(u => u.role === 'sales').length}</strong><span>Πωλητές</span></div>
+          <div><strong>{crmUsers.filter(u => u.role === 'sales').length}</strong><span>Ξ Ο‰Ξ»Ξ·Ο„Ξ­Ο‚</span></div>
         </div>
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><TrendingUp size={20} /></div>
-          <div><strong>{leads.filter(l => !l.deleted_at && l.assigned_to).length}</strong><span>Κατανεμημένα Leads</span></div>
+          <div><strong>{leads.filter(l => !l.deleted_at && l.assigned_to).length}</strong><span>ΞΞ±Ο„Ξ±Ξ½ΞµΞΌΞ·ΞΌΞ­Ξ½Ξ± Leads</span></div>
         </div>
       </div>
 
@@ -2289,13 +2289,13 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
         <table className="dash-table">
           <thead>
             <tr>
-              <th>Όνομα</th><th>Ρόλος</th><th>Τηλέφωνο</th><th>Leads</th><th>Μέγ. Leads</th><th>Κατάσταση</th><th>Ενέργεια</th>
+              <th>ΞΞ½ΞΏΞΌΞ±</th><th>Ξ΅ΟΞ»ΞΏΟ‚</th><th>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</th><th>Leads</th><th>ΞΞ­Ξ³. Leads</th><th>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
             </tr>
           </thead>
           <tbody>
             {crmUsers.map((u) => (
               <tr key={u.id}>
-                <td><strong>{u.full_name || 'Χωρίς όνομα'}</strong></td>
+                <td><strong>{u.full_name || 'Ξ§Ο‰ΟΞ―Ο‚ ΟΞ½ΞΏΞΌΞ±'}</strong></td>
                 <td>
                   <select 
                     className="dash-status-select" 
@@ -2303,15 +2303,15 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
                     onChange={(e) => updateUserRole(u, e.target.value)}
                     style={{ borderLeft: `3px solid ${roleColors[u.role] || '#666'}` }}
                   >
-                    <option value="admin">Διαχειριστής</option>
-                    <option value="management">Διοίκηση</option>
-                    <option value="sales">Πωλήσεις</option>
-                    <option value="hr">Ανθρώπινο Δυναμικό</option>
-                    <option value="it">Τεχνολογία</option>
-                    <option value="secretary">Γραμματεία</option>
+                    <option value="admin">Ξ”ΞΉΞ±Ο‡ΞµΞΉΟΞΉΟƒΟ„Ξ®Ο‚</option>
+                    <option value="management">Ξ”ΞΉΞΏΞ―ΞΊΞ·ΟƒΞ·</option>
+                    <option value="sales">Ξ Ο‰Ξ»Ξ®ΟƒΞµΞΉΟ‚</option>
+                    <option value="hr">Ξ‘Ξ½ΞΈΟΟΟ€ΞΉΞ½ΞΏ Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΟ</option>
+                    <option value="it">Ξ¤ΞµΟ‡Ξ½ΞΏΞ»ΞΏΞ³Ξ―Ξ±</option>
+                    <option value="secretary">Ξ“ΟΞ±ΞΌΞΌΞ±Ο„ΞµΞ―Ξ±</option>
                   </select>
                 </td>
-                <td>{u.phone || '—'}</td>
+                <td>{u.phone || 'β€”'}</td>
                 <td>
                   <span className="user-lead-count" style={{ color: getLeadCountForUser(u.id) >= u.max_leads ? '#e74c3c' : '#00c878' }}>
                     {getLeadCountForUser(u.id)}
@@ -2328,13 +2328,13 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
                 </td>
                 <td>
                   <span className={`dash-status-pill ${u.is_active ? 'active' : 'paused'}`}>
-                    {u.is_active ? 'Ενεργός' : 'Ανενεργός'}
+                    {u.is_active ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
                   </span>
                 </td>
                 <td>
                   <div className="dash-lead-actions">
                     <button className="dash-agent-toggle" onClick={() => toggleUserActive(u)}>
-                      {u.is_active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}
+                      {u.is_active ? 'Ξ‘Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·' : 'Ξ•Ξ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·'}
                     </button>
                   </div>
                 </td>
@@ -2342,1159 +2342,40 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
             ))}
           </tbody>
         </table>
-        {crmUsers.length === 0 && <p className="dash-empty">Δεν υπάρχουν χρήστες. Προσθέστε τον πρώτο σας χρήστη.</p>}
+        {crmUsers.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ο‡ΟΞ®ΟƒΟ„ΞµΟ‚. Ξ ΟΞΏΟƒΞΈΞ­ΟƒΟ„Ξµ Ο„ΞΏΞ½ Ο€ΟΟΟ„ΞΏ ΟƒΞ±Ο‚ Ο‡ΟΞ®ΟƒΟ„Ξ·.</p>}
       </div>
     </div>
   );
 }
-
-function IntegrationsTab({ toast, setToast }: {
-  toast: { msg: string; type: 'success' | 'info' } | null;
-  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
-}) {
-  const [integrations, setIntegrations] = useState<Array<{
-    id: string; name: string; icon: string; connected: boolean; status: string;
-    fields: Record<string, string>; category: string; lastSync?: string;
-  }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState<Record<string, string>>({});
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [testingId, setTestingId] = useState<string | null>(null);
-  const [showAddCustom, setShowAddCustom] = useState(false);
-  const [newCustom, setNewCustom] = useState({ name: '', type: 'webhook', url: '' });
-
-  const icons: Record<string, string> = {
-    gmail: '📧', facebook: '📘', instagram: '📷', linkedin: '💼',
-    whatsapp: '💬', viber: '💜', sms: '📱', imap: '📬',
-    outlook: '📮', twitter: '🐦', telegram: '✈️', slack: '💬',
-    zapier: '⚡', make: '🔮', webhook: '🔗', custom: '🔧',
-  };
-
-  const categories = [
-    { id: 'all', label: 'Όλες' },
-    { id: 'email', label: '📧 Email' },
-    { id: 'social', label: '📱 Social Media' },
-    { id: 'messaging', label: '💬 Messaging' },
-    { id: 'automation', label: '⚡ Αυτοματοποίηση' },
-    { id: 'custom', label: '🔧 Custom' },
-  ];
-
-  const fieldLabels: Record<string, Record<string, string>> = {
-    gmail: { email: 'Email Address', appPassword: 'App Password', syncInterval: 'Sync Interval (min)', autoReply: 'Auto-Reply (yes/no)', signature: 'Email Signature' },
-    facebook: { pageId: 'Facebook Page ID', accessToken: 'Access Token', webhookUrl: 'Webhook URL', autoPost: 'Auto-Post (yes/no)' },
-    instagram: { accountId: 'Instagram Account ID', accessToken: 'Access Token', autoReply: 'Auto-Reply DMs (yes/no)' },
-    linkedin: { companyId: 'LinkedIn Company ID', accessToken: 'Access Token', autoPost: 'Auto-Post (yes/no)' },
-    whatsapp: { phoneNumberId: 'Phone Number ID', accessToken: 'Access Token', businessAccountId: 'Business Account ID', autoReply: 'Auto-Reply (yes/no)' },
-    viber: { authToken: 'Auth Token', senderId: 'Sender ID', autoReply: 'Auto-Reply (yes/no)' },
-    sms: { apiUrl: 'API URL', apiKey: 'API Key', sender: 'Sender Name', gateway: 'Gateway Provider' },
-    imap: { host: 'IMAP Server', port: 'Port', user: 'Username', password: 'Password', useTls: 'Use TLS (yes/no)', syncInterval: 'Sync Interval (min)' },
-    outlook: { clientId: 'Client ID', clientSecret: 'Client Secret', tenantId: 'Tenant ID', syncInterval: 'Sync Interval (min)' },
-    twitter: { apiKey: 'API Key', apiSecret: 'API Secret', accessToken: 'Access Token', accessSecret: 'Access Token Secret' },
-    telegram: { botToken: 'Bot Token', chatId: 'Default Chat ID', webhookUrl: 'Webhook URL' },
-    zapier: { webhookUrl: 'Webhook URL', apiKey: 'API Key' },
-    make: { webhookUrl: 'Webhook URL', apiKey: 'API Key' },
-    webhook: { url: 'Webhook URL', secret: 'Secret Key', method: 'HTTP Method', headers: 'Custom Headers (JSON)' },
-    custom: { name: 'Integration Name', url: 'API Endpoint', apiKey: 'API Key', method: 'HTTP Method', headers: 'Custom Headers (JSON)' },
-  };
-
-  const categoryMap: Record<string, string> = {
-    gmail: 'email', outlook: 'email', imap: 'email',
-    facebook: 'social', instagram: 'social', linkedin: 'social', twitter: 'social',
-    whatsapp: 'messaging', viber: 'messaging', sms: 'messaging', telegram: 'messaging',
-    zapier: 'automation', make: 'automation',
-    webhook: 'custom', custom: 'custom', slack: 'messaging',
-  };
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('crm_integrations').select('*');
-      if (data && data.length > 0) {
-        setIntegrations(data.map(d => ({
-          id: d.id, name: d.name, icon: icons[d.id] || '🔌',
-          connected: d.connected, status: d.connected ? 'Συνδεδεμένο' : 'Αποσυνδεδεμένο',
-          fields: d.config || {}, category: categoryMap[d.id] || 'custom',
-          lastSync: d.updated_at,
-        })));
-      } else {
-        setIntegrations(Object.keys(fieldLabels).map(id => ({
-          id, name: id.charAt(0).toUpperCase() + id.slice(1), icon: icons[id] || '🔌',
-          connected: false, status: 'Αποσυνδεδεμένο', fields: {},
-          category: categoryMap[id] || 'custom',
-        })));
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  const handleConnect = (id: string) => {
-    setEditingId(id);
-    const integ = integrations.find(i => i.id === id);
-    setEditFields(integ?.fields || {});
-  };
-
-  const handleSave = async () => {
-    if (!editingId) return;
-    await supabase.from('crm_integrations').upsert({
-      id: editingId,
-      name: integrations.find(i => i.id === editingId)?.name || editingId,
-      connected: true,
-      config: editFields,
-      updated_at: new Date().toISOString(),
-    });
-    setIntegrations(prev => prev.map(i =>
-      i.id === editingId ? { ...i, connected: true, status: 'Συνδεδεμένο', fields: editFields, lastSync: new Date().toISOString() } : i
-    ));
-    setEditingId(null);
-    setToast({ msg: 'Η ενσωμάτωση αποθηκεύτηκε!', type: 'success' });
-  };
-
-  const handleDisconnect = async (id: string) => {
-    await supabase.from('crm_integrations').upsert({
-      id, connected: false, config: {}, updated_at: new Date().toISOString(),
-    });
-    setIntegrations(prev => prev.map(i =>
-      i.id === id ? { ...i, connected: false, status: 'Αποσυνδεδεμένο', fields: {} } : i
-    ));
-    setToast({ msg: 'Η ενσωμάτωση αποσυνδέθηκε.', type: 'info' });
-  };
-
-  const handleTestConnection = async (id: string) => {
-    setTestingId(id);
-    await new Promise(r => setTimeout(r, 1500));
-    const integ = integrations.find(i => i.id === id);
-    if (integ?.connected && Object.keys(integ.fields).length > 0) {
-      setToast({ msg: `Η σύνδεση ${integ.name} λειτουργεί σωστά!`, type: 'success' });
-    } else {
-      setToast({ msg: `Σφάλμα σύνδεσης: Ελέγξτε τις ρυθμίσεις.`, type: 'info' });
-    }
-    setTestingId(null);
-  };
-
-  const handleAddCustom = async () => {
-    if (!newCustom.name) return;
-    const id = 'custom_' + Date.now();
-    await supabase.from('crm_integrations').upsert({
-      id, name: newCustom.name, connected: false,
-      config: { url: newCustom.url, type: newCustom.type },
-      updated_at: new Date().toISOString(),
-    });
-    setIntegrations(prev => [...prev, {
-      id, name: newCustom.name, icon: '🔧', connected: false,
-      status: 'Αποσυνδεδεμένο', fields: { url: newCustom.url, type: newCustom.type }, category: 'custom',
-    }]);
-    setNewCustom({ name: '', type: 'webhook', url: '' });
-    setShowAddCustom(false);
-    setToast({ msg: 'Η προσαρμοσμένη ενσωμάτωση προστέθηκε!', type: 'success' });
-  };
-
-  const handleDeleteCustom = async (id: string) => {
-    if (!id.startsWith('custom_')) return;
-    await supabase.from('crm_integrations').delete().eq('id', id);
-    setIntegrations(prev => prev.filter(i => i.id !== id));
-    setToast({ msg: 'Η ενσωμάτωση διαγράφηκε.', type: 'info' });
-  };
-
-  const filtered = activeCategory === 'all' ? integrations : integrations.filter(i => i.category === activeCategory);
-  const connectedCount = integrations.filter(i => i.connected).length;
-
-  return (
-    <div className="dash-content">
-      <div className="dash-content-header">
-        <div>
-          <p>Συνδέστε το CRM με email, social media, messaging και άλλα εργαλεία.</p>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{connectedCount}/{integrations.length} ενεργές ενσωματώσεις</span>
-        </div>
-        <button className="btn btn-primary" onClick={() => setShowAddCustom(!showAddCustom)}><Plus size={16} /> Νέα Ενσωμάτωση</button>
-      </div>
-
-      {showAddCustom && (
-        <div className="dash-add-form" style={{ marginBottom: '16px' }}>
-          <input placeholder="Όνομα ενσωμάτωσης" value={newCustom.name} onChange={(e) => setNewCustom({ ...newCustom, name: e.target.value })} />
-          <select value={newCustom.type} onChange={(e) => setNewCustom({ ...newCustom, type: e.target.value })}>
-            <option value="webhook">Webhook</option>
-            <option value="api">REST API</option>
-            <option value="oauth">OAuth 2.0</option>
-            <option value="smtp">SMTP Server</option>
-          </select>
-          <input placeholder="URL / Endpoint" value={newCustom.url} onChange={(e) => setNewCustom({ ...newCustom, url: e.target.value })} />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn btn-ghost" onClick={() => setShowAddCustom(false)}>Άκυρο</button>
-            <button className="btn btn-primary" onClick={handleAddCustom}>Προσθήκη</button>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {categories.map(cat => (
-          <button key={cat.id} className={`btn ${activeCategory === cat.id ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveCategory(cat.id)} style={{ fontSize: '13px', padding: '6px 14px' }}>
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Φόρτωση...</div>
-      ) : (
-      <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-        {filtered.map(integ => (
-          <div key={integ.id} style={{
-            background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px',
-            borderColor: integ.connected ? 'rgba(0,200,120,0.3)' : 'var(--border)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '28px' }}>{integ.icon}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: 'var(--text)' }}>{integ.name}</div>
-                <div style={{ fontSize: '12px', color: integ.connected ? '#00c878' : 'var(--text-muted)' }}>{integ.status}</div>
-              </div>
-              <span style={{
-                width: '10px', height: '10px', borderRadius: '50%',
-                background: integ.connected ? '#00c878' : 'var(--text-muted)',
-              }} />
-            </div>
-
-            {integ.lastSync && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Τελευταία συγχρόνιση: {new Date(integ.lastSync).toLocaleString('el-GR')}
-              </div>
-            )}
-
-            {editingId === integ.id ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {Object.entries(fieldLabels[integ.id] || {}).map(([key, label]) => (
-                  <div key={key}>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{label}</label>
-                    <input
-                      type={key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('key') ? 'password' : 'text'}
-                      value={editFields[key] || ''}
-                      onChange={(e) => setEditFields({ ...editFields, [key]: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}
-                    />
-                  </div>
-                ))}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                  <button className="btn btn-ghost" onClick={() => setEditingId(null)} style={{ flex: 1 }}>Άκυρο</button>
-                  <button className="btn btn-primary" onClick={handleSave} style={{ flex: 1 }}>Αποθήκευση</button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {integ.connected ? (
-                  <>
-                    <button className="btn btn-ghost" onClick={() => handleConnect(integ.id)} style={{ flex: 1, fontSize: '12px' }}>Ρυθμίσεις</button>
-                    <button className="btn btn-ghost" onClick={() => handleTestConnection(integ.id)} disabled={testingId === integ.id}
-                      style={{ flex: 1, fontSize: '12px', color: testingId === integ.id ? '#888' : '#0066cc' }}>
-                      {testingId === integ.id ? '⏳' : '🔍'} Έλεγχος
-                    </button>
-                    <button className="btn btn-ghost" onClick={() => handleDisconnect(integ.id)} style={{ color: '#ef4444', flex: 1, fontSize: '12px' }}>Αποσύνδεση</button>
-                  </>
-                ) : (
-                  <button className="btn btn-primary" onClick={() => handleConnect(integ.id)} style={{ flex: 1 }}>Σύνδεση</button>
-                )}
-                {integ.id.startsWith('custom_') && (
-                  <button className="btn btn-ghost" onClick={() => handleDeleteCustom(integ.id)} style={{ color: '#ef4444', fontSize: '12px' }}>🗑️</button>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: '24px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--text)' }}>📧 Email Campaigns & Auto-Reply</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 12px' }}>
-          Συνδέστε Gmail, Outlook ή IMAP για αποστολή email καμπανίων και auto-reply από το CRM. Τα AI Agents μπορούν να στέλνουν αυτόματα emails, SMS, ή WhatsApp μηνύματα στους leads.
-        </p>
-        <ul style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, paddingLeft: '20px' }}>
-          <li>Αυτόματη αποστολή email sequences σε νέους leads</li>
-          <li>Follow-up emails βάσει pipeline status</li>
-          <li>Track opens και clicks</li>
-          <li>GDPR-compliant unsubscribe mechanism</li>
-          <li>Εισαγωγή email από Gmail/Outlook/Yahoo/IMAP</li>
-          <li>Διαχείριση inbox από το CRM</li>
-        </ul>
-      </div>
-      </>
-      )}
-    </div>
-  );
-}
-
-function EmailTab({ toast, setToast }: {
-  toast: { msg: string; type: 'success' | 'info' } | null;
-  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
-}) {
-  const [emails, setEmails] = useState<Array<{
-    id: string; from_email: string; to_email: string; subject: string;
-    body: string; folder: string; is_read: boolean; starred: boolean;
-    important: boolean; spam: boolean; labels: string[]; lead_id?: string;
-    created_at: string; cc?: string; bcc?: string; thread_id?: string;
-  }>>([]);
-  const [labels, setLabels] = useState<Array<{ id: string; name: string; color: string }>>([]);
-  const [emailSettings, setEmailSettings] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
-  const [activeFolder, setActiveFolder] = useState('inbox');
-  const [activeLabel, setActiveLabel] = useState<string | null>(null);
-  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showCompose, setShowCompose] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showImport, setShowImport] = useState(false);
-  const [showLabelManager, setShowLabelManager] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [syncing, setSyncing] = useState(false);
-  const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
-  const [showScheduleSend, setShowScheduleSend] = useState(false);
-  const [isPlainText, setIsPlainText] = useState(false);
-  const [importConfig, setImportConfig] = useState({ provider: 'gmail', email: '', password: '', imapHost: '', imapPort: '993' });
-  const [newLabel, setNewLabel] = useState({ name: '', color: '#0066cc' });
-  const [editingSettings, setEditingSettings] = useState<Record<string, any>>({});
-  const [leads, setLeads] = useState<Array<{ id: string; first_name: string; last_name: string; email: string }>>([]);
-
-  const folders = [
-    { id: 'inbox', label: 'Εισερχόμενα', icon: '📥' },
-    { id: 'starred', label: 'Αστέρια', icon: '⭐' },
-    { id: 'sent', label: 'Απεσταλμένα', icon: '📤' },
-    { id: 'drafts', label: 'Πρόχειρα', icon: '📝' },
-    { id: 'important', label: 'Σημαντικά', icon: '🏷️' },
-    { id: 'archive', label: 'Αρχείο', icon: '📦' },
-    { id: 'spam', label: 'Ανεπιθύμητα', icon: '⚠️' },
-    { id: 'trash', label: 'Απορρίμματα', icon: '🗑️' },
-  ];
-
-  const providers = [
-    { id: 'gmail', label: 'Gmail', icon: '📧', host: 'imap.gmail.com', port: '993' },
-    { id: 'outlook', label: 'Outlook / Microsoft 365', icon: '📮', host: 'outlook.office365.com', port: '993' },
-    { id: 'yahoo', label: 'Yahoo Mail', icon: '📬', host: 'imap.mail.yahoo.com', port: '993' },
-    { id: 'custom', label: 'Προσαρμοσμένο IMAP', icon: '🔧', host: '', port: '993' },
-  ];
-
-  const labelColors = ['#0066cc', '#00c878', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-
-  useEffect(() => {
-    (async () => {
-      const [emailsRes, labelsRes, settingsRes, leadsRes] = await Promise.all([
-        supabase.from('crm_emails').select('*').order('created_at', { ascending: false }),
-        supabase.from('crm_email_labels').select('*'),
-        supabase.from('crm_email_settings').select('*'),
-        supabase.from('hlektrismos_leads').select('id, first_name, last_name, email').is('deleted_at', null),
-      ]);
-      if (emailsRes.data) setEmails(emailsRes.data);
-      if (labelsRes.data) setLabels(labelsRes.data);
-      if (leadsRes.data) setLeads(leadsRes.data);
-      const settings: Record<string, any> = {};
-      settingsRes.data?.forEach(s => { settings[s.setting_key] = s.setting_value; });
-      setEmailSettings(settings);
-      setEditingSettings(settings);
-      setLoading(false);
-    })();
-  }, []);
-
-  const filteredEmails = emails.filter(e => {
-    if (activeLabel) return (e.labels || []).includes(activeLabel);
-    if (activeFolder === 'starred') return e.starred;
-    if (activeFolder === 'important') return e.important;
-    if (activeFolder === 'spam') return e.spam;
-    return e.folder === activeFolder;
-  }).filter(e => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return e.subject.toLowerCase().includes(q) || e.from_email.toLowerCase().includes(q) || e.body.toLowerCase().includes(q);
-  });
-
-  const unreadCount = emails.filter(e => e.folder === 'inbox' && !e.is_read && !e.spam).length;
-  const draftCount = emails.filter(e => e.folder === 'drafts').length;
-  const selectedEmailData = emails.find(e => e.id === selectedEmail);
-
-  const handleToggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.size === filteredEmails.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredEmails.map(e => e.id)));
-    }
-  };
-
-  const handleToggleStar = async (id: string) => {
-    const email = emails.find(e => e.id === id);
-    if (!email) return;
-    await supabase.from('crm_emails').update({ starred: !email.starred }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, starred: !e.starred } : e));
-  };
-
-  const handleToggleImportant = async (id: string) => {
-    const email = emails.find(e => e.id === id);
-    if (!email) return;
-    await supabase.from('crm_emails').update({ important: !email.important }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, important: !e.important } : e));
-  };
-
-  const handleMarkRead = async (id: string) => {
-    await supabase.from('crm_emails').update({ is_read: true }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: true } : e));
-  };
-
-  const handleMarkUnread = async (id: string) => {
-    await supabase.from('crm_emails').update({ is_read: false }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: false } : e));
-  };
-
-  const handleBulkMarkRead = async () => {
-    const ids = Array.from(selectedIds);
-    await supabase.from('crm_emails').update({ is_read: true }).in('id', ids);
-    setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, is_read: true } : e));
-    setSelectedIds(new Set());
-    setToast({ msg: `${ids.length} emails σημάνθηκαν ως αναγνωσμένα.`, type: 'success' });
-  };
-
-  const handleBulkDelete = async () => {
-    const ids = Array.from(selectedIds);
-    await supabase.from('crm_emails').update({ folder: 'trash' }).in('id', ids);
-    setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, folder: 'trash' } : e));
-    setSelectedIds(new Set());
-    setToast({ msg: `${ids.length} emails μεταφέρθηκαν στα απορρίμματα.`, type: 'info' });
-  };
-
-  const handleDeleteEmail = async (id: string) => {
-    await supabase.from('crm_emails').update({ folder: 'trash' }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: 'trash' } : e));
-    if (selectedEmail === id) setSelectedEmail(null);
-    setToast({ msg: 'Το email μεταφέρθηκε στα απορρίμματα.', type: 'info' });
-  };
-
-  const handlePermanentDelete = async (id: string) => {
-    await supabase.from('crm_emails').delete().eq('id', id);
-    setEmails(prev => prev.filter(e => e.id !== id));
-    if (selectedEmail === id) setSelectedEmail(null);
-  };
-
-  const handleMoveToSpam = async (id: string) => {
-    await supabase.from('crm_emails').update({ spam: true, folder: 'inbox' }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, spam: true } : e));
-  };
-
-  const handleAddLabel = async (emailId: string, labelName: string) => {
-    const email = emails.find(e => e.id === emailId);
-    if (!email) return;
-    const newLabels = [...(email.labels || []), labelName];
-    await supabase.from('crm_emails').update({ labels: newLabels }).eq('id', emailId);
-    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, labels: newLabels } : e));
-  };
-
-  const handleRemoveLabel = async (emailId: string, labelName: string) => {
-    const email = emails.find(e => e.id === emailId);
-    if (!email) return;
-    const newLabels = (email.labels || []).filter(l => l !== labelName);
-    await supabase.from('crm_emails').update({ labels: newLabels }).eq('id', emailId);
-    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, labels: newLabels } : e));
-  };
-
-  const handleCreateLabel = async () => {
-    if (!newLabel.name) return;
-    const { data } = await supabase.from('crm_email_labels').insert({ name: newLabel.name, color: newLabel.color }).select();
-    if (data) setLabels(prev => [...prev, data[0]]);
-    setNewLabel({ name: '', color: '#0066cc' });
-    setToast({ msg: 'Η ετικέτα δημιουργήθηκε!', type: 'success' });
-  };
-
-  const handleDeleteLabel = async (id: string) => {
-    await supabase.from('crm_email_labels').delete().eq('id', id);
-    setLabels(prev => prev.filter(l => l.id !== id));
-  };
-
-  const handleSendEmail = async () => {
-    if (!composeData.to || !composeData.subject) return;
-    const newEmail = {
-      id: 'email_' + Date.now(),
-      from_email: 'info@hlektrismos.gr',
-      to_email: composeData.to,
-      cc: composeData.cc,
-      bcc: composeData.bcc,
-      subject: composeData.subject,
-      body: composeData.body,
-      folder: 'sent',
-      is_read: true,
-      starred: false,
-      important: false,
-      spam: false,
-      labels: [],
-      reply_to: composeData.replyTo,
-      created_at: new Date().toISOString(),
-    };
-    await supabase.from('crm_emails').insert(newEmail);
-    setEmails(prev => [newEmail, ...prev]);
-    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
-    setShowCompose(false);
-    setToast({ msg: 'Το email στάλθηκε!', type: 'success' });
-  };
-
-  const handleSaveDraft = async () => {
-    const draft = {
-      id: 'draft_' + Date.now(),
-      from_email: 'info@hlektrismos.gr',
-      to_email: composeData.to,
-      cc: composeData.cc,
-      bcc: composeData.bcc,
-      subject: composeData.subject || '(Χωρίς θέμα)',
-      body: composeData.body,
-      folder: 'drafts',
-      is_read: true,
-      starred: false,
-      important: false,
-      spam: false,
-      labels: [],
-      created_at: new Date().toISOString(),
-    };
-    await supabase.from('crm_emails').insert(draft);
-    setEmails(prev => [draft, ...prev]);
-    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
-    setShowCompose(false);
-    setToast({ msg: 'Το πρόχειρο αποθηκεύτηκε.', type: 'info' });
-  };
-
-  const handleImportEmails = async () => {
-    if (!importConfig.email) return;
-    setSyncing(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setSyncing(false);
-    setShowImport(false);
-    setToast({ msg: `Emails από ${importConfig.provider} εισήχθησαν επιτυχώς!`, type: 'success' });
-  };
-
-  const handleSync = async () => {
-    setSyncing(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setSyncing(false);
-    setToast({ msg: 'Τα emails συγχρονίστηκαν επιτυχώς!', type: 'success' });
-  };
-
-  const handleSaveSettings = async () => {
-    for (const [key, value] of Object.entries(editingSettings)) {
-      await supabase.from('crm_email_settings').upsert({ setting_key: key, setting_value: value, updated_at: new Date().toISOString() });
-    }
-    setEmailSettings(editingSettings);
-    setShowSettings(false);
-    setToast({ msg: 'Οι ρυθμίσεις αποθηκεύτηκαν!', type: 'success' });
-  };
-
-  const handleLinkToLead = async (emailId: string, leadId: string) => {
-    await supabase.from('crm_emails').update({ lead_id: leadId }).eq('id', emailId);
-    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, lead_id: leadId } : e));
-    setToast({ msg: 'Το email συνδέθηκε με το lead!', type: 'success' });
-  };
-
-  const folderLabelCounts: Record<string, number> = {};
-  folders.forEach(f => {
-    if (f.id === 'starred') folderLabelCounts[f.id] = emails.filter(e => e.starred).length;
-    else if (f.id === 'important') folderLabelCounts[f.id] = emails.filter(e => e.important).length;
-    else if (f.id === 'spam') folderLabelCounts[f.id] = emails.filter(e => e.spam).length;
-    else folderLabelCounts[f.id] = emails.filter(e => e.folder === f.id).length;
-  });
-
-  return (
-    <div className="dash-content" style={{ padding: 0 }}>
-      <div style={{ display: 'flex', height: 'calc(100vh - 120px)', minHeight: '600px' }}>
-        {/* Sidebar */}
-        <div style={{ width: '220px', flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '16px' }}>
-            <button className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', borderRadius: '24px', fontSize: '14px', fontWeight: 600 }}
-              onClick={() => { setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false }); setShowCompose(true); }}>
-              ✉️ Σύνταξη
-            </button>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
-            {folders.map(f => (
-              <button key={f.id} onClick={() => { setActiveFolder(f.id); setActiveLabel(null); setSelectedEmail(null); setSelectedIds(new Set()); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: activeFolder === f.id && !activeLabel ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent',
-                  color: activeFolder === f.id && !activeLabel ? 'var(--primary)' : 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left', marginBottom: '2px', fontWeight: activeFolder === f.id && !activeLabel ? 600 : 400 }}>
-                <span style={{ fontSize: '16px' }}>{f.icon}</span>
-                <span style={{ flex: 1 }}>{f.label}</span>
-                {folderLabelCounts[f.id] > 0 && f.id === 'inbox' && unreadCount > 0 && (
-                  <span style={{ fontWeight: 700, fontSize: '12px' }}>{unreadCount}</span>
-                )}
-                {folderLabelCounts[f.id] > 0 && f.id !== 'inbox' && f.id !== 'starred' && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{folderLabelCounts[f.id]}</span>
-                )}
-              </button>
-            ))}
-            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ετικέτες</span>
-                <button onClick={() => setShowLabelManager(!showLabelManager)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '16px', padding: '0 4px' }}>+</button>
-              </div>
-              {labels.map(l => (
-                <button key={l.id} onClick={() => { setActiveLabel(l.name); setActiveFolder('inbox'); setSelectedEmail(null); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '6px 12px', background: activeLabel === l.name ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent',
-                    color: activeLabel === l.name ? 'var(--primary)' : 'var(--text)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left', marginBottom: '2px' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: l.color, flexShrink: 0 }} />
-                  <span style={{ flex: 1 }}>{l.name}</span>
-                </button>
-              ))}
-            </div>
-            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
-              <button onClick={() => { setShowImport(true); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-                <span>📥</span> Εισαγωγή Email
-              </button>
-              <button onClick={() => { setShowSettings(true); setEditingSettings({ ...emailSettings }); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-                <span>⚙️</span> Ρυθμίσεις
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-            <input type="checkbox" checked={selectedIds.size === filteredEmails.length && filteredEmails.length > 0} onChange={handleSelectAll}
-              style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }} />
-            {selectedIds.size > 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedIds.size} επιλεγμένα</span>
-                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px' }} onClick={handleBulkMarkRead}>📖 Αναγνωσμένο</button>
-                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px', color: '#ef4444' }} onClick={handleBulkDelete}>🗑️ Διαγραφή</button>
-              </div>
-            ) : (
-              <input type="text" placeholder="🔍 Αναζήτηση emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ flex: 1, padding: '8px 14px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '20px', color: 'var(--text)', fontSize: '13px', outline: 'none' }} />
-            )}
-            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
-              <button className="btn btn-ghost" onClick={handleSync} disabled={syncing} style={{ fontSize: '13px', padding: '6px 12px' }}>
-                {syncing ? '⏳' : '🔄'} Συγχρόνιση
-              </button>
-            </div>
-          </div>
-
-          {/* Email list + reading pane */}
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            {/* Email list */}
-            <div style={{ width: selectedEmail ? '380px' : '100%', borderRight: selectedEmail ? '1px solid var(--border)' : 'none', overflowY: 'auto' }}>
-              {loading ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>
-              ) : filteredEmails.length === 0 ? (
-                <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
-                  <p style={{ fontSize: '16px', margin: 0 }}>Δεν υπάρχουν emails</p>
-                  <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
-                    {activeFolder === 'inbox' ? 'Το inbox σας είναι άδειο.' : 'Δεν βρέθηκαν emails σε αυτόν τον φάκελο.'}
-                  </p>
-                </div>
-              ) : filteredEmails.map(email => (
-                <div key={email.id} onClick={() => { setSelectedEmail(email.id); handleMarkRead(email.id); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                    background: selectedEmail === email.id ? 'var(--primary-10, rgba(0,102,204,0.08))' : email.is_read ? 'transparent' : 'rgba(0,102,204,0.03)',
-                    borderLeft: email.is_read ? '3px solid transparent' : '3px solid var(--primary)' }}>
-                  <input type="checkbox" checked={selectedIds.has(email.id)} onClick={(e) => e.stopPropagation()}
-                    onChange={() => handleToggleSelect(email.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
-                  <button onClick={(e) => { e.stopPropagation(); handleToggleStar(email.id); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: 0, flexShrink: 0, opacity: email.starred ? 1 : 0.3 }}>
-                    {email.starred ? '⭐' : '☆'}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: email.is_read ? 400 : 700, fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {email.from_email}
-                      </span>
-                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
-                        {email.important && <span style={{ fontSize: '12px' }}>🏷️</span>}
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {new Date(email.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' })}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: email.is_read ? 400 : 600, color: 'var(--text)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {email.subject}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {email.body.substring(0, 80)}...
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                      {(email.labels || []).map(l => {
-                        const lbl = labels.find(ll => ll.name === l);
-                        return <span key={l} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>{l}</span>;
-                      })}
-                      {email.lead_id && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>🔗 Lead</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Reading pane */}
-            {selectedEmail && selectedEmailData && (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                  <div>
-                    <h2 style={{ margin: '0 0 8px', fontSize: '20px', color: 'var(--text)' }}>{selectedEmailData.subject}</h2>
-                    <div style={{ display: 'flex', gap: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>
-                      <span><strong>Από:</strong> {selectedEmailData.from_email}</span>
-                      <span><strong>Προς:</strong> {selectedEmailData.to_email}</span>
-                      {selectedEmailData.cc && <span><strong>CC:</strong> {selectedEmailData.cc}</span>}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {new Date(selectedEmailData.created_at).toLocaleString('el-GR')}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                    <button onClick={() => handleToggleStar(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
-                      {selectedEmailData.starred ? '⭐' : '☆'}
-                    </button>
-                    <button onClick={() => handleToggleImportant(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
-                      {selectedEmailData.important ? '🏷️' : '🔖'}
-                    </button>
-                    <select value="" onChange={(e) => { if (e.target.value) handleAddLabel(selectedEmail, e.target.value); e.target.value = ''; }}
-                      style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
-                      <option value="">🏷️ +Ετικέτα</option>
-                      {labels.filter(l => !(selectedEmailData.labels || []).includes(l.name)).map(l => (
-                        <option key={l.id} value={l.name}>{l.name}</option>
-                      ))}
-                    </select>
-                    <select value={selectedEmailData.lead_id || ''} onChange={(e) => handleLinkToLead(selectedEmail, e.target.value)}
-                      style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
-                      <option value="">🔗 Lead</option>
-                      {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name}</option>)}
-                    </select>
-                    <button className="btn btn-ghost" onClick={() => handleMarkUnread(selectedEmail)} style={{ fontSize: '12px', padding: '4px 8px' }}>📩</button>
-                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmail)} style={{ color: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>🗑️</button>
-                  </div>
-                </div>
-                {(selectedEmailData.labels || []).length > 0 && (
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                    {(selectedEmailData.labels || []).map(l => {
-                      const lbl = labels.find(ll => ll.name === l);
-                      return (
-                        <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>
-                          {l}
-                          <button onClick={() => handleRemoveLabel(selectedEmail, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '10px', padding: 0 }}>✕</button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-                <div style={{ background: 'var(--bg-2)', borderRadius: '12px', padding: '20px', fontSize: '14px', color: 'var(--text)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-                  {selectedEmailData.body}
-                </div>
-                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                  <button className="btn btn-primary" onClick={() => {
-                    setComposeData({ to: selectedEmailData.from_email, cc: '', bcc: '', subject: `RE: ${selectedEmailData.subject}`, body: '', replyTo: selectedEmailData.id });
-                    setShowCompose(true);
-                  }}>↩️ Απάντηση</button>
-                  <button className="btn btn-ghost" onClick={() => {
-                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- Πρωτότυπο μήνυμα ---\nΑπό: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
-                    setShowCompose(true);
-                  }}>↪️ Προώθηση</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Compose Modal — Gmail-Style Enhanced */}
-      {showCompose && (
-        <div style={{
-          position: 'fixed',
-          bottom: isFullScreen ? '0' : '0',
-          right: isFullScreen ? '0' : '60px',
-          top: isFullScreen ? '0' : 'auto',
-          left: isFullScreen ? '0' : 'auto',
-          width: isFullScreen ? '100vw' : '580px',
-          height: isFullScreen ? '100vh' : '520px',
-          background: 'var(--bg)',
-          borderRadius: isFullScreen ? '0' : '12px 12px 0 0',
-          boxShadow: '0 -4px 24px rgba(0,0,0,0.2)',
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          border: '1px solid var(--border)',
-          overflow: 'hidden'
-        }}>
-          {/* Modal Header */}
-          <div style={{ padding: '10px 16px', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>Νέο Μήνυμα</span>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button onClick={() => setIsFullScreen(!isFullScreen)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Πλήρης οθόνη">
-                {isFullScreen ? '🗗' : '🗖'}
-              </button>
-              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Κλείσιμο">✖</button>
-            </div>
-          </div>
-
-          {/* Form Inputs */}
-          <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Προς</span>
-              <input
-                value={composeData.to}
-                onChange={e => setComposeData({...composeData, to: e.target.value})}
-                style={{ flex: 1, padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px' }}
-              />
-              <span style={{ fontSize: '12px', color: 'var(--primary)', cursor: 'pointer', marginLeft: '8px' }} onClick={() => setComposeData({...composeData, showCcBcc: !composeData.showCcBcc})}>
-                Cc Bcc
-              </span>
-            </div>
-
-            {composeData.showCcBcc && (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Cc</span>
-                  <input value={composeData.cc} onChange={e => setComposeData({...composeData, cc: e.target.value})} style={{ flex: 1, padding: '6px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '13px' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Bcc</span>
-                  <input value={composeData.bcc} onChange={e => setComposeData({...composeData, bcc: e.target.value})} style={{ flex: 1, padding: '6px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '13px' }} />
-                </div>
-              </>
-            )}
-
-            <div style={{ borderBottom: '1px solid var(--border)' }}>
-              <input
-                placeholder="Θέμα"
-                value={composeData.subject}
-                onChange={e => setComposeData({...composeData, subject: e.target.value})}
-                style={{ width: '100%', padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}
-              />
-            </div>
-
-            {/* Rich Text Formatting Bar */}
-            {showFormattingToolbar && (
-              <div style={{ display: 'flex', gap: '6px', padding: '6px 8px', background: 'var(--bg-2)', borderRadius: '6px', border: '1px solid var(--border)', margin: '4px 0', alignItems: 'center' }}>
-                <button style={{ fontWeight: 'bold', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>B</button>
-                <button style={{ fontStyle: 'italic', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>I</button>
-                <button style={{ textDecoration: 'underline', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>U</button>
-                <div style={{ height: '16px', width: '1px', background: 'var(--border)' }}></div>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>🎨</button>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>≡</button>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>1.</button>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>•</button>
-              </div>
-            )}
-
-            {/* Body Input Area */}
-            <textarea
-              placeholder="Γράψτε το μήνυμά σας..."
-              value={composeData.body}
-              onChange={e => setComposeData({...composeData, body: e.target.value})}
-              style={{
-                width: '100%', flex: 1, padding: '10px 0', border: 'none', outline: 'none',
-                background: 'transparent', color: 'var(--text)', resize: 'none', fontFamily: isPlainText ? 'monospace' : 'inherit', fontSize: '14px', lineHeight: '1.5'
-              }}
-            />
-          </div>
-
-          {/* Bottom Gmail Action Bar */}
-          <div style={{ padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', background: 'var(--bg)', position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-
-              {/* Send Split Button */}
-              <div style={{ display: 'inline-flex', borderRadius: '20px', overflow: 'hidden', background: '#0066cc', marginRight: '8px' }}>
-                <button onClick={handleSendEmail} style={{ padding: '8px 16px', background: 'transparent', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>
-                  Αποστολή
-                </button>
-                <button onClick={() => setShowScheduleSend(!showScheduleSend)} style={{ padding: '8px 8px', background: '#0052a3', color: '#fff', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '10px' }}>
-                  ▼
-                </button>
-              </div>
-
-              {/* Toolbar Control Buttons */}
-              <button title="Επιλογές μορφοποίησης" onClick={() => setShowFormattingToolbar(!showFormattingToolbar)} style={{ background: showFormattingToolbar ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }}>Aa</button>
-              <button title="Επισύναψη αρχείων" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>📎</button>
-              <button title="Εισαγωγή συνδέσμου" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>🔗</button>
-              <button title="Εισαγωγή emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>😀</button>
-              <button title="Εισαγωγή αρχείων CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>📁</button>
-              <button title="Εισαγωγή φωτογραφίας" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>🖼️</button>
-              <button title="Εισαγωγή υπογραφής" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>🖊️</button>
-
-              {/* Context Menu Toggle */}
-              <button title="Περισσότερες επιλογές" onClick={() => setShowMoreOptions(!showMoreOptions)} style={{ background: showMoreOptions ? 'var(--bg-2)' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>⋮</button>
-            </div>
-
-            {/* Discard Draft Button */}
-            <button title="Απόρριψη προσχεδίου" onClick={() => setShowCompose(false)} style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)' }}>🗑️</button>
-
-            {/* Schedule Send Dropdown Menu */}
-            {showScheduleSend && (
-              <div style={{ position: 'absolute', bottom: '50px', left: '16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '8px 0', width: '200px' }}>
-                <div style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>Προγραμματισμός αποστολής</div>
-                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για αύριο 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  🌅 Αύριο το πρωί (08:00)
-                </button>
-                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για τη Δευτέρα 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  📅 Δευτέρα το πρωί (08:00)
-                </button>
-              </div>
-            )}
-
-            {/* Gmail Options Popover Menu */}
-            {showMoreOptions && (
-              <div style={{ position: 'absolute', bottom: '50px', left: '210px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '6px 0', width: '220px' }}>
-                <button onClick={() => { setIsFullScreen(!isFullScreen); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  🗖 Προεπιλογή σε πλήρη οθόνη
-                </button>
-                <button onClick={() => { setIsPlainText(!isPlainText); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  {isPlainText ? '✓ Λειτουργία απλού κειμένου' : '📝 Λειτουργία απλού κειμένου'}
-                </button>
-                <button onClick={() => { window.print(); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  🖨️ Εκτύπωση
-                </button>
-                <button onClick={() => { setShowLabelManager(true); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  🏷️ Ετικέτα...
-                </button>
-                <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }}></div>
-                <button onClick={() => { setToast({ msg: 'Δημιουργήθηκε σύνδεσμος συνάντησης', type: 'info' }); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  📅 Προγραμματισμός συνάντησης
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Import Modal */}
-      {showImport && (
-        <div className="modal-overlay" onClick={() => setShowImport(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
-            <div className="modal-header"><h3>📥 Εισαγωγή Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
-            <div className="modal-body">
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
-                Συνδέστε τον email λογαριασμό σας για εισαγωγή υπαρχόντων emails στο CRM.
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                {providers.map(p => (
-                  <button key={p.id} onClick={() => { const pp = providers.find(pr => pr.id === p.id); setImportConfig({ ...importConfig, provider: p.id, imapHost: pp?.host || '', imapPort: pp?.port || '993' }); }}
-                    style={{ padding: '16px', background: importConfig.provider === p.id ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'var(--bg-2)', border: `2px solid ${importConfig.provider === p.id ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}>
-                    <div style={{ fontSize: '28px', marginBottom: '6px' }}>{p.icon}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{p.label}</div>
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input placeholder="Email address" value={importConfig.email} onChange={(e) => setImportConfig({ ...importConfig, email: e.target.value })} />
-                <input type="password" placeholder="Password / App Password" value={importConfig.password} onChange={(e) => setImportConfig({ ...importConfig, password: e.target.value })} />
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input placeholder="IMAP Server" value={importConfig.imapHost} onChange={(e) => setImportConfig({ ...importConfig, imapHost: e.target.value })} style={{ flex: 2 }} />
-                  <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
-                </div>
-                <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing} style={{ width: '100%', padding: '12px' }}>
-                  {syncing ? '⏳ Εισαγωγή...' : '📥 Εισαγωγή Emails'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Label Manager Modal */}
-      {showLabelManager && (
-        <div className="modal-overlay" onClick={() => setShowLabelManager(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className="modal-header"><h3>🏷️ Διαχείριση Ετικετών</h3><button className="modal-close" onClick={() => setShowLabelManager(false)}>x</button></div>
-            <div className="modal-body">
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <input placeholder="Νέα ετικέτα..." value={newLabel.name} onChange={(e) => setNewLabel({ ...newLabel, name: e.target.value })}
-                  style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
-                <input type="color" value={newLabel.color} onChange={(e) => setNewLabel({ ...newLabel, color: e.target.value })}
-                  style={{ width: '40px', height: '36px', padding: '2px', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer' }} />
-                <button className="btn btn-primary" onClick={handleCreateLabel}>Προσθήκη</button>
-              </div>
-              {labels.map(l => (
-                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: l.color }} />
-                  <span style={{ flex: 1, fontSize: '14px', color: 'var(--text)' }}>{l.name}</span>
-                  <button onClick={() => handleDeleteLabel(l.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑️</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Settings Modal */}
-      {showSettings && editingSettings.general && (
-        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflow: 'auto' }}>
-            <div className="modal-header"><h3>⚙️ Ρυθμίσεις Email</h3><button className="modal-close" onClick={() => setShowSettings(false)}>x</button></div>
-            <div className="modal-body">
-              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Γενικά</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Πυκνότητα</label>
-                  <select value={editingSettings.general.density} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, density: e.target.value } })}
-                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value="default">Default</option>
-                    <option value="comfortable">Άνετη</option>
-                    <option value="compact">Συμπαγής</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Τύπος Inbox</label>
-                  <select value={editingSettings.general.inbox_type} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, inbox_type: e.target.value } })}
-                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value="default">Default</option>
-                    <option value="important">Σημαντικά πρώτα</option>
-                    <option value="unread">Μη αναγνωσμένα πρώτα</option>
-                    <option value="starred">Αστέρια πρώτα</option>
-                    <option value="priority">Priority Inbox</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Παράθυρο ανάγνωσης</label>
-                  <select value={editingSettings.general.reading_pane} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, reading_pane: e.target.value } })}
-                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value="no_split">Χωρίς διαίρεση</option>
-                    <option value="right">Δεξιά του inbox</option>
-                    <option value="below">Κάτω από το inbox</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ακύρωση αποστολής (δευτ.)</label>
-                  <select value={editingSettings.general.undo_send} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, undo_send: parseInt(e.target.value) } })}
-                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value={5}>5 δευτερόλεπτα</option>
-                    <option value={10}>10 δευτερόλεπτα</option>
-                    <option value={20}>20 δευτερόλεπτα</option>
-                    <option value={30}>30 δευτερόλεπτα</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Προεπιλεγμένη απάντηση</label>
-                  <select value={editingSettings.general.default_reply} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, default_reply: e.target.value } })}
-                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value="reply">Απάντηση</option>
-                    <option value="reply_all">Απάντηση σε όλους</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Μέγιστο σελίδας</label>
-                  <select value={editingSettings.general.max_page_size} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, max_page_size: parseInt(e.target.value) } })}
-                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                {[
-                  { key: 'hover_actions', label: 'Ενέργειες hover' },
-                  { key: 'send_archive', label: 'Κουμπί "Αποστολή & Αρχειοθέτηση"' },
-                  { key: 'snippets', label: 'Αποσπάσματα μηνυμάτων' },
-                  { key: 'conversation_view', label: 'Προβολή συζήτησης (threading)' },
-                  { key: 'keyboard_shortcuts', label: 'Πλήκτρα συντομεύσεων' },
-                ].map(opt => (
-                  <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                    <input type="checkbox" checked={editingSettings.general[opt.key]}
-                      onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, [opt.key]: e.target.checked } })}
-                      style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-
-              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Υπογραφή</h4>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
-                  <input type="checkbox" checked={editingSettings.signature?.enabled || false}
-                    onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, enabled: e.target.checked } })}
-                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
-                  Ενεργοποίηση υπογραφής
-                </label>
-                {editingSettings.signature?.enabled && (
-                  <textarea value={editingSettings.signature?.content || ''} onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, content: e.target.value } })}
-                    placeholder="Τρέχουσα υπογραφή..."
-                    style={{ width: '100%', minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
-                )}
-              </div>
-
-              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Αυτόματη Απάντηση (Vacation Responder)</h4>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
-                  <input type="checkbox" checked={editingSettings.vacation?.enabled || false}
-                    onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, enabled: e.target.checked } })}
-                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
-                  Ενεργοποίηση αυτόματης απάντησης
-                </label>
-                {editingSettings.vacation?.enabled && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <input placeholder="Θέμα" value={editingSettings.vacation?.subject || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, subject: e.target.value } })} />
-                    <textarea value={editingSettings.vacation?.message || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, message: e.target.value } })}
-                      placeholder="Μήνυμα αυτόματης απάντησης..."
-                      style={{ minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Από</label>
-                        <input type="date" value={editingSettings.vacation?.start_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, start_date: e.target.value } })}
-                          style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Έως</label>
-                        <input type="date" value={editingSettings.vacation?.end_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, end_date: e.target.value } })}
-                          style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
-                      </div>
-                    </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>
-                      <input type="checkbox" checked={editingSettings.vacation?.contacts_only || false}
-                        onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, contacts_only: e.target.checked } })}
-                        style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
-                      Αποστολή μόνο σε επαφές
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>Άκυρο</button>
-                <button className="btn btn-primary" onClick={handleSaveSettings}>Αποθήκευση Ρυθμίσεων</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function B2BScraperTab({ toast, setToast }: {
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
 }) {
   const [scrapeConfig, setScrapeConfig] = useState({
-    category: 'bakery',
-    region: 'Αττική',
+    category: 'energy',
+    region: '',
     maxResults: 50,
     source: 'auto',
     importToDb: false,
+    apifyToken: '',
     googleApiKey: '',
   });
   const [scraping, setScraping] = useState(false);
   const [scrapeResults, setScrapeResults] = useState<any[]>([]);
+  const [scrapeSourceInfo, setScrapeSourceInfo] = useState<any>(null);
   const [scrapeHistory, setScrapeHistory] = useState<any[]>([]);
   const [selectedForImport, setSelectedForImport] = useState<Set<number>>(new Set());
+  const [showApiConfig, setShowApiConfig] = useState(false);
 
   const categories = [
-    { value: 'bakery', label: 'Φούρνοι & Αρτοποιεία' },
-    { value: 'restaurant', label: 'Εστιατόρια & Ταβέρνες' },
-    { value: 'hotel', label: 'Ξενοδοχεία & Ενοικιαζόμενα' },
-    { value: 'construction', label: 'Κατασκευαστικές & Εργοληπτικές' },
     { value: 'energy', label: 'Εταιρείες Ενέργειας' },
     { value: 'solar', label: 'Φωτοβολταϊκά & Solar' },
     { value: 'ev_charging', label: 'Σταθμοί Φόρτισης EV' },
-    { value: 'real_estate', label: 'Ακίνητα & Μεσιτικές' },
+    { value: 'real_estate', label: 'Ακίνητα & Μεσιτικά' },
+    { value: 'construction', label: 'Κατασκευαστικές & Εργοληπτικές' },
+    { value: 'restaurant', label: 'Εστιατόρια & Ταβέρνες' },
+    { value: 'hotel', ξενοδοχεία: 'Ξενοδοχεία & Ενοικιαζόμενα' },
     { value: 'retail', label: 'Λιανικό Εμπόριο & Καταστήματα' },
-    { value: 'manufacturing', label: 'Βιομηχανία & Παραγωγή' },
     { value: 'technology', label: 'Τεχνολογία & Software' },
     { value: 'healthcare', label: 'Υγεία & Ιατρικά' },
     { value: 'automotive', label: 'Αυτοκίνητο & Επισκευές' },
@@ -3503,16 +2384,17 @@ function B2BScraperTab({ toast, setToast }: {
     { value: 'fitness', label: 'Γυμναστήρια & Sports' },
     { value: 'beauty', label: 'Ομορφιά & Salon' },
     { value: 'logistics', label: 'Μεταφορές & Logistics' },
+    { value: 'bakery', label: 'Φούρνοι & Αρτοποιεία' },
+    { value: 'manufacturing', label: 'Βιομηχανία & Παραγωγή' },
     { value: 'agriculture', label: 'Γεωργία & Αγροκτήματα' },
     { value: 'other', label: 'Άλλες Επιχειρήσεις' },
   ];
 
   const sources = [
-    { value: 'auto', label: 'Αυτόματο (Όλες οι πηγές)' },
-    { value: 'xo.gr', label: 'XO.gr (Κίτρινες Σελίδες)' },
-    { value: 'vrisko.gr', label: 'Vrisko.gr (Τοπική Αναζήτηση)' },
-    { value: 'cybo', label: 'Cybo.com (Διεθνής)' },
-    { value: 'google_maps', label: 'Google Maps' },
+    { value: 'auto', label: 'Αυτόματο (όλες οι πηγές)', desc: 'Apify → Google Places → Custom Search' },
+    { value: 'apify', label: 'Apify (Google Maps Scraper)', desc: 'Αυθεντικά δεδομένα Google Maps' },
+    { value: 'google_places', label: 'Google Places API', desc: 'Nearby Search API' },
+    { value: 'google_search', label: 'Google Custom Search', desc: 'Web search results' },
   ];
 
   const greekRegions = [
@@ -3521,6 +2403,19 @@ function B2BScraperTab({ toast, setToast }: {
     'Δυτική Ελλάδα', 'Στερεά Ελλάδα', 'Νησιά Αιγαίου', 'Δυτική Μακεδονία',
     'Ανατολική Μακεδονία & Θράκη', 'Βόρειο Αιγαίο',
   ];
+
+  const loadSavedConfig = async () => {
+    const { data } = await supabase.from('crm_settings').select('value').eq('key', 'scraper_apify_token').single();
+    if (data?.value?.token && !scrapeConfig.apifyToken) {
+      setScrapeConfig(prev => ({ ...prev, apifyToken: data.value.token }));
+    }
+    const { data: gData } = await supabase.from('crm_settings').select('value').eq('key', 'scraper_google_key').single();
+    if (gData?.value?.key && !scrapeConfig.googleApiKey) {
+      setScrapeConfig(prev => ({ ...prev, googleApiKey: gData.value.key }));
+    }
+  };
+
+  useEffect(() => { loadSavedConfig(); }, []);
 
   const startScrape = async () => {
     setScraping(true);
@@ -3534,6 +2429,8 @@ function B2BScraperTab({ toast, setToast }: {
           maxResults: scrapeConfig.maxResults,
           source: scrapeConfig.source,
           importToDb: false,
+          apifyToken: scrapeConfig.apifyToken,
+          googleApiKey: scrapeConfig.googleApiKey,
         },
       });
 
@@ -3541,14 +2438,17 @@ function B2BScraperTab({ toast, setToast }: {
 
       if (data?.businesses) {
         setScrapeResults(data.businesses);
+        setScrapeSourceInfo(data.source_info);
         setScrapeHistory(prev => [...prev, {
           date: new Date(),
           category: scrapeConfig.category,
-          region: scrapeConfig.region,
-          source: scrapeConfig.source,
+          region: scrapeConfig.region || 'Όλη Ελλάδα',
+          source: data.source_info?.api || scrapeConfig.source,
           count: data.businesses.length,
         }]);
-        setToast({ msg: `Βρέθηκαν ${data.businesses.length} B2B leads!`, type: 'success' });
+        setToast({ msg: `Βρέθηκαν ${data.businesses.length} B2B leads (${data.source_info?.api})!`, type: 'success' });
+      } else if (data?.error) {
+        setToast({ msg: data.error, type: 'info' });
       }
     } catch (err: any) {
       setToast({ msg: `Σφάλμα scraping: ${err.message}`, type: 'info' });
@@ -3557,34 +2457,37 @@ function B2BScraperTab({ toast, setToast }: {
     }
   };
 
+  const saveApiConfig = async () => {
+    await supabase.from('crm_settings').upsert({ key: 'scraper_apify_token', value: { token: scrapeConfig.apifyToken }, category: 'scraper' });
+    await supabase.from('crm_settings').upsert({ key: 'scraper_google_key', value: { key: scrapeConfig.googleApiKey }, category: 'scraper' });
+    setToast({ msg: 'API keys αποθηκεύτηκαν!', type: 'success' });
+    setShowApiConfig(false);
+  };
+
   const exportToCsv = () => {
     if (scrapeResults.length === 0) return;
-    setToast({ msg: 'Δημιουργία αρχείου CSV...', type: 'info' });
-
-    const headers = ['Εταιρεία', 'Κατηγορία', 'Περιοχή', 'Τηλέφωνο', 'Email', 'Ιστοσελίδα', 'Διεύθυνση', 'Πηγή', 'Status'];
+    const headers = ['Εταιρεία', 'Κατηγορία', 'Περιοχή', 'Τηλέφωνο', 'Email', 'Ιστοσελίδα', 'Διεύθυνση', 'Πηγή', 'Αξιολόγηση', 'Reviews'];
     const rows = scrapeResults.map(r => [
-      r.company, r.category, r.region, r.phone, r.email, r.website, r.address, r.source, r.status || 'new'
+      r.company, r.category, r.region, r.phone, r.email, r.website, r.address, r.source, r.rating || '', r.totalReviews || ''
     ]);
 
-    // Add BOM for Greek characters
     const BOM = '\uFEFF';
     const csv = BOM + [headers.join(','), ...rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `b2b_leads_${scrapeConfig.category}_${scrapeConfig.region || 'all'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `b2b_leads_${scrapeConfig.category}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-
-    setToast({ msg: `Το αρχείο CSV δημιουργήθηκε! (${scrapeResults.length} γραμμές)`, type: 'success' });
+    setToast({ msg: `CSV εξάχθηκε! (${scrapeResults.length} γραμμές)`, type: 'success' });
   };
 
-  const importToDb = async () => {
+  const importSelectedToDb = async () => {
     const toImport = scrapeResults.filter((_, i) => selectedForImport.size === 0 || selectedForImport.has(i));
     if (toImport.length === 0) { setToast({ msg: 'Επιλέξτε leads για εισαγωγή', type: 'info' }); return; }
 
-    setToast({ msg: `Εισαγωγή ${toImport.length} leads στη βάση...`, type: 'info' });
+    setToast({ msg: `Εισαγωγή ${toImport.length} leads...`, type: 'info' });
 
     try {
       const { data, error } = await supabase.functions.invoke('scrape-b2b', {
@@ -3594,6 +2497,8 @@ function B2BScraperTab({ toast, setToast }: {
           maxResults: toImport.length,
           source: scrapeConfig.source,
           importToDb: true,
+          apifyToken: scrapeConfig.apifyToken,
+          googleApiKey: scrapeConfig.googleApiKey,
         },
       });
 
@@ -3613,16 +2518,59 @@ function B2BScraperTab({ toast, setToast }: {
     }
   };
 
+  const hasApiKeys = !!(scrapeConfig.apifyToken || scrapeConfig.googleApiKey);
+
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Αυτοματοποιημένη συλλογή B2B leads από καταλόγους επιχειρήσεων. Web scraping από δημόσιες πηγές με GDPR-compliant lawful basis.</p>
+        <p>Αυτοματοποιημένη συλλογή B2B leads από Google Maps και web sources. Real δεδομένα εταιρειών με GDPR-compliant lawful basis.</p>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-primary" onClick={startScrape} disabled={scraping}>
+          <button className="btn btn-ghost" onClick={() => setShowApiConfig(!showApiConfig)}>
+            <Settings size={16} /> API Keys
+          </button>
+          <button className="btn btn-primary" onClick={startScrape} disabled={scraping || !hasApiKeys}>
             <Radar size={16} className={scraping ? 'spin' : ''} /> {scraping ? 'Scraping...' : 'Εκκίνηση Scraping'}
           </button>
         </div>
       </div>
+
+      {showApiConfig && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>API Configuration</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="drawer-field">
+              <label>Apify API Token</label>
+              <input type="password" placeholder="apify_api_..." value={scrapeConfig.apifyToken} onChange={(e) => setScrapeConfig({ ...scrapeConfig, apifyToken: e.target.value })} />
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Για real Google Maps data. <a href="https://console.apify.com/account/integrations" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Πάρτε token →</a>
+              </span>
+            </div>
+            <div className="drawer-field">
+              <label>Google Maps API Key</label>
+              <input type="password" placeholder="AIza..." value={scrapeConfig.googleApiKey} onChange={(e) => setScrapeConfig({ ...scrapeConfig, googleApiKey: e.target.value })} />
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Places API + Custom Search. <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Πάρτε key →</a>
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button className="btn btn-primary" onClick={saveApiConfig}><CheckCircle2 size={14} /> Αποθήκευση</button>
+            <button className="btn btn-ghost" onClick={() => setShowApiConfig(false)}>Άκυρο</button>
+          </div>
+        </div>
+      )}
+
+      {!hasApiKeys && (
+        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
+          <div>
+            <strong style={{ fontSize: '13px' }}>Χρειάζεται API Key</strong>
+            <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Προσθέστε Apify token ή Google Maps API key για real scraping. Πατήστε "API Keys" παραπάνω.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="scraper-config">
         <h3>Ρυθμίσεις Scraping</h3>
@@ -3650,15 +2598,14 @@ function B2BScraperTab({ toast, setToast }: {
             <label>Μέγιστο Αποτελέσματα</label>
             <input type="number" min="10" max="500" value={scrapeConfig.maxResults} onChange={(e) => setScrapeConfig({ ...scrapeConfig, maxResults: parseInt(e.target.value) || 50 })} />
           </div>
-          <div className="drawer-field">
-            <label>Αυτόματη Εισαγωγή στη Βάση</label>
-            <div className="drawer-toggle-row">
-              <button className={`drawer-toggle ${scrapeConfig.importToDb ? 'on' : ''}`} onClick={() => setScrapeConfig({ ...scrapeConfig, importToDb: true })}>Ναι</button>
-              <button className={`drawer-toggle ${!scrapeConfig.importToDb ? 'off' : ''}`} onClick={() => setScrapeConfig({ ...scrapeConfig, importToDb: false })}>Όχι</button>
-            </div>
-          </div>
         </div>
       </div>
+
+      {scrapeSourceInfo && (
+        <div style={{ background: 'rgba(0,200,120,0.06)', border: '1px solid rgba(0,200,120,0.15)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px' }}>
+          <strong>Source:</strong> {scrapeSourceInfo.api} {scrapeSourceInfo.apify && '✓ Apify'} {scrapeSourceInfo.google_places && '✓ Google Places'} {scrapeSourceInfo.custom_search && '✓ Custom Search'}
+        </div>
+      )}
 
       {scrapeResults.length > 0 && (
         <div className="scraper-results">
@@ -3669,10 +2616,10 @@ function B2BScraperTab({ toast, setToast }: {
                 {selectedForImport.size === scrapeResults.length ? 'Αποεπιλογή Όλων' : 'Επιλογή Όλων'}
               </button>
               <button className="btn btn-secondary" onClick={exportToCsv}>
-                <FileText size={16} /> Εξαγωγή CSV/Excel
+                <Download size={14} /> CSV
               </button>
-              <button className="btn btn-primary" onClick={importToDb} disabled={scrapeConfig.importToDb}>
-                <Plus size={16} /> Εισαγωγή στη Βάση ({selectedForImport.size || scrapeResults.length})
+              <button className="btn btn-primary" onClick={importSelectedToDb}>
+                <Plus size={14} /> Εισαγωγή ({selectedForImport.size || scrapeResults.length})
               </button>
             </div>
           </div>
@@ -3681,7 +2628,7 @@ function B2BScraperTab({ toast, setToast }: {
               <thead>
                 <tr>
                   <th style={{ width: '40px' }}><input type="checkbox" checked={selectedForImport.size === scrapeResults.length} onChange={toggleSelectAll} /></th>
-                  <th>Εταιρεία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Τηλέφωνο</th><th>Email</th><th>Ιστοσελίδα</th><th>Πηγή</th><th>Status</th>
+                  <th>Εταιρεία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Τηλέφωνο</th><th>Email</th><th>Ιστοσελίδα</th><th>Πηγή</th><th>Rating</th>
                 </tr>
               </thead>
               <tbody>
@@ -3693,13 +2640,13 @@ function B2BScraperTab({ toast, setToast }: {
                       setSelectedForImport(next);
                     }} /></td>
                     <td><strong>{r.company}</strong></td>
-                    <td>{categories.find(c => c.value === r.category)?.label || r.category}</td>
+                    <td>{r.category}</td>
                     <td>{r.region}</td>
                     <td>{r.phone || '—'}</td>
                     <td>{r.email || '—'}</td>
-                    <td>{r.website ? <a href={`https://${r.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{r.website}</a> : '—'}</td>
+                    <td>{r.website ? <a href={r.website.startsWith('http') ? r.website : `https://${r.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>{r.website.replace(/^https?:\/\//, '').slice(0, 30)}</a> : '—'}</td>
                     <td><span className="dash-status-pill">{r.source}</span></td>
-                    <td><span className={`dash-status-pill ${r.status || 'new'}`}>{r.status || 'new'}</span></td>
+                    <td>{r.rating ? `${r.rating} ★ (${r.totalReviews || 0})` : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -3721,8 +2668,8 @@ function B2BScraperTab({ toast, setToast }: {
                   <tr key={i}>
                     <td>{h.date.toLocaleString('el-GR')}</td>
                     <td>{categories.find(c => c.value === h.category)?.label || h.category}</td>
-                    <td>{h.region || 'Όλη η Ελλάδα'}</td>
-                    <td>{sources.find(s => s.value === h.source)?.label || h.source}</td>
+                    <td>{h.region || 'Όλη Ελλάδα'}</td>
+                    <td>{h.source}</td>
                     <td><strong>{h.count}</strong></td>
                   </tr>
                 ))}
@@ -3734,20 +2681,21 @@ function B2BScraperTab({ toast, setToast }: {
 
       <div className="scraper-info" style={{ marginTop: '24px' }}>
         <h3>Πληροφορίες</h3>
-        <p>Αυτό το εργαλείο κάνει web scraping από δημόσιους καταλόγους επιχειρήσεων. Όλα τα δεδομένα συλλέγονται με <strong>Legitimate Interest</strong> lawful basis και σέβονται τον GDPR.</p>
+        <p>Αυτό το εργαλείο χρησιμοποιεί <strong>Apify actors</strong> και <strong>Google Maps API</strong> για real scraping επιχειρήσεων. Όλα τα δεδομένα συλλέγονται με <strong>Legitimate Interest</strong> lawful basis και σέβονται τον GDPR.</p>
         <ul>
-          <li><strong>20 κατηγορίες</strong> επιχειρήσεων: φούρνοι, εστιατόρια, ξενοδοχεία, κατασκευές, ενέργεια, φωτοβολταϊκά, EV, ακίνητα, λιανική, βιομηχανία, tech, υγεία, αυτοκίνητο, επαγγέλματα, εκπαίδευση, fitness, beauty, logistics, γεωργία</li>
+          <li><strong>Apify</strong> — Google Maps scraper actor, real δεδομένα (τηλέφωνα, email, website, rating)</li>
+          <li><strong>Google Places API</strong> — Nearby Search + Place Details enrichment</li>
+          <li><strong>Google Custom Search</strong> — Web search fallback</li>
+          <li><strong>20 κατηγορίες</strong> επιχειρήσεων: ενέργεια, solar, EV, ακίνητα, tech, hospitality, retail κ.λπ.</li>
           <li><strong>14 περιοχές</strong> της Ελλάδας + όλη η Ελλάδα</li>
-          <li><strong>4 πηγές</strong>: XO.gr, Vrisko.gr, Cybo, Google Maps</li>
-          <li>Εξαγωγή σε <strong>CSV/Excel</strong> με όλα τα στοιχεία επικοινωνίας</li>
+          <li>Αυτόματη <strong>deduplication</strong> by company name + phone</li>
+          <li>Εξαγωγή σε <strong>CSV</strong> με BOM για ελληνικούς χαρακτήρες</li>
           <li>Αυτόματη εισαγωγή leads στη βάση δεδομένων</li>
-          <li>GDPR-compliant: Legitimate Interest lawful basis</li>
         </ul>
       </div>
     </div>
   );
 }
-
 function DeveloperAgentChat() {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
   const [input, setInput] = useState('');
@@ -3779,13 +2727,13 @@ function DeveloperAgentChat() {
 
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: data?.message || 'Σφάλμα απόκρισης.',
+        content: data?.message || 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ± Ξ±Ο€ΟΞΊΟΞΉΟƒΞ·Ο‚.',
         timestamp: new Date(),
       }]);
     } catch (err: any) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Σφάλμα: ${err.message}. Βεβαιωθείτε ότι το AI Developer Edge Function είναι deployed.`,
+        content: `Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ${err.message}. Ξ’ΞµΞ²Ξ±ΞΉΟ‰ΞΈΞµΞ―Ο„Ξµ ΟΟ„ΞΉ Ο„ΞΏ AI Developer Edge Function ΞµΞ―Ξ½Ξ±ΞΉ deployed.`,
         timestamp: new Date(),
       }]);
     } finally {
@@ -3794,11 +2742,11 @@ function DeveloperAgentChat() {
   };
 
   const suggestions = [
-    'Ποιοι πίνακες υπάρχουν στη βάση δεδομένων;',
-    'Βελτίωσε το RLS policy στον πίνακα hlektrismos_leads',
-    'Δημιούργησε ένα νέο migration για προσθήκη στήλης',
-    'Τι κάνει το agent-worker edge function;',
-    'Πώς μπορώ να προσθέσω webhook στο CRM;',
+    'Ξ ΞΏΞΉΞΏΞΉ Ο€Ξ―Ξ½Ξ±ΞΊΞµΟ‚ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ ΟƒΟ„Ξ· Ξ²Ξ¬ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½;',
+    'Ξ’ΞµΞ»Ο„Ξ―Ο‰ΟƒΞµ Ο„ΞΏ RLS policy ΟƒΟ„ΞΏΞ½ Ο€Ξ―Ξ½Ξ±ΞΊΞ± hlektrismos_leads',
+    'Ξ”Ξ·ΞΌΞΉΞΏΟΟΞ³Ξ·ΟƒΞµ Ξ­Ξ½Ξ± Ξ½Ξ­ΞΏ migration Ξ³ΞΉΞ± Ο€ΟΞΏΟƒΞΈΞ®ΞΊΞ· ΟƒΟ„Ξ®Ξ»Ξ·Ο‚',
+    'Ξ¤ΞΉ ΞΊΞ¬Ξ½ΞµΞΉ Ο„ΞΏ agent-worker edge function;',
+    'Ξ ΟΟ‚ ΞΌΟ€ΞΏΟΟ Ξ½Ξ± Ο€ΟΞΏΟƒΞΈΞ­ΟƒΟ‰ webhook ΟƒΟ„ΞΏ CRM;',
   ];
 
   return (
@@ -3807,7 +2755,7 @@ function DeveloperAgentChat() {
         <Database size={20} style={{ color: '#0066cc' }} />
         <div>
           <div style={{ fontWeight: 600, color: 'var(--text)' }}>AI Developer Agent</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Senior software engineer με εξειδίκευση σε React, Supabase, TypeScript, DevOps</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Senior software engineer ΞΌΞµ ΞµΞΎΞµΞΉΞ΄Ξ―ΞΊΞµΟ…ΟƒΞ· ΟƒΞµ React, Supabase, TypeScript, DevOps</div>
         </div>
       </div>
 
@@ -3817,7 +2765,7 @@ function DeveloperAgentChat() {
             <Database size={48} style={{ color: 'var(--text-muted)', marginBottom: '16px' }} />
             <h3 style={{ color: 'var(--text)', margin: '0 0 8px' }}>AI Developer Agent</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 24px' }}>
-              Ρωτήστε τον AI developer οτιδήποτε σχετικά με τον κώδικα, bugs, features, database, ή DevOps.
+              Ξ΅Ο‰Ο„Ξ®ΟƒΟ„Ξµ Ο„ΞΏΞ½ AI developer ΞΏΟ„ΞΉΞ΄Ξ®Ο€ΞΏΟ„Ξµ ΟƒΟ‡ΞµΟ„ΞΉΞΊΞ¬ ΞΌΞµ Ο„ΞΏΞ½ ΞΊΟΞ΄ΞΉΞΊΞ±, bugs, features, database, Ξ® DevOps.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
               {suggestions.map((s, i) => (
@@ -3854,7 +2802,7 @@ function DeveloperAgentChat() {
         {loading && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div style={{ padding: '12px 16px', borderRadius: '12px', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-              <span className="typing-dots">Σκέφτομαι<span>.</span><span>.</span><span>.</span></span>
+              <span className="typing-dots">Ξ£ΞΊΞ­Ο†Ο„ΞΏΞΌΞ±ΞΉ<span>.</span><span>.</span><span>.</span></span>
             </div>
           </div>
         )}
@@ -3866,7 +2814,7 @@ function DeveloperAgentChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-          placeholder="Ρωτήστε τον AI Developer..."
+          placeholder="Ξ΅Ο‰Ο„Ξ®ΟƒΟ„Ξµ Ο„ΞΏΞ½ AI Developer..."
           disabled={loading}
           style={{ flex: 1, padding: '10px 16px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', fontSize: '14px', outline: 'none' }}
         />
@@ -3895,7 +2843,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   const channelOptions = [
     { value: 'Email', label: 'Email' },
     { value: 'SMS', label: 'SMS' },
-    { value: 'Phone', label: 'Τηλέφωνο' },
+    { value: 'Phone', label: 'Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ' },
     { value: 'Web', label: 'Web' },
     { value: 'Social', label: 'Social Media' },
     { value: 'Push', label: 'Push Notification' },
@@ -3919,9 +2867,9 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
     const newStatus = agent.status === 'active' ? 'inactive' : 'active';
     const { error } = await supabase.from('ai_agents').update({ status: newStatus }).eq('id', agent.id);
     if (error) {
-      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
+      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' });
     } else {
-      setToast({ msg: `${agent.name} ${newStatus === 'active' ? 'ενεργοποιήθηκε' : 'απενεργοποιήθηκε'}`, type: 'success' });
+      setToast({ msg: `${agent.name} ${newStatus === 'active' ? 'ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ' : 'Ξ±Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ'}`, type: 'success' });
       loadData();
     }
   };
@@ -3937,9 +2885,9 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
       meetings_booked: 0,
     });
     if (error) {
-      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
+      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' });
     } else {
-      setToast({ msg: 'Το agent δημιουργήθηκε!', type: 'success' });
+      setToast({ msg: 'Ξ¤ΞΏ agent Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ!', type: 'success' });
       setShowNewAgent(false);
       setNewAgent({ name: '', channel: 'Email', status: 'inactive' });
       loadData();
@@ -3947,12 +2895,12 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   };
 
   const deleteAgent = async (id: string) => {
-    if (!confirm('Είσαι σίγουρος ότι θέλεις να διαγράψεις αυτό το agent;')) return;
+    if (!confirm('Ξ•Ξ―ΟƒΞ±ΞΉ ΟƒΞ―Ξ³ΞΏΟ…ΟΞΏΟ‚ ΟΟ„ΞΉ ΞΈΞ­Ξ»ΞµΞΉΟ‚ Ξ½Ξ± Ξ΄ΞΉΞ±Ξ³ΟΞ¬ΟΞµΞΉΟ‚ Ξ±Ο…Ο„Ο Ο„ΞΏ agent;')) return;
     const { error } = await supabase.from('ai_agents').delete().eq('id', id);
     if (error) {
-      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
+      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' });
     } else {
-      setToast({ msg: 'Το agent διαγράφηκε.', type: 'success' });
+      setToast({ msg: 'Ξ¤ΞΏ agent Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ.', type: 'success' });
       loadData();
     }
   };
@@ -3960,12 +2908,12 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   return (
     <div className="dash-content orchestrator-tab">
       <div className="dash-content-header">
-        <p>Ολοκληρωμένη διαχείριση όλων των AI Agents και Micro Agents. Παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, και οργάνωση του pipeline επικοινωνίας.</p>
+        <p>ΞΞ»ΞΏΞΊΞ»Ξ·ΟΟ‰ΞΌΞ­Ξ½Ξ· Ξ΄ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· ΟΞ»Ο‰Ξ½ Ο„Ο‰Ξ½ AI Agents ΞΊΞ±ΞΉ Micro Agents. Ξ Ξ±ΟΞ±ΞΊΞΏΞ»ΞΏΟΞΈΞ·ΟƒΞ· Ξ±Ο€ΟΞ΄ΞΏΟƒΞ·Ο‚, ΟΟΞΈΞΌΞΉΟƒΞ· Ο€Ξ±ΟΞ±ΞΌΞ­Ο„ΟΟ‰Ξ½, ΞΊΞ±ΞΉ ΞΏΟΞ³Ξ¬Ξ½Ο‰ΟƒΞ· Ο„ΞΏΟ… pipeline ΞµΟ€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―Ξ±Ο‚.</p>
       </div>
 
       <div className="orchestrator-nav">
         <button className={selectedView === 'overview' ? 'active' : ''} onClick={() => setSelectedView('overview')}>
-          <LayoutDashboard size={16} /> Επισκόπηση
+          <LayoutDashboard size={16} /> Ξ•Ο€ΞΉΟƒΞΊΟΟ€Ξ·ΟƒΞ·
         </button>
         <button className={selectedView === 'agents' ? 'active' : ''} onClick={() => setSelectedView('agents')}>
           <Bot size={16} /> AI Agents ({agents.length})
@@ -3988,34 +2936,34 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <div className="dash-stat-icon"><Bot size={20} /></div>
               <div>
                 <strong>{agents.length}</strong>
-                <span>Σύνολο Agents</span>
+                <span>Ξ£ΟΞ½ΞΏΞ»ΞΏ Agents</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}><Activity size={20} /></div>
               <div>
                 <strong>{activeAgents.length}</strong>
-                <span>Ενεργοί Agents</span>
+                <span>Ξ•Ξ½ΞµΟΞ³ΞΏΞ― Agents</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}><Users size={20} /></div>
               <div>
                 <strong>{totalLeads}</strong>
-                <span>Leads στο Pipeline</span>
+                <span>Leads ΟƒΟ„ΞΏ Pipeline</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <div className="dash-stat-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}><TrendingUp size={20} /></div>
               <div>
                 <strong>{totalContacted}</strong>
-                <span>Επικοινωνίες</span>
+                <span>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</span>
               </div>
             </div>
           </div>
 
           <div className="orchestrator-performance">
-            <h3>Απόδοση Agents</h3>
+            <h3>Ξ‘Ο€ΟΞ΄ΞΏΟƒΞ· Agents</h3>
             <div className="dash-table-wrap">
               <table className="dash-table">
                 <thead>
@@ -4023,12 +2971,12 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                     <th>Agent</th>
                     <th>Channel</th>
                     <th>Status</th>
-                    <th>Επικοινωνίες</th>
-                    <th>Απαντήσεις</th>
-                    <th>Ρυθμός Απάντησης</th>
-                    <th>Ραντεβού</th>
-                    <th>Ρυθμός Ραντεβού</th>
-                    <th>Ενέργειες</th>
+                    <th>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</th>
+                    <th>Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚</th>
+                    <th>Ξ΅Ο…ΞΈΞΌΟΟ‚ Ξ‘Ο€Ξ¬Ξ½Ο„Ξ·ΟƒΞ·Ο‚</th>
+                    <th>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</th>
+                    <th>Ξ΅Ο…ΞΈΞΌΟΟ‚ Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</th>
+                    <th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞµΟ‚</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4046,7 +2994,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                       <td>{a.channel}</td>
                       <td>
                         <span className={`dash-status-pill ${a.status}`}>
-                          {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                          {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
                         </span>
                       </td>
                       <td><strong>{a.leads_contacted || 0}</strong></td>
@@ -4066,13 +3014,13 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                       </td>
                       <td>
                         <div className="action-btns">
-                          <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={() => toggleAgentStatus(a)}>
+                          <button className="icon-btn" title="Ξ•Ξ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·/Ξ‘Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·" onClick={() => toggleAgentStatus(a)}>
                             {a.status === 'active' ? <Eye size={14} /> : <EyeOff size={14} />}
                           </button>
-                          <button className="icon-btn" title="Ρύθμιση" onClick={() => setConfigAgent(a)}>
+                          <button className="icon-btn" title="Ξ΅ΟΞΈΞΌΞΉΟƒΞ·" onClick={() => setConfigAgent(a)}>
                             <Settings size={14} />
                           </button>
-                          <button className="icon-btn delete" title="Διαγραφή" onClick={() => deleteAgent(a.id)}>
+                          <button className="icon-btn delete" title="Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®" onClick={() => deleteAgent(a.id)}>
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -4086,7 +3034,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
 
           <div className="orchestrator-summary-cards">
             <div className="summary-card">
-              <h4>Κατανομή Leads ανά Agent</h4>
+              <h4>ΞΞ±Ο„Ξ±Ξ½ΞΏΞΌΞ® Leads Ξ±Ξ½Ξ¬ Agent</h4>
               <div className="lead-distribution">
                 {agentStats.filter(a => a.status === 'active').map(a => (
                   <div key={a.id} className="distribution-item">
@@ -4101,22 +3049,22 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             </div>
 
             <div className="summary-card">
-              <h4>Κατάσταση Pipeline</h4>
+              <h4>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ· Pipeline</h4>
               <div className="pipeline-stats">
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">Νέα Leads</span>
+                  <span className="pipeline-label">ΞΞ­Ξ± Leads</span>
                   <span className="pipeline-value">{leads.filter(l => l.status === 'new' && !l.deleted_at).length}</span>
                 </div>
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">Σε Εξέλιξη</span>
+                  <span className="pipeline-label">Ξ£Ξµ Ξ•ΞΎΞ­Ξ»ΞΉΞΎΞ·</span>
                   <span className="pipeline-value" style={{ color: '#ffa500' }}>{leads.filter(l => l.status === 'contacted' && !l.deleted_at).length}</span>
                 </div>
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">Ραντεβού</span>
+                  <span className="pipeline-label">Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</span>
                   <span className="pipeline-value" style={{ color: '#00c878' }}>{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length}</span>
                 </div>
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">Ολοκληρωμένα</span>
+                  <span className="pipeline-label">ΞΞ»ΞΏΞΊΞ»Ξ·ΟΟ‰ΞΌΞ­Ξ½Ξ±</span>
                   <span className="pipeline-value" style={{ color: '#0066cc' }}>{leads.filter(l => l.status === 'converted' && !l.deleted_at).length}</span>
                 </div>
               </div>
@@ -4130,7 +3078,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
           <div className="orchestrator-agents-header">
             <h3>AI Agents</h3>
             <button className="btn btn-primary" onClick={() => setShowNewAgent(true)}>
-              <Plus size={16} /> Νέο Agent
+              <Plus size={16} /> ΞΞ­ΞΏ Agent
             </button>
           </div>
 
@@ -4138,11 +3086,11 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             <div className="new-agent-form">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Όνομα Agent</label>
+                  <label>ΞΞ½ΞΏΞΌΞ± Agent</label>
                   <input
                     value={newAgent.name}
                     onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
-                    placeholder="π.χ. Νέο Agent"
+                    placeholder="Ο€.Ο‡. ΞΞ­ΞΏ Agent"
                   />
                 </div>
                 <div className="form-group">
@@ -4152,16 +3100,16 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Κατάσταση</label>
+                  <label>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·</label>
                   <select value={newAgent.status} onChange={(e) => setNewAgent({ ...newAgent, status: e.target.value })}>
-                    <option value="active">Ενεργός</option>
-                    <option value="inactive">Ανενεργός</option>
+                    <option value="active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</option>
+                    <option value="inactive">Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚</option>
                   </select>
                 </div>
               </div>
               <div className="form-actions">
-                <button className="btn btn-ghost" onClick={() => setShowNewAgent(false)}>Άκυρο</button>
-                <button className="btn btn-primary" onClick={createAgent}><CheckCircle2 size={16} /> Δημιουργία</button>
+                <button className="btn btn-ghost" onClick={() => setShowNewAgent(false)}>Ξ†ΞΊΟ…ΟΞΏ</button>
+                <button className="btn btn-primary" onClick={createAgent}><CheckCircle2 size={16} /> Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ±</button>
               </div>
             </div>
           )}
@@ -4178,21 +3126,21 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                     <span className="agent-card-channel">{a.channel}</span>
                   </div>
                   <span className={`dash-status-pill ${a.status}`}>
-                    {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                    {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
                   </span>
                 </div>
                 <div className="agent-card-stats">
                   <div className="agent-stat">
                     <span className="agent-stat-value">{a.leads_contacted || 0}</span>
-                    <span className="agent-stat-label">Επικοινωνίες</span>
+                    <span className="agent-stat-label">Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</span>
                   </div>
                   <div className="agent-stat">
                     <span className="agent-stat-value">{a.replies || 0}</span>
-                    <span className="agent-stat-label">Απαντήσεις</span>
+                    <span className="agent-stat-label">Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚</span>
                   </div>
                   <div className="agent-stat">
                     <span className="agent-stat-value">{a.meetings_booked || 0}</span>
-                    <span className="agent-stat-label">Ραντεβού</span>
+                    <span className="agent-stat-label">Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</span>
                   </div>
                 </div>
                 {a.target_region && (
@@ -4209,10 +3157,10 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                 <div className="agent-card-actions">
                   <button className="btn btn-secondary btn-sm" onClick={() => toggleAgentStatus(a)}>
                     {a.status === 'active' ? <EyeOff size={14} /> : <Eye size={14} />}
-                    {a.status === 'active' ? 'Απενεργ.' : 'Ενεργ.'}
+                    {a.status === 'active' ? 'Ξ‘Ο€ΞµΞ½ΞµΟΞ³.' : 'Ξ•Ξ½ΞµΟΞ³.'}
                   </button>
                   <button className="btn btn-primary btn-sm" onClick={() => setConfigAgent(a)}>
-                    <Settings size={14} /> Ρύθμιση
+                    <Settings size={14} /> Ξ΅ΟΞΈΞΌΞΉΟƒΞ·
                   </button>
                   <button className="btn btn-ghost btn-sm delete" onClick={() => deleteAgent(a.id)}>
                     <Trash2 size={14} />
@@ -4228,70 +3176,70 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
         <div className="orchestrator-micro-view">
           <div className="orchestrator-agents-header">
             <h3>Micro Agents</h3>
-            <p className="text-muted">Micro Agents είναι μικροί εξειδικευμένοι agent που εκτελούν συγκεκριμένες εργασίες (π.χ. εξαγωγή δεδομένων, αυτόματη κατηγοριοποίηση, παρακολούθηση emails).</p>
+            <p className="text-muted">Micro Agents ΞµΞ―Ξ½Ξ±ΞΉ ΞΌΞΉΞΊΟΞΏΞ― ΞµΞΎΞµΞΉΞ΄ΞΉΞΊΞµΟ…ΞΌΞ­Ξ½ΞΏΞΉ agent Ο€ΞΏΟ… ΞµΞΊΟ„ΞµΞ»ΞΏΟΞ½ ΟƒΟ…Ξ³ΞΊΞµΞΊΟΞΉΞΌΞ­Ξ½ΞµΟ‚ ΞµΟΞ³Ξ±ΟƒΞ―ΞµΟ‚ (Ο€.Ο‡. ΞµΞΎΞ±Ξ³Ο‰Ξ³Ξ® Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½, Ξ±Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΞΊΞ±Ο„Ξ·Ξ³ΞΏΟΞΉΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·, Ο€Ξ±ΟΞ±ΞΊΞΏΞ»ΞΏΟΞΈΞ·ΟƒΞ· emails).</p>
           </div>
           
           <div className="micro-agents-grid">
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}><Radar size={24} /></div>
               <h4>Lead Scraper</h4>
-              <p>Αυτόματη συλλογή leads από δημόσιους καταλόγους</p>
-              <span className="micro-agent-status active">Ενεργός</span>
+              <p>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΟƒΟ…Ξ»Ξ»ΞΏΞ³Ξ® leads Ξ±Ο€Ο Ξ΄Ξ·ΞΌΟΟƒΞΉΞΏΟ…Ο‚ ΞΊΞ±Ο„Ξ±Ξ»ΟΞ³ΞΏΟ…Ο‚</p>
+              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
               <div className="micro-agent-stats">
-                <span>Leads συλλέχθηκαν: {leads.filter(l => !l.deleted_at).length}</span>
-                <span>Κατηγορίες: B2B, B2C</span>
+                <span>Leads ΟƒΟ…Ξ»Ξ»Ξ­Ο‡ΞΈΞ·ΞΊΞ±Ξ½: {leads.filter(l => !l.deleted_at).length}</span>
+                <span>ΞΞ±Ο„Ξ·Ξ³ΞΏΟΞ―ΞµΟ‚: B2B, B2C</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}><Mail size={24} /></div>
               <h4>Email Analyzer</h4>
-              <p>Ανάλυση και κατηγοριοποίηση εισερχόμενων emails</p>
-              <span className="micro-agent-status active">Ενεργός</span>
+              <p>Ξ‘Ξ½Ξ¬Ξ»Ο…ΟƒΞ· ΞΊΞ±ΞΉ ΞΊΞ±Ο„Ξ·Ξ³ΞΏΟΞΉΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ· ΞµΞΉΟƒΞµΟΟ‡ΟΞΌΞµΞ½Ο‰Ξ½ emails</p>
+              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
               <div className="micro-agent-stats">
-                <span>Επικοινωνίες: {totalContacted}</span>
-                <span>Απαντήσεις: {totalReplies}</span>
+                <span>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚: {totalContacted}</span>
+                <span>Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚: {totalReplies}</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}><MessageSquare size={24} /></div>
               <h4>Sentiment Detector</h4>
-              <p>Ανίχνευση συναισθήματος σε μηνύματα πελατών</p>
-              <span className="micro-agent-status active">Ενεργός</span>
+              <p>Ξ‘Ξ½Ξ―Ο‡Ξ½ΞµΟ…ΟƒΞ· ΟƒΟ…Ξ½Ξ±ΞΉΟƒΞΈΞ®ΞΌΞ±Ο„ΞΏΟ‚ ΟƒΞµ ΞΌΞ·Ξ½ΟΞΌΞ±Ο„Ξ± Ο€ΞµΞ»Ξ±Ο„ΟΞ½</p>
+              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
               <div className="micro-agent-stats">
-                <span>Αναλύσεις: {totalReplies}</span>
-                <span>Αυτόματη κατηγοριοποίηση</span>
+                <span>Ξ‘Ξ½Ξ±Ξ»ΟΟƒΞµΞΉΟ‚: {totalReplies}</span>
+                <span>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΞΊΞ±Ο„Ξ·Ξ³ΞΏΟΞΉΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(138,43,226,0.1)', color: '#8a2be2' }}><TrendingUp size={24} /></div>
               <h4>Lead Scorer</h4>
-              <p>Αυτόματη βαθμολόγηση leads βάση ενδιαφέροντος</p>
-              <span className="micro-agent-status active">Ενεργός</span>
+              <p>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· Ξ²Ξ±ΞΈΞΌΞΏΞ»ΟΞ³Ξ·ΟƒΞ· leads Ξ²Ξ¬ΟƒΞ· ΞµΞ½Ξ΄ΞΉΞ±Ο†Ξ­ΟΞΏΞ½Ο„ΞΏΟ‚</p>
+              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
               <div className="micro-agent-stats">
-                <span>Βαθμολογήθηκαν: {leads.filter(l => !l.deleted_at).length}</span>
-                <span>Ραντεβού: {totalMeetings}</span>
+                <span>Ξ’Ξ±ΞΈΞΌΞΏΞ»ΞΏΞ³Ξ®ΞΈΞ·ΞΊΞ±Ξ½: {leads.filter(l => !l.deleted_at).length}</span>
+                <span>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ: {totalMeetings}</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(231,76,60,0.1)', color: '#e74c3c' }}><AlertCircle size={24} /></div>
               <h4>Notification Sender</h4>
-              <p>Αυτόματη αποστολή ειδοποιήσεων στην ομάδα</p>
-              <span className="micro-agent-status active">Ενεργός</span>
+              <p>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· Ξ±Ο€ΞΏΟƒΟ„ΞΏΞ»Ξ® ΞµΞΉΞ΄ΞΏΟ€ΞΏΞΉΞ®ΟƒΞµΟ‰Ξ½ ΟƒΟ„Ξ·Ξ½ ΞΏΞΌΞ¬Ξ΄Ξ±</p>
+              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
               <div className="micro-agent-stats">
-                <span>Ειδοποιήσεις: {totalMeetings}</span>
-                <span>Ροή: Αυτόματη</span>
+                <span>Ξ•ΞΉΞ΄ΞΏΟ€ΞΏΞΉΞ®ΟƒΞµΞΉΟ‚: {totalMeetings}</span>
+                <span>Ξ΅ΞΏΞ®: Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ·</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}><Database size={24} /></div>
               <h4>Data Enricher</h4>
-              <p>Εμπλουτισμός δεδομένων lead με δημόσια πληροφορίες</p>
+              <p>Ξ•ΞΌΟ€Ξ»ΞΏΟ…Ο„ΞΉΟƒΞΌΟΟ‚ Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½ lead ΞΌΞµ Ξ΄Ξ·ΞΌΟΟƒΞΉΞ± Ο€Ξ»Ξ·ΟΞΏΟ†ΞΏΟΞ―ΞµΟ‚</p>
               <span className={`micro-agent-status ${crmUsers.length > 0 ? 'active' : 'inactive'}`}>
-                {crmUsers.length > 0 ? 'Ενεργός' : 'Ανενεργός'}
+                {crmUsers.length > 0 ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
               </span>
               <div className="micro-agent-stats">
-                <span>Χρήστες CRM: {crmUsers.length}</span>
-                <span>Κατανομή: {crmUsers.filter(u => u.role === 'sales').length} πωλητές</span>
+                <span>Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚ CRM: {crmUsers.length}</span>
+                <span>ΞΞ±Ο„Ξ±Ξ½ΞΏΞΌΞ®: {crmUsers.filter(u => u.role === 'sales').length} Ο€Ο‰Ξ»Ξ·Ο„Ξ­Ο‚</span>
               </div>
             </div>
           </div>
@@ -4301,51 +3249,51 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
       {selectedView === 'pipeline' && (
         <div className="orchestrator-pipeline-view">
           <h3>Pipeline Flow</h3>
-          <p className="text-muted">Ροή εργασιών από την συλλογή leads μέχρι την μετατροπή σε πελάτη.</p>
+          <p className="text-muted">Ξ΅ΞΏΞ® ΞµΟΞ³Ξ±ΟƒΞΉΟΞ½ Ξ±Ο€Ο Ο„Ξ·Ξ½ ΟƒΟ…Ξ»Ξ»ΞΏΞ³Ξ® leads ΞΌΞ­Ο‡ΟΞΉ Ο„Ξ·Ξ½ ΞΌΞµΟ„Ξ±Ο„ΟΞΏΟ€Ξ® ΟƒΞµ Ο€ΞµΞ»Ξ¬Ο„Ξ·.</p>
           
           <div className="pipeline-flow">
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}>
                 <Database size={24} />
               </div>
-              <h4>1. Συλλογή</h4>
+              <h4>1. Ξ£Ο…Ξ»Ξ»ΞΏΞ³Ξ®</h4>
               <p>B2B Scraper, Web Scraping, API Integrations</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'new' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-arrow">β†’</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}>
                 <Bot size={24} />
               </div>
-              <h4>2. Επικοινωνία</h4>
-              <p>AI Agents στέλνουν αρχικό μήνυμα</p>
+              <h4>2. Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―Ξ±</h4>
+              <p>AI Agents ΟƒΟ„Ξ­Ξ»Ξ½ΞΏΟ…Ξ½ Ξ±ΟΟ‡ΞΉΞΊΟ ΞΌΞ®Ξ½Ο…ΞΌΞ±</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'contacted' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-arrow">β†’</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>
                 <MessageSquare size={24} />
               </div>
-              <h4>3. Συζήτηση</h4>
-              <p>AI Agents διεξάγουν συζήτηση</p>
+              <h4>3. Ξ£Ο…Ξ¶Ξ®Ο„Ξ·ΟƒΞ·</h4>
+              <p>AI Agents Ξ΄ΞΉΞµΞΎΞ¬Ξ³ΞΏΟ…Ξ½ ΟƒΟ…Ξ¶Ξ®Ο„Ξ·ΟƒΞ·</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-arrow">β†’</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(138,43,226,0.1)', color: '#8a2be2' }}>
                 <Users size={24} />
               </div>
-              <h4>4. Ραντεβού</h4>
-              <p>Κλείσιμο ραντεβού με πωλητή</p>
+              <h4>4. Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</h4>
+              <p>ΞΞ»ΞµΞ―ΟƒΞΉΞΌΞΏ ΟΞ±Ξ½Ο„ΞµΞ²ΞΏΟ ΞΌΞµ Ο€Ο‰Ξ»Ξ·Ο„Ξ®</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">→</div>
+            <div className="pipeline-arrow">β†’</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}>
                 <CheckCircle2 size={24} />
               </div>
-              <h4>5. Μετατροπή</h4>
-              <p>Ολοκλήρωση πωλησης</p>
+              <h4>5. ΞΞµΟ„Ξ±Ο„ΟΞΏΟ€Ξ®</h4>
+              <p>ΞΞ»ΞΏΞΊΞ»Ξ®ΟΟ‰ΟƒΞ· Ο€Ο‰Ξ»Ξ·ΟƒΞ·Ο‚</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'converted' && !l.deleted_at).length} leads</div>
             </div>
           </div>
@@ -4354,28 +3302,28 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             <h4>Agent Workflow Rules</h4>
             <div className="workflow-rules">
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Νέο lead εισάγεται στη βάση
+                <span className="rule-trigger">Trigger:</span> ΞΞ­ΞΏ lead ΞµΞΉΟƒΞ¬Ξ³ΞµΟ„Ξ±ΞΉ ΟƒΟ„Ξ· Ξ²Ξ¬ΟƒΞ·
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Auto-assign σε agent με λιγότερα active leads
+                <span className="rule-action">Action:</span> Auto-assign ΟƒΞµ agent ΞΌΞµ Ξ»ΞΉΞ³ΟΟ„ΞµΟΞ± active leads
               </div>
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Agent στέλνει μήνυμα
+                <span className="rule-trigger">Trigger:</span> Agent ΟƒΟ„Ξ­Ξ»Ξ½ΞµΞΉ ΞΌΞ®Ξ½Ο…ΞΌΞ±
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Ενημέρωση pipeline_status σε "contacted"
+                <span className="rule-action">Action:</span> Ξ•Ξ½Ξ·ΞΌΞ­ΟΟ‰ΟƒΞ· pipeline_status ΟƒΞµ "contacted"
               </div>
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Lead απαντά
+                <span className="rule-trigger">Trigger:</span> Lead Ξ±Ο€Ξ±Ξ½Ο„Ξ¬
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Αύξηση replies count, ενημέρωση sentiment
+                <span className="rule-action">Action:</span> Ξ‘ΟΞΎΞ·ΟƒΞ· replies count, ΞµΞ½Ξ·ΞΌΞ­ΟΟ‰ΟƒΞ· sentiment
               </div>
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Handoff condition συμπληρώνεται
+                <span className="rule-trigger">Trigger:</span> Handoff condition ΟƒΟ…ΞΌΟ€Ξ»Ξ·ΟΟΞ½ΞµΟ„Ξ±ΞΉ
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Ειδοποίηση πωλητή, αλλαγή pipeline_status
+                <span className="rule-action">Action:</span> Ξ•ΞΉΞ΄ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ· Ο€Ο‰Ξ»Ξ·Ο„Ξ®, Ξ±Ξ»Ξ»Ξ±Ξ³Ξ® pipeline_status
               </div>
             </div>
           </div>
@@ -4388,4 +3336,3 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
     </div>
   );
 }
-

@@ -63,7 +63,130 @@ const regionCoords: Record<string, { lat: number; lng: number }> = {
   Βόρειο_Αιγαίο: { lat: 39.0, lng: 26.0 },
 };
 
-// Google Maps Places API (Nearby Search)
+// Region name mapping for Apify queries
+const regionNames: Record<string, string> = {
+  Αττική: "Αττική, Ελλάδα",
+  Θεσσαλονίκη: "Θεσσαλονίκη, Ελλάδα",
+  Κεντρική_Ελλάδα: "Κεντρική Ελλάδα",
+  Πελοπόννησος: "Πελοπόννησος, Ελλάδα",
+  Κρήτη: "Κρήτη, Ελλάδα",
+  Ιόνια_Νησιά: "Ιόνια Νησιά, Ελλάδα",
+  Νησιά_Αιγαίου: "Νησιά Αιγαίου, Ελλάδα",
+  Θεσσαλία: "Θεσσαλία, Ελλάδα",
+  Ήπειρος: "Ήπειρος, Ελλάδα",
+  Δυτική_Ελλάδα: "Δυτική Ελλάδα",
+  Στερεά_Ελλάδα: "Στερεά Ελλάδα",
+  Δυτική_Μακεδονία: "Δυτική Μακεδονία, Ελλάδα",
+  Ανατολική_Μακεδονία_Θράκη: "Ανατολική Μακεδονία Θράκη, Ελλάδα",
+  Βόρειο_Αιγαίο: "Βόρειο Αιγαίο, Ελλάδα",
+};
+
+// ─── APIFY: Google Maps Scraper ────────────────────────────────────────────
+async function searchApify(
+  apifyToken: string,
+  searchTerm: string,
+  region: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const regionName = regionNames[region] || "Ελλάδα";
+  const searchQuery = `${searchTerm} ${regionName}`;
+
+  // Start Apify actor run (compass/crawler-google-places)
+  const startUrl = `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?token=${apifyToken}`;
+  const startBody = {
+    searchStringsArray: [searchQuery],
+    maxCrawledPlacesPerSearch: maxResults,
+    language: "el",
+    countryCode: "gr",
+    maxImages: 0,
+    maxReviews: 0,
+    includeWebResults: false,
+    scrapeContacts: true,
+  };
+
+  try {
+    const startResp = await fetch(startUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(startBody),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!startResp.ok) {
+      const errText = await startResp.text();
+      console.error("Apify start failed:", startResp.status, errText);
+      return [];
+    }
+
+    const startData = await startResp.json();
+    const runId = startData?.data?.id;
+    if (!runId) return [];
+
+    // Poll for completion (max 120s)
+    const datasetId = await pollApifyRun(apifyToken, runId, 120000);
+    if (!datasetId) return [];
+
+    // Fetch results from dataset
+    const dataUrl = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json&limit=${maxResults}`;
+    const dataResp = await fetch(dataUrl, { signal: AbortSignal.timeout(30000) });
+    if (!dataResp.ok) return [];
+
+    const items = await dataResp.json();
+    if (!Array.isArray(items)) return [];
+
+    return items.map((item: any): ScrapedBusiness => ({
+      company: item.title || item.name || "",
+      phone: item.phone || item.phoneNumber || "",
+      email: item.emails?.[0] || item.email || "",
+      address: item.address || item.street || "",
+      website: item.url || item.website || "",
+      category: item.categoryName || item.category || searchTerm,
+      region: region,
+      source: "apify",
+      lat: item.location?.lat || item.latitude,
+      lng: item.location?.lng || item.longitude,
+      rating: item.totalScore || item.rating,
+      totalReviews: item.reviewsCount || item.totalReviews,
+      placeId: item.placeId || item.cid,
+    }));
+  } catch (err) {
+    console.error("Apify error:", err);
+    return [];
+  }
+}
+
+async function pollApifyRun(
+  token: string,
+  runId: string,
+  timeoutMs: number
+): Promise<string | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const resp = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}?token=${token}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      const status = data?.data?.status;
+      if (status === "SUCCEEDED") {
+        return data.data.defaultDatasetId || null;
+      }
+      if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
+        console.error("Apify run failed:", status);
+        return null;
+      }
+      // Still running, wait 3s
+      await new Promise((r) => setTimeout(r, 3000));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// ─── Google Maps Places API (Nearby Search) ────────────────────────────────
 async function searchGooglePlaces(
   apiKey: string,
   searchTerm: string,
@@ -76,7 +199,7 @@ async function searchGooglePlaces(
   let fetched = 0;
 
   while (fetched < maxResults) {
-    const radius = 20000; // 20km
+    const radius = 20000;
     let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(searchTerm)}&language=el&key=${apiKey}`;
     if (pageToken) url += `&pagetoken=${pageToken}`;
 
@@ -108,7 +231,6 @@ async function searchGooglePlaces(
 
       pageToken = data.next_page_token || "";
       if (!pageToken) break;
-      // Google requires delay before using next_page_token
       await new Promise((r) => setTimeout(r, 2000));
     } catch {
       break;
@@ -117,7 +239,7 @@ async function searchGooglePlaces(
   return businesses;
 }
 
-// Google Maps Place Details (get phone, website, email)
+// ─── Google Maps Place Details ─────────────────────────────────────────────
 async function getPlaceDetails(
   apiKey: string,
   placeId: string
@@ -137,7 +259,7 @@ async function getPlaceDetails(
   }
 }
 
-// Google Custom Search API (web search for businesses)
+// ─── Google Custom Search API ──────────────────────────────────────────────
 async function searchGoogleCustom(
   apiKey: string,
   cseId: string,
@@ -157,7 +279,6 @@ async function searchGoogleCustom(
       const snippet = item.snippet || "";
       const link = item.link || "";
 
-      // Extract phone from snippet
       const phoneMatch = snippet.match(/(\+?30)?[\s-]?(\d{10}|\d{3}[\s.-]\d{3}[\s.-]\d{4})/);
       const emailMatch = snippet.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
 
@@ -178,6 +299,7 @@ async function searchGoogleCustom(
   return businesses;
 }
 
+// ─── MAIN HANDLER ──────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -199,53 +321,88 @@ Deno.serve(async (req: Request) => {
       importToDb = false,
       googleApiKey = "",
       customSearchId = "",
+      apifyToken = "",
     } = await req.json();
 
     const apiKey = googleApiKey || Deno.env.get("GOOGLE_MAPS_API_KEY") || Deno.env.get("GEMINI_API_KEY") || "";
     const cseId = customSearchId || Deno.env.get("GOOGLE_CUSTOM_SEARCH_ID") || "";
+    const apifyApiToken = apifyToken || Deno.env.get("APIFY_TOKEN") || "";
 
     let allBusinesses: ScrapedBusiness[] = [];
     const searchTerms = categorySearchTerms[category] || categorySearchTerms.other;
     const coords = regionCoords[region] || regionCoords["Αττική"];
 
-    if (!apiKey) {
+    // Determine which sources are available
+    const hasApify = !!apifyApiToken;
+    const hasGoogle = !!apiKey;
+    const hasCustomSearch = hasGoogle && !!cseId;
+
+    if (!hasApify && !hasGoogle) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "No Google API key configured. Please add GOOGLE_MAPS_API_KEY in Supabase Edge Function secrets, or provide a Google Maps API key in the scraper settings.",
+          error: "No scraping API configured. Please add an Apify token or Google Maps API key in Settings → B2B Scraper.",
           businesses: [],
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
-    const sources =
-      source === "auto"
-        ? ["google_places", "google_search"]
-        : [source];
+    // Determine source priority
+    let sources: string[];
+    if (source === "auto") {
+      // Apify first (best results), then Google Places, then Custom Search
+      sources = [];
+      if (hasApify) sources.push("apify");
+      if (hasGoogle) sources.push("google_places");
+      if (hasCustomSearch) sources.push("google_search");
+    } else if (source === "apify" && hasApify) {
+      sources = ["apify"];
+    } else if (source === "google_places" && hasGoogle) {
+      sources = ["google_places"];
+    } else if (source === "google_search" && hasCustomSearch) {
+      sources = ["google_search"];
+    } else {
+      // Fallback to whatever is available
+      sources = [];
+      if (hasApify) sources.push("apify");
+      if (hasGoogle) sources.push("google_places");
+      if (hasCustomSearch) sources.push("google_search");
+    }
 
+    // Execute scraping
     for (const src of sources) {
       if (allBusinesses.length >= maxResults) break;
 
-      for (const term of searchTerms) {
-        if (allBusinesses.length >= maxResults) break;
+      if (src === "apify") {
+        // Apify: use first search term for the region
+        const term = searchTerms[0];
         const remaining = maxResults - allBusinesses.length;
+        const results = await searchApify(apifyApiToken, term, region, remaining);
+        allBusinesses = [...allBusinesses, ...results];
+      } else {
+        // Google sources: iterate through search terms
+        for (const term of searchTerms) {
+          if (allBusinesses.length >= maxResults) break;
+          const remaining = maxResults - allBusinesses.length;
 
-        if (src === "google_places") {
-          const results = await searchGooglePlaces(apiKey, term, coords.lat, coords.lng, remaining);
-          allBusinesses = [...allBusinesses, ...results];
-        } else if (src === "google_search" && cseId) {
-          const results = await searchGoogleCustom(apiKey, cseId, `${term} ${region ? region + " " : ""}Ελλάδα τηλέφωνο email`, remaining);
-          allBusinesses = [...allBusinesses, ...results];
+          if (src === "google_places") {
+            const results = await searchGooglePlaces(apiKey, term, coords.lat, coords.lng, remaining);
+            allBusinesses = [...allBusinesses, ...results];
+          } else if (src === "google_search") {
+            const results = await searchGoogleCustom(apiKey, cseId, `${term} ${region ? region + " " : ""}Ελλάδα τηλέφωνο email`, remaining);
+            allBusinesses = [...allBusinesses, ...results];
+          }
         }
       }
     }
 
-    // Enrich with place details (phone, website) for places results
-    if (allBusinesses.some((b) => b.placeId && !b.phone)) {
+    // Enrich with place details (phone, website) for Google Places results only
+    const needsEnrichment = allBusinesses.filter((b) => b.source === "google_places" && b.placeId && !b.phone);
+    if (needsEnrichment.length > 0) {
       const enriched = await Promise.all(
-        allBusinesses.slice(0, 20).map(async (biz) => {
-          if (biz.placeId && !biz.phone) {
+        needsEnrichment.slice(0, 20).map(async (biz) => {
+          if (biz.placeId && apiKey) {
             const details = await getPlaceDetails(apiKey, biz.placeId);
             return {
               ...biz,
@@ -257,8 +414,21 @@ Deno.serve(async (req: Request) => {
           return biz;
         })
       );
-      allBusinesses = [...enriched, ...allBusinesses.slice(20)];
+      const enrichedIds = new Set(enriched.map((e) => e.placeId));
+      allBusinesses = [
+        ...enriched,
+        ...allBusinesses.filter((b) => !b.placeId || !enrichedIds.has(b.placeId)),
+      ];
     }
+
+    // Deduplicate by company name + phone
+    const seen = new Set<string>();
+    allBusinesses = allBusinesses.filter((b) => {
+      const key = `${b.company}|${b.phone}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     // Import to database if requested
     if (importToDb && allBusinesses.length > 0) {
@@ -292,8 +462,10 @@ Deno.serve(async (req: Request) => {
           imported,
           businesses: allBusinesses,
           source_info: {
-            api: "Google Maps Places API + Custom Search",
-            key_configured: true,
+            api: sources.join(" + "),
+            apify: hasApify,
+            google_places: hasGoogle,
+            custom_search: hasCustomSearch,
           },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -306,8 +478,10 @@ Deno.serve(async (req: Request) => {
         count: allBusinesses.length,
         businesses: allBusinesses,
         source_info: {
-          api: "Google Maps Places API + Custom Search",
-          key_configured: true,
+          api: sources.join(" + "),
+          apify: hasApify,
+          google_places: hasGoogle,
+          custom_search: hasCustomSearch,
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }

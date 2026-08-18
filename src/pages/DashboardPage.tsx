@@ -566,6 +566,7 @@ export default function DashboardPage() {
           <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}><FileText size={18} /> Reports</button>
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Χρήστες</button>
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
+          <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
         </nav>
         <div className="dash-sidebar-footer">
           <div className="dash-user">

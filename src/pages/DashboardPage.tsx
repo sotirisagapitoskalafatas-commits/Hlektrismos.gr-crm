@@ -612,16 +612,51 @@ export default function DashboardPage() {
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)' }}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><TrendingUp size={24} /></div>
                     <div><strong style={{ fontSize: 32 }}>{conversionRate}%</strong><span>Conversion Rate</span></div>
-      </div>
-      )}
-    </div>
-  );
-                        })}
-                      </tbody>
-                    </table>
-                    {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads.</p>}
                   </div>
-                )}
+                </div>
+              </div>
+            )}
+
+            {tab === 'leads' && (
+              <div className="dash-content">
+                {leadsSubTab === 'active' && (
+                  <div className="dash-table-wrap">
+                    <table className="dash-table">
+                      <thead>
+                        <tr>
+                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLeads.map((l) => {
+                          const aiOk = canActivateAI(l);
+                          return (
+                            <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLead(l)}>
+                              <td>
+                                <button className="dash-lead-name-btn" onClick={(e) => { e.stopPropagation(); setOpenLead(l); }}>
+                                  {l.first_name} {l.last_name}
+                                </button>
+                              </td>
+                              <td>{l.email}</td>
+                              <td>{l.phone}</td>
+                              <td>{l.region}</td>
+                              <td>{l.customer_type}</td>
+                              <td>
+                                <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)} onClick={(e) => e.stopPropagation()}>
+                                  <option value="" disabled>—</option>
+                                  <option value="B2C_Household">B2C</option>
+                                  <option value="B2B_Corporate">B2B</option>
+                                </select>
+                              </td>
+                              <td>
+                                <div className="gdpr-badge-wrap">
+                                  <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)} onClick={(e) => e.stopPropagation()}>
+                                    <option value="" disabled>—</option>
+                                    <option value="Consent">Consent</option>
+                                    <option value="Legitimate_Interest">Leg. Interest</option>
+                                  </select>
+                                  <span className={`gdpr-badge ${aiOk ? 'ok' : 'blocked'}`}>{aiOk ? 'OK' : 'Missing'}</span>
+                                </div>
 
                 {leadsSubTab === 'deleted' && (
                   <div className="dash-table-wrap">

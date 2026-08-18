@@ -1553,6 +1553,8 @@ img { display: block; max-width: 100%; }
 :root:not(.dark) .journey-stop h3 { color: #1a1a2e; }
 :root:not(.dark) .journey-stop p { color: rgba(26,26,46,0.6); }
 :root:not(.dark) .journey-stop strong { color: rgba(26,26,46,0.8); }
+:root:not(.dark) .journey-stop { background: rgba(255,255,255,0.92); border-color: rgba(0,0,0,0.08); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+:root:not(.dark) .journey-stop-number { background: rgba(0,200,120,0.12); color: #00c878; }
 :root:not(.dark) .journey-current-label { color: #1a1a2e; }
 :root:not(.dark) .stat-cell { background: rgba(255,255,255,0.8); }
 :root:not(.dark) .stat-cell span { color: rgba(26,26,46,0.5); }
@@ -1572,11 +1574,17 @@ img { display: block; max-width: 100%; }
 :root:not(.dark) .site-footer { background: rgba(245,247,250,0.95); border-top-color: rgba(0,0,0,0.06); }
 :root:not(.dark) .footer-brand p { color: rgba(26,26,46,0.4); }
 :root:not(.dark) .site-header.scrolled { background: rgba(255,255,255,0.9); border-bottom-color: rgba(0,0,0,0.06); box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+:root:not(.dark) .site-header { background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); border-bottom-color: rgba(0,0,0,0.06); }
 :root:not(.dark) .brand { color: #1a1a2e; }
-:root:not(.dark) .main-nav a { color: rgba(26,26,46,0.7); }
+:root:not(.dark) .main-nav a { color: rgba(26,26,46,0.85); font-weight: 600; }
 :root:not(.dark) .main-nav a:hover { color: #00c878; }
 :root:not(.dark) .menu-button { color: #1a1a2e; }
 :root:not(.dark) .hero h1 { color: #1a1a2e; }
+:root:not(.dark) .hero-bg-overlay {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 50%, transparent 30%, rgba(245,247,250,0.7) 100%),
+    linear-gradient(180deg, rgba(245,247,250,0.5) 0%, transparent 20%, transparent 80%, rgba(245,247,250,0.75) 100%);
+}
 :root:not(.dark) .hero-intro { color: rgba(26,26,46,0.7); }
 :root:not(.dark) .btn-ghost { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #1a1a2e; }
 :root:not(.dark) .btn-ghost:hover { background: rgba(0,0,0,0.1); border-color: rgba(0,0,0,0.2); }
@@ -1595,6 +1603,7 @@ img { display: block; max-width: 100%; }
 :root:not(.dark) .about-copy p { color: rgba(26,26,46,0.65); }
 :root:not(.dark) .about-vision strong { color: #1a1a2e; }
 :root:not(.dark) .about-vision p { color: rgba(26,26,46,0.6); }
+:root:not(.dark) .about-vision { background: rgba(245,247,250,0.95); border-color: rgba(0,0,0,0.08); }
 :root:not(.dark) .pillar-card h3 { color: #1a1a2e; }
 :root:not(.dark) .pillar-card p { color: rgba(26,26,46,0.6); }
 :root:not(.dark) .pillar-num { color: rgba(26,26,46,0.12); }

@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import SettingsPanel from '@/components/SettingsPanel';
 
 type Lead = {
   id: string;
@@ -1225,7 +1226,7 @@ export default function DashboardPage() {
               />
             )}
             {tab === 'settings' && (
-              <IntegrationsTab toast={toast} setToast={setToast} />
+              <SettingsPanel toast={toast} setToast={setToast} />
             )}
             {tab === 'email' && (
               <EmailTab toast={toast} setToast={setToast} />

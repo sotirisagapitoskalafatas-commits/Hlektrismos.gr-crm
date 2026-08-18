@@ -640,8 +640,8 @@ export default function DashboardPage() {
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚</button>
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
           <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> π“§ Email</button>
-        </nav>
           <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
+        </nav>
         <div className="dash-sidebar-footer">
           <div className="dash-user">
             <div className="dash-user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
@@ -1234,10 +1234,10 @@ export default function DashboardPage() {
             {tab === 'email' && (
               <EmailTab toast={toast} setToast={setToast} />
             )}
-          </>
             {tab === 'documents' && (
-              <DocumentGenerator />
+              <DocumentGenerator toast={toast} setToast={setToast} />
             )}
+          </>
         )}
       </div>
 

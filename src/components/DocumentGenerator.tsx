@@ -231,10 +231,10 @@ const docStyles = `
 `;
 
 export default function DocumentGenerator({ lead, toast, setToast }: {
-  lead: any;
-  toast: { msg: string; type: 'success' | 'info' } | null;
-  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
-}) {
+  lead?: any;
+  toast?: { msg: string; type: 'success' | 'info' } | null;
+  setToast?: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+} = {}) {
   const [templates, setTemplates] = useState<DocTemplate[]>(() =>
     defaultTemplates.map((t, i) => ({
       ...t,
@@ -284,7 +284,7 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
     const filledBody = fillTemplate(template);
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      setToast({ msg: 'Αποκλείστηκε το popup. Επιτρέψτε popups.', type: 'info' });
+      setToast?.({ msg: 'Αποκλείστηκε το popup. Επιτρέψτε popups.', type: 'info' });
       return;
     }
 
@@ -309,7 +309,7 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
       </html>
     `);
     printWindow.document.close();
-    setToast({ msg: `Αρχείο ${template.name} δημιουργήθηκε!`, type: 'success' });
+    setToast?.({ msg: `Αρχείο ${template.name} δημιουργήθηκε!`, type: 'success' });
   };
 
   const handleDownloadPdf = (template: DocTemplate) => {
@@ -336,7 +336,7 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
     link.download = `${template.name.replace(/\s+/g, '_')}_${lead?.first_name || 'doc'}.html`;
     link.click();
     URL.revokeObjectURL(url);
-    setToast({ msg: `HTML αρχείο κατέβηκε. Χρησιμοποιήστε Ctrl+P → Save as PDF.`, type: 'success' });
+    setToast?.({ msg: `HTML αρχείο κατέβηκε. Χρησιμοποιήστε Ctrl+P → Save as PDF.`, type: 'success' });
   };
 
   return (

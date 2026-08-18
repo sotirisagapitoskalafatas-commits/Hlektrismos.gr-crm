@@ -1715,7 +1715,7 @@ function IntegrationsTab({ toast, setToast }: {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Φόρτωση...</div>
       ) : (
-
+      <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
         {integrations.map(integ => (
           <div key={integ.id} style={{
@@ -1780,6 +1780,8 @@ function IntegrationsTab({ toast, setToast }: {
           <li>GDPR-compliant unsubscribe mechanism</li>
         </ul>
       </div>
+      </>
+      )}
     </div>
   );
 }

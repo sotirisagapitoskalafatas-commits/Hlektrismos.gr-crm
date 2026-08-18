@@ -19,6 +19,7 @@ import {
   X,
   Upload,
   Zap,
+  FileText,
 } from 'lucide-react';
 import ChatBot from '@/components/ChatBot';
 import { supabase } from '@/lib/supabase';

@@ -1068,6 +1068,48 @@ export default function DashboardPage() {
       {configAgent && (
         <AgentConfigDrawer agent={configAgent} onClose={() => setConfigAgent(null)} onSave={saveAgentConfig} />
       )}
+
+      {openLead && (
+        <div className="modal-overlay" onClick={() => setOpenLead(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, width: '95vw', maxHeight: '85vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>{openLead.first_name} {openLead.last_name}</h3>
+              <button className="modal-close" onClick={() => setOpenLead(null)}>x</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                <div className="detail-group"><label>Email</label><span>{openLead.email || '—'}</span></div>
+                <div className="detail-group"><label>Τηλέφωνο</label><span>{openLead.phone || '—'}</span></div>
+                <div className="detail-group"><label>Περιοχή</label><span>{openLead.region || '—'}</span></div>
+                <div className="detail-group"><label>Τύπος</label><span>{openLead.customer_type || '—'}</span></div>
+                <div className="detail-group"><label>Κατηγορία</label><span>{openLead.customer_category || '—'}</span></div>
+                <div className="detail-group"><label>Πάροχος</label><span>{openLead.provider || '—'}</span></div>
+                <div className="detail-group"><label>Status</label><span className={`dash-status-pill ${openLead.status}`}>{openLead.status}</span></div>
+                <div className="detail-group"><label>Δημιουργήθηκε</label><span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span></div>
+                {openLead.assigned_to && <div className="detail-group"><label>Αντιπρόσωπος</label><span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span></div>}
+                {openLead.comments && <div className="detail-group" style={{ gridColumn: '1 / -1' }}><label>Σχόλια</label><span>{openLead.comments}</span></div>}
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <h4 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={18} /> Ανεβασμένα Αρχεία</h4>
+                {billLoading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Φόρτωση...</div>}
+                {billError && <div style={{ padding: 12, background: 'rgba(231,76,60,0.1)', borderRadius: 8, color: '#e74c3c', fontSize: 13 }}><AlertCircle size={14} /> {billError}</div>}
+                {!billLoading && !billError && billUrls.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}><FolderOpen size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />Δεν υπάρχουν ανεβασμένα αρχεία</div>}
+                {billUrls.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{billUrls.map((file, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    {file.type === 'application/pdf' ? <FileText size={24} style={{ color: '#e74c3c', flexShrink: 0 }} /> : <ImageIcon size={24} style={{ color: '#00c878', flexShrink: 0 }} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}{file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}</div>
+                    </div>
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><ExternalLink size={14} /> Προβολή</a>
+                    <a href={file.url} download={file.name} className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><Download size={14} /> Λήψη</a>
+                  </div>
+                ))}</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2791,140 +2833,6 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
 
       {selectedView === 'developer' && (
         <DeveloperAgentChat />
-      )}
-
-      {/* Lead Detail / Folder Modal */}
-      {openLead && (
-        <div className="modal-overlay" onClick={() => setOpenLead(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '95vw', maxHeight: '85vh', overflow: 'auto' }}>
-            <div className="modal-header">
-              <h3>📁 {openLead.first_name} {openLead.last_name}</h3>
-              <button className="modal-close" onClick={() => setOpenLead(null)}>×</button>
-            </div>
-            <div className="modal-body">
-              {/* Lead Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <div className="detail-group">
-                  <label>Email</label>
-                  <span>{openLead.email || '—'}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Τηλέφωνο</label>
-                  <span>{openLead.phone || '—'}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Περιοχή</label>
-                  <span>{openLead.region || '—'}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Τύπος Πελάτη</label>
-                  <span>{openLead.customer_type || '—'}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Κατηγορία</label>
-                  <span>{openLead.customer_category || '—'}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Πάροχος</label>
-                  <span>{openLead.provider || '—'}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Status</label>
-                  <span className={`dash-status-pill ${openLead.status}`}>{openLead.status}</span>
-                </div>
-                <div className="detail-group">
-                  <label>Δημιουργήθηκε</label>
-                  <span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span>
-                </div>
-                {openLead.assigned_to && (
-                  <div className="detail-group">
-                    <label>Αντιπρόσωπος</label>
-                    <span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span>
-                  </div>
-                )}
-                {openLead.comments && (
-                  <div className="detail-group" style={{ gridColumn: '1 / -1' }}>
-                    <label>Σχόλια</label>
-                    <span>{openLead.comments}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Uploaded Files / Folder View */}
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                <h4 style={{ margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText size={18} /> Ανεβασμένα Αρχεία
-                </h4>
-
-                {billLoading && (
-                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                    <span className="typing-dots">Φόρτωση αρχείων<span>.</span><span>.</span><span>.</span></span>
-                  </div>
-                )}
-
-                {billError && (
-                  <div style={{ padding: '12px', background: 'rgba(231,76,60,0.1)', borderRadius: '8px', color: '#e74c3c', fontSize: '13px' }}>
-                    <AlertCircle size={14} style={{ marginRight: '6px' }} /> {billError}
-                  </div>
-                )}
-
-                {!billLoading && !billError && billUrls.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
-                    <FolderOpen size={32} style={{ opacity: 0.3, marginBottom: '8px', display: 'block', margin: '0 auto 8px' }} />
-                    Δεν υπάρχουν ανεβασμένα αρχεία
-                  </div>
-                )}
-
-                {billUrls.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {billUrls.map((file, i) => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)',
-                        borderRadius: '10px', transition: 'border-color 0.2s',
-                      }}
-                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#0066cc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
-                      >
-                        {file.type === 'application/pdf' ? (
-                          <FileText size={24} style={{ color: '#e74c3c', flexShrink: 0 }} />
-                        ) : (
-                          <ImageIcon size={24} style={{ color: '#00c878', flexShrink: 0 }} />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, color: 'var(--text)', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {file.name}
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}
-                            {file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}
-                          </div>
-                        </div>
-                        <a
-                          href={file.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-ghost"
-                          style={{ fontSize: '12px', flexShrink: 0, textDecoration: 'none' }}
-                        >
-                          <ExternalLink size={14} /> Προβολή
-                        </a>
-                        <a
-                          href={file.url}
-                          download={file.name}
-                          className="btn btn-ghost"
-                          style={{ fontSize: '12px', flexShrink: 0, textDecoration: 'none' }}
-                        >
-                          <Download size={14} /> Λήψη
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -1456,6 +1456,27 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
             background: 'transparent', border: 'none', borderRadius: '50%', width: '32px', height: '32px',
             color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
           }} title="Live Voice Assistant Stream">📊</button>
+          <button
+            onClick={() => {
+              if (message.trim()) {
+                onSendMessage(message);
+                setMessage('');
+                setShowPlusMenu(false);
+              }
+            }}
+            disabled={!message.trim()}
+            style={{
+              background: message.trim() ? 'var(--text)' : 'rgba(0,0,0,0.06)',
+              color: message.trim() ? 'var(--bg)' : 'var(--text-muted)',
+              border: 'none', borderRadius: '50%', width: '32px', height: '32px',
+              cursor: message.trim() ? 'pointer' : 'not-allowed',
+              fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.15s',
+            }}
+            title="Αποστολή μηνύματος"
+          >
+            <Send size={15} />
+          </button>
         </div>
       </div>
     </div>

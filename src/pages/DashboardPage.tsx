@@ -28,6 +28,7 @@ import {
   Eye,
   EyeOff,
   Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,6 +52,8 @@ type Lead = {
   comments?: string | null;
   bill_file_path?: string | null;
   bill_file_name?: string | null;
+  assigned_to?: string | null;
+  assigned_at?: string | null;
 };
 
 type Agent = {
@@ -1550,7 +1553,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   loadData: () => Promise<void>;
 }) {
   const [showAddUser, setShowAddUser] = useState(false);
-  const [newUser, setNewUser] = useState({ full_name: '', role: 'sales', phone: '' });
+  const [newUser, setNewUser] = useState({ full_name: '', role: 'sales', phone: '', email: '', password: '' });
   const [editingUser, setEditingUser] = useState<CrmUser | null>(null);
 
   const roleLabels: Record<string, string> = {
@@ -1620,17 +1623,19 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
             <option value="admin">Διαχειριστής</option>
           </select>
           <input placeholder="Τηλέφωνο" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} />
+          <input placeholder="Email" type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+          <input placeholder="Κωδικός" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
           <button className="btn btn-primary" onClick={async () => {
-            if (!newUser.full_name) return;
-            await supabase.from('crm_users').insert({
-              id: crypto.randomUUID(),
-              full_name: newUser.full_name,
-              role: newUser.role,
-              phone: newUser.phone,
-              is_active: true,
-              max_leads: 50
+            if (!newUser.full_name || !newUser.email || !newUser.password) return;
+            const { error } = await supabase.rpc('create_crm_user', {
+              p_full_name: newUser.full_name,
+              p_role: newUser.role,
+              p_phone: newUser.phone,
+              p_email: newUser.email,
+              p_password: newUser.password,
             });
-            setNewUser({ full_name: '', role: 'sales', phone: '' });
+            if (error) { setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' }); return; }
+            setNewUser({ full_name: '', role: 'sales', phone: '', email: '', password: '' });
             setShowAddUser(false);
             loadData();
             setToast({ msg: 'Ο χρήστης δημιουργήθηκε.', type: 'success' });
@@ -1935,6 +1940,17 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newAgent, setNewAgent] = useState({ name: '', channel: 'Email', status: 'inactive' });
+
+  const channelOptions = [
+    { value: 'Email', label: 'Email' },
+    { value: 'SMS', label: 'SMS' },
+    { value: 'Phone', label: 'Τηλέφωνο' },
+    { value: 'Web', label: 'Web' },
+    { value: 'Social', label: 'Social Media' },
+    { value: 'Push', label: 'Push Notification' },
+    { value: 'In-App', label: 'In-App' },
+    { value: 'API', label: 'API' },
+  ];
 
   const activeAgents = agents.filter(a => a.status === 'active');
   const totalLeads = leads.filter(l => !l.deleted_at).length;

@@ -17,11 +17,12 @@ serve(async (req: any) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Fetch new leads that haven't been contacted yet
+    // 1. Fetch new leads that haven't been contacted yet (exclude soft-deleted)
     const { data: leads, error: leadsError } = await supabaseAdmin
       .from('hlektrismos_leads')
       .select('*')
       .eq('status', 'new')
+      .is('deleted_at', null)
       .limit(10);
 
     if (leadsError) throw leadsError;

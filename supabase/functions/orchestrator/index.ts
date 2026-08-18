@@ -26,6 +26,7 @@ serve(async (req: any) => {
   try {
     const url = new URL(req.url)
     const isReport = url.searchParams.get('mode') === 'report' || url.pathname.endsWith('/report')
+    const isStream = url.searchParams.get('stream') === 'true' || req.headers.get('accept') === 'text/event-stream'
 
     const body = await req.json()
     const { message, agent_id, context_id, mode, report_type, multi_agent, agent_ids } = body
@@ -90,6 +91,24 @@ serve(async (req: any) => {
         .limit(30)
 
       memoryContext = memory?.map((m: any) => `[${m.role}]: ${m.content}`).join('\n') || ''
+    }
+
+    // Also try to fetch from agent_messages (new persistent sessions)
+    if (!memoryContext && context_id) {
+      try {
+        const { data: sessionMessages } = await supabaseAdmin
+          .from('agent_messages')
+          .select('*')
+          .eq('session_id', context_id)
+          .order('created_at', { ascending: true })
+          .limit(30)
+
+        if (sessionMessages && sessionMessages.length > 0) {
+          memoryContext = sessionMessages.map((m: any) => `[${m.role}]: ${m.content}`).join('\n')
+        }
+      } catch {
+        // agent_messages table may not exist
+      }
     }
 
     const agentList = agents?.map((a: any) =>
@@ -235,8 +254,12 @@ ${multiAgentContext}
 
     geminiMessages.push({ role: 'user', parts: [{ text: message }] })
 
-    // Call Gemini API with timeout
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`, {
+    // Call Gemini API with optional streaming
+    const geminiApiUrl = isStream
+      ? `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse`
+      : `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
+
+    const geminiResponse = await fetch(geminiApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -246,13 +269,91 @@ ${multiAgentContext}
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: geminiMessages,
       }),
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(120000),
     })
 
-    const aiData = await geminiResponse.json()
     if (!geminiResponse.ok) {
-      throw new Error(aiData.error?.message || 'Gemini API error')
+      const errData = await geminiResponse.json().catch(() => ({}))
+      throw new Error(errData.error?.message || `Gemini API error: ${geminiResponse.status}`)
     }
+
+    // STREAMING MODE: Return SSE stream directly to client
+    if (isStream) {
+      const memContextId = context_id && context_id !== 'null' ? context_id : crypto.randomUUID()
+      const targetAgentId = primaryAgent?.id || 'orchestrator-director'
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          const reader = geminiResponse.body?.getReader()
+          if (!reader) { controller.close(); return }
+
+          const decoder = new TextDecoder()
+          let fullText = ''
+          let buffer = ''
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6))
+                    const chunk = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+                    if (chunk) {
+                      fullText += chunk
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ chunk, done: false })}\n\n`))
+                    }
+                  } catch { /* skip malformed SSE lines */ }
+                }
+              }
+            }
+
+            // Send final message with metadata
+            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ chunk: '', done: true, context_id: memContextId, agent_id: targetAgentId, model: geminiModel })}\n\n`))
+            controller.close()
+
+            // Save to agent_memory (async, after stream completes)
+            await supabaseAdmin.from('agent_memory').insert([
+              { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message },
+              { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: fullText, metadata: { model: geminiModel, streaming: true } },
+            ])
+
+            // Also save to agent_messages (persistent sessions)
+            if (context_id) {
+              try {
+                await supabaseAdmin.from('agent_messages').insert([
+                  { session_id: context_id, role: 'user', content: message },
+                  { session_id: context_id, role: 'assistant', content: fullText, agent_id: targetAgentId, model: geminiModel },
+                ])
+              } catch { /* table may not exist */ }
+            }
+
+          } catch (err) {
+            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`))
+            controller.close()
+          }
+        }
+      })
+
+      return new Response(stream, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+        status: 200,
+      })
+    }
+
+    // NON-STREAMING MODE: Return JSON response
+    const aiData = await geminiResponse.json()
 
     const reply = aiData.candidates?.[0]?.content?.parts?.[0]?.text
     if (!reply) throw new Error('Empty response from Gemini API')
@@ -265,6 +366,16 @@ ${multiAgentContext}
       { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message },
       { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: reply, metadata: { model: geminiModel, tokens: aiData.usageMetadata?.totalTokenCount } },
     ])
+
+    // Also save to agent_messages (persistent sessions)
+    if (context_id) {
+      try {
+        await supabaseAdmin.from('agent_messages').insert([
+          { session_id: context_id, role: 'user', content: message },
+          { session_id: context_id, role: 'assistant', content: reply, agent_id: targetAgentId, model: geminiModel },
+        ])
+      } catch { /* table may not exist */ }
+    }
 
     // If multi-agent, save inter-agent messages
     if (selectedAgents.length > 1) {

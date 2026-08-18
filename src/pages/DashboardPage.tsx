@@ -599,19 +599,19 @@ export default function DashboardPage() {
             {tab === 'overview' && (
               <div className="dash-overview">
                 <div className="dash-stats-grid">
-                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,200,120,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(0,200,120,0.15)' }}>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,200,120,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(0,200,120,0.15)', cursor: 'pointer' }} onClick={() => setTab('leads')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.15)', color: '#00c878' }}><Users size={24} /></div>
                     <div><strong style={{ fontSize: 32 }}>{leads.filter(l => !l.deleted_at).length}</strong><span>Σύνολο Leads</span></div>
                   </div>
-                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,102,204,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(0,102,204,0.15)' }}>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,102,204,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(0,102,204,0.15)', cursor: 'pointer' }} onClick={() => setTab('agents')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.15)', color: '#0066cc' }}><Bot size={24} /></div>
                     <div><strong style={{ fontSize: 32 }}>{agents.filter(a => !a.deleted_at && a.status === 'active').length}</strong><span>Ενεργά AI Agents</span></div>
                   </div>
-                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(147,51,234,0.15)' }}>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(147,51,234,0.15)', cursor: 'pointer' }} onClick={() => setTab('email')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(147,51,234,0.15)', color: '#9333ea' }}><Mail size={24} /></div>
                     <div><strong style={{ fontSize: 32 }}>{totalLeadsContacted}</strong><span>Επικοινωνίες</span></div>
                   </div>
-                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)' }}>
+                  <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)', cursor: 'pointer' }} onClick={() => setTab('reports')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><TrendingUp size={24} /></div>
                     <div><strong style={{ fontSize: 32 }}>{conversionRate}%</strong><span>Conversion Rate</span></div>
                   </div>
@@ -619,7 +619,10 @@ export default function DashboardPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '24px' }}>
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
-                    <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: 'var(--text)' }}>📋 Πρόσφατα Leads</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>📋 Πρόσφατα Leads</h3>
+                      <button onClick={() => setTab('leads')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Προβολή όλων →</button>
+                    </div>
                     {leads.filter(l => !l.deleted_at).slice(0, 5).map(l => (
                       <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                         <div>
@@ -633,7 +636,10 @@ export default function DashboardPage() {
                   </div>
 
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
-                    <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: 'var(--text)' }}>🤖 AI Agents Status</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>🤖 AI Agents Status</h3>
+                      <button onClick={() => setTab('agents')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Διαχείριση →</button>
+                    </div>
                     {agents.filter(a => !a.deleted_at).slice(0, 5).map(a => (
                       <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -650,6 +656,31 @@ export default function DashboardPage() {
                     ))}
                     {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν agents.</p>}
                   </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '24px' }}>
+                  {[
+                    { icon: '🤖', label: 'Agent Hub', tab: 'hub', desc: 'AI συνομιλία' },
+                    { icon: '🔍', label: 'B2B Scraper', tab: 'scraper', desc: 'Αναζήτηση leads' },
+                    { icon: '📊', label: 'Orchestrator', tab: 'orchestrator', desc: 'Director view' },
+                    { icon: '📈', label: 'Email', tab: 'email', desc: 'Διαχείριση email' },
+                  ].map((action) => (
+                    <button
+                      key={action.tab}
+                      onClick={() => setTab(action.tab as Tab)}
+                      style={{
+                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px',
+                        padding: '16px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
+                      <div style={{ fontSize: '24px', marginBottom: '6px' }}>{action.icon}</div>
+                      <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>{action.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{action.desc}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -1129,6 +1160,300 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   AGENT HUB — Chat Input Toolbar (Claude-style + menu, mic, voice)
+   ═══════════════════════════════════════════════════════════════ */
+
+function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
+  onSendMessage: (msg: string) => void;
+  onOpenSettings: (tab: string) => void;
+}) {
+  const [message, setMessage] = useState('');
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (message.trim()) {
+        onSendMessage(message);
+        setMessage('');
+        setShowPlusMenu(false);
+      }
+    }
+  };
+
+  const menuItemStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', padding: '8px 14px', background: 'transparent', border: 'none',
+    color: 'var(--text)', fontSize: '13px', cursor: 'pointer', textAlign: 'left'
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', maxWidth: '880px', margin: '0 auto' }}>
+      {/* Attachment / Actions Popover (+ Menu) */}
+      {showPlusMenu && (
+        <div style={{
+          position: 'absolute', bottom: '60px', left: '0', width: '260px',
+          background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.3)', zIndex: 1000, padding: '6px 0',
+          color: 'var(--text)', fontSize: '13px'
+        }}>
+          <button onClick={() => fileInputRef.current?.click()} style={menuItemStyle}>
+            <span>📎 Προσθήκη αρχείων ή φωτογραφιών</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-2)', padding: '2px 6px', borderRadius: '4px' }}>Ctrl+U</span>
+          </button>
+          <button onClick={() => onOpenSettings('skills')} style={menuItemStyle}>
+            <span>📁 Προσθήκη σε project</span><span>›</span>
+          </button>
+          <button onClick={() => onOpenSettings('connectors')} style={menuItemStyle}>
+            <span>🐙 Προσθήκη από GitHub</span>
+          </button>
+          <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+          <button onClick={() => onOpenSettings('skills')} style={menuItemStyle}>
+            <span>🛠️ Skills (Δεξιότητες)</span><span>›</span>
+          </button>
+          <button onClick={() => onOpenSettings('connectors')} style={menuItemStyle}>
+            <span>🔌 Connectors (Συνδέσεις)</span><span>›</span>
+          </button>
+          <button onClick={() => onOpenSettings('plugins')} style={menuItemStyle}>
+            <span>🧩 Plugins (Πρόσθετα)</span><span>›</span>
+          </button>
+          <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+          <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} style={{ ...menuItemStyle, justifyContent: 'space-between' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>🌐 Αναζήτηση στο Web</span>
+            {webSearchEnabled && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span>}
+          </button>
+        </div>
+      )}
+
+      <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={(e) => console.log(e.target.files)} />
+
+      {/* Main Input Capsule */}
+      <div style={{
+        display: 'flex', alignItems: 'center', background: 'var(--bg-2)',
+        border: '1px solid var(--border)', borderRadius: '24px', padding: '8px 14px', gap: '10px'
+      }}>
+        <button onClick={() => setShowPlusMenu(!showPlusMenu)} style={{
+          background: showPlusMenu ? 'rgba(0,102,204,0.15)' : 'rgba(0,0,0,0.06)',
+          border: 'none', borderRadius: '50%', width: '32px', height: '32px',
+          color: 'var(--text)', cursor: 'pointer', fontSize: '18px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} title="Προσθήκη υλικού & εργαλείων">+</button>
+
+        <textarea
+          value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown}
+          placeholder="Στείλτε μήνυμα στον Agent Hub..." rows={1}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '14px', resize: 'none', fontFamily: 'inherit' }}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => setIsRecording(!isRecording)} style={{
+            background: isRecording ? 'rgba(239,68,68,0.15)' : 'transparent',
+            border: 'none', borderRadius: '50%', width: '32px', height: '32px',
+            color: isRecording ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
+          }} title="Φωνητική υπαγόρευση">🎙️</button>
+          <button style={{
+            background: 'transparent', border: 'none', borderRadius: '50%', width: '32px', height: '32px',
+            color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
+          }} title="Live Voice Assistant Stream">📊</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AGENT HUB — Settings Modal (Claude-inspired, 6 tabs)
+   ═══════════════════════════════════════════════════════════════ */
+
+function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
+  isOpen: boolean; onClose: () => void; initialTab?: string;
+}) {
+  const [activeCategory, setActiveCategory] = useState(initialTab);
+  const [generateMemory, setGenerateMemory] = useState(true);
+  const [userName, setUserName] = useState('Agapitos Kalafatas');
+  const [callName, setCallName] = useState('Agapitos');
+  const [workDescription, setWorkDescription] = useState('Software Engineer & AI Solutions Architect');
+  const [instructions, setInstructions] = useState('Prefer concise responses, direct TypeScript / SQL snippets, and structured markdown tables.');
+  const [toolAccessMode, setToolAccessMode] = useState('Tools already loaded');
+  const [connectorSearch, setConnectorSearch] = useState(true);
+  const [switchModels, setSwitchModels] = useState(true);
+  const [classifySessions, setClassifySessions] = useState(false);
+  const [artifacts, setArtifacts] = useState(true);
+  const [aiArtifacts, setAiArtifacts] = useState(true);
+  const [inlineVisualizations, setInlineVisualizations] = useState(true);
+  const [codeTheme, setCodeTheme] = useState('dark');
+  const [codeFont, setCodeFont] = useState('Fira Code');
+  const [interfaceFont, setInterfaceFont] = useState('Inter');
+  const [transcriptSize, setTranscriptSize] = useState('Normal');
+  const [transcriptWidth, setTranscriptWidth] = useState('Maximized');
+  const [codeExecution, setCodeExecution] = useState(true);
+  const [networkEgress, setNetworkEgress] = useState(false);
+  const [branchPrefix, setBranchPrefix] = useState('agent/');
+  const [autoPR, setAutoPR] = useState(false);
+  const [autofixPR, setAutofixPR] = useState(true);
+
+  if (!isOpen) return null;
+
+  const navSectionHeader: React.CSSProperties = { fontSize: '10px', fontWeight: 'bold' as const, color: 'var(--text-muted)', padding: '12px 8px 4px 8px', letterSpacing: '0.5px' };
+  const navItemStyle = (active: boolean): React.CSSProperties => ({ display: 'block', width: '100%', textAlign: 'left' as const, padding: '8px 10px', background: active ? 'rgba(0,102,204,0.1)' : 'transparent', border: 'none', borderRadius: '6px', color: active ? 'var(--text)' : 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', fontWeight: active ? '600' as const : 'normal' as const });
+  const tabHeaderStyle: React.CSSProperties = { margin: '0 0 4px 0', fontSize: '22px', fontWeight: 'bold' as const, color: 'var(--text)' };
+  const subTextStyle: React.CSSProperties = { margin: 0, fontSize: '14px', color: 'var(--text-muted)', marginBottom: '24px' };
+  const sectionContainer: React.CSSProperties = { marginTop: '24px', display: 'flex', flexDirection: 'column' as const };
+  const sectionTitleStyle: React.CSSProperties = { fontSize: '15px', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '12px' };
+  const labelStyle: React.CSSProperties = { fontSize: '14px', fontWeight: '600' as const, color: 'var(--text)', marginBottom: '2px' };
+  const helpTextStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' };
+  const selectStyle: React.CSSProperties = { padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '13px', outline: 'none' };
+  const inputStyle: React.CSSProperties = { padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '13px', outline: 'none' };
+  const checkboxStyle: React.CSSProperties = { width: '20px', height: '20px', accentColor: '#0066cc', cursor: 'pointer', marginTop: '2px' };
+
+  const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (c: boolean) => void }) => (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ paddingRight: '40px' }}><div style={labelStyle}>{label}</div><div style={helpTextStyle}>{description}</div></div>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={checkboxStyle} />
+    </div>
+  );
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '980px', height: '720px', background: 'var(--bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)', color: 'var(--text)' }}>
+        {/* Left Sidebar Navigation */}
+        <div style={{ width: '240px', background: 'var(--bg-2)', borderRight: '1px solid var(--border)', padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', padding: '0 8px', color: 'var(--text)' }}>Ρυθμίσεις Agent</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={navSectionHeader}>ΓΕΝΙΚΑ</div>
+            <button onClick={() => setActiveCategory('general')} style={navItemStyle(activeCategory === 'general')}>⚙️ General</button>
+            <button onClick={() => setActiveCategory('visuals')} style={navItemStyle(activeCategory === 'visuals')}>🎨 Appearance & Visuals</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={navSectionHeader}>CAPABILITIES</div>
+            <button onClick={() => setActiveCategory('code')} style={navItemStyle(activeCategory === 'code')}>💻 Code & Execution</button>
+            <button onClick={() => setActiveCategory('connectors')} style={navItemStyle(activeCategory === 'connectors')}>🔌 Connectors</button>
+            <button onClick={() => setActiveCategory('security')} style={navItemStyle(activeCategory === 'security')}>🔒 Security & Tokens</button>
+          </div>
+          <button onClick={onClose} style={{ marginTop: 'auto', padding: '10px', background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer' }}>✖ Κλείσιμο</button>
+        </div>
+
+        {/* Right Content Pane */}
+        <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+          {activeCategory === 'general' && (
+            <div>
+              <h2 style={tabHeaderStyle}>General Settings</h2>
+              <p style={subTextStyle}>Manage how the AI interacts with tools, models, and sessions.</p>
+              <div style={sectionContainer}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div><label style={labelStyle}>Tool access mode</label><div style={helpTextStyle}>Controls how connector tools are loaded in new conversations.</div></div>
+                  <select value={toolAccessMode} onChange={e => setToolAccessMode(e.target.value)} style={selectStyle}><option>Tools already loaded</option><option>Load on demand</option></select>
+                </div>
+                <ToggleRow label="Connector search" description="Let the AI search the connector directory and surface ones relevant to your conversation." checked={connectorSearch} onChange={setConnectorSearch} />
+                <ToggleRow label="Switch models when flagged" description="When safeguards flag a message, automatically switch to a different model to keep chatting." checked={switchModels} onChange={setSwitchModels} />
+                <ToggleRow label="Classify session states" description="Allow the Agent to automatically classify sessions as blocked, ready for review, or done." checked={classifySessions} onChange={setClassifySessions} />
+              </div>
+            </div>
+          )}
+          {activeCategory === 'visuals' && (
+            <div>
+              <h2 style={tabHeaderStyle}>Visuals & Appearance</h2>
+              <p style={subTextStyle}>Customize the interface, typography, and how generated artifacts are displayed.</p>
+              <div style={sectionContainer}>
+                <h3 style={sectionTitleStyle}>Artifacts & Output</h3>
+                <ToggleRow label="Artifacts" description="Generate code, documents, and designs in a dedicated window alongside your conversation." checked={artifacts} onChange={setArtifacts} />
+                <ToggleRow label="AI-powered artifacts" description="Build apps and interactive documents that use the AI inside the artifact." checked={aiArtifacts} onChange={setAiArtifacts} />
+                <ToggleRow label="Inline visualizations" description="Allow the Agent to generate interactive visualizations, charts, and diagrams directly in the conversation." checked={inlineVisualizations} onChange={setInlineVisualizations} />
+              </div>
+              <div style={sectionContainer}>
+                <h3 style={sectionTitleStyle}>Interface & Typography</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div><label style={labelStyle}>Code appearance</label><div style={helpTextStyle}>Light or dark theme for code blocks.</div></div>
+                  <select value={codeTheme} onChange={e => setCodeTheme(e.target.value)} style={selectStyle}><option value="dark">Dark Theme</option><option value="light">Light Theme</option></select>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '16px' }}>
+                  <div><label style={labelStyle}>Interface font</label><select value={interfaceFont} onChange={e => setInterfaceFont(e.target.value)} style={{...selectStyle, marginTop: '8px', width: '100%'}}><option>Inter</option><option>System Default</option><option>Roboto</option></select></div>
+                  <div><label style={labelStyle}>Code font</label><select value={codeFont} onChange={e => setCodeFont(e.target.value)} style={{...selectStyle, marginTop: '8px', width: '100%'}}><option>Fira Code</option><option>JetBrains Mono</option><option>Consolas</option></select></div>
+                  <div><label style={labelStyle}>Transcript text size</label><select value={transcriptSize} onChange={e => setTranscriptSize(e.target.value)} style={{...selectStyle, width: '100%'}}><option>Small</option><option>Normal</option><option>Large</option></select></div>
+                  <div><label style={labelStyle}>Transcript width</label><select value={transcriptWidth} onChange={e => setTranscriptWidth(e.target.value)} style={{...selectStyle, width: '100%'}}><option>Standard</option><option>Wide</option><option>Maximized</option></select></div>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeCategory === 'code' && (
+            <div>
+              <h2 style={tabHeaderStyle}>Code Execution & Pull Requests</h2>
+              <p style={subTextStyle}>Manage how the AI interacts with your local environment and repositories.</p>
+              <div style={sectionContainer}>
+                <h3 style={sectionTitleStyle}>Code Execution & File Creation</h3>
+                <ToggleRow label="Code execution and file creation" description="The Agent can execute code and create and edit docs, spreadsheets, presentations, PDFs, and data reports." checked={codeExecution} onChange={setCodeExecution} />
+                <ToggleRow label="Allow network egress ⚠️" description="Allow the Agent to access common package managers to install packages and libraries." checked={networkEgress} onChange={setNetworkEgress} />
+              </div>
+              <div style={sectionContainer}>
+                <h3 style={sectionTitleStyle}>Pull Requests</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div><label style={labelStyle}>Branch prefix</label><div style={helpTextStyle}>Prefix added to branch names.</div></div>
+                  <input type="text" value={branchPrefix} onChange={e => setBranchPrefix(e.target.value)} style={{...inputStyle, width: '200px'}} />
+                </div>
+                <ToggleRow label="Create pull requests automatically" description="When the AI pushes changes to a branch, it automatically opens a pull request." checked={autoPR} onChange={setAutoPR} />
+                <ToggleRow label="Autofix pull requests" description="The AI automatically monitors PRs for CI failures and responds proactively." checked={autofixPR} onChange={setAutofixPR} />
+              </div>
+            </div>
+          )}
+          {activeCategory === 'connectors' && (
+            <div>
+              <h2 style={tabHeaderStyle}>Connectors</h2>
+              <p style={subTextStyle}>Συνδέστε εξωτερικές πλατφόρμες για αυτόματη ανάκτηση δεδομένων.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '20px' }}>
+                {[
+                  { name: 'GitHub Integration', status: 'Connected', icon: '🐙', type: 'Web' },
+                  { name: 'Supabase Database', status: 'Connected', icon: '⚡', type: 'Database' },
+                  { name: 'Vercel Deployments', status: 'Connected', icon: '▲', type: 'Web' },
+                  { name: 'Gmail Workspace', status: 'Disconnected', icon: '📧', type: 'Email' },
+                  { name: 'Google Drive', status: 'Disconnected', icon: '📁', type: 'Storage' },
+                  { name: 'Railway App', status: 'Connected', icon: '🚂', type: 'Web' },
+                ].map((conn, idx) => (
+                  <div key={idx} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '20px' }}>{conn.icon}</span>
+                      <div><div style={{ fontWeight: '600', fontSize: '13px' }}>{conn.name}</div><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{conn.type}</div></div>
+                    </div>
+                    <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: conn.status === 'Connected' ? 'rgba(16,185,129,0.12)' : 'rgba(0,0,0,0.06)', color: conn.status === 'Connected' ? '#10b981' : 'var(--text-muted)' }}>{conn.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {activeCategory === 'security' && (
+            <div>
+              <h2 style={tabHeaderStyle}>Security & Authorization</h2>
+              <p style={subTextStyle}>Manage active sessions and application scopes.</p>
+              <div style={sectionContainer}>
+                <h3 style={sectionTitleStyle}>Authorization tokens</h3>
+                <div style={helpTextStyle}>Created when you sign in to the Agent Hub. Revoke a token to sign out from that device.</div>
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-2)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div><div style={{ fontWeight: 'bold', fontSize: '14px' }}>Agent Hub Web Session</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Created: 18 Aug 2026 • Last used: Just now</div></div>
+                    <button style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Revoke</button>
+                  </div>
+                </div>
+              </div>
+              <div style={sectionContainer}>
+                <h3 style={sectionTitleStyle}>Application Scopes</h3>
+                <div style={helpTextStyle}>Manage what data the connected applications have access to.</div>
+                <div style={{ padding: '16px', background: 'var(--bg-2)', borderRadius: '8px', marginTop: '12px', fontSize: '13px', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>No external applications are currently requesting scopes.</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AGENT HUB TAB — Full Layout (Sidebar + Header + Chat + Input)
+   ═══════════════════════════════════════════════════════════════ */
+
 function AgentHubTab({ agents, conversations, activeConversationId, setActiveConversationId, hubMessages, setHubConversations, hubInput, setHubInput, hubLoading, setHubLoading, hubSelectedAgents, setHubSelectedAgents, endRef, toast, setToast, createNewConversation, deleteConversation, updateConversationTitle, toggleAgentInConversation }: {
   agents: Agent[];
   conversations: Array<{
@@ -1240,206 +1565,191 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   };
 
   return (
-    <div className="dash-content hub-tab">
-      <div className="hub-layout">
-        {/* Sidebar - Conversation History */}
-        <div className="hub-sidebar">
-          <div className="hub-sidebar-header">
-            <h3>Ιστορικό Συνομιλιών</h3>
-            <button className="btn btn-primary btn-sm" onClick={createNewConversation}>
-              <Plus size={14} /> Νέα Συνομιλία
-            </button>
-          </div>
-          <div className="hub-conversations-list">
-            {conversations.map((conv) => (
-              <div 
-                key={conv.id} 
-                className={`hub-conversation-item ${activeConversationId === conv.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveConversationId(conv.id);
-                  setHubSelectedAgents(conv.selectedAgents);
-                }}
-              >
-                <div className="hub-conversation-info">
-                  {editingTitle === conv.id ? (
-                    <input 
-                      className="hub-title-input"
-                      defaultValue={conv.title}
-                      onBlur={(e) => {
-                        updateConversationTitle(conv.id, e.target.value);
-                        setEditingTitle(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateConversationTitle(conv.id, e.currentTarget.value);
-                          setEditingTitle(null);
-                        }
-                      }}
-                      autoFocus
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <strong onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      setEditingTitle(conv.id);
-                    }}>{conv.title}</strong>
-                  )}
-                  <span>{conv.messages.length} μηνύματα · {conv.updatedAt.toLocaleDateString('el-GR')}</span>
-                </div>
-                <button 
-                  className="hub-conversation-delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteConversation(conv.id);
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-            {conversations.length === 0 && (
-              <p className="dash-empty">Δεν υπάρχουν συνομιλίες. Ξεκίνα μια νέα!</p>
-            )}
-          </div>
+    <div style={{ display: 'flex', height: '100%', width: '100%', background: 'var(--bg)', color: 'var(--text)' }}>
+
+      {/* ═══ INNER SIDEBAR: ΙΣΤΟΡΙΚΟ ΣΥΝΟΜΙΛΙΩΝ ═══ */}
+      <div style={{ width: '260px', borderRight: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
+          <button onClick={createNewConversation} style={{ width: '100%', padding: '10px', background: 'var(--text)', color: 'var(--bg)', borderRadius: '8px', fontWeight: '600', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px' }}>
+            <Plus size={14} /> Νέα Συνομιλία
+          </button>
         </div>
 
-        {/* Main Chat Area */}
-        <div className="hub-main">
-          <div className="hub-content-header">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ margin: 0 }}>Επικοινώνησε με τον Master Orchestrator ή με συγκεκριμένα AI agents. Κάθε μήνυμα αποθηκεύεται στη μνήμη του agent.</p>
-                {hubApiKey && (
-                  <span style={{ fontSize: '11px', color: '#10b981', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                    API Key συνδεδεμένο · {GEMINI_MODELS.find(m => m.value === hubModel)?.label || hubModel}
-                  </span>
-                )}
-                {!hubApiKey && (
-                  <span style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
-                    Χωρίς API Key — πρόσθεσε τον κλειδί σου στις ρυθμίσεις (⚙️)
-                  </span>
-                )}
-              </div>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setShowHubSettings(!showHubSettings)}
-                title="Ρυθμίσεις API & Μοντέλου"
-                style={{ flexShrink: 0 }}
-              >
-                <Settings size={16} />
-              </button>
-            </div>
-            {showHubSettings && (
-              <div style={{
-                marginTop: '12px', padding: '16px', background: '#f8fafc', borderRadius: '12px',
-                border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px',
-              }}>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>⚙️ Ρυθμίσεις Agent Hub</div>
-                <div className="drawer-field">
-                  <label style={{ fontWeight: 500, fontSize: '12px' }}>Google Gemini API Key</label>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      type="password"
-                      value={hubApiKey}
-                      onChange={(e) => {
-                        setHubApiKey(e.target.value);
-                        localStorage.setItem('hub_api_key', e.target.value);
-                      }}
-                      placeholder="AIzaSy..."
-                      style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px' }}
-                    />
-                    {hubApiKey && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ whiteSpace: 'nowrap' }}>Καθαρισμός</button>
-                    )}
-                  </div>
-                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    Λήψη από: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>Google AI Studio</a> · Το κλειδί αποθηκεύεται τοπικά στον browser σου
-                  </span>
+        <div style={{ padding: '12px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontWeight: 600 }}>Ιστορικό Συνομιλιών</div>
+          {conversations.map((conv) => (
+            <div
+              key={conv.id}
+              onClick={() => { setActiveConversationId(conv.id); setHubSelectedAgents(conv.selectedAgents); }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: '4px',
+                background: activeConversationId === conv.id ? 'rgba(0,102,204,0.1)' : 'transparent',
+                border: 'none', borderRadius: '8px', cursor: 'pointer',
+                color: activeConversationId === conv.id ? 'var(--text)' : 'var(--text-muted)',
+                fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                borderLeft: activeConversationId === conv.id ? '3px solid var(--primary)' : '3px solid transparent',
+              }}
+            >
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontWeight: activeConversationId === conv.id ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                  💬 {conv.title}
                 </div>
-                <div className="drawer-field">
-                  <label style={{ fontWeight: 500, fontSize: '12px' }}>Gemini Μοντέλο</label>
-                  <select
-                    value={hubModel}
-                    onChange={(e) => {
-                      setHubModel(e.target.value);
-                      localStorage.setItem('hub_model', e.target.value);
-                    }}
-                  >
-                    {GEMINI_MODELS.map(m => (
-                      <option key={m.value} value={m.value}>{m.label} — {m.desc}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ fontSize: '11px', color: '#64748b', background: '#e0f2fe', padding: '8px 12px', borderRadius: '8px' }}>
-                  💡 <strong>Πώς δουλεύει:</strong> Το API key σου χρησιμοποιείται απευθείας στη κλήση προς το Google Generative Language API. Το key δεν αποθηκεύεται στον server — μόνο στον browser σου.
-                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{conv.messages.length} μηνύματα · {conv.updatedAt.toLocaleDateString('el-GR')}</div>
               </div>
-            )}
-            <div className="hub-multi-agent-selector">
-              <label>Agents:</label>
-              <div className="hub-agent-checkboxes">
-                {agents.filter(a => a.status === 'active').map((a) => (
-                  <label key={a.id} className="hub-agent-checkbox">
-                    <input 
-                      type="checkbox" 
-                      checked={hubSelectedAgents.includes(a.id)}
-                      onChange={() => toggleAgentInConversation(a.id)}
-                    />
-                    <span>{a.name}</span>
-                  </label>
-                ))}
-              </div>
+              <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '12px', opacity: 0.6 }}>🗑️</button>
             </div>
-          </div>
-
-          {activeConversationId ? (
-            <div className="hub-chat-container">
-              <div className="hub-messages">
-                {hubMessages.map((m, i) => (
-                  <div key={i} className={`hub-message ${m.role}`}>
-                    <div className="hub-message-avatar">
-                      {m.role === 'assistant' ? <Bot size={18} /> : <Users size={18} />}
-                    </div>
-                    <div className="hub-message-content">
-                      <div className="hub-message-text">{m.text}</div>
-                    </div>
-                  </div>
-                ))}
-                {hubLoading && (
-                  <div className="hub-message assistant">
-                    <div className="hub-message-avatar"><Bot size={18} /></div>
-                    <div className="hub-message-content">
-                      <div className="hub-message-text hub-typing">Σκέφτομαι<span className="dot-anim">...</span></div>
-                    </div>
-                  </div>
-                )}
-                <div ref={endRef} />
-              </div>
-
-              <div className="hub-input-bar">
-                <input
-                  value={hubInput}
-                  onChange={(e) => setHubInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Γράψε ένα μήνυμα στον Orchestrator..."
-                  disabled={hubLoading}
-                />
-                <button className="btn btn-primary" onClick={sendMessage} disabled={hubLoading || !hubInput.trim()}>
-                  <Send size={16} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="hub-empty-state">
-              <Bot size={48} />
-              <h3>Επιλέξτε μια συνομιλία ή δημιουργήστε μια νέα</h3>
-              <p>Χρησιμοποίησε το πλαϊνό μενού για να δεις το ιστορικό ή πάτα "Νέα Συνομιλία" για να ξεκινήσεις.</p>
+          ))}
+          {conversations.length === 0 && (
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '20px', padding: '20px', background: 'rgba(0,0,0,0.03)', borderRadius: '8px' }}>
+              Δεν υπάρχουν συνομιλίες.<br/>Ξεκίνα μια νέα!
             </div>
           )}
         </div>
+
+        {/* Settings Trigger */}
+        <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            ⚙️ Ρυθμίσεις Agent
+          </button>
+        </div>
       </div>
+
+      {/* ═══ KENTRIKO PARATHYRO CHAT ═══ */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+
+        {/* HEADER: ΕΠΙΛΟΓΗ ΜΟΝΤΕΛΟΥ */}
+        <div style={{ padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>Agent Hub</span>
+            <span style={{ fontSize: '11px', background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '3px 10px', borderRadius: '12px' }}>
+              {hubLoading ? '⏳ Processing...' : '● Online'}
+            </span>
+            {hubApiKey && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {GEMINI_MODELS.find(m => m.value === hubModel)?.label || hubModel}
+              </span>
+            )}
+            {!hubApiKey && (
+              <span style={{ fontSize: '11px', color: '#f59e0b' }}>
+                ⚠️ Χωρίς API Key
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <select
+              value={hubModel}
+              onChange={(e) => { setHubModel(e.target.value); localStorage.setItem('hub_model', e.target.value); }}
+              style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+            >
+              {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }} title="Ρυθμίσεις">⚙️</button>
+          </div>
+        </div>
+
+        {/* API Key Settings Panel (toggled) */}
+        {showHubSettings && (
+          <div style={{ padding: '16px 24px', background: 'var(--bg-2)', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>⚙️ Ρυθμίσεις API & Μοντέλου</div>
+            <div className="drawer-field">
+              <label style={{ fontWeight: 500, fontSize: '12px' }}>Google Gemini API Key</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input type="password" value={hubApiKey} onChange={(e) => { setHubApiKey(e.target.value); localStorage.setItem('hub_api_key', e.target.value); }} placeholder="AIzaSy..." style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }} />
+                {hubApiKey && <button onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ padding: '6px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>Καθαρισμός</button>}
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                Λήψη από: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Google AI Studio</a> · Το κλειδί αποθηκεύεται μόνο στον browser σου
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(0,102,204,0.08)', padding: '8px 12px', borderRadius: '8px' }}>
+              💡 <strong>Πώς δουλεύει:</strong> Το API key σου χρησιμοποιείται απευθείας στη κλήση προς Google. Δεν αποθηκεύεται στον server.
+            </div>
+          </div>
+        )}
+
+        {/* AGENT SELECTOR (multi-agent checkboxes) */}
+        <div style={{ padding: '8px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Agents:</span>
+          {agents.filter(a => a.status === 'active').map((a) => (
+            <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer', padding: '3px 8px', borderRadius: '12px', background: hubSelectedAgents.includes(a.id) ? 'rgba(0,102,204,0.12)' : 'rgba(0,0,0,0.04)' }}>
+              <input type="checkbox" checked={hubSelectedAgents.includes(a.id)} onChange={() => toggleAgentInConversation(a.id)} style={{ accentColor: '#0066cc' }} />
+              <span>{a.name}</span>
+            </label>
+          ))}
+        </div>
+
+        {/* MESSAGE FEED */}
+        {activeConversationId ? (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {hubMessages.map((m, i) => (
+              <div key={i} style={{ display: 'flex', gap: '12px', maxWidth: '800px', width: '100%', margin: '0 auto', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
+                {/* Avatar */}
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: m.role === 'assistant' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, border: '1px solid var(--border)' }}>
+                  {m.role === 'assistant' ? '🤖' : '👤'}
+                </div>
+                {/* Message Bubble */}
+                <div style={{
+                  background: m.role === 'user' ? 'var(--bg-2)' : 'transparent',
+                  padding: m.role === 'user' ? '12px 16px' : '6px 0',
+                  borderRadius: '12px', fontSize: '14px', lineHeight: '1.7', color: 'var(--text)',
+                  flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                }}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {hubLoading && (
+              <div style={{ display: 'flex', gap: '12px', maxWidth: '800px', width: '100%', margin: '0 auto' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>🤖</div>
+                <div style={{ padding: '12px 16px', background: 'var(--bg-2)', borderRadius: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>
+                  Σκέφτομαι<span className="dot-anim">...</span>
+                </div>
+              </div>
+            )}
+            <div ref={endRef} />
+          </div>
+        ) : (
+          /* EMPTY STATE */
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '40px' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🤖</div>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text)', margin: 0 }}>Γεια σου! Είμαι ο AI Agent</h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '400px', margin: 0 }}>
+              Πώς μπορώ να σας βοηθήσω σήμερα; Δοκιμάστε μία από τις παρακάτω ενέργειες:
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '8px' }}>
+              {[
+                '📊 Ανάλυση των Leads μου',
+                '📋 Δημιουργία Report για Market RAG',
+                '🔍 Βρες νέα B2B leads στην Αττική',
+                '💰 Τιμές ρεύματος σήμερα',
+                '📧 Στείλε email σε lead',
+              ].map((suggestion, idx) => (
+                <button key={idx} onClick={() => { setHubInput(suggestion); createNewConversation(); }} style={{
+                  padding: '8px 16px', background: 'var(--bg-2)', border: '1px solid var(--border)',
+                  borderRadius: '20px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)',
+                  transition: 'all 0.2s',
+                }}>
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* INPUT TOOLBAR */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <AgentChatInputToolbar
+            onSendMessage={(msg) => { setHubInput(msg); setTimeout(() => sendMessage(), 100); }}
+            onOpenSettings={(tab) => setShowHubSettings(true)}
+          />
+          <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+            Ο Agent Hub μπορεί να κάνει λάθη. Παρακαλώ ελέγχετε τις πληροφορίες.
+          </div>
+        </div>
+      </div>
+
+      {/* Settings Modal */}
+      <AgentSettingsModal isOpen={showHubSettings} onClose={() => setShowHubSettings(false)} />
     </div>
   );
 }
@@ -2117,7 +2427,12 @@ function EmailTab({ toast, setToast }: {
   const [showLabelManager, setShowLabelManager] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' });
+  const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showScheduleSend, setShowScheduleSend] = useState(false);
+  const [isPlainText, setIsPlainText] = useState(false);
   const [importConfig, setImportConfig] = useState({ provider: 'gmail', email: '', password: '', imapHost: '', imapPort: '993' });
   const [newLabel, setNewLabel] = useState({ name: '', color: '#0066cc' });
   const [editingSettings, setEditingSettings] = useState<Record<string, any>>({});
@@ -2302,7 +2617,7 @@ function EmailTab({ toast, setToast }: {
     };
     await supabase.from('crm_emails').insert(newEmail);
     setEmails(prev => [newEmail, ...prev]);
-    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' });
+    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
     setShowCompose(false);
     setToast({ msg: 'Το email στάλθηκε!', type: 'success' });
   };
@@ -2326,7 +2641,7 @@ function EmailTab({ toast, setToast }: {
     };
     await supabase.from('crm_emails').insert(draft);
     setEmails(prev => [draft, ...prev]);
-    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' });
+    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
     setShowCompose(false);
     setToast({ msg: 'Το πρόχειρο αποθηκεύτηκε.', type: 'info' });
   };
@@ -2377,7 +2692,7 @@ function EmailTab({ toast, setToast }: {
         <div style={{ width: '220px', flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '16px' }}>
             <button className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', borderRadius: '24px', fontSize: '14px', fontWeight: 600 }}
-              onClick={() => { setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' }); setShowCompose(true); }}>
+              onClick={() => { setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false }); setShowCompose(true); }}>
               ✉️ Σύνταξη
             </button>
           </div>
@@ -2569,41 +2884,162 @@ function EmailTab({ toast, setToast }: {
         </div>
       </div>
 
-      {/* Compose Modal */}
+      {/* Compose Modal — Gmail-Style Enhanced */}
       {showCompose && (
-        <div style={{ position: 'fixed', bottom: '20px', right: '20px', width: '560px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', zIndex: 1000, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--primary)', color: '#fff', fontWeight: 600, fontSize: '14px' }}>
-            <span>✉️ Νέο Μήνυμα</span>
-            <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+        <div style={{
+          position: 'fixed',
+          bottom: isFullScreen ? '0' : '0',
+          right: isFullScreen ? '0' : '60px',
+          top: isFullScreen ? '0' : 'auto',
+          left: isFullScreen ? '0' : 'auto',
+          width: isFullScreen ? '100vw' : '580px',
+          height: isFullScreen ? '100vh' : '520px',
+          background: 'var(--bg)',
+          borderRadius: isFullScreen ? '0' : '12px 12px 0 0',
+          boxShadow: '0 -4px 24px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          border: '1px solid var(--border)',
+          overflow: 'hidden'
+        }}>
+          {/* Modal Header */}
+          <div style={{ padding: '10px 16px', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>Νέο Μήνυμα</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button onClick={() => setIsFullScreen(!isFullScreen)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Πλήρης οθόνη">
+                {isFullScreen ? '🗗' : '🗖'}
+              </button>
+              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Κλείσιμο">✖</button>
+            </div>
           </div>
-          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>Προς</label>
-              <input value={composeData.to} onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+
+          {/* Form Inputs */}
+          <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Προς</span>
+              <input
+                value={composeData.to}
+                onChange={e => setComposeData({...composeData, to: e.target.value})}
+                style={{ flex: 1, padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px' }}
+              />
+              <span style={{ fontSize: '12px', color: 'var(--primary)', cursor: 'pointer', marginLeft: '8px' }} onClick={() => setComposeData({...composeData, showCcBcc: !composeData.showCcBcc})}>
+                Cc Bcc
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>CC</label>
-              <input value={composeData.cc} onChange={(e) => setComposeData({ ...composeData, cc: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+
+            {composeData.showCcBcc && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Cc</span>
+                  <input value={composeData.cc} onChange={e => setComposeData({...composeData, cc: e.target.value})} style={{ flex: 1, padding: '6px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '13px' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Bcc</span>
+                  <input value={composeData.bcc} onChange={e => setComposeData({...composeData, bcc: e.target.value})} style={{ flex: 1, padding: '6px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '13px' }} />
+                </div>
+              </>
+            )}
+
+            <div style={{ borderBottom: '1px solid var(--border)' }}>
+              <input
+                placeholder="Θέμα"
+                value={composeData.subject}
+                onChange={e => setComposeData({...composeData, subject: e.target.value})}
+                style={{ width: '100%', padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}
+              />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>BCC</label>
-              <input value={composeData.bcc} onChange={(e) => setComposeData({ ...composeData, bcc: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>Θέμα</label>
-              <input value={composeData.subject} onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
-            </div>
-            <textarea value={composeData.body} onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
+
+            {/* Rich Text Formatting Bar */}
+            {showFormattingToolbar && (
+              <div style={{ display: 'flex', gap: '6px', padding: '6px 8px', background: 'var(--bg-2)', borderRadius: '6px', border: '1px solid var(--border)', margin: '4px 0', alignItems: 'center' }}>
+                <button style={{ fontWeight: 'bold', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>B</button>
+                <button style={{ fontStyle: 'italic', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>I</button>
+                <button style={{ textDecoration: 'underline', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>U</button>
+                <div style={{ height: '16px', width: '1px', background: 'var(--border)' }}></div>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>🎨</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>≡</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>1.</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>•</button>
+              </div>
+            )}
+
+            {/* Body Input Area */}
+            <textarea
               placeholder="Γράψτε το μήνυμά σας..."
-              style={{ minHeight: '200px', resize: 'vertical', padding: '12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '14px', fontFamily: 'inherit', lineHeight: 1.6 }} />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px' }}>
-              <button className="btn btn-ghost" onClick={handleSaveDraft} style={{ fontSize: '13px' }}>💾 Πρόχειρο</button>
-              <button className="btn btn-primary" onClick={handleSendEmail} style={{ fontSize: '13px' }}>Αποστολή ➤</button>
+              value={composeData.body}
+              onChange={e => setComposeData({...composeData, body: e.target.value})}
+              style={{
+                width: '100%', flex: 1, padding: '10px 0', border: 'none', outline: 'none',
+                background: 'transparent', color: 'var(--text)', resize: 'none', fontFamily: isPlainText ? 'monospace' : 'inherit', fontSize: '14px', lineHeight: '1.5'
+              }}
+            />
+          </div>
+
+          {/* Bottom Gmail Action Bar */}
+          <div style={{ padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', background: 'var(--bg)', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+
+              {/* Send Split Button */}
+              <div style={{ display: 'inline-flex', borderRadius: '20px', overflow: 'hidden', background: '#0066cc', marginRight: '8px' }}>
+                <button onClick={handleSendEmail} style={{ padding: '8px 16px', background: 'transparent', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>
+                  Αποστολή
+                </button>
+                <button onClick={() => setShowScheduleSend(!showScheduleSend)} style={{ padding: '8px 8px', background: '#0052a3', color: '#fff', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '10px' }}>
+                  ▼
+                </button>
+              </div>
+
+              {/* Toolbar Control Buttons */}
+              <button title="Επιλογές μορφοποίησης" onClick={() => setShowFormattingToolbar(!showFormattingToolbar)} style={{ background: showFormattingToolbar ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }}>Aa</button>
+              <button title="Επισύναψη αρχείων" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>📎</button>
+              <button title="Εισαγωγή συνδέσμου" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>🔗</button>
+              <button title="Εισαγωγή emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>😀</button>
+              <button title="Εισαγωγή αρχείων CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>📁</button>
+              <button title="Εισαγωγή φωτογραφίας" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>🖼️</button>
+              <button title="Εισαγωγή υπογραφής" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>🖊️</button>
+
+              {/* Context Menu Toggle */}
+              <button title="Περισσότερες επιλογές" onClick={() => setShowMoreOptions(!showMoreOptions)} style={{ background: showMoreOptions ? 'var(--bg-2)' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>⋮</button>
             </div>
+
+            {/* Discard Draft Button */}
+            <button title="Απόρριψη προσχεδίου" onClick={() => setShowCompose(false)} style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)' }}>🗑️</button>
+
+            {/* Schedule Send Dropdown Menu */}
+            {showScheduleSend && (
+              <div style={{ position: 'absolute', bottom: '50px', left: '16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '8px 0', width: '200px' }}>
+                <div style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>Προγραμματισμός αποστολής</div>
+                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για αύριο 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  🌅 Αύριο το πρωί (08:00)
+                </button>
+                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για τη Δευτέρα 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  📅 Δευτέρα το πρωί (08:00)
+                </button>
+              </div>
+            )}
+
+            {/* Gmail Options Popover Menu */}
+            {showMoreOptions && (
+              <div style={{ position: 'absolute', bottom: '50px', left: '210px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '6px 0', width: '220px' }}>
+                <button onClick={() => { setIsFullScreen(!isFullScreen); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  🗖 Προεπιλογή σε πλήρη οθόνη
+                </button>
+                <button onClick={() => { setIsPlainText(!isPlainText); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  {isPlainText ? '✓ Λειτουργία απλού κειμένου' : '📝 Λειτουργία απλού κειμένου'}
+                </button>
+                <button onClick={() => { window.print(); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  🖨️ Εκτύπωση
+                </button>
+                <button onClick={() => { setShowLabelManager(true); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  🏷️ Ετικέτα...
+                </button>
+                <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }}></div>
+                <button onClick={() => { setToast({ msg: 'Δημιουργήθηκε σύνδεσμος συνάντησης', type: 'info' }); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  📅 Προγραμματισμός συνάντησης
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -33,6 +33,7 @@ import {
   ImageIcon,
   ExternalLink,
   Download,
+  Calendar,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -192,10 +193,12 @@ export default function DashboardPage() {
   const [newSource, setNewSource] = useState({ name: '', type: 'opt-in', lawful_basis: 'consent' });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [configAgent, setConfigAgent] = useState<Agent | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [leadsSubTab, setLeadsSubTab] = useState<'active' | 'deleted'>('active');
+  const [leadsSubTab, setLeadsSubTab] = useState<'all' | 'new' | 'contacted' | 'qualified' | 'converted' | 'lost' | 'deleted'>('all');
   const [agentsSubTab, setAgentsSubTab] = useState<'active' | 'deleted'>('active');
   const [agentStatusFilter, setAgentStatusFilter] = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -482,14 +485,47 @@ export default function DashboardPage() {
     }
   };
 
+  // Lead counts per status folder
+  const leadCounts = {
+    all: leads.filter(l => !l.deleted_at).length,
+    new: leads.filter(l => !l.deleted_at && l.status === 'new').length,
+    contacted: leads.filter(l => !l.deleted_at && l.status === 'contacted').length,
+    qualified: leads.filter(l => !l.deleted_at && l.status === 'qualified').length,
+    converted: leads.filter(l => !l.deleted_at && l.status === 'converted').length,
+    lost: leads.filter(l => !l.deleted_at && l.status === 'lost').length,
+    deleted: leads.filter(l => !!l.deleted_at).length,
+  };
+
   const filteredLeads = leads.filter((l) => {
-    if (l.deleted_at) return false;
+    // Deleted sub-tab: only show deleted leads
+    if (leadsSubTab === 'deleted') {
+      if (!l.deleted_at) return false;
+    } else {
+      // All other sub-tabs: only show non-deleted leads
+      if (l.deleted_at) return false;
+      // 'all' shows everything, otherwise filter by specific status
+      if (leadsSubTab !== 'all' && l.status !== leadsSubTab) return false;
+    }
+
+    // Search filter
     const matchesSearch = !search ||
       l.first_name.toLowerCase().includes(search.toLowerCase()) ||
       l.last_name.toLowerCase().includes(search.toLowerCase()) ||
-      l.email.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
-    return matchesSearch && matchesStatus;
+      l.email.toLowerCase().includes(search.toLowerCase()) ||
+      (l.phone && l.phone.includes(search)) ||
+      (l.region && l.region.toLowerCase().includes(search.toLowerCase()));
+
+    // Date range filter
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const created = l.created_at ? new Date(l.created_at) : null;
+      if (created) {
+        if (dateFrom) matchesDate = matchesDate && created >= new Date(dateFrom);
+        if (dateTo) matchesDate = matchesDate && created <= new Date(dateTo + 'T23:59:59');
+      }
+    }
+
+    return matchesSearch && matchesDate;
   });
 
   const deletedLeads = leads.filter((l) => {
@@ -498,7 +534,14 @@ export default function DashboardPage() {
       l.first_name.toLowerCase().includes(search.toLowerCase()) ||
       l.last_name.toLowerCase().includes(search.toLowerCase()) ||
       l.email.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
+
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const deleted = new Date(l.deleted_at);
+      if (dateFrom) matchesDate = matchesDate && deleted >= new Date(dateFrom);
+      if (dateTo) matchesDate = matchesDate && deleted <= new Date(dateTo + 'T23:59:59');
+    }
+    return matchesSearch && matchesDate;
   });
 
   const filteredAgents = agents.filter((a) => {
@@ -753,7 +796,93 @@ export default function DashboardPage() {
 
             {tab === 'leads' && (
               <div className="dash-content">
-                {leadsSubTab === 'active' && (
+                {/* Content Header */}
+                <div className="dash-content-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <p style={{ margin: 0 }}>Διαχείριση Leads — αναζήτηση, φίλτρα, ανάθεση σε AI agents.</p>
+                    <button className="btn btn-primary" onClick={() => { setSearch(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setLeadsSubTab('all'); }}>
+                      <RefreshCw size={14} /> Επαναφορά Φίλτρων
+                    </button>
+                  </div>
+
+                  {/* Sub-tabs (folders) */}
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'all', label: 'Όλα', icon: '📁' },
+                      { key: 'new', label: 'Νέα', icon: '🆕' },
+                      { key: 'contacted', label: 'Επικοινωνήθηκε', icon: '📞' },
+                      { key: 'qualified', label: 'Qualified', icon: '✅' },
+                      { key: 'converted', label: 'Μετατράπηκε', icon: '🎉' },
+                      { key: 'lost', label: 'Χαμένα', icon: '❌' },
+                      { key: 'deleted', label: 'Διεγραμμένα', icon: '🗑️' },
+                    ].map((folder) => (
+                      <button
+                        key={folder.key}
+                        onClick={() => setLeadsSubTab(folder.key as any)}
+                        style={{
+                          padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                          border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                          background: leadsSubTab === folder.key ? 'var(--text)' : 'var(--surface)',
+                          color: leadsSubTab === folder.key ? 'var(--bg)' : 'var(--text)',
+                          borderColor: leadsSubTab === folder.key ? 'var(--text)' : 'var(--border)',
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                        }}
+                      >
+                        <span>{folder.icon}</span>
+                        <span>{folder.label}</span>
+                        <span style={{
+                          background: leadsSubTab === folder.key ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',
+                          borderRadius: '10px', padding: '1px 7px', fontSize: '11px',
+                        }}>
+                          {leadCounts[folder.key as keyof typeof leadCounts]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search + Date Filters */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                      <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type="text"
+                        placeholder="Αναζήτηση με όνομα, email, τηλέφωνο ή περιοχή..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)' }}
+                      />
+                      {search && (
+                        <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>✕</button>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        title="Από"
+                        style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }}
+                      />
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>—</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        title="Έως"
+                        style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }}
+                      />
+                    </div>
+                    {(search || dateFrom || dateTo) && (
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {filteredLeads.length} αποτελέσματα
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Active leads table */}
+                {leadsSubTab !== 'deleted' && (
                   <div className="dash-table-wrap">
                     <table className="dash-table">
                       <thead>
@@ -808,7 +937,7 @@ export default function DashboardPage() {
                               </td>
                               <td>
                                 <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
-                                  <button className="btn-delete-lead permanent" onClick={() => softDeleteLead(l.id)} title="Μεταφορά στον Αποθηκευμένους">
+                                  <button className="btn-delete-lead permanent" onClick={() => softDeleteLead(l.id)} title="Μεταφορά στα Διεγραμμένα">
                                     <Trash2 size={14} />
                                   </button>
                                 </div>
@@ -818,10 +947,11 @@ export default function DashboardPage() {
                         })}
                       </tbody>
                     </table>
-                    {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads.</p>}
+                    {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads σε αυτόν τον φάκελο.</p>}
                   </div>
                 )}
 
+                {/* Deleted leads table */}
                 {leadsSubTab === 'deleted' && (
                   <div className="dash-table-wrap">
                     <div className="dash-deleted-notice">

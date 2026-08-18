@@ -614,6 +614,107 @@ export default function DashboardPage() {
                     <div><strong style={{ fontSize: 32 }}>{conversionRate}%</strong><span>Conversion Rate</span></div>
                   </div>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '24px' }}>
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: 'var(--text)' }}>📋 Πρόσφατα Leads</h3>
+                    {leads.filter(l => !l.deleted_at).slice(0, 5).map(l => (
+                      <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div>
+                          <strong style={{ fontSize: '13px', color: 'var(--text)' }}>{l.first_name} {l.last_name}</strong>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>{l.region}</span>
+                        </div>
+                        <span className={`dash-status-pill ${l.status}`}>{l.status}</span>
+                      </div>
+                    ))}
+                    {leads.filter(l => !l.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν leads.</p>}
+                  </div>
+
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: 'var(--text)' }}>🤖 AI Agents Status</h3>
+                    {agents.filter(a => !a.deleted_at).slice(0, 5).map(a => (
+                      <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Bot size={14} />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: 'var(--text)' }}>{a.name}</strong>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>{a.channel}</span>
+                          </div>
+                        </div>
+                        <span className={`dash-status-pill ${a.status}`}>
+                          {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                        </span>
+                      </div>
+                    ))}
+                    {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν agents.</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === 'agents' && (
+              <div className="dash-content">
+                <div className="dash-content-header">
+                  <p>Διαχείριση AI Agents — παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, ενεργοποίηση/απενεργοποίηση.</p>
+                  <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> Νέο Agent</button>
+                </div>
+                <div className="dash-table-wrap">
+                  <table className="dash-table">
+                    <thead>
+                      <tr>
+                        <th>Agent</th><th>Channel</th><th>Status</th><th>Περιοχή</th><th>Επικοινωνίες</th><th>Απαντήσεις</th><th>Ραντεβού</th><th>Ενέργεια</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agents.filter(a => !a.deleted_at).map((a) => (
+                        <tr key={a.id}>
+                          <td>
+                            <div className="agent-name-cell">
+                              <Bot size={16} />
+                              <div>
+                                <strong>{a.name}</strong>
+                                {a.target_region && <span className="agent-region">{a.target_region}</span>}
+                              </div>
+                            </div>
+                          </td>
+                          <td>{a.channel}</td>
+                          <td>
+                            <span className={`dash-status-pill ${a.status}`}>
+                              {a.status === 'active' ? 'Ενεργός' : a.status === 'paused' ? 'Παυμένος' : a.status}
+                            </span>
+                          </td>
+                          <td>{a.target_region || '—'}</td>
+                          <td><strong>{a.leads_contacted || 0}</strong></td>
+                          <td><strong>{a.replies || 0}</strong></td>
+                          <td><strong>{a.meetings_booked || 0}</strong></td>
+                          <td>
+                            <div className="dash-lead-actions">
+                              <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={async () => {
+                                const newStatus = a.status === 'active' ? 'paused' : 'active';
+                                await supabase.from('ai_agents').update({ status: newStatus }).eq('id', a.id);
+                                loadData();
+                              }}>
+                                {a.status === 'active' ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                              <button className="icon-btn" title="Ρυθμίσεις" onClick={() => setConfigAgent(a)}>
+                                <Settings size={14} />
+                              </button>
+                              <button className="icon-btn" title="Διαγραφή" onClick={async () => {
+                                await supabase.from('ai_agents').update({ deleted_at: new Date().toISOString() }).eq('id', a.id);
+                                loadData();
+                              }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {agents.filter(a => !a.deleted_at).length === 0 && (
+                        <tr><td colSpan={8} className="dash-empty">Δεν υπάρχουν agents. Πατήστε "Νέο Agent" για να δημιουργήσετε.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

@@ -202,6 +202,7 @@ export default function DashboardPage() {
   const [agentsSubTab, setAgentsSubTab] = useState<'active' | 'deleted'>('active');
   const [agentStatusFilter, setAgentStatusFilter] = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [confirmDeleteAgentId, setConfirmDeleteAgentId] = useState<string | null>(null);
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [billUrls, setBillUrls] = useState<Array<{ url: string; name: string; type: string; size: number }>>([]);
@@ -445,6 +446,32 @@ export default function DashboardPage() {
     setConfirmDeleteId(null);
     setToast({ msg: 'Το lead διαγράφηκε μόνιμα.', type: 'success' });
     loadData();
+  };
+
+  const bulkSoftDeleteLeads = async () => {
+    if (selectedLeads.size === 0) return;
+    const ids = Array.from(selectedLeads);
+    await supabase.from('hlektrismos_leads').update({ deleted_at: new Date().toISOString() }).in('id', ids);
+    setSelectedLeads(new Set());
+    setToast({ msg: `${ids.length} leads μεταφέρθηκαν στα διεγραμμένα.`, type: 'success' });
+    loadData();
+  };
+
+  const toggleLeadSelection = (id: string) => {
+    setSelectedLeads(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllLeads = () => {
+    if (selectedLeads.size === filteredLeads.length) {
+      setSelectedLeads(new Set());
+    } else {
+      setSelectedLeads(new Set(filteredLeads.map(l => l.id)));
+    }
   };
 
   const softDeleteAgent = async (agentId: string) => {
@@ -800,9 +827,22 @@ export default function DashboardPage() {
                 <div className="dash-content-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ margin: 0 }}>Διαχείριση Leads — αναζήτηση, φίλτρα, ανάθεση σε AI agents.</p>
-                    <button className="btn btn-primary" onClick={() => { setSearch(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setLeadsSubTab('all'); }}>
-                      <RefreshCw size={14} /> Επαναφορά Φίλτρων
-                    </button>
+                    {selectedLeads.size > 0 ? (
+                      <button
+                        onClick={bulkSoftDeleteLeads}
+                        style={{
+                          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                          background: '#e74c3c', color: '#fff', border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.15s',
+                        }}
+                      >
+                        <Trash2 size={14} /> Διαγραφή ({selectedLeads.size})
+                      </button>
+                    ) : (
+                      <button className="btn btn-primary" onClick={() => { setSearch(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setLeadsSubTab('all'); }}>
+                        <RefreshCw size={14} /> Επαναφορά Φίλτρων
+                      </button>
+                    )}
                   </div>
 
                   {/* Sub-tabs (folders) */}
@@ -887,6 +927,14 @@ export default function DashboardPage() {
                     <table className="dash-table">
                       <thead>
                         <tr>
+                          <th style={{ width: '40px', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={filteredLeads.length > 0 && selectedLeads.size === filteredLeads.length}
+                              onChange={toggleAllLeads}
+                              style={{ accentColor: '#0066cc', cursor: 'pointer' }}
+                            />
+                          </th>
                           <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
                         </tr>
                       </thead>
@@ -894,7 +942,15 @@ export default function DashboardPage() {
                         {filteredLeads.map((l) => {
                           const aiOk = canActivateAI(l);
                           return (
-                            <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLead(l)}>
+                            <tr key={l.id} className="dash-row-clickable" style={selectedLeads.has(l.id) ? { background: 'rgba(0,102,204,0.06)' } : undefined} onClick={() => setOpenLead(l)}>
+                              <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedLeads.has(l.id)}
+                                  onChange={() => toggleLeadSelection(l.id)}
+                                  style={{ accentColor: '#0066cc', cursor: 'pointer' }}
+                                />
+                              </td>
                               <td>
                                 <button className="dash-lead-name-btn" onClick={(e) => { e.stopPropagation(); setOpenLead(l); }}>
                                   {l.first_name} {l.last_name}

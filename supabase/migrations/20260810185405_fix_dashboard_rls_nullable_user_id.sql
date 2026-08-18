@@ -14,35 +14,43 @@ ALTER TABLE lead_sources ALTER COLUMN user_id DROP NOT NULL;
 
 -- ===== ai_agents: company-wide for authenticated =====
 DROP POLICY IF EXISTS "select_own_agents" ON ai_agents;
+DROP POLICY IF EXISTS "select_all_agents" ON ai_agents;
 CREATE POLICY "select_all_agents" ON ai_agents FOR SELECT
   TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "insert_own_agents" ON ai_agents;
+DROP POLICY IF EXISTS "insert_all_agents" ON ai_agents;
 CREATE POLICY "insert_all_agents" ON ai_agents FOR INSERT
   TO authenticated WITH CHECK (true);
 
 DROP POLICY IF EXISTS "update_own_agents" ON ai_agents;
+DROP POLICY IF EXISTS "update_all_agents" ON ai_agents;
 CREATE POLICY "update_all_agents" ON ai_agents FOR UPDATE
   TO authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "delete_own_agents" ON ai_agents;
+DROP POLICY IF EXISTS "delete_all_agents" ON ai_agents;
 CREATE POLICY "delete_all_agents" ON ai_agents FOR DELETE
   TO authenticated USING (true);
 
 -- ===== lead_sources: company-wide for authenticated =====
 DROP POLICY IF EXISTS "select_own_sources" ON lead_sources;
+DROP POLICY IF EXISTS "select_all_sources" ON lead_sources;
 CREATE POLICY "select_all_sources" ON lead_sources FOR SELECT
   TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "insert_own_sources" ON lead_sources;
+DROP POLICY IF EXISTS "insert_all_sources" ON lead_sources;
 CREATE POLICY "insert_all_sources" ON lead_sources FOR INSERT
   TO authenticated WITH CHECK (true);
 
 DROP POLICY IF EXISTS "update_own_sources" ON lead_sources;
+DROP POLICY IF EXISTS "update_all_sources" ON lead_sources;
 CREATE POLICY "update_all_sources" ON lead_sources FOR UPDATE
   TO authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "delete_own_sources" ON lead_sources;
+DROP POLICY IF EXISTS "delete_all_sources" ON lead_sources;
 CREATE POLICY "delete_all_sources" ON lead_sources FOR DELETE
   TO authenticated USING (true);
 
@@ -63,7 +71,7 @@ VALUES
   ('Partner Network', 'partner', 'legitimate_interest', 91, 'active')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO powerfor_leads (first_name, last_name, email, phone, region, customer_type, provider, status, consent)
+INSERT INTO hlektrismos_leads (first_name, last_name, email, phone, region, customer_type, provider, status, consent)
 VALUES
   ('Γιάννης', 'Παπαδόπουλος', 'giannis.pap@email.gr', '+30 690 123 4567', 'Αττική', 'Ιδιώτης (νοικοκυριό)', 'Ρεύμα', 'new', true),
   ('Μαρία', 'Γεωργίου', 'maria.g@email.gr', '+30 698 234 5678', 'Θεσσαλονίκη', 'Ιδιώτης (νοικοκυριό)', 'Φυσικό Αέριο', 'contacted', true),

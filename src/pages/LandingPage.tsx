@@ -33,7 +33,7 @@ type LeadForm = {
   propertyType: string;
   service: string;
   message: string;
-  billFile: File | null;
+  billFiles: File[];
   consent: boolean;
 };
 
@@ -188,7 +188,7 @@ function Flame(props: any) {
 export default function LandingPage() {
   const [form, setForm] = useState<LeadForm>({
     firstName: '', lastName: '', email: '', phone: '',
-    region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFile: null, consent: false,
+    region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false,
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -240,20 +240,34 @@ export default function LandingPage() {
   const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((current) => ({ ...current, [field]: value }));
 
   const handleBillChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    if (!file) {
-      update('billFile', null);
+    const files = e.target.files;
+    if (!files || files.length === 0) {
       return;
     }
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!allowedTypes.includes(file.type) || file.size > 10 * 1024 * 1024) {
-      setFormError('Ανεβάστε PDF, JPG ή PNG έως 10MB.');
-      e.target.value = '';
-      update('billFile', null);
-      return;
+    const maxSize = 25 * 1024 * 1024; // 25MB per file
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!allowedTypes.includes(file.type)) {
+        setFormError(`Το αρχείο "${file.name}" δεν είναι αποδεκτό. Επιτρέπονται μόνο PDF, JPG, PNG.`);
+        e.target.value = '';
+        return;
+      }
+      if (file.size > maxSize) {
+        setFormError(`Το αρχείο "${file.name}" υπερβαίνει το όριο 25MB.`);
+        e.target.value = '';
+        return;
+      }
+      validFiles.push(file);
     }
     setFormError('');
-    update('billFile', file);
+    setForm(prev => ({ ...prev, billFiles: [...prev.billFiles, ...validFiles] }));
+    e.target.value = '';
+  };
+
+  const removeBillFile = (index: number) => {
+    setForm(prev => ({ ...prev, billFiles: prev.billFiles.filter((_, i) => i !== index) }));
   };
 
   const submitLead = async (e: FormEvent<HTMLFormElement>) => {
@@ -261,19 +275,20 @@ export default function LandingPage() {
     setFormError('');
     setSubmitting(true);
 
-    let billFilePath: string | null = null;
-    if (form.billFile) {
-      const extension = form.billFile.name.split('.').pop()?.toLowerCase() ?? 'file';
-      billFilePath = `${crypto.randomUUID()}.${extension}`;
-      const { error: uploadError } = await supabase.storage.from('energy-bills').upload(billFilePath, form.billFile, {
-        contentType: form.billFile.type,
+    const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
+    for (const file of form.billFiles) {
+      const extension = file.name.split('.').pop()?.toLowerCase() ?? 'file';
+      const filePath = `${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from('energy-bills').upload(filePath, file, {
+        contentType: file.type,
         upsert: false,
       });
       if (uploadError) {
         setSubmitting(false);
-        setFormError('Δεν ήταν δυνατή η αποστολή του λογαριασμού. Δοκιμάστε ξανά.');
+        setFormError(`Σφάλμα μεταφόρτωσης: ${uploadError.message}`);
         return;
       }
+      uploadedFiles.push({ path: filePath, name: file.name, type: file.type, size: file.size });
     }
 
     const { error } = await supabase.from('hlektrismos_leads').insert({
@@ -286,8 +301,9 @@ export default function LandingPage() {
       property_type: form.propertyType,
       provider: form.service,
       comments: form.message || null,
-      bill_file_path: billFilePath,
-      bill_file_name: form.billFile?.name ?? null,
+      bill_file_path: uploadedFiles.length > 0 ? uploadedFiles[0].path : null,
+      bill_file_name: uploadedFiles.length > 0 ? uploadedFiles[0].name : null,
+      bill_files: uploadedFiles.length > 0 ? uploadedFiles : null,
       consent: form.consent,
       lawful_basis: form.consent ? 'Consent' : null,
       customer_category: form.propertyType === 'Σπίτι' ? 'B2C_Household' : 'B2B_Corporate',
@@ -296,7 +312,7 @@ export default function LandingPage() {
     setSubmitting(false);
     if (error) { setFormError('Κάτι πήγε στραβά. Δοκιμάστε ξανά.'); return; }
     setSubmitted(true);
-    setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFile: null, consent: false });
+    setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
   };
 
   const heroBgTransform = `translate3d(0, ${scrollY * 0.4}px, 0) scale(${1 + scrollY * 0.0003})`;
@@ -611,13 +627,25 @@ export default function LandingPage() {
                       </div>
                       <div className="form-field full"><label>Σχόλια <span className="optional-label">(προαιρετικά)</span></label><textarea value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." /></div>
                       <div className="form-field full">
-                        <label>Ανέβασε τον λογαριασμό σου <span className="optional-label">(προαιρετικό)</span></label>
+                        <label>Ανέβασε λογαριασμούς / αρχεία <span className="optional-label">(προαιρετικό)</span></label>
+                        {form.billFiles.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                            {form.billFiles.map((f, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(0,102,204,0.06)', borderRadius: '8px', fontSize: '13px' }}>
+                                <FileText size={14} style={{ color: '#0066cc', flexShrink: 0 }} />
+                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexShrink: 0 }}>{(f.size / 1024 / 1024).toFixed(1)}MB</span>
+                                <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: '2px', lineHeight: 1 }}>×</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <label className="bill-upload">
                           <Upload size={18} />
-                          <span>{form.billFile ? form.billFile.name : 'PDF, JPG ή PNG έως 10MB'}</span>
-                          <input type="file" accept="application/pdf,image/jpeg,image/png" onChange={handleBillChange} />
+                          <span>{form.billFiles.length > 0 ? `Ανέβασε άλλο αρχείο (${form.billFiles.length} ήδη)` : 'PDF, JPG ή PNG έως 25MB το καθένα — μπορείτε να ανεβάσετε πολλαπλά'}</span>
+                          <input type="file" accept="application/pdf,image/jpeg,image/png" multiple onChange={handleBillChange} />
                         </label>
-                        <small className="upload-note">Ο λογαριασμός χρησιμοποιείται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</small>
+                        <small className="upload-note">Μπορείτε να ανεβάσετε πολλαπλά αρχεία (PDF, JPG, PNG). Κάθε αρχείο έως 25MB. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</small>
                       </div>
                     </div>
                     <div className="consent-row">

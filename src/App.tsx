@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/LoginPage';
@@ -62,6 +63,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Router />
+      <Analytics />
     </AuthProvider>
   );
 }

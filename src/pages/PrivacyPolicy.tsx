@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
 
 export default function PrivacyPolicy() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
@@ -8,11 +7,11 @@ export default function PrivacyPolicy() {
     <div style={{ minHeight: '100vh', background: '#fff', color: '#1a1a2e', fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid #e8ecf1', padding: '16px 0' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <a href="#/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #00c878, #0066cc)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>⚡</span>
             <span style={{ fontWeight: 700, fontSize: 18, color: '#1a1a2e' }}>Hlektrismos<span style={{ color: '#00c878' }}>.gr</span></span>
-          </Link>
-          <Link to="/" style={{ textDecoration: 'none', color: '#0066cc', fontWeight: 500, fontSize: 14 }}>← Επιστροφή</Link>
+          </a>
+          <a href="#/" style={{ textDecoration: 'none', color: '#0066cc', fontWeight: 500, fontSize: 14 }}>← Επιστροφή</a>
         </div>
       </nav>
 
@@ -52,7 +51,7 @@ export default function PrivacyPolicy() {
           <p>Σύμφωνα με το GDPR, έχετε δικαίωμα: πρόσβασης, διόρθωσης, διαγραφής, περιορισμού, φορητότητας, και αντίρρησης στην επεξεργασία των δεδομένων σας. Για να ασκήσετε τα δικαιώματά σας, επικοινωνήστε στο <a href="mailto:privacy@hlektrismos.gr" style={{ color: '#0066cc' }}>privacy@hlektrismos.gr</a>.</p>
 
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>8. Cookies</h2>
-          <p>Χρησιμοποιούμε cookies για τη βελτίωση της εμπειρίας σας. Για περισσότερες πληροφορίες, ανατρέξτε στη <Link to="/cookies" style={{ color: '#0066cc' }}>Πολιτική Cookies</Link> μας.</p>
+          <p>Χρησιμοποιούμε cookies για τη βελτίωση της εμπειρίας σας. Για περισσότερες πληροφορίες, ανατρέξτε στη <a href="#/cookies" style={{ color: '#0066cc' }}>Πολιτική Cookies</a> μας.</p>
 
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>9. Επικοινωνία</h2>
           <p>Για ερωτήματα σχετικά με το απόρρητο: <a href="mailto:privacy@hlektrismos.gr" style={{ color: '#0066cc' }}>privacy@hlektrismos.gr</a> | <strong>+30 210 1234567</strong></p>

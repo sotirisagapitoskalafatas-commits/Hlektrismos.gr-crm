@@ -47,7 +47,7 @@ serve(async (req: any) => {
       })
     }
 
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || agents[0]?.custom_api_key;
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('CRM_AI_AGENT') || Deno.env.get('CRM_AI_AGENT_2') || agents[0]?.custom_api_key;
     if (!geminiApiKey) throw new Error("No GEMINI_API_KEY available.");
 
     // 3. Fetch tariffs for RAG
@@ -108,9 +108,12 @@ Email: ${lead.email}
 
       // Call Gemini API (use agent's custom key if available)
       const apiKey = agent.custom_api_key || geminiApiKey;
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': apiKey,
+        },
         body: JSON.stringify({
           system_instruction: { parts: { text: systemPrompt } },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],

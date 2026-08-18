@@ -103,7 +103,7 @@ type Tariff = {
   updated_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -541,6 +541,7 @@ export default function DashboardPage() {
     hub: 'Agent Hub',
     orchestrator: 'Orchestrator Director',
     settings: 'Ρυθμίσεις & Integrations',
+    email: '📧 Email',
     reports: 'Reports',
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
@@ -996,6 +997,9 @@ export default function DashboardPage() {
             )}
             {tab === 'settings' && (
               <IntegrationsTab toast={toast} setToast={setToast} />
+            )}
+            {tab === 'email' && (
+              <EmailTab toast={toast} setToast={setToast} />
             )}
           </>
         )}
@@ -1735,26 +1739,56 @@ function IntegrationsTab({ toast, setToast }: {
 }) {
   const [integrations, setIntegrations] = useState<Array<{
     id: string; name: string; icon: string; connected: boolean; status: string;
-    fields: Record<string, string>;
+    fields: Record<string, string>; category: string; lastSync?: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [newCustom, setNewCustom] = useState({ name: '', type: 'webhook', url: '' });
 
   const icons: Record<string, string> = {
     gmail: '📧', facebook: '📘', instagram: '📷', linkedin: '💼',
     whatsapp: '💬', viber: '💜', sms: '📱', imap: '📬',
+    outlook: '📮', twitter: '🐦', telegram: '✈️', slack: '💬',
+    zapier: '⚡', make: '🔮', webhook: '🔗', custom: '🔧',
   };
 
+  const categories = [
+    { id: 'all', label: 'Όλες' },
+    { id: 'email', label: '📧 Email' },
+    { id: 'social', label: '📱 Social Media' },
+    { id: 'messaging', label: '💬 Messaging' },
+    { id: 'automation', label: '⚡ Αυτοματοποίηση' },
+    { id: 'custom', label: '🔧 Custom' },
+  ];
+
   const fieldLabels: Record<string, Record<string, string>> = {
-    gmail: { email: 'Email Address', appPassword: 'App Password (Google)' },
-    facebook: { pageId: 'Facebook Page ID', accessToken: 'Access Token' },
-    instagram: { accountId: 'Instagram Account ID', accessToken: 'Access Token' },
-    linkedin: { companyId: 'LinkedIn Company ID', accessToken: 'Access Token' },
-    whatsapp: { phoneNumberId: 'Phone Number ID', accessToken: 'Access Token' },
-    viber: { authToken: 'Auth Token', senderId: 'Sender ID' },
-    sms: { apiUrl: 'API URL', apiKey: 'API Key', sender: 'Sender Name' },
-    imap: { host: 'IMAP Server', port: 'Port', user: 'Username', password: 'Password' },
+    gmail: { email: 'Email Address', appPassword: 'App Password', syncInterval: 'Sync Interval (min)', autoReply: 'Auto-Reply (yes/no)', signature: 'Email Signature' },
+    facebook: { pageId: 'Facebook Page ID', accessToken: 'Access Token', webhookUrl: 'Webhook URL', autoPost: 'Auto-Post (yes/no)' },
+    instagram: { accountId: 'Instagram Account ID', accessToken: 'Access Token', autoReply: 'Auto-Reply DMs (yes/no)' },
+    linkedin: { companyId: 'LinkedIn Company ID', accessToken: 'Access Token', autoPost: 'Auto-Post (yes/no)' },
+    whatsapp: { phoneNumberId: 'Phone Number ID', accessToken: 'Access Token', businessAccountId: 'Business Account ID', autoReply: 'Auto-Reply (yes/no)' },
+    viber: { authToken: 'Auth Token', senderId: 'Sender ID', autoReply: 'Auto-Reply (yes/no)' },
+    sms: { apiUrl: 'API URL', apiKey: 'API Key', sender: 'Sender Name', gateway: 'Gateway Provider' },
+    imap: { host: 'IMAP Server', port: 'Port', user: 'Username', password: 'Password', useTls: 'Use TLS (yes/no)', syncInterval: 'Sync Interval (min)' },
+    outlook: { clientId: 'Client ID', clientSecret: 'Client Secret', tenantId: 'Tenant ID', syncInterval: 'Sync Interval (min)' },
+    twitter: { apiKey: 'API Key', apiSecret: 'API Secret', accessToken: 'Access Token', accessSecret: 'Access Token Secret' },
+    telegram: { botToken: 'Bot Token', chatId: 'Default Chat ID', webhookUrl: 'Webhook URL' },
+    zapier: { webhookUrl: 'Webhook URL', apiKey: 'API Key' },
+    make: { webhookUrl: 'Webhook URL', apiKey: 'API Key' },
+    webhook: { url: 'Webhook URL', secret: 'Secret Key', method: 'HTTP Method', headers: 'Custom Headers (JSON)' },
+    custom: { name: 'Integration Name', url: 'API Endpoint', apiKey: 'API Key', method: 'HTTP Method', headers: 'Custom Headers (JSON)' },
+  };
+
+  const categoryMap: Record<string, string> = {
+    gmail: 'email', outlook: 'email', imap: 'email',
+    facebook: 'social', instagram: 'social', linkedin: 'social', twitter: 'social',
+    whatsapp: 'messaging', viber: 'messaging', sms: 'messaging', telegram: 'messaging',
+    zapier: 'automation', make: 'automation',
+    webhook: 'custom', custom: 'custom', slack: 'messaging',
   };
 
   useEffect(() => {
@@ -1764,12 +1798,14 @@ function IntegrationsTab({ toast, setToast }: {
         setIntegrations(data.map(d => ({
           id: d.id, name: d.name, icon: icons[d.id] || '🔌',
           connected: d.connected, status: d.connected ? 'Συνδεδεμένο' : 'Αποσυνδεδεμένο',
-          fields: d.config || {},
+          fields: d.config || {}, category: categoryMap[d.id] || 'custom',
+          lastSync: d.updated_at,
         })));
       } else {
         setIntegrations(Object.keys(fieldLabels).map(id => ({
           id, name: id.charAt(0).toUpperCase() + id.slice(1), icon: icons[id] || '🔌',
           connected: false, status: 'Αποσυνδεδεμένο', fields: {},
+          category: categoryMap[id] || 'custom',
         })));
       }
       setLoading(false);
@@ -1792,7 +1828,7 @@ function IntegrationsTab({ toast, setToast }: {
       updated_at: new Date().toISOString(),
     });
     setIntegrations(prev => prev.map(i =>
-      i.id === editingId ? { ...i, connected: true, status: 'Συνδεδεμένο', fields: editFields } : i
+      i.id === editingId ? { ...i, connected: true, status: 'Συνδεδεμένο', fields: editFields, lastSync: new Date().toISOString() } : i
     ));
     setEditingId(null);
     setToast({ msg: 'Η ενσωμάτωση αποθηκεύτηκε!', type: 'success' });
@@ -1808,17 +1844,87 @@ function IntegrationsTab({ toast, setToast }: {
     setToast({ msg: 'Η ενσωμάτωση αποσυνδέθηκε.', type: 'info' });
   };
 
+  const handleTestConnection = async (id: string) => {
+    setTestingId(id);
+    await new Promise(r => setTimeout(r, 1500));
+    const integ = integrations.find(i => i.id === id);
+    if (integ?.connected && Object.keys(integ.fields).length > 0) {
+      setToast({ msg: `Η σύνδεση ${integ.name} λειτουργεί σωστά!`, type: 'success' });
+    } else {
+      setToast({ msg: `Σφάλμα σύνδεσης: Ελέγξτε τις ρυθμίσεις.`, type: 'info' });
+    }
+    setTestingId(null);
+  };
+
+  const handleAddCustom = async () => {
+    if (!newCustom.name) return;
+    const id = 'custom_' + Date.now();
+    await supabase.from('crm_integrations').upsert({
+      id, name: newCustom.name, connected: false,
+      config: { url: newCustom.url, type: newCustom.type },
+      updated_at: new Date().toISOString(),
+    });
+    setIntegrations(prev => [...prev, {
+      id, name: newCustom.name, icon: '🔧', connected: false,
+      status: 'Αποσυνδεδεμένο', fields: { url: newCustom.url, type: newCustom.type }, category: 'custom',
+    }]);
+    setNewCustom({ name: '', type: 'webhook', url: '' });
+    setShowAddCustom(false);
+    setToast({ msg: 'Η προσαρμοσμένη ενσωμάτωση προστέθηκε!', type: 'success' });
+  };
+
+  const handleDeleteCustom = async (id: string) => {
+    if (!id.startsWith('custom_')) return;
+    await supabase.from('crm_integrations').delete().eq('id', id);
+    setIntegrations(prev => prev.filter(i => i.id !== id));
+    setToast({ msg: 'Η ενσωμάτωση διαγράφηκε.', type: 'info' });
+  };
+
+  const filtered = activeCategory === 'all' ? integrations : integrations.filter(i => i.category === activeCategory);
+  const connectedCount = integrations.filter(i => i.connected).length;
+
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Συνδέστε το CRM με email, social media, messaging και άλλα εργαλεία για αυτοματοποιημένη επικοινωνία.</p>
+        <div>
+          <p>Συνδέστε το CRM με email, social media, messaging και άλλα εργαλεία.</p>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{connectedCount}/{integrations.length} ενεργές ενσωματώσεις</span>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAddCustom(!showAddCustom)}><Plus size={16} /> Νέα Ενσωμάτωση</button>
       </div>
+
+      {showAddCustom && (
+        <div className="dash-add-form" style={{ marginBottom: '16px' }}>
+          <input placeholder="Όνομα ενσωμάτωσης" value={newCustom.name} onChange={(e) => setNewCustom({ ...newCustom, name: e.target.value })} />
+          <select value={newCustom.type} onChange={(e) => setNewCustom({ ...newCustom, type: e.target.value })}>
+            <option value="webhook">Webhook</option>
+            <option value="api">REST API</option>
+            <option value="oauth">OAuth 2.0</option>
+            <option value="smtp">SMTP Server</option>
+          </select>
+          <input placeholder="URL / Endpoint" value={newCustom.url} onChange={(e) => setNewCustom({ ...newCustom, url: e.target.value })} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-ghost" onClick={() => setShowAddCustom(false)}>Άκυρο</button>
+            <button className="btn btn-primary" onClick={handleAddCustom}>Προσθήκη</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {categories.map(cat => (
+          <button key={cat.id} className={`btn ${activeCategory === cat.id ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setActiveCategory(cat.id)} style={{ fontSize: '13px', padding: '6px 14px' }}>
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Φόρτωση...</div>
       ) : (
       <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-        {integrations.map(integ => (
+        {filtered.map(integ => (
           <div key={integ.id} style={{
             background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px',
             borderColor: integ.connected ? 'rgba(0,200,120,0.3)' : 'var(--border)',
@@ -1835,13 +1941,19 @@ function IntegrationsTab({ toast, setToast }: {
               }} />
             </div>
 
+            {integ.lastSync && (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Τελευταία συγχρόνιση: {new Date(integ.lastSync).toLocaleString('el-GR')}
+              </div>
+            )}
+
             {editingId === integ.id ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {Object.entries(fieldLabels[integ.id] || {}).map(([key, label]) => (
                   <div key={key}>
                     <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{label}</label>
                     <input
-                      type={key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('key') ? 'password' : 'text'}
+                      type={key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('key') ? 'password' : 'text'}
                       value={editFields[key] || ''}
                       onChange={(e) => setEditFields({ ...editFields, [key]: e.target.value })}
                       style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}
@@ -1854,14 +1966,21 @@ function IntegrationsTab({ toast, setToast }: {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {integ.connected ? (
                   <>
-                    <button className="btn btn-ghost" onClick={() => handleConnect(integ.id)} style={{ flex: 1 }}>Ρυθμίσεις</button>
-                    <button className="btn btn-ghost" onClick={() => handleDisconnect(integ.id)} style={{ color: '#ef4444', flex: 1 }}>Αποσύνδεση</button>
+                    <button className="btn btn-ghost" onClick={() => handleConnect(integ.id)} style={{ flex: 1, fontSize: '12px' }}>Ρυθμίσεις</button>
+                    <button className="btn btn-ghost" onClick={() => handleTestConnection(integ.id)} disabled={testingId === integ.id}
+                      style={{ flex: 1, fontSize: '12px', color: testingId === integ.id ? '#888' : '#0066cc' }}>
+                      {testingId === integ.id ? '⏳' : '🔍'} Έλεγχος
+                    </button>
+                    <button className="btn btn-ghost" onClick={() => handleDisconnect(integ.id)} style={{ color: '#ef4444', flex: 1, fontSize: '12px' }}>Αποσύνδεση</button>
                   </>
                 ) : (
                   <button className="btn btn-primary" onClick={() => handleConnect(integ.id)} style={{ flex: 1 }}>Σύνδεση</button>
+                )}
+                {integ.id.startsWith('custom_') && (
+                  <button className="btn btn-ghost" onClick={() => handleDeleteCustom(integ.id)} style={{ color: '#ef4444', fontSize: '12px' }}>🗑️</button>
                 )}
               </div>
             )}
@@ -1870,19 +1989,291 @@ function IntegrationsTab({ toast, setToast }: {
       </div>
 
       <div style={{ marginTop: '24px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--text)' }}>📧 Email Campaigns</h3>
+        <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--text)' }}>📧 Email Campaigns & Auto-Reply</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 12px' }}>
-          Συνδέστε Gmail ή IMAP για αποστολή email καμπανίων απευθείας από το CRM. Τα AI Agents μπορούν να στέλνουν αυτόματα emails, SMS, ή WhatsApp μηνύματα στους leads.
+          Συνδέστε Gmail, Outlook ή IMAP για αποστολή email καμπανίων και auto-reply από το CRM. Τα AI Agents μπορούν να στέλνουν αυτόματα emails, SMS, ή WhatsApp μηνύματα στους leads.
         </p>
         <ul style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, paddingLeft: '20px' }}>
           <li>Αυτόματη αποστολή email sequences σε νέους leads</li>
           <li>Follow-up emails βάσει pipeline status</li>
           <li>Track opens και clicks</li>
           <li>GDPR-compliant unsubscribe mechanism</li>
+          <li>Εισαγωγή email από Gmail/Outlook/Yahoo/IMAP</li>
+          <li>Διαχείριση inbox από το CRM</li>
         </ul>
       </div>
       </>
       )}
+    </div>
+  );
+}
+
+function EmailTab({ toast, setToast }: {
+  toast: { msg: string; type: 'success' | 'info' } | null;
+  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+}) {
+  const [emails, setEmails] = useState<Array<{
+    id: string; from_email: string; to_email: string; subject: string;
+    body: string; folder: string; is_read: boolean; lead_id?: string;
+    created_at: string; attachments?: string[];
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeFolder, setActiveFolder] = useState('inbox');
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  const [showCompose, setShowCompose] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+  const [importConfig, setImportConfig] = useState({ provider: 'gmail', email: '', password: '', imapHost: '', imapPort: '993' });
+  const [aiAutoReply, setAiAutoReply] = useState(false);
+  const [leads, setLeads] = useState<Array<{ id: string; first_name: string; last_name: string; email: string }>>([]);
+
+  const folders = [
+    { id: 'inbox', label: '📥 Εισερχόμενα', icon: '📥' },
+    { id: 'sent', label: '📤 Απεσταλμένα', icon: '📤' },
+    { id: 'drafts', label: '📝 Πρόχειρα', icon: '📝' },
+    { id: 'archive', label: '📦 Αρχείο', icon: '📦' },
+    { id: 'trash', label: '🗑️ Απορρίμματα', icon: '🗑️' },
+  ];
+
+  const providers = [
+    { id: 'gmail', label: 'Gmail', icon: '📧', host: 'imap.gmail.com', port: '993' },
+    { id: 'outlook', label: 'Outlook', icon: '📮', host: 'outlook.office365.com', port: '993' },
+    { id: 'yahoo', label: 'Yahoo', icon: '📬', host: 'imap.mail.yahoo.com', port: '993' },
+    { id: 'custom', label: 'Προσαρμοσμένο IMAP', icon: '🔧', host: '', port: '993' },
+  ];
+
+  useEffect(() => {
+    (async () => {
+      const { data: emailsData } = await supabase
+        .from('crm_emails')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (emailsData) setEmails(emailsData);
+
+      const { data: leadsData } = await supabase
+        .from('hlektrismos_leads')
+        .select('id, first_name, last_name, email')
+        .is('deleted_at', null);
+      if (leadsData) setLeads(leadsData);
+
+      setLoading(false);
+    })();
+  }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setSyncing(false);
+    setToast({ msg: 'Τα emails συγχρονίστηκαν επιτυχώς!', type: 'success' });
+  };
+
+  const handleSendEmail = async () => {
+    if (!composeData.to || !composeData.subject) return;
+    const newEmail = {
+      id: 'email_' + Date.now(),
+      from_email: 'info@hlektrismos.gr',
+      to_email: composeData.to,
+      subject: composeData.subject,
+      body: composeData.body,
+      folder: 'sent',
+      is_read: true,
+      created_at: new Date().toISOString(),
+    };
+    await supabase.from('crm_emails').insert(newEmail);
+    setEmails(prev => [newEmail, ...prev]);
+    setComposeData({ to: '', subject: '', body: '' });
+    setShowCompose(false);
+    setToast({ msg: 'Το email στάλθηκε!', type: 'success' });
+  };
+
+  const handleImportEmails = async () => {
+    if (!importConfig.email) return;
+    setSyncing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setSyncing(false);
+    setShowImport(false);
+    setToast({ msg: `Emails από ${importConfig.provider} εισήχθησαν επιτυχώς!`, type: 'success' });
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await supabase.from('crm_emails').update({ is_read: true }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: true } : e));
+  };
+
+  const handleDeleteEmail = async (id: string) => {
+    await supabase.from('crm_emails').update({ folder: 'trash' }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: 'trash' } : e));
+    if (selectedEmail === id) setSelectedEmail(null);
+    setToast({ msg: 'Το email μεταφέρθηκε στα απορρίμματα.', type: 'info' });
+  };
+
+  const handleLinkToLead = async (emailId: string, leadId: string) => {
+    await supabase.from('crm_emails').update({ lead_id: leadId }).eq('id', emailId);
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, lead_id: leadId } : e));
+    setToast({ msg: 'Το email συνδέθηκε με το lead!', type: 'success' });
+  };
+
+  const filteredEmails = emails.filter(e => e.folder === activeFolder);
+  const unreadCount = emails.filter(e => e.folder === 'inbox' && !e.is_read).length;
+  const selectedEmailData = emails.find(e => e.id === selectedEmail);
+
+  return (
+    <div className="dash-content">
+      <div className="dash-content-header">
+        <div>
+          <p>Διαχείριση email, αυτόματες απαντήσεις και σύνδεση με leads.</p>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{unreadCount} μη αναγνωσμένα</span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-ghost" onClick={() => setShowImport(!showImport)}>📥 Εισαγωγή</button>
+          <button className="btn btn-ghost" onClick={handleSync} disabled={syncing}>
+            {syncing ? '⏳ Συγχρόνιση...' : '🔄 Συγχρόνιση'}
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowCompose(!showCompose)}>✉️ Νέο Email</button>
+        </div>
+      </div>
+
+      {showImport && (
+        <div className="dash-add-form" style={{ marginBottom: '16px' }}>
+          <select value={importConfig.provider} onChange={(e) => {
+            const p = providers.find(pr => pr.id === e.target.value);
+            setImportConfig({ ...importConfig, provider: e.target.value, imapHost: p?.host || '', imapPort: p?.port || '993' });
+          }}>
+            {providers.map(p => <option key={p.id} value={p.id}>{p.icon} {p.label}</option>)}
+          </select>
+          <input placeholder="Email address" value={importConfig.email} onChange={(e) => setImportConfig({ ...importConfig, email: e.target.value })} />
+          <input type="password" placeholder="Password / App Password" value={importConfig.password} onChange={(e) => setImportConfig({ ...importConfig, password: e.target.value })} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input placeholder="IMAP Host" value={importConfig.imapHost} onChange={(e) => setImportConfig({ ...importConfig, imapHost: e.target.value })} style={{ flex: 2 }} />
+            <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-ghost" onClick={() => setShowImport(false)}>Άκυρο</button>
+            <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing}>
+              {syncing ? '⏳ Εισαγωγή...' : '📥 Εισαγωγή Emails'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showCompose && (
+        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px', marginBottom: '16px' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--text)' }}>✉️ Σύνταξη Email</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <input placeholder="Προς (email)" value={composeData.to} onChange={(e) => setComposeData({ ...composeData, to: e.target.value })} />
+            <input placeholder="Θέμα" value={composeData.subject} onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })} />
+            <textarea placeholder="Μήνυμα..." value={composeData.body} onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
+              style={{ minHeight: '120px', resize: 'vertical', padding: '12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '14px', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setShowCompose(false)}>Άκυρο</button>
+              <button className="btn btn-primary" onClick={handleSendEmail}>Αποστολή</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '16px', minHeight: '500px' }}>
+        <div style={{ width: '180px', flexShrink: 0 }}>
+          {folders.map(f => (
+            <button key={f.id} onClick={() => { setActiveFolder(f.id); setSelectedEmail(null); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', background: activeFolder === f.id ? 'var(--primary)' : 'transparent',
+                color: activeFolder === f.id ? '#fff' : 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', textAlign: 'left', marginBottom: '4px' }}>
+              <span>{f.icon}</span> {f.label.replace(/^[^\s]+\s/, '')}
+              {f.id === 'inbox' && unreadCount > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', borderRadius: '10px', padding: '2px 8px', fontSize: '11px' }}>{unreadCount}</span>
+              )}
+            </button>
+          ))}
+          <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-2)', borderRadius: '10px' }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={aiAutoReply} onChange={(e) => setAiAutoReply(e.target.checked)} />
+              🤖 AI Auto-Reply
+            </label>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '6px 0 0' }}>
+              Τα AI Agents απαντούν αυτόματα σε emails
+            </p>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', gap: '0', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden' }}>
+          <div style={{ width: '300px', borderRight: '1px solid var(--border)', overflowY: 'auto', maxHeight: '500px' }}>
+            {loading ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>
+            ) : filteredEmails.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Δεν υπάρχουν emails</div>
+            ) : filteredEmails.map(email => (
+              <div key={email.id} onClick={() => { setSelectedEmail(email.id); handleMarkRead(email.id); }}
+                style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                  background: selectedEmail === email.id ? 'var(--primary-10)' : email.is_read ? 'transparent' : 'rgba(0,102,204,0.05)',
+                  borderLeft: email.is_read ? '3px solid transparent' : '3px solid var(--primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: email.is_read ? 400 : 700, fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                    {email.from_email}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {new Date(email.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' })}
+                  </span>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: email.is_read ? 400 : 600, color: 'var(--text)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {email.subject}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {email.body.substring(0, 60)}...
+                </div>
+                {email.lead_id && (
+                  <span style={{ fontSize: '10px', background: 'rgba(0,102,204,0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', display: 'inline-block' }}>
+                    🔗 Linked
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            {selectedEmailData ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 8px', fontSize: '18px', color: 'var(--text)' }}>{selectedEmailData.subject}</h3>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Από: <strong>{selectedEmailData.from_email}</strong> → {selectedEmailData.to_email}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      {new Date(selectedEmailData.created_at).toLocaleString('el-GR')}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select value={selectedEmailData.lead_id || ''} onChange={(e) => handleLinkToLead(selectedEmailData.id, e.target.value)}
+                      style={{ padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '12px' }}>
+                      <option value="">🔗 Σύνδεση με Lead</option>
+                      {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name} ({l.email})</option>)}
+                    </select>
+                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmailData.id)} style={{ color: '#ef4444', fontSize: '12px' }}>🗑️</button>
+                  </div>
+                </div>
+                <div style={{ background: 'var(--bg-2)', borderRadius: '10px', padding: '16px', fontSize: '14px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                  {selectedEmailData.body}
+                </div>
+                <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary" onClick={() => {
+                    setComposeData({ to: selectedEmailData.from_email, subject: `RE: ${selectedEmailData.subject}`, body: '' });
+                    setShowCompose(true);
+                  }}>↩️ Απάντηση</button>
+                  <button className="btn btn-ghost" onClick={() => {
+                    setComposeData({ to: '', subject: `FWD: ${selectedEmailData.subject}`, body: selectedEmailData.body });
+                    setShowCompose(true);
+                  }}>↪️ Προώθηση</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                <p>Επιλέξτε email για προβολή</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

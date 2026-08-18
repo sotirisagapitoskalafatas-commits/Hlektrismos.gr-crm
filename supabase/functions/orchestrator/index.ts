@@ -23,8 +23,8 @@ serve(async (req: any) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
-    if (!geminiApiKey) throw new Error("GEMINI_API_KEY is not set.")
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('CRM_AI_AGENT') || Deno.env.get('CRM_AI_AGENT_2') || ''
+    if (!geminiApiKey) throw new Error("No Gemini API key available.")
 
     // Fetch all active agents
     const { data: agents, error: agentsError } = await supabaseAdmin
@@ -97,9 +97,12 @@ Leads: ${targetAgent?.leads_contacted} | Replies: ${targetAgent?.replies} | Meet
 
 Ζήτημα: Δημιούργησε αναφορά στα ελληνικά με απόδοση, αναλυτικά στοιχεία και συμβουλές.`
 
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiApiKey}`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': geminiApiKey,
+        },
         body: JSON.stringify({
           system_instruction: { parts: { text: 'Είσαι ο report generator της Hlektrismos.gr. Δημιούργησε αναφορές στα ελληνικά με markdown formatting.' } },
           contents: [{ role: 'user', parts: [{ text: reportPrompt }] }],
@@ -192,9 +195,12 @@ Leads: ${targetAgent?.leads_contacted} | Replies: ${targetAgent?.replies} | Meet
     geminiMessages.push({ role: 'user', parts: [{ text: message }] })
 
     // Call Gemini API
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiApiKey}`, {
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': geminiApiKey,
+      },
       body: JSON.stringify({
         system_instruction: { parts: { text: systemPrompt } },
         contents: geminiMessages,

@@ -111,7 +111,7 @@ Deno.serve(async (req: Request) => {
       { role: "user", content: message },
     ];
 
-    // Call Gemini API
+    // Call Gemini API (auth keys use X-goog-api-key header)
     const geminiApiKey =
       Deno.env.get("GEMINI_API_KEY") ||
       Deno.env.get("CRM_AI_AGENT") ||
@@ -132,10 +132,13 @@ Deno.serve(async (req: Request) => {
     const systemInstruction = messages.find((m) => m.role === "system");
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": geminiApiKey,
+        },
         body: JSON.stringify({
           contents: geminiContents,
           systemInstruction: systemInstruction

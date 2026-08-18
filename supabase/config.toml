@@ -1,0 +1,14 @@
+[functions.ai-developer]
+verify_jwt = false
+
+[functions.orchestrator]
+verify_jwt = false
+
+[functions.agent-worker]
+verify_jwt = false
+
+[functions.chat]
+verify_jwt = false
+
+[functions.scrape-b2b]
+verify_jwt = false

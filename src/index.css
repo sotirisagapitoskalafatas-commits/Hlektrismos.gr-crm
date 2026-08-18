@@ -160,7 +160,9 @@ img { display: block; max-width: 100%; }
 .stat-cell span { display: block; margin-top: 6px; color: var(--card-text-muted); font-size: 13px; }
 
 /* ===== Sections ===== */
-.section { position: relative; padding: 120px 0; background: var(--section-bg); backdrop-filter: blur(12px); }
+.section { position: relative; padding: 100px 0; background: var(--section-bg); backdrop-filter: blur(12px); }
+#contact { scroll-margin-top: 80px; }
+#faq { scroll-margin-top: 80px; }
 .section-heading { max-width: 720px; margin: 0 auto 64px; text-align: center; }
 .section-heading h2 { margin: 20px 0; font: 700 clamp(32px, 4.5vw, 56px)/1.1 var(--font-display); letter-spacing: -1.5px; color: var(--card-text); }
 .section-heading p { margin: 0; color: var(--card-text-muted); font-size: 17px; line-height: 1.65; }
@@ -214,7 +216,7 @@ img { display: block; max-width: 100%; }
 .price-cta { width: 100%; }
 
 /* ===== Contact form ===== */
-.contact-section { position: relative; padding: 120px 0; overflow: hidden; background: var(--section-bg-solid); backdrop-filter: blur(16px); }
+.contact-section { position: relative; padding: 80px 0; overflow: hidden; background: var(--section-bg-solid); backdrop-filter: blur(16px); }
 .contact-glow { position: absolute; width: 800px; height: 800px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(0,200,120,0.12), transparent 60%); filter: blur(80px); opacity: 0.5; }
 .contact-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 .contact-copy h2 { margin: 20px 0; font: 700 clamp(32px, 4.5vw, 52px)/1.1 var(--font-display); letter-spacing: -1.5px; color: var(--card-text); }
@@ -1367,29 +1369,35 @@ img { display: block; max-width: 100%; }
 /* ===== Generic Modal (Lead Detail / Folder) ===== */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 9000;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   animation: fadeIn 0.2s ease;
 }
 .modal {
-  background: var(--surface); border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  background: #fff; border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.2);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0,0,0,0.08);
   animation: modalSlideIn 0.3s ease;
+  color: #1a1a2e;
 }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  padding: 20px 24px; border-bottom: 1px solid #e8e8e8;
+  background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(245,247,250,0.9));
+  border-radius: 20px 20px 0 0;
 }
-.modal-header h3 { margin: 0; font-size: 18px; color: var(--text); }
+.modal-header h3 { margin: 0; font-size: 18px; color: #1a1a2e; }
 .modal-close {
-  background: none; border: none; color: var(--text-muted); font-size: 22px;
-  cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;
+  background: #f0f0f0; border: none; color: #666; font-size: 20px;
+  cursor: pointer; padding: 6px 10px; border-radius: 8px; line-height: 1;
+  transition: all 0.2s;
 }
-.modal-close:hover { background: var(--bg-2); color: var(--text); }
-.modal-body { padding: 24px; }
+.modal-close:hover { background: #e0e0e0; color: #333; }
+.modal-body { padding: 24px; background: #fff; border-radius: 0 0 20px 20px; }
 .detail-group { display: flex; flex-direction: column; gap: 4px; }
-.detail-group label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.detail-group span { font-size: 14px; color: var(--text); }
+.detail-group label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.detail-group span { font-size: 14px; color: #1a1a2e; }
 @keyframes modalSlideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ===== Leads Delete / Deleted Tab ===== */

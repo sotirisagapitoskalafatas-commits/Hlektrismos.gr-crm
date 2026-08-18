@@ -612,240 +612,10 @@ export default function DashboardPage() {
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)' }}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><TrendingUp size={24} /></div>
                     <div><strong style={{ fontSize: 32 }}>{conversionRate}%</strong><span>Conversion Rate</span></div>
-                  </div>
-                </div>
-                <div className="dash-panels" style={{ gridTemplateColumns: '1.2fr 0.8fr' }}>
-                  <div className="dash-panel">
-                    <h3 style={{ marginBottom: 16 }}>Πρόσφατα Leads</h3>
-                    <div className="dash-mini-leads">
-                      {leads.filter(l => !l.deleted_at).slice(0, 6).map((l) => (
-                        <div className="dash-mini-lead" key={l.id}>
-                          <div className="dash-mini-lead-avatar">{l.first_name[0]}{l.last_name[0]}</div>
-                          <div><strong>{l.first_name} {l.last_name}</strong><span>{l.email}</span></div>
-                          <span className={`dash-status-pill ${l.status}`}>{l.status}</span>
-                        </div>
-                      ))}
-                      {leads.length === 0 && <p className="dash-empty">Δεν υπάρχουν leads ακόμα.</p>}
-                    </div>
-                  </div>
-                  <div className="dash-panel">
-                    <h3 style={{ marginBottom: 16 }}>Απόδοση AI Agents</h3>
-                    <div className="dash-mini-leads">
-                      {agents.filter(a => !a.deleted_at).slice(0, 5).map((a) => (
-                        <div className="dash-mini-lead" key={a.id}>
-                          <div className="dash-mini-lead-icon">{channelIcon(a.channel)}</div>
-                          <div><strong>{a.name}</strong><span>{a.leads_contacted} επικοινωνίες · {a.meetings_booked} ραντεβού</span></div>
-                          <span className={`dash-status-pill ${a.status}`}>{a.status}</span>
-                        </div>
-                      ))}
-                      {agents.length === 0 && <p className="dash-empty">Δεν υπάρχουν agents ακόμα.</p>}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {tab === 'agents' && (
-              <div className="dash-content">
-                <div className="dash-content-header">
-                  <p>Διαχειριστείτε τα αυτόνομα AI agents που αναζητούν, προκριματίζουν και επικοινωνούν με leads.</p>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button className="btn btn-secondary" onClick={runAgents} disabled={runningAgents}>
-                      <Activity size={16} className={runningAgents ? 'spin' : ''} /> {runningAgents ? 'Εκτέλεση...' : 'Εκκίνηση AI Agents'}
-                    </button>
-                    <button className="btn btn-primary" onClick={() => setShowAddAgent(!showAddAgent)}><Plus size={16} /> Νέο Agent</button>
-                  </div>
-                </div>
-                <div className="dash-filters" style={{ marginBottom: 16 }}>
-                  <div className="dash-leads-subtabs">
-                    <button className={agentsSubTab === 'active' ? 'active' : ''} onClick={() => setAgentsSubTab('active')}><Bot size={14} /> Ενεργά Agents ({filteredAgents.length})</button>
-                    <button className={agentsSubTab === 'deleted' ? 'active' : ''} onClick={() => setAgentsSubTab('deleted')}><Trash2 size={14} /> Διεγραμμένα ({deletedAgents.length})</button>
-                  </div>
-                  {agentsSubTab === 'active' && (
-                    <select value={agentStatusFilter} onChange={(e) => setAgentStatusFilter(e.target.value)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13 }}>
-                      <option value="all">Όλα τα status</option>
-                      <option value="active">Ενεργό</option>
-                      <option value="paused">Παυμένο</option>
-                    </select>
-                  )}
-                </div>
-                {showAddAgent && (
-                  <div className="dash-add-form">
-                    <input placeholder="Όνομα agent" value={newAgent.name} onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })} />
-                    <select value={newAgent.channel} onChange={(e) => setNewAgent({ ...newAgent, channel: e.target.value })}>
-                      <option value="email">Email</option>
-                      <option value="sms">SMS</option>
-                      <option value="voice">Φωνή</option>
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="telegram">Telegram</option>
-                      <option value="viber">Viber</option>
-                      <option value="linkedin">LinkedIn</option>
-                      <option value="facebook">Facebook Messenger</option>
-                    </select>
-                    <button className="btn btn-primary" onClick={createAgent}>Δημιουργία</button>
-                  </div>
-                )}
-                {agentsSubTab === 'active' && (
-                  <div className="dash-agents-grid">
-                    {filteredAgents.map((a) => (
-                      <div className="dash-agent-card" key={a.id}>
-                        <div className="dash-agent-header">
-                          <div className="dash-agent-icon">{channelIcon(a.channel)}</div>
-                          <div><h3>{a.name}</h3><span className="dash-agent-channel">{a.channel}</span></div>
-                          <span className={`dash-status-pill ${a.status}`}>{a.status}</span>
-                        </div>
-                        <div className="dash-agent-stats">
-                          <div><strong>{a.leads_contacted}</strong><span>Επικοινωνίες</span></div>
-                          <div><strong>{a.replies}</strong><span>Απαντήσεις</span></div>
-                          <div><strong>{a.meetings_booked}</strong><span>Ραντεβού</span></div>
-                        </div>
-                        {a.target_region && <div className="dash-agent-region"><Globe size={14} /> {a.target_region}</div>}
-                        <div className="dash-agent-actions">
-                          <button className="dash-agent-toggle" onClick={() => setConfigAgent(a)}>
-                            <Settings size={14} /> Διαμόρφωση
-                          </button>
-                          <button className="dash-agent-toggle" onClick={() => toggleAgentStatus(a)}>
-                            {a.status === 'active' ? 'Παύση' : 'Ενεργοποίηση'}
-                          </button>
-                          {confirmDeleteAgentId === a.id ? (
-                            <div className="dash-delete-confirm">
-                              <button className="btn-delete-yes" onClick={() => softDeleteAgent(a.id)}>Ναι</button>
-                              <button className="btn-delete-yes permanent" onClick={() => permanentDeleteAgent(a.id)}>Μόνιμα</button>
-                              <button className="btn-delete-lead" onClick={() => setConfirmDeleteAgentId(null)}>Όχι</button>
-                            </div>
-                          ) : (
-                            <button className="btn-delete-lead" onClick={() => setConfirmDeleteAgentId(a.id)}>
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {filteredAgents.length === 0 && <p className="dash-empty">Δεν υπάρχουν agents με αυτό το φίλτρο.</p>}
-                  </div>
-                )}
-                {agentsSubTab === 'deleted' && (
-                  <div className="dash-agents-grid">
-                    {deletedAgents.map((a) => (
-                      <div className="dash-agent-card" key={a.id} style={{ opacity: 0.6 }}>
-                        <div className="dash-agent-header">
-                          <div className="dash-agent-icon">{channelIcon(a.channel)}</div>
-                          <div><h3>{a.name}</h3><span className="dash-agent-channel">{a.channel}</span></div>
-                          <span className="dash-status-pill" style={{ background: 'rgba(231,76,60,0.1)', color: '#e74c3c' }}>διεγραμμένο</span>
-                        </div>
-                        <div className="dash-agent-stats">
-                          <div><strong>{a.leads_contacted}</strong><span>Επικοινωνίες</span></div>
-                          <div><strong>{a.replies}</strong><span>Απαντήσεις</span></div>
-                          <div><strong>{a.meetings_booked}</strong><span>Ραντεβού</span></div>
-                        </div>
-                        <div className="dash-agent-actions">
-                          <button className="btn btn-secondary" onClick={() => restoreAgent(a.id)} style={{ fontSize: 12 }}>
-                            <RefreshCw size={12} /> Αποκατάσταση
-                          </button>
-                          <button className="btn-delete-lead" onClick={() => permanentDeleteAgent(a.id)}>
-                            <Trash2 size={12} /> Μόνιμα
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {deletedAgents.length === 0 && <p className="dash-empty">Δεν υπάρχουν διεγραμμένα agents.</p>}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tab === 'leads' && (
-              <div className="dash-content">
-                <div className="dash-content-header">
-                  <div className="dash-filters">
-                    <div className="dash-leads-subtabs">
-                      <button className={leadsSubTab === 'active' ? 'active' : ''} onClick={() => setLeadsSubTab('active')}><Users size={14} /> Ενεργά Leads ({leads.filter(l => !l.deleted_at).length})</button>
-                      <button className={leadsSubTab === 'deleted' ? 'active' : ''} onClick={() => setLeadsSubTab('deleted')}><X size={14} /> Διεγραμμένα ({deletedLeads.length})</button>
-                    </div>
-                    <div className="dash-search">
-                      <Search size={16} />
-                      <input placeholder="Αναζήτηση leads..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                    </div>
-                    {leadsSubTab === 'active' && (
-                      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="all">Όλα τα status</option>
-                        <option value="new">new</option>
-                        <option value="contacted">contacted</option>
-                        <option value="qualified">qualified</option>
-                        <option value="closed">closed</option>
-                      </select>
-                    )}
-                  </div>
-                </div>
-
-                {leadsSubTab === 'active' && (
-                  <div className="dash-table-wrap">
-                    <table className="dash-table">
-                      <thead>
-                        <tr>
-                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredLeads.map((l) => {
-                          const aiOk = canActivateAI(l);
-                          return (
-                            <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLead(l)}>
-                              <td>
-                                <button className="dash-lead-name-btn" onClick={(e) => { e.stopPropagation(); setOpenLead(l); }}>
-                                  {l.first_name} {l.last_name}
-                                </button>
-                              </td>
-                              <td>{l.email}</td>
-                              <td>{l.phone}</td>
-                              <td>{l.region}</td>
-                              <td>{l.customer_type}</td>
-                              <td>
-                                <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                  <option value="" disabled>—</option>
-                                  <option value="B2C_Household">B2C</option>
-                                  <option value="B2B_Corporate">B2B</option>
-                                </select>
-                              </td>
-                              <td>
-                                <div className="gdpr-badge-wrap">
-                                  <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                    <option value="" disabled>—</option>
-                                    <option value="Consent">Consent</option>
-                                    <option value="Legitimate_Interest">Leg. Interest</option>
-                                  </select>
-                                  <span className={`gdpr-badge ${aiOk ? 'ok' : 'blocked'}`}>{aiOk ? 'OK' : 'Missing'}</span>
-                                </div>
-                              </td>
-                              <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
-                              <td>
-                                <button className={`ai-activate-btn ${aiOk ? 'active' : 'disabled'}`} disabled={!aiOk} title={!aiOk ? 'Missing GDPR Consent' : undefined} onClick={(e) => { e.stopPropagation(); if (aiOk) setToast({ msg: `AI Agent ενεργοποιήθηκε για ${l.first_name} ${l.last_name}.`, type: 'info' }); }}>
-                                  <Zap size={14} /> {aiOk ? 'Ενεργό' : 'Αποκλεισμένο'}
-                                </button>
-                              </td>
-                              <td>
-                                <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
-                                  <select className="dash-status-select" value={l.status} onChange={(e) => updateLeadStatus(l, e.target.value)}>
-                                    <option value="new">new</option>
-                                    <option value="contacted">contacted</option>
-                                    <option value="qualified">qualified</option>
-                                    <option value="closed">closed</option>
-                                  </select>
-                                  {confirmDeleteId === l.id ? (
-                                    <div className="dash-delete-confirm">
-                                      <span>Διαγραφή;</span>
-                                      <button className="btn-delete-yes" onClick={() => softDeleteLead(l.id)}>Ναι</button>
-                                      <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>Όχι</button>
-                                    </div>
-                                  ) : (
-                                    <button className="btn-delete-lead" onClick={() => setConfirmDeleteId(l.id)} title="Μεταφορά στα διεγραμμένα">
-                                      <X size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
+      </div>
+      )}
+    </div>
+  );
                         })}
                       </tbody>
                     </table>
@@ -1797,43 +1567,21 @@ function IntegrationsTab({ toast, setToast }: {
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
 }) {
-  const [integrations, setIntegrations] = useState([
-    { id: 'gmail', name: 'Gmail / Email', icon: '📧', connected: false, status: 'Αποσυνδεδεμένο', fields: { email: '', appPassword: '' } },
-    { id: 'facebook', name: 'Facebook Pages', icon: '📘', connected: false, status: 'Αποσυνδεδεμένο', fields: { pageId: '', accessToken: '' } },
-    { id: 'instagram', name: 'Instagram Business', icon: '📷', connected: false, status: 'Αποσυνδεδεμένο', fields: { accountId: '', accessToken: '' } },
-    { id: 'linkedin', name: 'LinkedIn', icon: '💼', connected: false, status: 'Αποσυνδεδεμένο', fields: { companyId: '', accessToken: '' } },
-    { id: 'whatsapp', name: 'WhatsApp Business', icon: '💬', connected: false, status: 'Αποσυνδεδεμένο', fields: { phoneNumberId: '', accessToken: '' } },
-    { id: 'viber', name: 'Viber Business', icon: '💜', connected: false, status: 'Αποσυνδεδεμένο', fields: { authToken: '', senderId: '' } },
-    { id: 'sms', name: 'SMS Gateway', icon: '📱', connected: false, status: 'Αποσυνδεδεμένο', fields: { apiUrl: '', apiKey: '', sender: '' } },
-    { id: 'imap', name: 'IMAP Email Server', icon: '📬', connected: false, status: 'Αποσυνδεδεμένο', fields: { host: '', port: '993', user: '', password: '' } },
-  ]);
+  const [integrations, setIntegrations] = useState<Array<{
+    id: string; name: string; icon: string; connected: boolean; status: string;
+    fields: Record<string, string>;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
 
-  const handleConnect = (id: string) => {
-    setEditingId(id);
-    const integ = integrations.find(i => i.id === id);
-    setEditFields(integ?.fields || {});
-  };
-
-  const handleSave = () => {
-    if (!editingId) return;
-    setIntegrations(prev => prev.map(i =>
-      i.id === editingId ? { ...i, connected: true, status: 'Συνδεδεμένο', fields: editFields } : i
-    ));
-    setEditingId(null);
-    setToast({ msg: 'Η ενσωμάτωση ενημερώθηκε!', type: 'success' });
-  };
-
-  const handleDisconnect = (id: string) => {
-    setIntegrations(prev => prev.map(i =>
-      i.id === id ? { ...i, connected: false, status: 'Αποσυνδεδεμένο', fields: {} } : i
-    ));
-    setToast({ msg: 'Η ενσωμάτωση αποσυνδέθηκε.', type: 'info' });
+  const icons: Record<string, string> = {
+    gmail: '📧', facebook: '📘', instagram: '📷', linkedin: '💼',
+    whatsapp: '💬', viber: '💜', sms: '📱', imap: '📬',
   };
 
   const fieldLabels: Record<string, Record<string, string>> = {
-    gmail: { email: 'Email Διεύθυνση', appPassword: 'App Password (Google)' },
+    gmail: { email: 'Email Address', appPassword: 'App Password (Google)' },
     facebook: { pageId: 'Facebook Page ID', accessToken: 'Access Token' },
     instagram: { accountId: 'Instagram Account ID', accessToken: 'Access Token' },
     linkedin: { companyId: 'LinkedIn Company ID', accessToken: 'Access Token' },
@@ -1843,11 +1591,65 @@ function IntegrationsTab({ toast, setToast }: {
     imap: { host: 'IMAP Server', port: 'Port', user: 'Username', password: 'Password' },
   };
 
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('crm_integrations').select('*');
+      if (data && data.length > 0) {
+        setIntegrations(data.map(d => ({
+          id: d.id, name: d.name, icon: icons[d.id] || '🔌',
+          connected: d.connected, status: d.connected ? 'Συνδεδεμένο' : 'Αποσυνδεδεμένο',
+          fields: d.config || {},
+        })));
+      } else {
+        setIntegrations(Object.keys(fieldLabels).map(id => ({
+          id, name: id.charAt(0).toUpperCase() + id.slice(1), icon: icons[id] || '🔌',
+          connected: false, status: 'Αποσυνδεδεμένο', fields: {},
+        })));
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const handleConnect = (id: string) => {
+    setEditingId(id);
+    const integ = integrations.find(i => i.id === id);
+    setEditFields(integ?.fields || {});
+  };
+
+  const handleSave = async () => {
+    if (!editingId) return;
+    await supabase.from('crm_integrations').upsert({
+      id: editingId,
+      name: integrations.find(i => i.id === editingId)?.name || editingId,
+      connected: true,
+      config: editFields,
+      updated_at: new Date().toISOString(),
+    });
+    setIntegrations(prev => prev.map(i =>
+      i.id === editingId ? { ...i, connected: true, status: 'Συνδεδεμένο', fields: editFields } : i
+    ));
+    setEditingId(null);
+    setToast({ msg: 'Η ενσωμάτωση αποθηκεύτηκε!', type: 'success' });
+  };
+
+  const handleDisconnect = async (id: string) => {
+    await supabase.from('crm_integrations').upsert({
+      id, connected: false, config: {}, updated_at: new Date().toISOString(),
+    });
+    setIntegrations(prev => prev.map(i =>
+      i.id === id ? { ...i, connected: false, status: 'Αποσυνδεδεμένο', fields: {} } : i
+    ));
+    setToast({ msg: 'Η ενσωμάτωση αποσυνδέθηκε.', type: 'info' });
+  };
+
   return (
     <div className="dash-content">
       <div className="dash-content-header">
         <p>Συνδέστε το CRM με email, social media, messaging και άλλα εργαλεία για αυτοματοποιημένη επικοινωνία.</p>
       </div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Φόρτωση...</div>
+      ) : (
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
         {integrations.map(integ => (

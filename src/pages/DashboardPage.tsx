@@ -2014,58 +2014,185 @@ function EmailTab({ toast, setToast }: {
 }) {
   const [emails, setEmails] = useState<Array<{
     id: string; from_email: string; to_email: string; subject: string;
-    body: string; folder: string; is_read: boolean; lead_id?: string;
-    created_at: string; attachments?: string[];
+    body: string; folder: string; is_read: boolean; starred: boolean;
+    important: boolean; spam: boolean; labels: string[]; lead_id?: string;
+    created_at: string; cc?: string; bcc?: string; thread_id?: string;
   }>>([]);
+  const [labels, setLabels] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [emailSettings, setEmailSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [activeFolder, setActiveFolder] = useState('inbox');
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCompose, setShowCompose] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showLabelManager, setShowLabelManager] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+  const [composeData, setComposeData] = useState({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' });
   const [importConfig, setImportConfig] = useState({ provider: 'gmail', email: '', password: '', imapHost: '', imapPort: '993' });
-  const [aiAutoReply, setAiAutoReply] = useState(false);
+  const [newLabel, setNewLabel] = useState({ name: '', color: '#0066cc' });
+  const [editingSettings, setEditingSettings] = useState<Record<string, any>>({});
   const [leads, setLeads] = useState<Array<{ id: string; first_name: string; last_name: string; email: string }>>([]);
 
   const folders = [
-    { id: 'inbox', label: '📥 Εισερχόμενα', icon: '📥' },
-    { id: 'sent', label: '📤 Απεσταλμένα', icon: '📤' },
-    { id: 'drafts', label: '📝 Πρόχειρα', icon: '📝' },
-    { id: 'archive', label: '📦 Αρχείο', icon: '📦' },
-    { id: 'trash', label: '🗑️ Απορρίμματα', icon: '🗑️' },
+    { id: 'inbox', label: 'Εισερχόμενα', icon: '📥' },
+    { id: 'starred', label: 'Αστέρια', icon: '⭐' },
+    { id: 'sent', label: 'Απεσταλμένα', icon: '📤' },
+    { id: 'drafts', label: 'Πρόχειρα', icon: '📝' },
+    { id: 'important', label: 'Σημαντικά', icon: '🏷️' },
+    { id: 'archive', label: 'Αρχείο', icon: '📦' },
+    { id: 'spam', label: 'Ανεπιθύμητα', icon: '⚠️' },
+    { id: 'trash', label: 'Απορρίμματα', icon: '🗑️' },
   ];
 
   const providers = [
     { id: 'gmail', label: 'Gmail', icon: '📧', host: 'imap.gmail.com', port: '993' },
-    { id: 'outlook', label: 'Outlook', icon: '📮', host: 'outlook.office365.com', port: '993' },
-    { id: 'yahoo', label: 'Yahoo', icon: '📬', host: 'imap.mail.yahoo.com', port: '993' },
+    { id: 'outlook', label: 'Outlook / Microsoft 365', icon: '📮', host: 'outlook.office365.com', port: '993' },
+    { id: 'yahoo', label: 'Yahoo Mail', icon: '📬', host: 'imap.mail.yahoo.com', port: '993' },
     { id: 'custom', label: 'Προσαρμοσμένο IMAP', icon: '🔧', host: '', port: '993' },
   ];
 
+  const labelColors = ['#0066cc', '#00c878', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
   useEffect(() => {
     (async () => {
-      const { data: emailsData } = await supabase
-        .from('crm_emails')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (emailsData) setEmails(emailsData);
-
-      const { data: leadsData } = await supabase
-        .from('hlektrismos_leads')
-        .select('id, first_name, last_name, email')
-        .is('deleted_at', null);
-      if (leadsData) setLeads(leadsData);
-
+      const [emailsRes, labelsRes, settingsRes, leadsRes] = await Promise.all([
+        supabase.from('crm_emails').select('*').order('created_at', { ascending: false }),
+        supabase.from('crm_email_labels').select('*'),
+        supabase.from('crm_email_settings').select('*'),
+        supabase.from('hlektrismos_leads').select('id, first_name, last_name, email').is('deleted_at', null),
+      ]);
+      if (emailsRes.data) setEmails(emailsRes.data);
+      if (labelsRes.data) setLabels(labelsRes.data);
+      if (leadsRes.data) setLeads(leadsRes.data);
+      const settings: Record<string, any> = {};
+      settingsRes.data?.forEach(s => { settings[s.setting_key] = s.setting_value; });
+      setEmailSettings(settings);
+      setEditingSettings(settings);
       setLoading(false);
     })();
   }, []);
 
-  const handleSync = async () => {
-    setSyncing(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setSyncing(false);
-    setToast({ msg: 'Τα emails συγχρονίστηκαν επιτυχώς!', type: 'success' });
+  const filteredEmails = emails.filter(e => {
+    if (activeLabel) return (e.labels || []).includes(activeLabel);
+    if (activeFolder === 'starred') return e.starred;
+    if (activeFolder === 'important') return e.important;
+    if (activeFolder === 'spam') return e.spam;
+    return e.folder === activeFolder;
+  }).filter(e => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return e.subject.toLowerCase().includes(q) || e.from_email.toLowerCase().includes(q) || e.body.toLowerCase().includes(q);
+  });
+
+  const unreadCount = emails.filter(e => e.folder === 'inbox' && !e.is_read && !e.spam).length;
+  const draftCount = emails.filter(e => e.folder === 'drafts').length;
+  const selectedEmailData = emails.find(e => e.id === selectedEmail);
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredEmails.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEmails.map(e => e.id)));
+    }
+  };
+
+  const handleToggleStar = async (id: string) => {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+    await supabase.from('crm_emails').update({ starred: !email.starred }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, starred: !e.starred } : e));
+  };
+
+  const handleToggleImportant = async (id: string) => {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+    await supabase.from('crm_emails').update({ important: !email.important }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, important: !e.important } : e));
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await supabase.from('crm_emails').update({ is_read: true }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: true } : e));
+  };
+
+  const handleMarkUnread = async (id: string) => {
+    await supabase.from('crm_emails').update({ is_read: false }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: false } : e));
+  };
+
+  const handleBulkMarkRead = async () => {
+    const ids = Array.from(selectedIds);
+    await supabase.from('crm_emails').update({ is_read: true }).in('id', ids);
+    setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, is_read: true } : e));
+    setSelectedIds(new Set());
+    setToast({ msg: `${ids.length} emails σημάνθηκαν ως αναγνωσμένα.`, type: 'success' });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    await supabase.from('crm_emails').update({ folder: 'trash' }).in('id', ids);
+    setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, folder: 'trash' } : e));
+    setSelectedIds(new Set());
+    setToast({ msg: `${ids.length} emails μεταφέρθηκαν στα απορρίμματα.`, type: 'info' });
+  };
+
+  const handleDeleteEmail = async (id: string) => {
+    await supabase.from('crm_emails').update({ folder: 'trash' }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: 'trash' } : e));
+    if (selectedEmail === id) setSelectedEmail(null);
+    setToast({ msg: 'Το email μεταφέρθηκε στα απορρίμματα.', type: 'info' });
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    await supabase.from('crm_emails').delete().eq('id', id);
+    setEmails(prev => prev.filter(e => e.id !== id));
+    if (selectedEmail === id) setSelectedEmail(null);
+  };
+
+  const handleMoveToSpam = async (id: string) => {
+    await supabase.from('crm_emails').update({ spam: true, folder: 'inbox' }).eq('id', id);
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, spam: true } : e));
+  };
+
+  const handleAddLabel = async (emailId: string, labelName: string) => {
+    const email = emails.find(e => e.id === emailId);
+    if (!email) return;
+    const newLabels = [...(email.labels || []), labelName];
+    await supabase.from('crm_emails').update({ labels: newLabels }).eq('id', emailId);
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, labels: newLabels } : e));
+  };
+
+  const handleRemoveLabel = async (emailId: string, labelName: string) => {
+    const email = emails.find(e => e.id === emailId);
+    if (!email) return;
+    const newLabels = (email.labels || []).filter(l => l !== labelName);
+    await supabase.from('crm_emails').update({ labels: newLabels }).eq('id', emailId);
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, labels: newLabels } : e));
+  };
+
+  const handleCreateLabel = async () => {
+    if (!newLabel.name) return;
+    const { data } = await supabase.from('crm_email_labels').insert({ name: newLabel.name, color: newLabel.color }).select();
+    if (data) setLabels(prev => [...prev, data[0]]);
+    setNewLabel({ name: '', color: '#0066cc' });
+    setToast({ msg: 'Η ετικέτα δημιουργήθηκε!', type: 'success' });
+  };
+
+  const handleDeleteLabel = async (id: string) => {
+    await supabase.from('crm_email_labels').delete().eq('id', id);
+    setLabels(prev => prev.filter(l => l.id !== id));
   };
 
   const handleSendEmail = async () => {
@@ -2074,17 +2201,48 @@ function EmailTab({ toast, setToast }: {
       id: 'email_' + Date.now(),
       from_email: 'info@hlektrismos.gr',
       to_email: composeData.to,
+      cc: composeData.cc,
+      bcc: composeData.bcc,
       subject: composeData.subject,
       body: composeData.body,
       folder: 'sent',
       is_read: true,
+      starred: false,
+      important: false,
+      spam: false,
+      labels: [],
+      reply_to: composeData.replyTo,
       created_at: new Date().toISOString(),
     };
     await supabase.from('crm_emails').insert(newEmail);
     setEmails(prev => [newEmail, ...prev]);
-    setComposeData({ to: '', subject: '', body: '' });
+    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' });
     setShowCompose(false);
     setToast({ msg: 'Το email στάλθηκε!', type: 'success' });
+  };
+
+  const handleSaveDraft = async () => {
+    const draft = {
+      id: 'draft_' + Date.now(),
+      from_email: 'info@hlektrismos.gr',
+      to_email: composeData.to,
+      cc: composeData.cc,
+      bcc: composeData.bcc,
+      subject: composeData.subject || '(Χωρίς θέμα)',
+      body: composeData.body,
+      folder: 'drafts',
+      is_read: true,
+      starred: false,
+      important: false,
+      spam: false,
+      labels: [],
+      created_at: new Date().toISOString(),
+    };
+    await supabase.from('crm_emails').insert(draft);
+    setEmails(prev => [draft, ...prev]);
+    setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' });
+    setShowCompose(false);
+    setToast({ msg: 'Το πρόχειρο αποθηκεύτηκε.', type: 'info' });
   };
 
   const handleImportEmails = async () => {
@@ -2096,16 +2254,20 @@ function EmailTab({ toast, setToast }: {
     setToast({ msg: `Emails από ${importConfig.provider} εισήχθησαν επιτυχώς!`, type: 'success' });
   };
 
-  const handleMarkRead = async (id: string) => {
-    await supabase.from('crm_emails').update({ is_read: true }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, is_read: true } : e));
+  const handleSync = async () => {
+    setSyncing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setSyncing(false);
+    setToast({ msg: 'Τα emails συγχρονίστηκαν επιτυχώς!', type: 'success' });
   };
 
-  const handleDeleteEmail = async (id: string) => {
-    await supabase.from('crm_emails').update({ folder: 'trash' }).eq('id', id);
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: 'trash' } : e));
-    if (selectedEmail === id) setSelectedEmail(null);
-    setToast({ msg: 'Το email μεταφέρθηκε στα απορρίμματα.', type: 'info' });
+  const handleSaveSettings = async () => {
+    for (const [key, value] of Object.entries(editingSettings)) {
+      await supabase.from('crm_email_settings').upsert({ setting_key: key, setting_value: value, updated_at: new Date().toISOString() });
+    }
+    setEmailSettings(editingSettings);
+    setShowSettings(false);
+    setToast({ msg: 'Οι ρυθμίσεις αποθηκεύτηκαν!', type: 'success' });
   };
 
   const handleLinkToLead = async (emailId: string, leadId: string) => {
@@ -2114,166 +2276,452 @@ function EmailTab({ toast, setToast }: {
     setToast({ msg: 'Το email συνδέθηκε με το lead!', type: 'success' });
   };
 
-  const filteredEmails = emails.filter(e => e.folder === activeFolder);
-  const unreadCount = emails.filter(e => e.folder === 'inbox' && !e.is_read).length;
-  const selectedEmailData = emails.find(e => e.id === selectedEmail);
+  const folderLabelCounts: Record<string, number> = {};
+  folders.forEach(f => {
+    if (f.id === 'starred') folderLabelCounts[f.id] = emails.filter(e => e.starred).length;
+    else if (f.id === 'important') folderLabelCounts[f.id] = emails.filter(e => e.important).length;
+    else if (f.id === 'spam') folderLabelCounts[f.id] = emails.filter(e => e.spam).length;
+    else folderLabelCounts[f.id] = emails.filter(e => e.folder === f.id).length;
+  });
 
   return (
-    <div className="dash-content">
-      <div className="dash-content-header">
-        <div>
-          <p>Διαχείριση email, αυτόματες απαντήσεις και σύνδεση με leads.</p>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{unreadCount} μη αναγνωσμένα</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-ghost" onClick={() => setShowImport(!showImport)}>📥 Εισαγωγή</button>
-          <button className="btn btn-ghost" onClick={handleSync} disabled={syncing}>
-            {syncing ? '⏳ Συγχρόνιση...' : '🔄 Συγχρόνιση'}
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowCompose(!showCompose)}>✉️ Νέο Email</button>
-        </div>
-      </div>
-
-      {showImport && (
-        <div className="dash-add-form" style={{ marginBottom: '16px' }}>
-          <select value={importConfig.provider} onChange={(e) => {
-            const p = providers.find(pr => pr.id === e.target.value);
-            setImportConfig({ ...importConfig, provider: e.target.value, imapHost: p?.host || '', imapPort: p?.port || '993' });
-          }}>
-            {providers.map(p => <option key={p.id} value={p.id}>{p.icon} {p.label}</option>)}
-          </select>
-          <input placeholder="Email address" value={importConfig.email} onChange={(e) => setImportConfig({ ...importConfig, email: e.target.value })} />
-          <input type="password" placeholder="Password / App Password" value={importConfig.password} onChange={(e) => setImportConfig({ ...importConfig, password: e.target.value })} />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input placeholder="IMAP Host" value={importConfig.imapHost} onChange={(e) => setImportConfig({ ...importConfig, imapHost: e.target.value })} style={{ flex: 2 }} />
-            <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn btn-ghost" onClick={() => setShowImport(false)}>Άκυρο</button>
-            <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing}>
-              {syncing ? '⏳ Εισαγωγή...' : '📥 Εισαγωγή Emails'}
+    <div className="dash-content" style={{ padding: 0 }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 120px)', minHeight: '600px' }}>
+        {/* Sidebar */}
+        <div style={{ width: '220px', flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '16px' }}>
+            <button className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', borderRadius: '24px', fontSize: '14px', fontWeight: 600 }}
+              onClick={() => { setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '' }); setShowCompose(true); }}>
+              ✉️ Σύνταξη
             </button>
           </div>
-        </div>
-      )}
-
-      {showCompose && (
-        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--text)' }}>✉️ Σύνταξη Email</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <input placeholder="Προς (email)" value={composeData.to} onChange={(e) => setComposeData({ ...composeData, to: e.target.value })} />
-            <input placeholder="Θέμα" value={composeData.subject} onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })} />
-            <textarea placeholder="Μήνυμα..." value={composeData.body} onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
-              style={{ minHeight: '120px', resize: 'vertical', padding: '12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '14px', fontFamily: 'inherit' }} />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setShowCompose(false)}>Άκυρο</button>
-              <button className="btn btn-primary" onClick={handleSendEmail}>Αποστολή</button>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
+            {folders.map(f => (
+              <button key={f.id} onClick={() => { setActiveFolder(f.id); setActiveLabel(null); setSelectedEmail(null); setSelectedIds(new Set()); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: activeFolder === f.id && !activeLabel ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent',
+                  color: activeFolder === f.id && !activeLabel ? 'var(--primary)' : 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left', marginBottom: '2px', fontWeight: activeFolder === f.id && !activeLabel ? 600 : 400 }}>
+                <span style={{ fontSize: '16px' }}>{f.icon}</span>
+                <span style={{ flex: 1 }}>{f.label}</span>
+                {folderLabelCounts[f.id] > 0 && f.id === 'inbox' && unreadCount > 0 && (
+                  <span style={{ fontWeight: 700, fontSize: '12px' }}>{unreadCount}</span>
+                )}
+                {folderLabelCounts[f.id] > 0 && f.id !== 'inbox' && f.id !== 'starred' && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{folderLabelCounts[f.id]}</span>
+                )}
+              </button>
+            ))}
+            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ετικέτες</span>
+                <button onClick={() => setShowLabelManager(!showLabelManager)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '16px', padding: '0 4px' }}>+</button>
+              </div>
+              {labels.map(l => (
+                <button key={l.id} onClick={() => { setActiveLabel(l.name); setActiveFolder('inbox'); setSelectedEmail(null); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '6px 12px', background: activeLabel === l.name ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent',
+                    color: activeLabel === l.name ? 'var(--primary)' : 'var(--text)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left', marginBottom: '2px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: l.color, flexShrink: 0 }} />
+                  <span style={{ flex: 1 }}>{l.name}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
+              <button onClick={() => { setShowImport(true); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
+                <span>📥</span> Εισαγωγή Email
+              </button>
+              <button onClick={() => { setShowSettings(true); setEditingSettings({ ...emailSettings }); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
+                <span>⚙️</span> Ρυθμίσεις
+              </button>
             </div>
           </div>
         </div>
-      )}
 
-      <div style={{ display: 'flex', gap: '16px', minHeight: '500px' }}>
-        <div style={{ width: '180px', flexShrink: 0 }}>
-          {folders.map(f => (
-            <button key={f.id} onClick={() => { setActiveFolder(f.id); setSelectedEmail(null); }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', background: activeFolder === f.id ? 'var(--primary)' : 'transparent',
-                color: activeFolder === f.id ? '#fff' : 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', textAlign: 'left', marginBottom: '4px' }}>
-              <span>{f.icon}</span> {f.label.replace(/^[^\s]+\s/, '')}
-              {f.id === 'inbox' && unreadCount > 0 && (
-                <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', borderRadius: '10px', padding: '2px 8px', fontSize: '11px' }}>{unreadCount}</span>
-              )}
-            </button>
-          ))}
-          <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-2)', borderRadius: '10px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={aiAutoReply} onChange={(e) => setAiAutoReply(e.target.checked)} />
-              🤖 AI Auto-Reply
-            </label>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '6px 0 0' }}>
-              Τα AI Agents απαντούν αυτόματα σε emails
-            </p>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, display: 'flex', gap: '0', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden' }}>
-          <div style={{ width: '300px', borderRight: '1px solid var(--border)', overflowY: 'auto', maxHeight: '500px' }}>
-            {loading ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>
-            ) : filteredEmails.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Δεν υπάρχουν emails</div>
-            ) : filteredEmails.map(email => (
-              <div key={email.id} onClick={() => { setSelectedEmail(email.id); handleMarkRead(email.id); }}
-                style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                  background: selectedEmail === email.id ? 'var(--primary-10)' : email.is_read ? 'transparent' : 'rgba(0,102,204,0.05)',
-                  borderLeft: email.is_read ? '3px solid transparent' : '3px solid var(--primary)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: email.is_read ? 400 : 700, fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                    {email.from_email}
-                  </span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                    {new Date(email.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' })}
-                  </span>
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: email.is_read ? 400 : 600, color: 'var(--text)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {email.subject}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {email.body.substring(0, 60)}...
-                </div>
-                {email.lead_id && (
-                  <span style={{ fontSize: '10px', background: 'rgba(0,102,204,0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', display: 'inline-block' }}>
-                    🔗 Linked
-                  </span>
-                )}
+        {/* Main content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+            <input type="checkbox" checked={selectedIds.size === filteredEmails.length && filteredEmails.length > 0} onChange={handleSelectAll}
+              style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }} />
+            {selectedIds.size > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedIds.size} επιλεγμένα</span>
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px' }} onClick={handleBulkMarkRead}>📖 Αναγνωσμένο</button>
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px', color: '#ef4444' }} onClick={handleBulkDelete}>🗑️ Διαγραφή</button>
               </div>
-            ))}
+            ) : (
+              <input type="text" placeholder="🔍 Αναζήτηση emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ flex: 1, padding: '8px 14px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '20px', color: 'var(--text)', fontSize: '13px', outline: 'none' }} />
+            )}
+            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+              <button className="btn btn-ghost" onClick={handleSync} disabled={syncing} style={{ fontSize: '13px', padding: '6px 12px' }}>
+                {syncing ? '⏳' : '🔄'} Συγχρόνιση
+              </button>
+            </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-            {selectedEmailData ? (
-              <div>
+          {/* Email list + reading pane */}
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* Email list */}
+            <div style={{ width: selectedEmail ? '380px' : '100%', borderRight: selectedEmail ? '1px solid var(--border)' : 'none', overflowY: 'auto' }}>
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>
+              ) : filteredEmails.length === 0 ? (
+                <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
+                  <p style={{ fontSize: '16px', margin: 0 }}>Δεν υπάρχουν emails</p>
+                  <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
+                    {activeFolder === 'inbox' ? 'Το inbox σας είναι άδειο.' : 'Δεν βρέθηκαν emails σε αυτόν τον φάκελο.'}
+                  </p>
+                </div>
+              ) : filteredEmails.map(email => (
+                <div key={email.id} onClick={() => { setSelectedEmail(email.id); handleMarkRead(email.id); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                    background: selectedEmail === email.id ? 'var(--primary-10, rgba(0,102,204,0.08))' : email.is_read ? 'transparent' : 'rgba(0,102,204,0.03)',
+                    borderLeft: email.is_read ? '3px solid transparent' : '3px solid var(--primary)' }}>
+                  <input type="checkbox" checked={selectedIds.has(email.id)} onClick={(e) => e.stopPropagation()}
+                    onChange={() => handleToggleSelect(email.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
+                  <button onClick={(e) => { e.stopPropagation(); handleToggleStar(email.id); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: 0, flexShrink: 0, opacity: email.starred ? 1 : 0.3 }}>
+                    {email.starred ? '⭐' : '☆'}
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: email.is_read ? 400 : 700, fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {email.from_email}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
+                        {email.important && <span style={{ fontSize: '12px' }}>🏷️</span>}
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {new Date(email.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: email.is_read ? 400 : 600, color: 'var(--text)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {email.subject}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {email.body.substring(0, 80)}...
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {(email.labels || []).map(l => {
+                        const lbl = labels.find(ll => ll.name === l);
+                        return <span key={l} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>{l}</span>;
+                      })}
+                      {email.lead_id && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>🔗 Lead</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Reading pane */}
+            {selectedEmail && selectedEmailData && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div>
-                    <h3 style={{ margin: '0 0 8px', fontSize: '18px', color: 'var(--text)' }}>{selectedEmailData.subject}</h3>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                      Από: <strong>{selectedEmailData.from_email}</strong> → {selectedEmailData.to_email}
+                    <h2 style={{ margin: '0 0 8px', fontSize: '20px', color: 'var(--text)' }}>{selectedEmailData.subject}</h2>
+                    <div style={{ display: 'flex', gap: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <span><strong>Από:</strong> {selectedEmailData.from_email}</span>
+                      <span><strong>Προς:</strong> {selectedEmailData.to_email}</span>
+                      {selectedEmailData.cc && <span><strong>CC:</strong> {selectedEmailData.cc}</span>}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {new Date(selectedEmailData.created_at).toLocaleString('el-GR')}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <select value={selectedEmailData.lead_id || ''} onChange={(e) => handleLinkToLead(selectedEmailData.id, e.target.value)}
-                      style={{ padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '12px' }}>
-                      <option value="">🔗 Σύνδεση με Lead</option>
-                      {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name} ({l.email})</option>)}
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <button onClick={() => handleToggleStar(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                      {selectedEmailData.starred ? '⭐' : '☆'}
+                    </button>
+                    <button onClick={() => handleToggleImportant(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                      {selectedEmailData.important ? '🏷️' : '🔖'}
+                    </button>
+                    <select value="" onChange={(e) => { if (e.target.value) handleAddLabel(selectedEmail, e.target.value); e.target.value = ''; }}
+                      style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
+                      <option value="">🏷️ +Ετικέτα</option>
+                      {labels.filter(l => !(selectedEmailData.labels || []).includes(l.name)).map(l => (
+                        <option key={l.id} value={l.name}>{l.name}</option>
+                      ))}
                     </select>
-                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmailData.id)} style={{ color: '#ef4444', fontSize: '12px' }}>🗑️</button>
+                    <select value={selectedEmailData.lead_id || ''} onChange={(e) => handleLinkToLead(selectedEmail, e.target.value)}
+                      style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
+                      <option value="">🔗 Lead</option>
+                      {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name}</option>)}
+                    </select>
+                    <button className="btn btn-ghost" onClick={() => handleMarkUnread(selectedEmail)} style={{ fontSize: '12px', padding: '4px 8px' }}>📩</button>
+                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmail)} style={{ color: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>🗑️</button>
                   </div>
                 </div>
-                <div style={{ background: 'var(--bg-2)', borderRadius: '10px', padding: '16px', fontSize: '14px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                {(selectedEmailData.labels || []).length > 0 && (
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    {(selectedEmailData.labels || []).map(l => {
+                      const lbl = labels.find(ll => ll.name === l);
+                      return (
+                        <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>
+                          {l}
+                          <button onClick={() => handleRemoveLabel(selectedEmail, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '10px', padding: 0 }}>✕</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{ background: 'var(--bg-2)', borderRadius: '12px', padding: '20px', fontSize: '14px', color: 'var(--text)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                   {selectedEmailData.body}
                 </div>
-                <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
                   <button className="btn btn-primary" onClick={() => {
-                    setComposeData({ to: selectedEmailData.from_email, subject: `RE: ${selectedEmailData.subject}`, body: '' });
+                    setComposeData({ to: selectedEmailData.from_email, cc: '', bcc: '', subject: `RE: ${selectedEmailData.subject}`, body: '', replyTo: selectedEmailData.id });
                     setShowCompose(true);
                   }}>↩️ Απάντηση</button>
                   <button className="btn btn-ghost" onClick={() => {
-                    setComposeData({ to: '', subject: `FWD: ${selectedEmailData.subject}`, body: selectedEmailData.body });
+                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- Πρωτότυπο μήνυμα ---\nΑπό: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
                     setShowCompose(true);
                   }}>↪️ Προώθηση</button>
                 </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                <p>Επιλέξτε email για προβολή</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Compose Modal */}
+      {showCompose && (
+        <div style={{ position: 'fixed', bottom: '20px', right: '20px', width: '560px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', zIndex: 1000, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--primary)', color: '#fff', fontWeight: 600, fontSize: '14px' }}>
+            <span>✉️ Νέο Μήνυμα</span>
+            <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+          </div>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>Προς</label>
+              <input value={composeData.to} onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
+                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>CC</label>
+              <input value={composeData.cc} onChange={(e) => setComposeData({ ...composeData, cc: e.target.value })}
+                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>BCC</label>
+              <input value={composeData.bcc} onChange={(e) => setComposeData({ ...composeData, bcc: e.target.value })}
+                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px' }}>Θέμα</label>
+              <input value={composeData.subject} onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })}
+                style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+            </div>
+            <textarea value={composeData.body} onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
+              placeholder="Γράψτε το μήνυμά σας..."
+              style={{ minHeight: '200px', resize: 'vertical', padding: '12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '14px', fontFamily: 'inherit', lineHeight: 1.6 }} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px' }}>
+              <button className="btn btn-ghost" onClick={handleSaveDraft} style={{ fontSize: '13px' }}>💾 Πρόχειρο</button>
+              <button className="btn btn-primary" onClick={handleSendEmail} style={{ fontSize: '13px' }}>Αποστολή ➤</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <div className="modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h3>📥 Εισαγωγή Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
+                Συνδέστε τον email λογαριασμό σας για εισαγωγή υπαρχόντων emails στο CRM.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                {providers.map(p => (
+                  <button key={p.id} onClick={() => { const pp = providers.find(pr => pr.id === p.id); setImportConfig({ ...importConfig, provider: p.id, imapHost: pp?.host || '', imapPort: pp?.port || '993' }); }}
+                    style={{ padding: '16px', background: importConfig.provider === p.id ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'var(--bg-2)', border: `2px solid ${importConfig.provider === p.id ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '6px' }}>{p.icon}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{p.label}</div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input placeholder="Email address" value={importConfig.email} onChange={(e) => setImportConfig({ ...importConfig, email: e.target.value })} />
+                <input type="password" placeholder="Password / App Password" value={importConfig.password} onChange={(e) => setImportConfig({ ...importConfig, password: e.target.value })} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input placeholder="IMAP Server" value={importConfig.imapHost} onChange={(e) => setImportConfig({ ...importConfig, imapHost: e.target.value })} style={{ flex: 2 }} />
+                  <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
+                </div>
+                <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing} style={{ width: '100%', padding: '12px' }}>
+                  {syncing ? '⏳ Εισαγωγή...' : '📥 Εισαγωγή Emails'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Label Manager Modal */}
+      {showLabelManager && (
+        <div className="modal-overlay" onClick={() => setShowLabelManager(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-header"><h3>🏷️ Διαχείριση Ετικετών</h3><button className="modal-close" onClick={() => setShowLabelManager(false)}>x</button></div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <input placeholder="Νέα ετικέτα..." value={newLabel.name} onChange={(e) => setNewLabel({ ...newLabel, name: e.target.value })}
+                  style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+                <input type="color" value={newLabel.color} onChange={(e) => setNewLabel({ ...newLabel, color: e.target.value })}
+                  style={{ width: '40px', height: '36px', padding: '2px', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer' }} />
+                <button className="btn btn-primary" onClick={handleCreateLabel}>Προσθήκη</button>
+              </div>
+              {labels.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: l.color }} />
+                  <span style={{ flex: 1, fontSize: '14px', color: 'var(--text)' }}>{l.name}</span>
+                  <button onClick={() => handleDeleteLabel(l.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑️</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && editingSettings.general && (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflow: 'auto' }}>
+            <div className="modal-header"><h3>⚙️ Ρυθμίσεις Email</h3><button className="modal-close" onClick={() => setShowSettings(false)}>x</button></div>
+            <div className="modal-body">
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Γενικά</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Πυκνότητα</label>
+                  <select value={editingSettings.general.density} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, density: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="default">Default</option>
+                    <option value="comfortable">Άνετη</option>
+                    <option value="compact">Συμπαγής</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Τύπος Inbox</label>
+                  <select value={editingSettings.general.inbox_type} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, inbox_type: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="default">Default</option>
+                    <option value="important">Σημαντικά πρώτα</option>
+                    <option value="unread">Μη αναγνωσμένα πρώτα</option>
+                    <option value="starred">Αστέρια πρώτα</option>
+                    <option value="priority">Priority Inbox</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Παράθυρο ανάγνωσης</label>
+                  <select value={editingSettings.general.reading_pane} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, reading_pane: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="no_split">Χωρίς διαίρεση</option>
+                    <option value="right">Δεξιά του inbox</option>
+                    <option value="below">Κάτω από το inbox</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ακύρωση αποστολής (δευτ.)</label>
+                  <select value={editingSettings.general.undo_send} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, undo_send: parseInt(e.target.value) } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value={5}>5 δευτερόλεπτα</option>
+                    <option value={10}>10 δευτερόλεπτα</option>
+                    <option value={20}>20 δευτερόλεπτα</option>
+                    <option value={30}>30 δευτερόλεπτα</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Προεπιλεγμένη απάντηση</label>
+                  <select value={editingSettings.general.default_reply} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, default_reply: e.target.value } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value="reply">Απάντηση</option>
+                    <option value="reply_all">Απάντηση σε όλους</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Μέγιστο σελίδας</label>
+                  <select value={editingSettings.general.max_page_size} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, max_page_size: parseInt(e.target.value) } })}
+                    style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                {[
+                  { key: 'hover_actions', label: 'Ενέργειες hover' },
+                  { key: 'send_archive', label: 'Κουμπί "Αποστολή & Αρχειοθέτηση"' },
+                  { key: 'snippets', label: 'Αποσπάσματα μηνυμάτων' },
+                  { key: 'conversation_view', label: 'Προβολή συζήτησης (threading)' },
+                  { key: 'keyboard_shortcuts', label: 'Πλήκτρα συντομεύσεων' },
+                ].map(opt => (
+                  <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                    <input type="checkbox" checked={editingSettings.general[opt.key]}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, [opt.key]: e.target.checked } })}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Υπογραφή</h4>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
+                  <input type="checkbox" checked={editingSettings.signature?.enabled || false}
+                    onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, enabled: e.target.checked } })}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                  Ενεργοποίηση υπογραφής
+                </label>
+                {editingSettings.signature?.enabled && (
+                  <textarea value={editingSettings.signature?.content || ''} onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, content: e.target.value } })}
+                    placeholder="Τρέχουσα υπογραφή..."
+                    style={{ width: '100%', minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
+                )}
+              </div>
+
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Αυτόματη Απάντηση (Vacation Responder)</h4>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
+                  <input type="checkbox" checked={editingSettings.vacation?.enabled || false}
+                    onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, enabled: e.target.checked } })}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                  Ενεργοποίηση αυτόματης απάντησης
+                </label>
+                {editingSettings.vacation?.enabled && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input placeholder="Θέμα" value={editingSettings.vacation?.subject || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, subject: e.target.value } })} />
+                    <textarea value={editingSettings.vacation?.message || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, message: e.target.value } })}
+                      placeholder="Μήνυμα αυτόματης απάντησης..."
+                      style={{ minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Από</label>
+                        <input type="date" value={editingSettings.vacation?.start_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, start_date: e.target.value } })}
+                          style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Έως</label>
+                        <input type="date" value={editingSettings.vacation?.end_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, end_date: e.target.value } })}
+                          style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
+                      </div>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>
+                      <input type="checkbox" checked={editingSettings.vacation?.contacts_only || false}
+                        onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, contacts_only: e.target.checked } })}
+                        style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
+                      Αποστολή μόνο σε επαφές
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>Άκυρο</button>
+                <button className="btn btn-primary" onClick={handleSaveSettings}>Αποθήκευση Ρυθμίσεων</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

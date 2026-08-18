@@ -704,11 +704,11 @@ export default function LandingPage() {
           <div className="footer-bottom">
             <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
             <div className="footer-legal-links">
-              <a href="https://hlektrismos.gr/politiki-aporritou/" target="_blank" rel="noopener noreferrer">Πολιτική Απορρήτου</a>
+              <a href="#/privacy">Πολιτική Απορρήτου</a>
               <span>·</span>
-              <a href="https://hlektrismos.gr/oroi-chrisis/" target="_blank" rel="noopener noreferrer">Όροι Χρήσης</a>
+              <a href="#/terms">Όροι Χρήσης</a>
               <span>·</span>
-              <a href="https://hlektrismos.gr/cookies/" target="_blank" rel="noopener noreferrer">Cookies</a>
+              <a href="#/cookies">Cookies</a>
             </div>
           </div>
         </div>

@@ -9,8 +9,11 @@ import ServicesPage from '@/pages/ServicesPage';
 import EnergyPage from '@/pages/EnergyPage';
 import FaqPage from '@/pages/FaqPage';
 import ContactPage from '@/pages/ContactPage';
+import TermsOfUse from '@/pages/TermsOfUse';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import Cookies from '@/pages/Cookies';
 
-type Route = 'landing' | 'login' | 'dashboard' | 'about' | 'services' | 'energy' | 'faq' | 'contact';
+type Route = 'landing' | 'login' | 'dashboard' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies';
 
 function getRouteFromHash(): Route {
   const hash = window.location.hash.replace('#', '');
@@ -21,6 +24,9 @@ function getRouteFromHash(): Route {
   if (hash === '/energy') return 'energy';
   if (hash === '/faq') return 'faq';
   if (hash === '/contact') return 'contact';
+  if (hash === '/terms') return 'terms';
+  if (hash === '/privacy') return 'privacy';
+  if (hash === '/cookies') return 'cookies';
   return 'landing';
 }
 
@@ -55,6 +61,9 @@ function Router() {
   if (route === 'energy') return <EnergyPage />;
   if (route === 'faq') return <FaqPage />;
   if (route === 'contact') return <ContactPage />;
+  if (route === 'terms') return <TermsOfUse />;
+  if (route === 'privacy') return <PrivacyPolicy />;
+  if (route === 'cookies') return <Cookies />;
 
   return <LandingPage />;
 }

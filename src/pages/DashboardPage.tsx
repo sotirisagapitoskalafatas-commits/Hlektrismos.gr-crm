@@ -1159,6 +1159,19 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   toggleAgentInConversation: (agentId: string) => void;
 }) {
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
+  const [hubApiKey, setHubApiKey] = useState(() => localStorage.getItem('hub_api_key') || '');
+  const [hubModel, setHubModel] = useState(() => localStorage.getItem('hub_model') || 'gemini-3.6-flash');
+  const [showHubSettings, setShowHubSettings] = useState(false);
+
+  const GEMINI_MODELS = [
+    { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Latest)', desc: 'Το πιο πρόσφατο & ταχύ' },
+    { value: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro', desc: 'Το πιο πρόσφατο & έξυπνο' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Ταχύ, stable' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'Έξυπνο, αργότερο' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Γρήγορο, παλαιότερο' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Ελαφρύ, budget-friendly' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', desc: 'Κλασικό pro μοντέλο' },
+  ];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1194,6 +1207,8 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
           mode: 'chat',
           multi_agent: hubSelectedAgents.length > 1,
           agent_ids: hubSelectedAgents,
+          api_key: hubApiKey || undefined,
+          model: hubModel || undefined,
         },
       });
 
@@ -1291,7 +1306,77 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         {/* Main Chat Area */}
         <div className="hub-main">
           <div className="hub-content-header">
-            <p>Επικοινώνησε με τον Master Orchestrator ή με συγκεκριμένα AI agents. Κάθε μήνυμα αποθηκεύεται στη μνήμη του agent.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0 }}>Επικοινώνησε με τον Master Orchestrator ή με συγκεκριμένα AI agents. Κάθε μήνυμα αποθηκεύεται στη μνήμη του agent.</p>
+                {hubApiKey && (
+                  <span style={{ fontSize: '11px', color: '#10b981', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                    API Key συνδεδεμένο · {GEMINI_MODELS.find(m => m.value === hubModel)?.label || hubModel}
+                  </span>
+                )}
+                {!hubApiKey && (
+                  <span style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                    Χωρίς API Key — πρόσθεσε τον κλειδί σου στις ρυθμίσεις (⚙️)
+                  </span>
+                )}
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowHubSettings(!showHubSettings)}
+                title="Ρυθμίσεις API & Μοντέλου"
+                style={{ flexShrink: 0 }}
+              >
+                <Settings size={16} />
+              </button>
+            </div>
+            {showHubSettings && (
+              <div style={{
+                marginTop: '12px', padding: '16px', background: '#f8fafc', borderRadius: '12px',
+                border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px',
+              }}>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>⚙️ Ρυθμίσεις Agent Hub</div>
+                <div className="drawer-field">
+                  <label style={{ fontWeight: 500, fontSize: '12px' }}>Google Gemini API Key</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="password"
+                      value={hubApiKey}
+                      onChange={(e) => {
+                        setHubApiKey(e.target.value);
+                        localStorage.setItem('hub_api_key', e.target.value);
+                      }}
+                      placeholder="AIzaSy..."
+                      style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px' }}
+                    />
+                    {hubApiKey && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ whiteSpace: 'nowrap' }}>Καθαρισμός</button>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Λήψη από: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>Google AI Studio</a> · Το κλειδί αποθηκεύεται τοπικά στον browser σου
+                  </span>
+                </div>
+                <div className="drawer-field">
+                  <label style={{ fontWeight: 500, fontSize: '12px' }}>Gemini Μοντέλο</label>
+                  <select
+                    value={hubModel}
+                    onChange={(e) => {
+                      setHubModel(e.target.value);
+                      localStorage.setItem('hub_model', e.target.value);
+                    }}
+                  >
+                    {GEMINI_MODELS.map(m => (
+                      <option key={m.value} value={m.value}>{m.label} — {m.desc}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', background: '#e0f2fe', padding: '8px 12px', borderRadius: '8px' }}>
+                  💡 <strong>Πώς δουλεύει:</strong> Το API key σου χρησιμοποιείται απευθείας στη κλήση προς το Google Generative Language API. Το key δεν αποθηκεύεται στον server — μόνο στον browser σου.
+                </div>
+              </div>
+            )}
             <div className="hub-multi-agent-selector">
               <label>Agents:</label>
               <div className="hub-agent-checkboxes">
@@ -2737,6 +2822,7 @@ function B2BScraperTab({ toast, setToast }: {
     maxResults: 50,
     source: 'auto',
     importToDb: false,
+    googleApiKey: '',
   });
   const [scraping, setScraping] = useState(false);
   const [scrapeResults, setScrapeResults] = useState<any[]>([]);

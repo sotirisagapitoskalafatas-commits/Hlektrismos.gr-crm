@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apiapi, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req: any) => {
@@ -101,7 +101,7 @@ ${visitorContext}
 
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('CRM_AI_AGENT') || Deno.env.get('CRM_AI_AGENT_2') || '';
 
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ ${visitorContext}
       },
       body: JSON.stringify({
         system_instruction: {
-          parts: { text: systemPrompt }
+          parts: [{ text: systemPrompt }]
         },
         contents: geminiMessages,
         generationConfig: {
@@ -117,6 +117,7 @@ ${visitorContext}
           maxOutputTokens: 300,
         }
       }),
+      signal: AbortSignal.timeout(30000),
     })
 
     const aiData = await geminiResponse.json()

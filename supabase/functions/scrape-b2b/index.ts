@@ -16,375 +16,165 @@ interface ScrapedBusiness {
   category: string;
   region: string;
   source: string;
+  lat?: number;
+  lng?: number;
+  rating?: number;
+  totalReviews?: number;
+  placeId?: string;
 }
 
-// Greek business directory category mappings
-const categoryKeywords: Record<string, string[]> = {
-  bakery: ["αρτοποιείο", "αρτοπωλείο", "ζαχαροπλαστείο", "bakery", "φούρνος", "ψησταριά"],
-  restaurant: ["εστιατόριο", "εστιατόρια", "ταβέρνα", "restaurant", "καφετέρια", "οινοποσείο"],
-  hotel: ["ξενοδοχείο", "ξενοδοχεία", "hotel", "μοτέλ", "πάνσιον", "ενοικιαζόμενα"],
-  construction: ["κατασκευαστική", "κατασκευές", "construction", "εργοληπτική", "ανακαίνιση"],
-  energy: ["ενέργεια", "ηλεκτρική", "φωτοβολταϊκά", "solar", "energy", "ρεύμα"],
-  solar: ["φωτοβολταϊκά", "solar", "ηλιακή", "pv", "φ/β", "photovoltaic"],
-  ev_charging: ["φόρτιση", "ev", "ηλεκτροκίνηση", "charging", "ενεργειακός", "station"],
-  real_estate: ["ακίνητα", "μεσιτική", "real estate", "ακινητομεσιτική", "property"],
-  retail: ["κατάστημα", "εμπορικό", "retail", "λιανική", "πωλήσεις"],
-  manufacturing: ["βιομηχανία", "εργοστάσιο", "manufacturing", "παραγωγή", "βιομηχανική"],
-  technology: ["τεχνολογία", "software", "it", "tech", "ψηφιακό", "digital"],
-  healthcare: ["υγεία", "γιατρός", "νοσοκομείο", "φαρμακείο", "clinic", "medical"],
-  automotive: ["αυτοκίνητο", "επισκευή", "αυτοκινητοβιομηχανία", "car", "garage", "μηχανικός"],
-  professional: ["δικηγόρος", "λογιστής", "μηχανικός", "architect", "γραφείο", "professional"],
-  education: ["σχολείο", "φροντιστήριο", "σχολή", "education", "κέντρο", "μάθησης"],
-  fitness: ["γυμναστήριο", "fitness", "sports", "αθλητικό", "gym", "yoga"],
-  beauty: ["κομμωτήριο", "ομορφιά", "beauty", "salon", "αισθητική", "μασάζ"],
-  logistics: ["μεταφορά", "logistics", "αποστολή", "courier", "μεταφορική"],
-  agriculture: ["γεωργία", "αγρόκτημα", "agriculture", "φυτική", "κτηνοτροφία"],
-  other: ["επιχείρηση", "business", "company", "εταιρεία"],
+// Greek business category keywords for search queries
+const categorySearchTerms: Record<string, string[]> = {
+  energy: ["ενέργεια εταιρεία", "ηλεκτροενέργεια", "εταιρεία ρεύματος"],
+  solar: ["φωτοβολταϊκά", "solar panels", "ηλιακή ενέργεια", "pv install"],
+  ev_charging: ["σταθμός φόρτισης", "ev charging", "ηλεκτροκίνηση"],
+  real_estate: ["ακίνητα", "μεσιτικό γραφείο", "real estate"],
+  construction: ["κατασκευαστική εταιρεία", "εργοληπτική"],
+  restaurant: ["εστιατόριο", "ταβέρνα", "εστιατόρια"],
+  hotel: ["ξενοδοχείο", "μοτέλ", "ξενοδοχεία"],
+  retail: ["κατάστημα", "εμπορικό κέντρο", "showroom"],
+  technology: ["software εταιρεία", "IT εταιρεία", "τεχνολογία"],
+  healthcare: ["ιατρείο", "κλινική", "φαρμακείο", "νοσοκομείο"],
+  automotive: ["αυτοκίνητο service", "επισκευή αυτοκινήτου", "garage"],
+  professional: ["δικηγορικό γραφείο", "λογιστικό γραφείο", "μηχανικός"],
+  fitness: ["γυμναστήριο", "fitness center", "gym"],
+  beauty: ["κομμωτήριο", "αισθητική", "beauty salon"],
+  logistics: ["μεταφορική εταιρεία", "logistics", "courier"],
+  education: ["φροντιστήριο", "σχολή", "akadimía"],
+  bakery: ["αρτοποιείο", "ζαχαροπλαστείο", "φούρνος"],
+  other: ["εταιρεία", "επιχείρηση", "business"],
 };
 
-// Scrape xo.gr (Greek Yellow Pages)
-async function scrapeXoGr(
-  category: string,
-  region: string,
+// Region to approximate lat/lng for Greek regions
+const regionCoords: Record<string, { lat: number; lng: number }> = {
+  Αττική: { lat: 37.9838, lng: 23.7275 },
+  Θεσσαλονίκη: { lat: 40.6401, lng: 22.9444 },
+  Κεντρική_Ελλάδα: { lat: 38.2466, lng: 23.6647 },
+  Πελοπόννησος: { lat: 37.5, lng: 22.5 },
+  Κρήτη: { lat: 35.2401, lng: 24.4691 },
+  Ιόνια_Νησιά: { lat: 39.6243, lng: 19.9217 },
+  Νησιά_Αιγαίου: { lat: 37.5, lng: 25.5 },
+  Θεσσαλία: { lat: 39.6, lng: 22.0 },
+  Ήπειρος: { lat: 39.6, lng: 20.8 },
+  Δυτική_Ελλάδα: { lat: 38.2, lng: 21.7 },
+  Στερεά_Ελλάδα: { lat: 38.6, lng: 22.7 },
+  Δυτική_Μακεδονία: { lat: 40.3, lng: 21.8 },
+  Ανατολική_Μακεδονία_Θράκη: { lat: 41.1, lng: 24.8 },
+  Βόρειο_Αιγαίο: { lat: 39.0, lng: 26.0 },
+};
+
+// Google Maps Places API (Nearby Search)
+async function searchGooglePlaces(
+  apiKey: string,
+  searchTerm: string,
+  lat: number,
+  lng: number,
   maxResults: number
 ): Promise<ScrapedBusiness[]> {
-  const keywords = categoryKeywords[category] || categoryKeywords.other;
-  const query = encodeURIComponent(keywords[0] + (region ? " " + region : ""));
-  const url = `https://www.xo.gr/en/search/?q=${query}&page=1`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "el-GR,el;q=0.9,en;q=0.8",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    const businesses: ScrapedBusiness[] = [];
-
-    // Parse business listings from xo.gr HTML
-    const listingRegex =
-      /<div[^>]*class="[^"]*result[^"]*"[^>]*>[\s\S]*?<h2[^>]*>(.*?)<\/h2>[\s\S]*?<\/div>/gi;
-    const phoneRegex = /(\+?30)?[\s-]?(\d{10}|\d{3}[\s-]?\d{3}[\s-]?\d{4})/g;
-    const emailRegex = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-
-    let match;
-    while ((match = listingRegex.exec(html)) !== null && businesses.length < maxResults) {
-      const block = match[0];
-      const nameMatch = block.match(/<h2[^>]*>(.*?)<\/h2>/i);
-      const phoneMatch = block.match(phoneRegex);
-      const emailMatch = block.match(emailRegex);
-
-      if (nameMatch) {
-        businesses.push({
-          company: nameMatch[1].replace(/<[^>]+>/g, "").trim(),
-          phone: phoneMatch ? phoneMatch[0].trim() : "",
-          email: emailMatch ? emailMatch[0] : "",
-          address: "",
-          website: "",
-          category,
-          region,
-          source: "xo.gr",
-        });
-      }
-    }
-
-    return businesses;
-  } catch {
-    return [];
-  }
-}
-
-// Scrape vrisko.gr (Greek Local Search)
-async function scrapeVriskoGr(
-  category: string,
-  region: string,
-  maxResults: number
-): Promise<ScrapedBusiness[]> {
-  const keywords = categoryKeywords[category] || categoryKeywords.other;
-  const query = encodeURIComponent(keywords[0] + (region ? " " + region : ""));
-  const url = `https://www.vrisko.gr/Search?q=${query}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "el-GR,el;q=0.9,en;q=0.8",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    const businesses: ScrapedBusiness[] = [];
-
-    // Parse business listings from vrisko.gr HTML
-    const listingRegex =
-      /<div[^>]*class="[^"]*listing[^"]*"[^>]*>[\s\S]*?<\/div>/gi;
-    const nameRegex = /<h[23][^>]*>(.*?)<\/h[23]>/gi;
-    const phoneRegex = /(\+?30)?[\s-]?(\d{10}|\d{3}[\s-]?\d{3}[\s-]?\d{4})/g;
-    const emailRegex = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-
-    let match;
-    while ((match = listingRegex.exec(html)) !== null && businesses.length < maxResults) {
-      const block = match[0];
-      const nameMatch = block.match(/<h[23][^>]*>(.*?)<\/h[23]>/i);
-      const phoneMatch = block.match(phoneRegex);
-      const emailMatch = block.match(emailRegex);
-
-      if (nameMatch) {
-        businesses.push({
-          company: nameMatch[1].replace(/<[^>]+>/g, "").trim(),
-          phone: phoneMatch ? phoneMatch[0].trim() : "",
-          email: emailMatch ? emailMatch[0] : "",
-          address: "",
-          website: "",
-          category,
-          region,
-          source: "vrisko.gr",
-        });
-      }
-    }
-
-    return businesses;
-  } catch {
-    return [];
-  }
-}
-
-// Scrape Google Maps search results (public search page)
-async function scrapeGoogleMaps(
-  category: string,
-  region: string,
-  maxResults: number
-): Promise<ScrapedBusiness[]> {
-  const keywords = categoryKeywords[category] || categoryKeywords.other;
-  const query = encodeURIComponent(
-    keywords[0] + (region ? " " + region : "") + " Ελλάδα"
-  );
-  const url = `https://www.google.com/search?q=${query}&tbm=lcl`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "el-GR,el;q=0.9,en;q=0.8",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    const businesses: ScrapedBusiness[] = [];
-
-    // Parse Google local results
-    const resultRegex =
-      /<div[^>]*class="[^"]*(?:rllt|VkpGBb)[^"]*"[^>]*>[\s\S]*?<\/div>/gi;
-    const nameRegex = /<span[^>]*>([^<]+)<\/span>/i;
-    const phoneRegex = /(\+?30)?[\s-]?(\d{10}|\d{3}[\s-]?\d{3}[\s-]?\d{4})/g;
-    const emailRegex = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-
-    let match;
-    while ((match = resultRegex.exec(html)) !== null && businesses.length < maxResults) {
-      const block = match[0];
-      const nameMatch = block.match(/<span[^>]*>([^<]+)<\/span>/i);
-      const phoneMatch = block.match(phoneRegex);
-      const emailMatch = block.match(emailRegex);
-
-      if (nameMatch) {
-        businesses.push({
-          company: nameMatch[1].trim(),
-          phone: phoneMatch ? phoneMatch[0].trim() : "",
-          email: emailMatch ? emailMatch[0] : "",
-          address: "",
-          website: "",
-          category,
-          region,
-          source: "google_maps",
-        });
-      }
-    }
-
-    return businesses;
-  } catch {
-    return [];
-  }
-}
-
-// Scrape cybo.com (international directory with Greece coverage)
-async function scrapeCybo(
-  category: string,
-  region: string,
-  maxResults: number
-): Promise<ScrapedBusiness[]> {
-  const keywords = categoryKeywords[category] || categoryKeywords.other;
-  const query = encodeURIComponent(keywords[0]);
-  const url = `https://cybo.com/GR/search?q=${query}${region ? "&l=" + encodeURIComponent(region) : ""}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "el-GR,el;q=0.9,en;q=0.8",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    const businesses: ScrapedBusiness[] = [];
-
-    // Parse cybo listings
-    const listingRegex =
-      /<div[^>]*class="[^"]*company[^"]*"[^>]*>[\s\S]*?<\/div>/gi;
-    const nameRegex = /<h[23][^>]*>(.*?)<\/h[23]>/gi;
-    const phoneRegex = /(\+?30)?[\s-]?(\d{10}|\d{3}[\s-]?\d{3}[\s-]?\d{4})/g;
-    const emailRegex = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-
-    let match;
-    while ((match = listingRegex.exec(html)) !== null && businesses.length < maxResults) {
-      const block = match[0];
-      const nameMatch = block.match(/<h[23][^>]*>(.*?)<\/h[23]>/i);
-      const phoneMatch = block.match(phoneRegex);
-      const emailMatch = block.match(emailRegex);
-
-      if (nameMatch) {
-        businesses.push({
-          company: nameMatch[1].replace(/<[^>]+>/g, "").trim(),
-          phone: phoneMatch ? phoneMatch[0].trim() : "",
-          email: emailMatch ? emailMatch[0] : "",
-          address: "",
-          website: "",
-          category,
-          region,
-          source: "cybo.com",
-        });
-      }
-    }
-
-    return businesses;
-  } catch {
-    return [];
-  }
-}
-
-// Generate mock businesses based on real Greek business patterns
-// (fallback when scraping returns empty)
-function generateRealisticBusinesses(
-  category: string,
-  region: string,
-  count: number
-): ScrapedBusiness[] {
-  const regionCities: Record<string, string[]> = {
-    Αττική: ["Αθήνα", "Πειραιάς", "Μαρούσι", "Γλυφάδα", "Καλλιθέα", "Χαλάνδρι", "Βύρωνας", "Νέο Φάληρο", "Αμπελόκηποι", "Εξάρχειος"],
-    Θεσσαλονίκη: ["Θεσσαλονίκη", "Καλαμαριά", "Σταυρούπολη", "Πυλαία", "Εξοχή", "Τρία Αδέλφια", "Αμπελόκηποι", "Λαδάδικα"],
-    Κεντρική_Ελλάδα: ["Λαμία", "Χαλκίδα", "Λιβαδειά", "Αρτοπόστολος", "Καμμένα Βούρλα", "Ιθάκη"],
-    Πελοπόννησος: ["Πάτρα", "Καλαμάτα", "Σπάρτη", "Ναύπλιο", "Κορινθία", "Μεσσηνία"],
-    Κρήτη: ["Ηράκλειο", "Χανιά", "Ρέθυμνο", "Άγιος Νικόλαος", "Ιεράπετρα", "Μάλια"],
-    Ιόνια_Νησιά: ["Κέρκυρα", "Ζάκυνθος", "Λευκάδα", "Κεφαλλονιά", "Ιθάκη"],
-    Νησιά_Αιγαίου: ["Μύκονος", "Σαντορίνη", "Ρόδος", "Μυτιλήνη", "Χίος", "Σάμος"],
-    Θεσσαλία: ["Λάρισα", "Βόλος", "Τρίκαλα", "Καρδίτσα", "Σποράδες"],
-    Ήπειρος: ["Ιωάννινα", "Άρτα", "Πρέβεζα", "Ηγουμενίτσα"],
-    Δυτική_Ελλάδα: ["Πάτρα", "Μεσολογγίο", "Αγρίνιο", "Πύργος"],
-    Στερεά_Ελλάδα: ["Λαμία", "Χαλκίδα", "Λιβαδειά", "Αταλάντη"],
-    Δυτική_Μακεδονία: ["Κοζάνη", "Καστοριά", "Γρεβενά", "Φλώρινα"],
-    Ανατολική_Μακεδονία_Θράκη: ["Κομοτηνή", "Αλεξανδρούπολη", "Καβάλα", "Ξάνθη", "Δράμα"],
-    Βόρειο_Αιγαίο: ["Μυτιλήνη", "Χίος", "Σάμος", "Ικαρία"],
-  };
-
-  const cities = regionCities[region] || regionCities["Αττική"];
   const businesses: ScrapedBusiness[] = [];
+  let pageToken = "";
+  let fetched = 0;
 
-  // Real Greek company name patterns
-  const namePatterns: Record<string, string[]> = {
-    bakery: ["Αρτοποιείο", "Ζαχαροπλαστείο", "Ψησταριά", "Φούρνος", "Bakery", "Αρτόπωλο"],
-    restaurant: ["Εστιατόριο", "Ταβέρνα", "Οινοποσείο", "Restaurant", "Μεζέδοπωλείο", "Μπουφέ"],
-    hotel: ["Ξενοδοχείο", "Μοτέλ", "Πάνσιον", "Hotel", "Resort", "Βίλα"],
-    construction: ["Κατασκευαστική", "Εργοληπτική", "Ανακαίνιση", "Construction", "Μεταλλουργείο"],
-    energy: ["Ενέργεια", "Ηλεκτρική", "ΕΦΔ", "Energy", "ΔΕΗ", "Ρεύμα"],
-    solar: ["Φωτοβολταϊκά", "Solar", "PV", "Ηλιακή", "Green Energy", "Sun Power"],
-    ev_charging: ["EV Charge", "Φόρτιση", "Charging Station", "E-Mobility", "Ηλεκτροκίνηση"],
-    real_estate: ["Ακίνητα", "Μεσιτική", "Real Estate", "Property", "Ακινητομεσιτική"],
-    retail: ["Κατάστημα", "Εμπορικό", "Retail", "Λιανική", "Showroom", "Boutique"],
-    manufacturing: ["Βιομηχανία", "Εργοστάσιο", "Manufacturing", "Παραγωγή", "Εργαστήριο"],
-    technology: ["Tech", "Software", "IT", "Digital", "Ψηφιακό", "Solutions"],
-    healthcare: ["Ιατρείο", "Κλινική", "Φαρμακείο", "Νοσοκομείο", "Medical", "Health"],
-    automotive: ["Αυτοκίνητο", "Επισκευή", "Garage", "Μηχανικός", "Car Service", "Auto"],
-    professional: ["Δικηγορικό", "Λογιστικό", "Μηχανικός", "Γραφείο", "Studio", "Consulting"],
-    education: ["Φροντιστήριο", "Σχολή", "Κέντρο", "Academy", "Education", "Training"],
-    fitness: ["Γυμναστήριο", "Fitness", "Gym", "Sports", "Studio", "CrossFit"],
-    beauty: ["Κομμωτήριο", "Beauty", "Salon", "Αισθητική", "Spa", "Wellness"],
-    logistics: ["Μεταφορά", "Logistics", "Courier", "Αποστολή", "Μεταφορική", "Delivery"],
-    agriculture: ["Αγρόκτημο", "Γεωργία", "Agriculture", "Ελαιώνας", "Αμπελώνας"],
-    other: ["Εταιρεία", "Επιχείρηση", "Business", "Company", "Services", "Solutions"],
-  };
+  while (fetched < maxResults) {
+    const radius = 20000; // 20km
+    let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(searchTerm)}&language=el&key=${apiKey}`;
+    if (pageToken) url += `&pagetoken=${pageToken}`;
 
-  const names = namePatterns[category] || namePatterns.other;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!response.ok) break;
+      const data = await response.json();
+      if (!data.results || data.results.length === 0) break;
 
-  for (let i = 0; i < count; i++) {
-    const city = cities[i % cities.length];
-    const namePrefix = names[i % names.length];
-    const suffixes = ["Α.Ε.", "Ε.Π.Ε.", "Ε.E.", "Ω.Ε.", "Μ.Ε.", "Λτδ.", ""];
-    const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+      for (const place of data.results) {
+        if (fetched >= maxResults) break;
+        businesses.push({
+          company: place.name || "",
+          phone: place.formatted_phone_number || "",
+          email: "",
+          address: place.vicinity || "",
+          website: "",
+          category: searchTerm,
+          region: "",
+          source: "google_places",
+          lat: place.geometry?.location?.lat,
+          lng: place.geometry?.location?.lng,
+          rating: place.rating,
+          totalReviews: place.user_ratings_total,
+          placeId: place.place_id,
+        });
+        fetched++;
+      }
 
-    // Generate realistic Greek phone numbers
-    const areaCodes: Record<string, string> = {
-      Αθήνα: "210",
-      Πειραιάς: "210",
-      Θεσσαλονίκη: "231",
-      Πάτρα: "261",
-      Ηράκλειο: "281",
-      Λάρισα: "241",
-      Βόλος: "242",
-      Ιωάννινα: "265",
-      Χανιά: "2821",
-      Ρέθυμνο: "2831",
-      Κέρκυρα: "2661",
-      Ζάκυνθος: "2695",
-      Κομοτηνή: "2531",
-      Καβάλα: "2510",
-      Ξάνθη: "2541",
-      Λαμία: "2231",
-      Χαλκίδα: "22210",
-    };
-    const areaCode = areaCodes[city] || "210";
-    const phoneNum = `${areaCode}${String(Math.floor(Math.random() * 9000000) + 1000000).slice(-7)}`;
-
-    // Generate realistic Greek email
-    const nameSlug = namePrefix
-      .toLowerCase()
-      .replace(/[^a-z0-9α-ωά-ώ]/g, "")
-      .slice(0, 12);
-    const emailDomains = ["gr", "com", "eu"];
-    const emailDomain = emailDomains[Math.floor(Math.random() * emailDomains.length)];
-
-    businesses.push({
-      company: `${namePrefix} ${city} ${suffix}`.trim(),
-      phone: phoneNum,
-      email: `info@${nameSlug}${i}.${emailDomain}`,
-      address: `${["Λεωφόρος", "Οδός", "Πλατεία", "Δρόμος"][i % 4]} ${["Σολωμού", "Ελευθερίου", "Βενιζέλου", "Κολοκοτρώνη", "Μαυροκορδάτου", "Ασκληπιού"][i % 6]} ${Math.floor(Math.random() * 100) + 1}, ${city}`,
-      website: `www.${nameSlug}${i}.gr`,
-      category,
-      region,
-      source: "generated",
-    });
+      pageToken = data.next_page_token || "";
+      if (!pageToken) break;
+      // Google requires delay before using next_page_token
+      await new Promise((r) => setTimeout(r, 2000));
+    } catch {
+      break;
+    }
   }
+  return businesses;
+}
 
+// Google Maps Place Details (get phone, website, email)
+async function getPlaceDetails(
+  apiKey: string,
+  placeId: string
+): Promise<{ phone: string; website: string; address: string }> {
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website,formatted_address&language=el&key=${apiKey}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) return { phone: "", website: "", address: "" };
+    const data = await response.json();
+    return {
+      phone: data.result?.formatted_phone_number || "",
+      website: data.result?.website || "",
+      address: data.result?.formatted_address || "",
+    };
+  } catch {
+    return { phone: "", website: "", address: "" };
+  }
+}
+
+// Google Custom Search API (web search for businesses)
+async function searchGoogleCustom(
+  apiKey: string,
+  cseId: string,
+  query: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const businesses: ScrapedBusiness[] = [];
+  try {
+    const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${apiKey}&cx=${cseId}&num=${Math.min(maxResults, 10)}&gl=gr&hl=el`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) return [];
+    const data = await response.json();
+
+    for (const item of data.items || []) {
+      if (businesses.length >= maxResults) break;
+      const title = item.title || "";
+      const snippet = item.snippet || "";
+      const link = item.link || "";
+
+      // Extract phone from snippet
+      const phoneMatch = snippet.match(/(\+?30)?[\s-]?(\d{10}|\d{3}[\s.-]\d{3}[\s.-]\d{4})/);
+      const emailMatch = snippet.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+
+      businesses.push({
+        company: title.split(" - ")[0].trim(),
+        phone: phoneMatch ? phoneMatch[0].trim() : "",
+        email: emailMatch ? emailMatch[0] : "",
+        address: "",
+        website: link,
+        category: "",
+        region: "",
+        source: "google_search",
+      });
+    }
+  } catch {
+    // silent
+  }
   return businesses;
 }
 
@@ -407,54 +197,73 @@ Deno.serve(async (req: Request) => {
       maxResults = 20,
       source = "auto",
       importToDb = false,
+      googleApiKey = "",
+      customSearchId = "",
     } = await req.json();
 
-    let allBusinesses: ScrapedBusiness[] = [];
+    const apiKey = googleApiKey || Deno.env.get("GOOGLE_MAPS_API_KEY") || Deno.env.get("GEMINI_API_KEY") || "";
+    const cseId = customSearchId || Deno.env.get("GOOGLE_CUSTOM_SEARCH_ID") || "";
 
-    // Try multiple sources
+    let allBusinesses: ScrapedBusiness[] = [];
+    const searchTerms = categorySearchTerms[category] || categorySearchTerms.other;
+    const coords = regionCoords[region] || regionCoords["Αττική"];
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "No Google API key configured. Please add GOOGLE_MAPS_API_KEY in Supabase Edge Function secrets, or provide a Google Maps API key in the scraper settings.",
+          businesses: [],
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
     const sources =
       source === "auto"
-        ? ["xo.gr", "vrisko.gr", "cybo", "google_maps"]
+        ? ["google_places", "google_search"]
         : [source];
 
     for (const src of sources) {
       if (allBusinesses.length >= maxResults) break;
 
-      let results: ScrapedBusiness[] = [];
-      const remaining = maxResults - allBusinesses.length;
+      for (const term of searchTerms) {
+        if (allBusinesses.length >= maxResults) break;
+        const remaining = maxResults - allBusinesses.length;
 
-      switch (src) {
-        case "xo.gr":
-          results = await scrapeXoGr(category, region, remaining);
-          break;
-        case "vrisko.gr":
-          results = await scrapeVriskoGr(category, region, remaining);
-          break;
-        case "cybo":
-          results = await scrapeCybo(category, region, remaining);
-          break;
-        case "google_maps":
-          results = await scrapeGoogleMaps(category, region, remaining);
-          break;
+        if (src === "google_places") {
+          const results = await searchGooglePlaces(apiKey, term, coords.lat, coords.lng, remaining);
+          allBusinesses = [...allBusinesses, ...results];
+        } else if (src === "google_search" && cseId) {
+          const results = await searchGoogleCustom(apiKey, cseId, `${term} ${region ? region + " " : ""}Ελλάδα τηλέφωνο email`, remaining);
+          allBusinesses = [...allBusinesses, ...results];
+        }
       }
-
-      allBusinesses = [...allBusinesses, ...results];
     }
 
-    // If scraping returned empty, generate realistic businesses based on patterns
-    if (allBusinesses.length === 0) {
-      allBusinesses = generateRealisticBusinesses(
-        category,
-        region,
-        Math.min(maxResults, 50)
+    // Enrich with place details (phone, website) for places results
+    if (allBusinesses.some((b) => b.placeId && !b.phone)) {
+      const enriched = await Promise.all(
+        allBusinesses.slice(0, 20).map(async (biz) => {
+          if (biz.placeId && !biz.phone) {
+            const details = await getPlaceDetails(apiKey, biz.placeId);
+            return {
+              ...biz,
+              phone: details.phone || biz.phone,
+              website: details.website || biz.website,
+              address: details.address || biz.address,
+            };
+          }
+          return biz;
+        })
       );
+      allBusinesses = [...enriched, ...allBusinesses.slice(20)];
     }
 
     // Import to database if requested
     if (importToDb && allBusinesses.length > 0) {
       let imported = 0;
       for (const biz of allBusinesses.slice(0, maxResults)) {
-        // Split company name into first/last for the leads table
         const nameParts = biz.company.split(" ");
         const firstName = nameParts[0] || biz.company;
         const lastName = nameParts.slice(1).join(" ") || "";
@@ -464,13 +273,13 @@ Deno.serve(async (req: Request) => {
           last_name: lastName,
           email: biz.email || "",
           phone: biz.phone || "",
-          region: biz.region,
+          region: region || biz.region,
           customer_type: "Εταιρεία (B2B)",
           provider: "B2B Scraper",
           status: "new",
           lawful_basis: "Legitimate_Interest",
           customer_category: "B2B_Corporate",
-          comments: `Source: ${biz.source} | Category: ${biz.category} | Address: ${biz.address} | Website: ${biz.website}`,
+          comments: `Source: ${biz.source} | Category: ${biz.category} | Address: ${biz.address} | Website: ${biz.website} | Rating: ${biz.rating || "N/A"} (${biz.totalReviews || 0} reviews)`,
         });
 
         if (!error) imported++;
@@ -482,11 +291,12 @@ Deno.serve(async (req: Request) => {
           count: allBusinesses.length,
           imported,
           businesses: allBusinesses,
+          source_info: {
+            api: "Google Maps Places API + Custom Search",
+            key_configured: true,
+          },
         }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -495,19 +305,17 @@ Deno.serve(async (req: Request) => {
         success: true,
         count: allBusinesses.length,
         businesses: allBusinesses,
+        source_info: {
+          api: "Google Maps Places API + Custom Search",
+          key_configured: true,
+        },
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
     return new Response(
       JSON.stringify({ error: String(error), success: false }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });

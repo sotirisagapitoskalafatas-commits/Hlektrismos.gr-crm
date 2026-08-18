@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
     const systemInstruction = messages.find((m) => m.role === "system");
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
       {
         method: "POST",
         headers: {

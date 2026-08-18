@@ -108,16 +108,17 @@ Email: ${lead.email}
 
       // Call Gemini API (use agent's custom key if available)
       const apiKey = agent.custom_api_key || geminiApiKey;
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-goog-api-key': apiKey,
         },
         body: JSON.stringify({
-          system_instruction: { parts: { text: systemPrompt } },
+          system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
         }),
+        signal: AbortSignal.timeout(60000),
       });
 
       const aiData = await geminiResponse.json();

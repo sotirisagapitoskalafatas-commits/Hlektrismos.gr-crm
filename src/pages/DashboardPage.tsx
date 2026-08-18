@@ -98,7 +98,7 @@ type Tariff = {
   updated_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -519,6 +519,7 @@ export default function DashboardPage() {
     market: 'Market RAG',
     hub: 'Agent Hub',
     orchestrator: 'Orchestrator Director',
+    settings: 'Ρυθμίσεις & Integrations',
     reports: 'Reports',
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
@@ -539,6 +540,7 @@ export default function DashboardPage() {
           <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}><Globe size={18} /> Market RAG</button>
           <button className={tab === 'hub' ? 'active' : ''} onClick={() => setTab('hub')}><Sparkles size={18} /> Agent Hub</button>
           <button className={tab === 'orchestrator' ? 'active' : ''} onClick={() => setTab('orchestrator')}><Activity size={18} /> Orchestrator Director</button>
+          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Settings size={18} /> Ρυθμίσεις</button>
           <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}><FileText size={18} /> Reports</button>
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Χρήστες</button>
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
@@ -1034,6 +1036,9 @@ export default function DashboardPage() {
                 setConfigAgent={setConfigAgent}
                 loadData={loadData}
               />
+            )}
+            {tab === 'settings' && (
+              <IntegrationsTab toast={toast} setToast={setToast} />
             )}
           </>
         )}
@@ -1725,95 +1730,279 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   );
 }
 
-function B2BScraperTab({ toast, setToast }: {
+function IntegrationsTab({ toast, setToast }: {
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
 }) {
-  const [scrapeConfig, setScrapeConfig] = useState({
-    category: 'energy_companies',
-    region: 'Αττική',
-    maxResults: 100,
-    includeContact: true,
-  });
-  const [scraping, setScraping] = useState(false);
-  const [scrapeResults, setScrapeResults] = useState<any[]>([]);
-  const [scrapeHistory, setScrapeHistory] = useState<any[]>([]);
+  const [integrations, setIntegrations] = useState([
+    { id: 'gmail', name: 'Gmail / Email', icon: '📧', connected: false, status: 'Αποσυνδεδεμένο', fields: { email: '', appPassword: '' } },
+    { id: 'facebook', name: 'Facebook Pages', icon: '📘', connected: false, status: 'Αποσυνδεδεμένο', fields: { pageId: '', accessToken: '' } },
+    { id: 'instagram', name: 'Instagram Business', icon: '📷', connected: false, status: 'Αποσυνδεδεμένο', fields: { accountId: '', accessToken: '' } },
+    { id: 'linkedin', name: 'LinkedIn', icon: '💼', connected: false, status: 'Αποσυνδεδεμένο', fields: { companyId: '', accessToken: '' } },
+    { id: 'whatsapp', name: 'WhatsApp Business', icon: '💬', connected: false, status: 'Αποσυνδεδεμένο', fields: { phoneNumberId: '', accessToken: '' } },
+    { id: 'viber', name: 'Viber Business', icon: '💜', connected: false, status: 'Αποσυνδεδεμένο', fields: { authToken: '', senderId: '' } },
+    { id: 'sms', name: 'SMS Gateway', icon: '📱', connected: false, status: 'Αποσυνδεδεμένο', fields: { apiUrl: '', apiKey: '', sender: '' } },
+    { id: 'imap', name: 'IMAP Email Server', icon: '📬', connected: false, status: 'Αποσυνδεδεμένο', fields: { host: '', port: '993', user: '', password: '' } },
+  ]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<Record<string, string>>({});
 
-  const categories = [
-    { value: 'energy_companies', label: 'Εταιρείες Ενέργειας' },
-    { value: 'solar_installers', label: 'Εγκαταστάτες Φ/Β' },
-    { value: 'ev_charging', label: 'Σταθμοί Φόρτισης EV' },
-    { value: 'construction', label: 'Κατασκευαστικές' },
-    { value: 'real_estate', label: 'Ακινητομεσιτικές' },
-    { value: 'manufacturing', label: 'Βιομηχανία' },
-    { value: 'retail', label: 'Λιανικό Εμπόριο' },
-    { value: 'hospitality', label: 'Ξενοδοχεία & Εστιατόρια' },
-  ];
-
-  const greekRegions = [
-    'Αττική', 'Θεσσαλονίκη', 'Κεντρική Μακεδονία', 'Δυτική Μακεδονία',
-    'Ανατολική Μακεδονία & Θράκη', 'Ήπειρος', 'Θεσσαλία', 'Ιόνια Νησιά',
-    'Δυτική Ελλάδα', 'Στερεά Ελλάδα', 'Πελοπόννησος', 'Νησιά Αιγαίου',
-    'Κρήτη', 'Βόρειο Αιγαίο',
-  ];
-
-  const startScrape = async () => {
-    setScraping(true);
-    setToast({ msg: 'Εκκίνηση B2B scraping...', type: 'info' });
-    
-    // Placeholder for Apify integration
-    // In production, this would call the Apify API
-    setTimeout(() => {
-      const mockResults = [
-        { id: 1, company: 'Ελληνική Ενέργεια Α.Ε.', category: 'Εταιρείες Ενέργειας', region: 'Αττική', phone: '2101234567', email: 'info@energeia.gr', website: 'energeia.gr', status: 'new' },
-        { id: 2, company: 'Solar Tech Ελλάς', category: 'Εγκαταστάτες Φ/Β', region: 'Θεσσαλονίκη', phone: '2310123456', email: 'contact@solartech.gr', website: 'solartech.gr', status: 'new' },
-        { id: 3, company: 'Green Power Solutions', category: 'Εταιρείες Ενέργειας', region: 'Αττική', phone: '2109876543', email: 'info@greenpower.gr', website: 'greenpower.gr', status: 'new' },
-        { id: 4, company: 'EV Charge Greece', category: 'Σταθμοί Φόρτισης EV', region: 'Αττική', phone: '2105551234', email: 'info@evcharge.gr', website: 'evcharge.gr', status: 'new' },
-        { id: 5, company: 'Αττική Κατασκευές', category: 'Κατασκευαστικές', region: 'Αττική', phone: '2106667890', email: 'info@attiki-kataskeves.gr', website: 'attiki-kataskeves.gr', status: 'new' },
-      ];
-      setScrapeResults(mockResults);
-      setScrapeHistory(prev => [...prev, { date: new Date(), category: scrapeConfig.category, region: scrapeConfig.region, count: mockResults.length }]);
-      setScraping(false);
-      setToast({ msg: `Βρέθηκαν ${mockResults.length} B2B leads!`, type: 'success' });
-    }, 2000);
+  const handleConnect = (id: string) => {
+    setEditingId(id);
+    const integ = integrations.find(i => i.id === id);
+    setEditFields(integ?.fields || {});
   };
 
-  const exportToExcel = () => {
-    // Placeholder for Excel export
-    setToast({ msg: 'Εξαγωγή σε Excel...', type: 'info' });
-    // In production, this would generate and download an Excel file
-    setTimeout(() => {
-      setToast({ msg: 'Το αρχείο Excel δημιουργήθηκε!', type: 'success' });
-    }, 1000);
+  const handleSave = () => {
+    if (!editingId) return;
+    setIntegrations(prev => prev.map(i =>
+      i.id === editingId ? { ...i, connected: true, status: 'Συνδεδεμένο', fields: editFields } : i
+    ));
+    setEditingId(null);
+    setToast({ msg: 'Η ενσωμάτωση ενημερώθηκε!', type: 'success' });
   };
 
-  const importLeads = async () => {
-    if (scrapeResults.length === 0) return;
-    setToast({ msg: 'Εισαγωγή leads στη βάση...', type: 'info' });
-    
-    for (const result of scrapeResults) {
-      await supabase.from('hlektrismos_leads').insert({
-        first_name: result.company.split(' ')[0],
-        last_name: result.company.split(' ').slice(1).join(' '),
-        email: result.email,
-        phone: result.phone,
-        region: result.region,
-        customer_type: 'Εταιρεία (B2B)',
-        provider: 'B2B Scraper',
-        status: 'new',
-        lawful_basis: 'Legitimate_Interest',
-        customer_category: 'B2B_Corporate',
-      });
-    }
-    
-    setToast({ msg: `${scrapeResults.length} leads εισήχθησαν!`, type: 'success' });
-    setScrapeResults([]);
+  const handleDisconnect = (id: string) => {
+    setIntegrations(prev => prev.map(i =>
+      i.id === id ? { ...i, connected: false, status: 'Αποσυνδεδεμένο', fields: {} } : i
+    ));
+    setToast({ msg: 'Η ενσωμάτωση αποσυνδέθηκε.', type: 'info' });
+  };
+
+  const fieldLabels: Record<string, Record<string, string>> = {
+    gmail: { email: 'Email Διεύθυνση', appPassword: 'App Password (Google)' },
+    facebook: { pageId: 'Facebook Page ID', accessToken: 'Access Token' },
+    instagram: { accountId: 'Instagram Account ID', accessToken: 'Access Token' },
+    linkedin: { companyId: 'LinkedIn Company ID', accessToken: 'Access Token' },
+    whatsapp: { phoneNumberId: 'Phone Number ID', accessToken: 'Access Token' },
+    viber: { authToken: 'Auth Token', senderId: 'Sender ID' },
+    sms: { apiUrl: 'API URL', apiKey: 'API Key', sender: 'Sender Name' },
+    imap: { host: 'IMAP Server', port: 'Port', user: 'Username', password: 'Password' },
   };
 
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Αυτοματοποιημένη συλλογή B2B leads από καταλόγους επιχειρήσεων. Χρησιμοποιεί Apify για web scraping με GDPR-compliant lawful basis.</p>
+        <p>Συνδέστε το CRM με email, social media, messaging και άλλα εργαλεία για αυτοματοποιημένη επικοινωνία.</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+        {integrations.map(integ => (
+          <div key={integ.id} style={{
+            background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px',
+            borderColor: integ.connected ? 'rgba(0,200,120,0.3)' : 'var(--border)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '28px' }}>{integ.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: 'var(--text)' }}>{integ.name}</div>
+                <div style={{ fontSize: '12px', color: integ.connected ? '#00c878' : 'var(--text-muted)' }}>{integ.status}</div>
+              </div>
+              <span style={{
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: integ.connected ? '#00c878' : 'var(--text-muted)',
+              }} />
+            </div>
+
+            {editingId === integ.id ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {Object.entries(fieldLabels[integ.id] || {}).map(([key, label]) => (
+                  <div key={key}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{label}</label>
+                    <input
+                      type={key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('key') ? 'password' : 'text'}
+                      value={editFields[key] || ''}
+                      onChange={(e) => setEditFields({ ...editFields, [key]: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}
+                    />
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button className="btn btn-ghost" onClick={() => setEditingId(null)} style={{ flex: 1 }}>Άκυρο</button>
+                  <button className="btn btn-primary" onClick={handleSave} style={{ flex: 1 }}>Αποθήκευση</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {integ.connected ? (
+                  <>
+                    <button className="btn btn-ghost" onClick={() => handleConnect(integ.id)} style={{ flex: 1 }}>Ρυθμίσεις</button>
+                    <button className="btn btn-ghost" onClick={() => handleDisconnect(integ.id)} style={{ color: '#ef4444', flex: 1 }}>Αποσύνδεση</button>
+                  </>
+                ) : (
+                  <button className="btn btn-primary" onClick={() => handleConnect(integ.id)} style={{ flex: 1 }}>Σύνδεση</button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: '24px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--text)' }}>📧 Email Campaigns</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 12px' }}>
+          Συνδέστε Gmail ή IMAP για αποστολή email καμπανίων απευθείας από το CRM. Τα AI Agents μπορούν να στέλνουν αυτόματα emails, SMS, ή WhatsApp μηνύματα στους leads.
+        </p>
+        <ul style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, paddingLeft: '20px' }}>
+          <li>Αυτόματη αποστολή email sequences σε νέους leads</li>
+          <li>Follow-up emails βάσει pipeline status</li>
+          <li>Track opens και clicks</li>
+          <li>GDPR-compliant unsubscribe mechanism</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function B2BScraperTab({ toast, setToast }: {
+  toast: { msg: string; type: 'success' | 'info' } | null;
+  setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+}) {
+  const [scrapeConfig, setScrapeConfig] = useState({
+    category: 'bakery',
+    region: 'Αττική',
+    maxResults: 50,
+    source: 'auto',
+    importToDb: false,
+  });
+  const [scraping, setScraping] = useState(false);
+  const [scrapeResults, setScrapeResults] = useState<any[]>([]);
+  const [scrapeHistory, setScrapeHistory] = useState<any[]>([]);
+  const [selectedForImport, setSelectedForImport] = useState<Set<number>>(new Set());
+
+  const categories = [
+    { value: 'bakery', label: 'Φούρνοι & Αρτοποιεία' },
+    { value: 'restaurant', label: 'Εστιατόρια & Ταβέρνες' },
+    { value: 'hotel', label: 'Ξενοδοχεία & Ενοικιαζόμενα' },
+    { value: 'construction', label: 'Κατασκευαστικές & Εργοληπτικές' },
+    { value: 'energy', label: 'Εταιρείες Ενέργειας' },
+    { value: 'solar', label: 'Φωτοβολταϊκά & Solar' },
+    { value: 'ev_charging', label: 'Σταθμοί Φόρτισης EV' },
+    { value: 'real_estate', label: 'Ακίνητα & Μεσιτικές' },
+    { value: 'retail', label: 'Λιανικό Εμπόριο & Καταστήματα' },
+    { value: 'manufacturing', label: 'Βιομηχανία & Παραγωγή' },
+    { value: 'technology', label: 'Τεχνολογία & Software' },
+    { value: 'healthcare', label: 'Υγεία & Ιατρικά' },
+    { value: 'automotive', label: 'Αυτοκίνητο & Επισκευές' },
+    { value: 'professional', label: 'Επαγγελματικές Υπηρεσίες' },
+    { value: 'education', label: 'Εκπαίδευση & Φροντιστήρια' },
+    { value: 'fitness', label: 'Γυμναστήρια & Sports' },
+    { value: 'beauty', label: 'Ομορφιά & Salon' },
+    { value: 'logistics', label: 'Μεταφορές & Logistics' },
+    { value: 'agriculture', label: 'Γεωργία & Αγροκτήματα' },
+    { value: 'other', label: 'Άλλες Επιχειρήσεις' },
+  ];
+
+  const sources = [
+    { value: 'auto', label: 'Αυτόματο (Όλες οι πηγές)' },
+    { value: 'xo.gr', label: 'XO.gr (Κίτρινες Σελίδες)' },
+    { value: 'vrisko.gr', label: 'Vrisko.gr (Τοπική Αναζήτηση)' },
+    { value: 'cybo', label: 'Cybo.com (Διεθνής)' },
+    { value: 'google_maps', label: 'Google Maps' },
+  ];
+
+  const greekRegions = [
+    'Αττική', 'Θεσσαλονίκη', 'Κεντρική Ελλάδα', 'Πελοπόννησος',
+    'Κρήτη', 'Ιόνια Νησιά', 'Θεσσαλία', 'Ήπειρος',
+    'Δυτική Ελλάδα', 'Στερεά Ελλάδα', 'Νησιά Αιγαίου', 'Δυτική Μακεδονία',
+    'Ανατολική Μακεδονία & Θράκη', 'Βόρειο Αιγαίο',
+  ];
+
+  const startScrape = async () => {
+    setScraping(true);
+    setToast({ msg: 'Εκκίνηση B2B scraping...', type: 'info' });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('scrape-b2b', {
+        body: {
+          category: scrapeConfig.category,
+          region: scrapeConfig.region,
+          maxResults: scrapeConfig.maxResults,
+          source: scrapeConfig.source,
+          importToDb: false,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.businesses) {
+        setScrapeResults(data.businesses);
+        setScrapeHistory(prev => [...prev, {
+          date: new Date(),
+          category: scrapeConfig.category,
+          region: scrapeConfig.region,
+          source: scrapeConfig.source,
+          count: data.businesses.length,
+        }]);
+        setToast({ msg: `Βρέθηκαν ${data.businesses.length} B2B leads!`, type: 'success' });
+      }
+    } catch (err: any) {
+      setToast({ msg: `Σφάλμα scraping: ${err.message}`, type: 'info' });
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const exportToCsv = () => {
+    if (scrapeResults.length === 0) return;
+    setToast({ msg: 'Δημιουργία αρχείου CSV...', type: 'info' });
+
+    const headers = ['Εταιρεία', 'Κατηγορία', 'Περιοχή', 'Τηλέφωνο', 'Email', 'Ιστοσελίδα', 'Διεύθυνση', 'Πηγή', 'Status'];
+    const rows = scrapeResults.map(r => [
+      r.company, r.category, r.region, r.phone, r.email, r.website, r.address, r.source, r.status || 'new'
+    ]);
+
+    // Add BOM for Greek characters
+    const BOM = '\uFEFF';
+    const csv = BOM + [headers.join(','), ...rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `b2b_leads_${scrapeConfig.category}_${scrapeConfig.region || 'all'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    setToast({ msg: `Το αρχείο CSV δημιουργήθηκε! (${scrapeResults.length} γραμμές)`, type: 'success' });
+  };
+
+  const importToDb = async () => {
+    const toImport = scrapeResults.filter((_, i) => selectedForImport.size === 0 || selectedForImport.has(i));
+    if (toImport.length === 0) { setToast({ msg: 'Επιλέξτε leads για εισαγωγή', type: 'info' }); return; }
+
+    setToast({ msg: `Εισαγωγή ${toImport.length} leads στη βάση...`, type: 'info' });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('scrape-b2b', {
+        body: {
+          category: scrapeConfig.category,
+          region: scrapeConfig.region,
+          maxResults: toImport.length,
+          source: scrapeConfig.source,
+          importToDb: true,
+        },
+      });
+
+      if (error) throw error;
+      setToast({ msg: `${data?.imported || toImport.length} leads εισήχθησαν στη βάση!`, type: 'success' });
+      setSelectedForImport(new Set());
+    } catch (err: any) {
+      setToast({ msg: `Σφάλμα εισαγωγής: ${err.message}`, type: 'info' });
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedForImport.size === scrapeResults.length) {
+      setSelectedForImport(new Set());
+    } else {
+      setSelectedForImport(new Set(scrapeResults.map((_, i) => i)));
+    }
+  };
+
+  return (
+    <div className="dash-content">
+      <div className="dash-content-header">
+        <p>Αυτοματοποιημένη συλλογή B2B leads από καταλόγους επιχειρήσεων. Web scraping από δημόσιες πηγές με GDPR-compliant lawful basis.</p>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-primary" onClick={startScrape} disabled={scraping}>
             <Radar size={16} className={scraping ? 'spin' : ''} /> {scraping ? 'Scraping...' : 'Εκκίνηση Scraping'}
@@ -1838,14 +2027,20 @@ function B2BScraperTab({ toast, setToast }: {
             </select>
           </div>
           <div className="drawer-field">
-            <label>Μέγιστο Αποτελέσματα</label>
-            <input type="number" value={scrapeConfig.maxResults} onChange={(e) => setScrapeConfig({ ...scrapeConfig, maxResults: parseInt(e.target.value) || 100 })} />
+            <label>Πηγή Δεδομένων</label>
+            <select value={scrapeConfig.source} onChange={(e) => setScrapeConfig({ ...scrapeConfig, source: e.target.value })}>
+              {sources.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
           </div>
           <div className="drawer-field">
-            <label>Συμπερίληψη Στοιχείων Επικοινωνίας</label>
+            <label>Μέγιστο Αποτελέσματα</label>
+            <input type="number" min="10" max="500" value={scrapeConfig.maxResults} onChange={(e) => setScrapeConfig({ ...scrapeConfig, maxResults: parseInt(e.target.value) || 50 })} />
+          </div>
+          <div className="drawer-field">
+            <label>Αυτόματη Εισαγωγή στη Βάση</label>
             <div className="drawer-toggle-row">
-              <button className={`drawer-toggle ${scrapeConfig.includeContact ? 'on' : ''}`} onClick={() => setScrapeConfig({ ...scrapeConfig, includeContact: true })}>Ναι</button>
-              <button className={`drawer-toggle ${!scrapeConfig.includeContact ? 'off' : ''}`} onClick={() => setScrapeConfig({ ...scrapeConfig, includeContact: false })}>Όχι</button>
+              <button className={`drawer-toggle ${scrapeConfig.importToDb ? 'on' : ''}`} onClick={() => setScrapeConfig({ ...scrapeConfig, importToDb: true })}>Ναι</button>
+              <button className={`drawer-toggle ${!scrapeConfig.importToDb ? 'off' : ''}`} onClick={() => setScrapeConfig({ ...scrapeConfig, importToDb: false })}>Όχι</button>
             </div>
           </div>
         </div>
@@ -1853,14 +2048,17 @@ function B2BScraperTab({ toast, setToast }: {
 
       {scrapeResults.length > 0 && (
         <div className="scraper-results">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3>Αποτελέσματα ({scrapeResults.length} leads)</h3>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn btn-secondary" onClick={exportToExcel}>
-                <FileText size={16} /> Εξαγωγή Excel
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <h3>Αποτελέσματα ({scrapeResults.length} leads) {selectedForImport.size > 0 && `- Επιλεγμένα: ${selectedForImport.size}`}</h3>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary" onClick={toggleSelectAll}>
+                {selectedForImport.size === scrapeResults.length ? 'Αποεπιλογή Όλων' : 'Επιλογή Όλων'}
               </button>
-              <button className="btn btn-primary" onClick={importLeads}>
-                <Plus size={16} /> Εισαγωγή στη Βάση
+              <button className="btn btn-secondary" onClick={exportToCsv}>
+                <FileText size={16} /> Εξαγωγή CSV/Excel
+              </button>
+              <button className="btn btn-primary" onClick={importToDb} disabled={scrapeConfig.importToDb}>
+                <Plus size={16} /> Εισαγωγή στη Βάση ({selectedForImport.size || scrapeResults.length})
               </button>
             </div>
           </div>
@@ -1868,19 +2066,26 @@ function B2BScraperTab({ toast, setToast }: {
             <table className="dash-table">
               <thead>
                 <tr>
-                  <th>Εταιρεία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Τηλέφωνο</th><th>Email</th><th>Ιστοσελίδα</th><th>Status</th>
+                  <th style={{ width: '40px' }}><input type="checkbox" checked={selectedForImport.size === scrapeResults.length} onChange={toggleSelectAll} /></th>
+                  <th>Εταιρεία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Τηλέφωνο</th><th>Email</th><th>Ιστοσελίδα</th><th>Πηγή</th><th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {scrapeResults.map((r) => (
-                  <tr key={r.id}>
+                {scrapeResults.map((r, i) => (
+                  <tr key={i} className={selectedForImport.has(i) ? 'selected-row' : ''}>
+                    <td><input type="checkbox" checked={selectedForImport.has(i)} onChange={() => {
+                      const next = new Set(selectedForImport);
+                      if (next.has(i)) next.delete(i); else next.add(i);
+                      setSelectedForImport(next);
+                    }} /></td>
                     <td><strong>{r.company}</strong></td>
-                    <td>{r.category}</td>
+                    <td>{categories.find(c => c.value === r.category)?.label || r.category}</td>
                     <td>{r.region}</td>
-                    <td>{r.phone}</td>
-                    <td>{r.email}</td>
-                    <td><a href={`https://${r.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{r.website}</a></td>
-                    <td><span className={`dash-status-pill ${r.status}`}>{r.status}</span></td>
+                    <td>{r.phone || '—'}</td>
+                    <td>{r.email || '—'}</td>
+                    <td>{r.website ? <a href={`https://${r.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{r.website}</a> : '—'}</td>
+                    <td><span className="dash-status-pill">{r.source}</span></td>
+                    <td><span className={`dash-status-pill ${r.status || 'new'}`}>{r.status || 'new'}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -1890,12 +2095,12 @@ function B2BScraperTab({ toast, setToast }: {
       )}
 
       {scrapeHistory.length > 0 && (
-        <div className="scraper-history">
+        <div className="scraper-history" style={{ marginTop: '24px' }}>
           <h3>Ιστορικό Scraping</h3>
           <div className="dash-table-wrap">
             <table className="dash-table">
               <thead>
-                <tr><th>Ημερομηνία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Αποτελέσματα</th></tr>
+                <tr><th>Ημερομηνία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Πηγή</th><th>Αποτελέσματα</th></tr>
               </thead>
               <tbody>
                 {scrapeHistory.map((h, i) => (
@@ -1903,6 +2108,7 @@ function B2BScraperTab({ toast, setToast }: {
                     <td>{h.date.toLocaleString('el-GR')}</td>
                     <td>{categories.find(c => c.value === h.category)?.label || h.category}</td>
                     <td>{h.region || 'Όλη η Ελλάδα'}</td>
+                    <td>{sources.find(s => s.value === h.source)?.label || h.source}</td>
                     <td><strong>{h.count}</strong></td>
                   </tr>
                 ))}
@@ -1912,16 +2118,147 @@ function B2BScraperTab({ toast, setToast }: {
         </div>
       )}
 
-      <div className="scraper-info">
-        <h3>Πληροφορίες Ολοκληρωσης</h3>
-        <p>Αυτό το εργαλείο χρησιμοποιεί <strong>Apify</strong> για web scraping από δημόσιους καταλόγους επιχειρήσεων. Όλα τα δεδομένα συλλέγονται με <strong>Legitimate Interest</strong> lawful basis και σέβονται τον GDPR.</p>
+      <div className="scraper-info" style={{ marginTop: '24px' }}>
+        <h3>Πληροφορίες</h3>
+        <p>Αυτό το εργαλείο κάνει web scraping από δημόσιους καταλόγους επιχειρήσεων. Όλα τα δεδομένα συλλέγονται με <strong>Legitimate Interest</strong> lawful basis και σέβονται τον GDPR.</p>
         <ul>
-          <li>Αυτόματη αναζήτηση σε δημόσιους καταλόγους</li>
-          <li>Φιλτράρισμα ανά κατηγορία και περιοχή</li>
-          <li>Εξαγωγή σε Excel για περαιτέρω επεξεργασία</li>
+          <li><strong>20 κατηγορίες</strong> επιχειρήσεων: φούρνοι, εστιατόρια, ξενοδοχεία, κατασκευές, ενέργεια, φωτοβολταϊκά, EV, ακίνητα, λιανική, βιομηχανία, tech, υγεία, αυτοκίνητο, επαγγέλματα, εκπαίδευση, fitness, beauty, logistics, γεωργία</li>
+          <li><strong>14 περιοχές</strong> της Ελλάδας + όλη η Ελλάδα</li>
+          <li><strong>4 πηγές</strong>: XO.gr, Vrisko.gr, Cybo, Google Maps</li>
+          <li>Εξαγωγή σε <strong>CSV/Excel</strong> με όλα τα στοιχεία επικοινωνίας</li>
           <li>Αυτόματη εισαγωγή leads στη βάση δεδομένων</li>
           <li>GDPR-compliant: Legitimate Interest lawful basis</li>
         </ul>
+      </div>
+    </div>
+  );
+}
+
+function DeveloperAgentChat() {
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [conversationId] = useState(() => crypto.randomUUID());
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }]);
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-developer', {
+        body: {
+          message: userMsg,
+          conversationId,
+          agentId: null,
+        },
+      });
+
+      if (error) throw error;
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data?.message || 'Σφάλμα απόκρισης.',
+        timestamp: new Date(),
+      }]);
+    } catch (err: any) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Σφάλμα: ${err.message}. Βεβαιωθείτε ότι το AI Developer Edge Function είναι deployed.`,
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const suggestions = [
+    'Ποιοι πίνακες υπάρχουν στη βάση δεδομένων;',
+    'Βελτίωσε το RLS policy στον πίνακα hlektrismos_leads',
+    'Δημιούργησε ένα νέο migration για προσθήκη στήλης',
+    'Τι κάνει το agent-worker edge function;',
+    'Πώς μπορώ να προσθέσω webhook στο CRM;',
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '70vh', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '14px', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <Database size={20} style={{ color: '#0066cc' }} />
+        <div>
+          <div style={{ fontWeight: 600, color: 'var(--text)' }}>AI Developer Agent</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Senior software engineer με εξειδίκευση σε React, Supabase, TypeScript, DevOps</div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {messages.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <Database size={48} style={{ color: 'var(--text-muted)', marginBottom: '16px' }} />
+            <h3 style={{ color: 'var(--text)', margin: '0 0 8px' }}>AI Developer Agent</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 24px' }}>
+              Ρωτήστε τον AI developer οτιδήποτε σχετικά με τον κώδικα, bugs, features, database, ή DevOps.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+              {suggestions.map((s, i) => (
+                <button key={i} className="btn btn-ghost" onClick={() => setInput(s)} style={{ fontSize: '13px' }}>{s}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+          }}>
+            <div style={{
+              maxWidth: '80%',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              background: msg.role === 'user' ? '#0066cc' : 'var(--surface-2)',
+              color: msg.role === 'user' ? '#fff' : 'var(--text)',
+              fontSize: '14px',
+              lineHeight: '1.6',
+              whiteSpace: 'pre-wrap',
+              border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
+            }}>
+              {msg.content}
+              <div style={{ fontSize: '11px', opacity: 0.5, marginTop: '6px' }}>
+                {msg.timestamp.toLocaleTimeString('el-GR')}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ padding: '12px 16px', borderRadius: '12px', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+              <span className="typing-dots">Σκέφτομαι<span>.</span><span>.</span><span>.</span></span>
+            </div>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px' }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+          placeholder="Ρωτήστε τον AI Developer..."
+          disabled={loading}
+          style={{ flex: 1, padding: '10px 16px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', fontSize: '14px', outline: 'none' }}
+        />
+        <button className="btn btn-primary" onClick={sendMessage} disabled={loading || !input.trim()}>
+          <Send size={16} />
+        </button>
       </div>
     </div>
   );
@@ -1936,7 +2273,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   setConfigAgent: (v: Agent | null) => void;
   loadData: () => Promise<void>;
 }) {
-  const [selectedView, setSelectedView] = useState<'overview' | 'agents' | 'micro' | 'pipeline'>('overview');
+  const [selectedView, setSelectedView] = useState<'overview' | 'agents' | 'micro' | 'pipeline' | 'developer'>('overview');
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newAgent, setNewAgent] = useState({ name: '', channel: 'Email', status: 'inactive' });
@@ -2024,6 +2361,9 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
         </button>
         <button className={selectedView === 'pipeline' ? 'active' : ''} onClick={() => setSelectedView('pipeline')}>
           <Activity size={16} /> Pipeline Flow
+        </button>
+        <button className={selectedView === 'developer' ? 'active' : ''} onClick={() => setSelectedView('developer')}>
+          <Database size={16} /> AI Developer
         </button>
       </div>
 
@@ -2426,6 +2766,10 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             </div>
           </div>
         </div>
+      )}
+
+      {selectedView === 'developer' && (
+        <DeveloperAgentChat />
       )}
     </div>
   );

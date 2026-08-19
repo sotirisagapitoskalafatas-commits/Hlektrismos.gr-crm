@@ -29,6 +29,7 @@ const CATEGORIES = [
   { key: 'appearance', label: 'Εμφάνιση', icon: Palette, desc: 'Theme, colors, branding' },
   { key: 'tariffs', label: 'Τιμολόγια', icon: Zap, desc: 'Energy suppliers & formulas' },
   { key: 'email', label: '📧 Email', icon: Mail, desc: 'SMTP, IMAP, email delivery' },
+  { key: 'ai-assistant', label: '🤖 AI Widget', icon: Bot, desc: 'CRM AI chatbot widget' },
   { key: 'communications', label: 'Τηλεφωνία & SMS', icon: Phone, desc: 'PBX, SMS, Viber gateways' },
   { key: 'security', label: 'Ασφάλεια & GDPR', icon: Shield, desc: 'Audit logs & compliance' },
 ];
@@ -157,6 +158,7 @@ export default function SettingsPanel({ toast, setToast }: { toast: any; setToas
       case 'appearance': return <AppearanceSettings settings={settings} update={updateSetting} />;
       case 'tariffs': return <TariffsSettings settings={settings} update={updateSetting} />;
       case 'email': return <EmailSettings settings={settings} update={updateSetting} />;
+      case 'ai-assistant': return <AiAssistantSettings />;
       case 'communications': return <CommunicationsSettings settings={settings} update={updateSetting} />;
       case 'security': return <SecuritySettings settings={settings} update={updateSetting} />;
       default: return null;
@@ -531,6 +533,59 @@ function TariffsSettings({ settings, update }: { settings: Record<string, any>; 
         <FieldRow label="Κίτρινο (€/kWh)"><NumberInput value={s.price_tiers?.yellow || 0.12} onChange={(v) => update('energy_tariffs_config', { ...s, price_tiers: { ...s.price_tiers, yellow: v } })} min={0} max={1} /></FieldRow>
         <FieldRow label="Πορτοκαλί (€/kWh)"><NumberInput value={s.price_tiers?.orange || 0.15} onChange={(v) => update('energy_tariffs_config', { ...s, price_tiers: { ...s.price_tiers, orange: v } })} min={0} max={1} /></FieldRow>
       </div>
+    </div>
+  );
+}
+
+function AiAssistantSettings() {
+  const storageKey = 'crm_ai_widget_config';
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })();
+  const [enabled, setEnabled] = useState(saved.enabled !== false);
+  const [personaName, setPersonaName] = useState(saved.personaName || 'Αλέξης');
+  const [accentColor, setAccentColor] = useState(saved.accentColor || '#0066cc');
+  const [greeting, setGreeting] = useState(saved.greeting || 'Γεια σου! Είμαι ο βοηθός CRM της Hlektrismos.gr. Ρώτα με για leads, τιμολόγια, ή οτιδήποτε χρειάζεσαι.');
+  const [saved2, setSaved2] = useState(false);
+
+  const save = () => {
+    localStorage.setItem(storageKey, JSON.stringify({ enabled, personaName, accentColor, greeting }));
+    setSaved2(true);
+    setTimeout(() => setSaved2(false), 2000);
+  };
+
+  return (
+    <div>
+      <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>🤖 CRM AI Assistant Widget</h3>
+      <p style={{ margin: '0 0 20px', fontSize: 12, color: '#6b7280' }}>Ρυθμίσεις του floating AI chatbot στη γωνιά του dashboard.</p>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} style={{ width: 16, height: 16 }} />
+          Ενεργοποίηση Widget
+        </label>
+        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#6b7280' }}>Εμφανίζει το floating chatbot button στο dashboard.</p>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Όνομα Persona</label>
+        <input value={personaName} onChange={e => setPersonaName(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text)' }} />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Χρώμα Widget</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ width: 48, height: 36, border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }} />
+          <span style={{ fontSize: 12, color: '#6b7280' }}>{accentColor}</span>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Μήνυμα Χαιρετισμού</label>
+        <textarea value={greeting} onChange={e => setGreeting(e.target.value)} rows={3} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text)', resize: 'vertical' }} />
+      </div>
+
+      <button onClick={save} style={{ padding: '10px 20px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+        {saved2 ? '✅ Αποθηκεύτηκε!' : '💾 Αποθήκευση'}
+      </button>
     </div>
   );
 }

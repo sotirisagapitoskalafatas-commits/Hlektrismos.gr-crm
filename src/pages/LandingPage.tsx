@@ -278,18 +278,14 @@ export default function LandingPage() {
 
     const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
     for (const file of form.billFiles) {
-      const extension = file.name.split('.').pop()?.toLowerCase() ?? 'file';
-      const filePath = `${crypto.randomUUID()}.${extension}`;
-      const { error: uploadError } = await supabase.storage.from('energy-bills').upload(filePath, file, {
-        contentType: file.type,
-        upsert: false,
-      });
+      const { uploadDocument } = await import('@/lib/storage');
+      const { data, error: uploadError } = await uploadDocument(file);
       if (uploadError) {
         setSubmitting(false);
-        setFormError(`Σφάλμα μεταφόρτωσης: ${uploadError.message}`);
+        setFormError(uploadError);
         return;
       }
-      uploadedFiles.push({ path: filePath, name: file.name, type: file.type, size: file.size });
+      if (data) uploadedFiles.push(data);
     }
 
     const { error } = await supabase.from('hlektrismos_leads').insert({

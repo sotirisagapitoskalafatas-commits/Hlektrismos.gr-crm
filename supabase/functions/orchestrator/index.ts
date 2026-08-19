@@ -119,6 +119,35 @@ const GEMINI_TOOLS = [
           },
         },
       },
+      {
+        name: 'schedule_meeting',
+        description: 'Προγραμματισμός συνάντησης ή κλήσης με lead. Αποθηκεύεται στο ημερολόγιο.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING', description: 'Τίτλος event (π.χ. "Συνάντηση με ΔΕΗ")' },
+            lead_id: { type: 'STRING', description: 'Το ID του lead (προαιρετικό)' },
+            event_type: { type: 'STRING', description: 'Τύπος: meeting, call, follow_up, deadline' },
+            start_time: { type: 'STRING', description: 'Ημερομηνία/ώρα έναρξης (ISO 8601, π.χ. 2026-08-20T14:00:00)' },
+            end_time: { type: 'STRING', description: 'Ημερομηνία/ώρα λήξης (ISO 8601, προαιρετικό)' },
+            location: { type: 'STRING', description: 'Τοποθεσία (π.χ. Zoom, γραφείο)' },
+            notes: { type: 'STRING', description: 'Σημειώσεις' },
+          },
+          required: ['title', 'start_time'],
+        },
+      },
+      {
+        name: 'get_calendar_events',
+        description: 'Ανάκτηση events από το ημερολόγιο. Επιστρέφει επερχόμενα ή προηγούμενα events.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            from_date: { type: 'STRING', description: 'Από πότε (ISO date, default: σήμερα)' },
+            to_date: { type: 'STRING', description: 'Έως πότε (ISO date, default: +30 ημέρες)' },
+            status: { type: 'STRING', description: 'Φίλτρο status: scheduled, completed, cancelled' },
+          },
+        },
+      },
     ],
   },
 ]
@@ -232,6 +261,55 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
         if (!agents || agents.length === 0) return 'Δεν βρέθηκαν agents.'
         return agents.map((a: any) =>
           `${a.name} | Channel: ${a.channel} | Region: ${a.target_region || 'All'} | Leads: ${a.leads_contacted} | Replies: ${a.replies} | Meetings: ${a.meetings_booked} | Conv: ${a.leads_contacted > 0 ? ((a.meetings_booked / a.leads_contacted) * 100).toFixed(1) : 0}%`
+        ).join('\n')
+      }
+
+      case 'schedule_meeting': {
+        const eventData: any = {
+          title: args.title,
+          event_type: args.event_type || 'meeting',
+          start_time: args.start_time,
+          status: 'scheduled',
+        }
+        if (args.lead_id) eventData.lead_id = args.lead_id
+        if (args.end_time) eventData.end_time = args.end_time
+        if (args.location) eventData.location = args.location
+        if (args.notes) eventData.notes = args.notes
+
+        const { data: evt, error } = await supabaseAdmin.from('calendar_events').insert(eventData).select().single()
+        if (error) throw error
+
+        // Also add as note to the lead if lead_id provided
+        if (args.lead_id) {
+          await supabaseAdmin.from('lead_notes').insert({
+            lead_id: args.lead_id,
+            content: `📅 Προγραμματίστηκε ${args.event_type === 'call' ? 'κλήση' : args.event_type === 'meeting' ? 'συνάντηση' : args.event_type}: "${args.title}" στις ${new Date(args.start_time).toLocaleString('el-GR')}`,
+            author: 'AI Agent',
+            note_type: 'calendar_event',
+          })
+        }
+
+        return `✅ Event δημιουργήθηκε: "${args.title}" στις ${new Date(args.start_time).toLocaleString('el-GR')}${args.location ? ` (${args.location})` : ''}`
+      }
+
+      case 'get_calendar_events': {
+        const fromDate = args.from_date || new Date().toISOString().slice(0, 10)
+        const toDate = args.to_date || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+
+        let query = supabaseAdmin.from('calendar_events')
+          .select('*')
+          .gte('start_time', `${fromDate}T00:00:00`)
+          .lte('start_time', `${toDate}T23:59:59`)
+          .order('start_time', { ascending: true })
+
+        if (args.status) query = query.eq('status', args.status)
+
+        const { data: events, error } = await query
+        if (error) throw error
+        if (!events || events.length === 0) return 'Δεν βρέθηκαν events στο ημερολόγιο.'
+
+        return events.map((e: any) =>
+          `${e.status === 'scheduled' ? '📅' : e.status === 'completed' ? '✅' : '❌'} ${e.title} | ${new Date(e.start_time).toLocaleString('el-GR')} | ${e.event_type}${e.location ? ` | ${e.location}` : ''}`
         ).join('\n')
       }
 

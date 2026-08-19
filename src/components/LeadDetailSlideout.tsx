@@ -107,7 +107,7 @@ export default function LeadDetailSlideout({
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
 
-  // Load bill file signed URLs
+  // Load bill file signed URLs — tries hlektrismos_docs first, falls back to energy-bills
   useEffect(() => {
     let cancelled = false;
     setBillLoading(true);
@@ -129,12 +129,20 @@ export default function LeadDetailSlideout({
     (async () => {
       const results: BillFile[] = [];
       for (const file of filesToLoad) {
-        const { data, error } = await supabase.storage
-          .from('energy-bills')
-          .createSignedUrl(file.path, 60 * 10);
+        // Try new bucket first, then legacy bucket
+        let signedUrl = '';
+        for (const bucket of ['hlektrismos_docs', 'energy-bills']) {
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(file.path, 60 * 10);
+          if (!error && data?.signedUrl) {
+            signedUrl = data.signedUrl;
+            break;
+          }
+        }
         if (cancelled) return;
-        if (!error && data?.signedUrl) {
-          results.push({ url: data.signedUrl, name: file.name, type: file.type, size: file.size });
+        if (signedUrl) {
+          results.push({ url: signedUrl, name: file.name, type: file.type, size: file.size });
         }
       }
       if (!cancelled) {

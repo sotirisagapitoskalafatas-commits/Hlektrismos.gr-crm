@@ -41,6 +41,9 @@ import SettingsPanel from '@/components/SettingsPanel';
 import DocumentGenerator from '@/components/DocumentGenerator';
 import LeadDetailSlideout from '@/components/LeadDetailSlideout';
 import MarketRagFolders from '@/components/MarketRagFolders';
+import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
+import NotificationBell from '@/components/NotificationBell';
+import CalendarView from '@/components/CalendarView';
 
 type Lead = {
   id: string;
@@ -108,7 +111,7 @@ type Tariff = {
   updated_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -620,6 +623,7 @@ export default function DashboardPage() {
     settings: 'Ρυθμίσεις & Integrations',
     email: '📧 Email',
     reports: 'Reports',
+    calendar: '📅 Ημερολόγιο',
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
     documents: '\u0395\u03b3\u03b3\u03c1\u03b1\u03c6\u03ac',
@@ -645,6 +649,7 @@ export default function DashboardPage() {
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Χρήστες</button>
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
           <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
+          <button className={tab === 'calendar' ? 'active' : ''} onClick={() => setTab('calendar')}><Calendar size={18} /> 📅 Ημερολόγιο</button>
           <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
         </nav>
         <div className="dash-sidebar-footer">
@@ -660,6 +665,7 @@ export default function DashboardPage() {
         <header className="dash-header">
           <h1>{tabLabels[tab]}</h1>
           <div className="dash-header-right">
+            <NotificationBell />
             <span className="dash-live"><span className="dash-live-dot" /> Live</span>
           </div>
         </header>
@@ -1238,6 +1244,9 @@ export default function DashboardPage() {
             )}
             {tab === 'email' && (
               <EmailTab toast={toast} setToast={setToast} />
+            )}
+            {tab === 'calendar' && (
+              <CalendarView leads={leads.filter(l => !l.deleted_at)} />
             )}
             {tab === 'documents' && (
               <DocumentGenerator toast={toast} setToast={setToast} />
@@ -4131,6 +4140,9 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
       {selectedView === 'developer' && (
         <DeveloperAgentChat />
       )}
+
+      {/* Floating AI Assistant Widget */}
+      <CrmAiAssistantWidget leads={leads} tariffs={tariffs} />
     </div>
   );
 }

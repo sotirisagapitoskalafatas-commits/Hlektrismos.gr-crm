@@ -105,11 +105,16 @@ type CrmUser = {
 
 type Tariff = {
   id: string;
+  provider_name: string;
+  program_name: string;
+  customer_type: string;
+  tariff_color: string;
+  unit_rate_kwh: number;
+  fixed_fee_monthly: number;
+  validity_month: string;
+  source_url: string;
   resource: string;
-  tariff_name: string;
-  price_eur: number;
-  unit: string;
-  updated_at: string;
+  created_at: string;
 };
 
 type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'rag-search';
@@ -372,7 +377,7 @@ export default function DashboardPage() {
       supabase.from('hlektrismos_leads').select('*').order('created_at', { ascending: false }),
       supabase.from('ai_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_sources').select('*').order('created_at', { ascending: false }),
-      supabase.from('market_tariffs').select('*').order('resource', { ascending: true }),
+      supabase.from('market_tariffs').select('*').order('provider_name', { ascending: true }),
       supabase.from('crm_users').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_notes').select('*').order('created_at', { ascending: false }),
     ]);
@@ -507,17 +512,21 @@ export default function DashboardPage() {
 
   const syncTariffs = async () => {
     setSyncing(true);
-    const now = new Date().toISOString();
-    await supabase.from('market_tariffs').update({ updated_at: now }).in('resource', ['Electricity', 'Natural Gas', 'Photovoltaic']);
+    try {
+      const { error } = await supabase.functions.invoke('sync-market-tariffs');
+      if (error) throw error;
+      setToast({ msg: 'Η βάση γνώσης ενημερώθηκε.', type: 'success' });
+      loadData();
+    } catch (e: any) {
+      setToast({ msg: `Σφάλμα: ${e.message}`, type: 'info' });
+    }
     setSyncing(false);
-    setToast({ msg: 'Η βάση γνώσης ενημερώθηκε.', type: 'success' });
-    loadData();
   };
 
   const updateTariffPrice = async (t: Tariff) => {
-    const newPrice = prompt(`Εισάγετε νέα τιμή για το ${t.tariff_name}:`, t.price_eur.toString());
+    const newPrice = prompt(`Εισάγετε νέα τιμή/kWh για ${t.provider_name} - ${t.program_name}:`, t.unit_rate_kwh.toString());
     if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
-      await supabase.from('market_tariffs').update({ price_eur: parseFloat(newPrice), updated_at: new Date().toISOString() }).eq('id', t.id);
+      await supabase.from('market_tariffs').update({ unit_rate_kwh: parseFloat(newPrice) }).eq('id', t.id);
       loadData();
       setToast({ msg: 'Η τιμή ενημερώθηκε.', type: 'success' });
     }
@@ -609,7 +618,7 @@ export default function DashboardPage() {
   const generateAgentContext = () => {
     const activeAgent = configAgent || agents[0];
     if (!activeAgent) return '';
-    const tariffLines = tariffs.map((t) => `  - ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n');
+    const tariffLines = tariffs.map((t) => `  - ${t.provider_name}: ${t.program_name} @ ${t.unit_rate_kwh} €/kWh (${t.fixed_fee_monthly} €/μήνα, ${t.tariff_color}, ${t.customer_type})`).join('\n');
     return `Είσαι ο ${activeAgent.name}, ένας αυτόνομος ${activeAgent.channel} agent της Hlektrismos.gr.\n\nΒΑΣΙΚΟ PROMPT:\n${activeAgent.base_prompt || '(Δεν έχει οριστεί base prompt)'}\n\nΣΤΟΧΟΣ: ${activeAgent.target_region || 'Όλη η Ελλάδα'}\n\nΠΑΡΑΔΟΣΗ ΣΕ ΑΝΘΡΩΠΟ: ${activeAgent.handoff_condition || 'Interest Confirmed'}\n\nΖΩΝΤΑΝΑ ΤΑΡΙΦΑ (RAG Knowledge Base):\n${tariffLines}\n\nΟδηγίες: Επικοινώνησε με leads στην περιοχή στόχου, πρότεινε τα παραπάνω τιμολόγια, και παράδωσε σε άνθρωπο όταν: ${activeAgent.handoff_condition || 'Interest Confirmed'}.`;
   };
 

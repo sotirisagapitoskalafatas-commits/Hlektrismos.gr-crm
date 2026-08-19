@@ -308,6 +308,19 @@ export default function LandingPage() {
     });
     setSubmitting(false);
     if (error) { setFormError('Κάτι πήγε στραβά. Δοκιμάστε ξανά.'); return; }
+
+    // Auto-trigger OCR for uploaded bill files in background
+    if (uploadedFiles.length > 0) {
+      const leadId = (await supabase.from('hlektrismos_leads').select('id').order('created_at', { ascending: false }).limit(1).single())?.data?.id;
+      if (leadId) {
+        for (const file of uploadedFiles) {
+          supabase.functions.invoke('billing-ocr', {
+            body: { lead_id: leadId, file_url: file.path, file_type: file.type },
+          }).then(() => {}).catch(() => {});
+        }
+      }
+    }
+
     setSubmitted(true);
     setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
   };

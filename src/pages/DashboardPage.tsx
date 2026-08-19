@@ -1281,7 +1281,7 @@ export default function DashboardPage() {
               </div>
             )}
             {tab === 'campaigns' && (
-              <CampaignsTab leads={leads} toast={toast} setToast={setToast} />
+              <CampaignsTab leads={leads} preSelectedLeadIds={selectedLeads} toast={toast} setToast={setToast} onClearSelection={() => setSelectedLeads(new Set())} />
             )}
             {tab === 'documents' && (
               <DocumentGenerator toast={toast} setToast={setToast} />
@@ -2694,17 +2694,24 @@ function B2BScraperTab({ toast, setToast }: {
   );
 }
 
-function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; setToast: (v: any) => void }) {
+function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelection }: { leads: Lead[]; preSelectedLeadIds?: Set<string>; toast: any; setToast: (v: any) => void; onClearSelection?: () => void }) {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [sending, setSending] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<Set<string>>(new Set());
   const [newCampaign, setNewCampaign] = useState({
     name: '', channel: 'email' as const, subject: '', body: '',
     audience_filter: {} as any,
   });
 
-  useEffect(() => { loadCampaigns(); }, []);
+  useEffect(() => {
+    loadCampaigns();
+    if (preSelectedLeadIds && preSelectedLeadIds.size > 0) {
+      setSelectedFilter(new Set(preSelectedLeadIds));
+      setShowCreate(true);
+    }
+  }, []);
 
   const loadCampaigns = async () => {
     setLoading(true);
@@ -2717,12 +2724,14 @@ function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; s
     if (!newCampaign.name || !newCampaign.body) { setToast({ msg: 'Πληρώστε όνομα και μήνυμα', type: 'info' }); return; }
     setSending(true);
     try {
-      // Filter leads based on audience
-      let targetLeads = leads.filter(l => !l.deleted_at);
+      // Use pre-selected leads if available, otherwise all leads
+      let targetLeads = selectedFilter.size > 0
+        ? leads.filter(l => selectedFilter.has(l.id) && !l.deleted_at)
+        : leads.filter(l => !l.deleted_at);
       if (newCampaign.channel === 'email') targetLeads = targetLeads.filter(l => l.email);
       else targetLeads = targetLeads.filter(l => l.phone);
 
-      if (targetLeads.length === 0) { setToast({ msg: 'Δεν υπάρχουν leads με το απαραίτητο κανάλι', type: 'info' }); setSending(false); return; }
+      if (targetLeads.length === 0) { setToast({ msg: 'Δεν υπάρχουν leads με το απαραίτητο κανάλι (email/τηλέφωνο)', type: 'info' }); setSending(false); return; }
 
       // Create campaign record
       const { data: campaign } = await supabase.from('campaigns').insert({
@@ -2741,6 +2750,22 @@ function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; s
           body: { campaign_id: campaign?.id, leads: targetLeads, subject: newCampaign.subject, html_body: newCampaign.body, from_name: 'Αλέξης - Hlektrismos.gr' },
         });
         result = res.data;
+      } else if (newCampaign.channel === 'voice') {
+        // Voice calls — call make-voice-call for each lead sequentially
+        let sent = 0, failed = 0;
+        for (const lead of targetLeads) {
+          try {
+            const res = await supabase.functions.invoke('make-voice-call', {
+              body: {
+                lead_id: lead.id, phone: lead.phone, first_name: lead.first_name,
+                last_name: lead.last_name, region: lead.region,
+                current_provider: lead.provider,
+              },
+            });
+            if (res.error) failed++; else sent++;
+          } catch { failed++; }
+        }
+        result = { sent, failed };
       } else {
         const res = await supabase.functions.invoke('send-sms', {
           body: { campaign_id: campaign?.id, leads: targetLeads, message: newCampaign.body, channel: newCampaign.channel },
@@ -2781,7 +2806,17 @@ function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; s
 
       {showCreate && (
         <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 24 }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: 14 }}>Δημιουργία Καμπάνιας</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h4 style={{ margin: 0, fontSize: 14 }}>Δημιουργία Καμπάνιας</h4>
+            {selectedFilter.size > 0 && (
+              <button
+                onClick={() => { setSelectedFilter(new Set()); onClearSelection?.(); }}
+                style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}
+              >
+                ✕ Καθαρισμός επιλογής ({selectedFilter.size})
+              </button>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
               <label style={{ fontWeight: 600, fontSize: 12 }}>Όνομα Καμπάνιας</label>
@@ -2794,7 +2829,7 @@ function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; s
                 <option value="sms">📱 SMS (Infobip)</option>
                 <option value="viber">💬 Viber (Infobip)</option>
                 <option value="whatsapp">💬 WhatsApp (Infobip)</option>
-                <option value="📞 voice">📞 AI Voice Call (Vapi.ai)</option>
+                <option value="voice">📞 AI Voice Call (Vapi.ai)</option>
               </select>
             </div>
           </div>
@@ -2809,10 +2844,21 @@ function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; s
             <textarea value={newCampaign.body} onChange={(e) => setNewCampaign({ ...newCampaign, body: e.target.value })} rows={6} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4, fontFamily: 'monospace', fontSize: 12 }} placeholder={newCampaign.channel === 'email' ? '<h2>Εξοικονομήστε!</h2><p>Γεια σου {{first_name}}, η Hlektrismos.gr μπορεί να μειώσει τον λογαριασμό σου...</p>' : 'Γεια σου {{first_name}}, η Hlektrismos.gr μπορεί να μειώσει τον λογαριασμό σου ρεύματος!'} />
           </div>
           <div style={{ marginTop: 12, padding: 12, background: '#f0fdf4', borderRadius: 8, fontSize: 12 }}>
-            📊 <strong>{leads.filter(l => !l.deleted_at && (newCampaign.channel === 'email' ? l.email : l.phone)).length}</strong> leads θα λάβουν αυτή την καμπάνια
+            📊 <strong>{(() => {
+              const base = selectedFilter.size > 0
+                ? leads.filter(l => selectedFilter.has(l.id) && !l.deleted_at)
+                : leads.filter(l => !l.deleted_at);
+              return base.filter(l => newCampaign.channel === 'email' ? l.email : l.phone).length;
+            })()}</strong> leads θα λάβουν αυτή την καμπάνια
+            {selectedFilter.size > 0 && <span style={{ color: '#0066cc', marginLeft: 8 }}>(επιλεγμένοι: {selectedFilter.size})</span>}
           </div>
           <button onClick={createAndSend} disabled={sending} style={{ marginTop: 16, padding: '10px 24px', background: sending ? '#94a3b8' : '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer' }}>
-            {sending ? '⏳ Αποστολή...' : `📤 Αποστολή σε ${leads.filter(l => !l.deleted_at && (newCampaign.channel === 'email' ? l.email : l.phone)).length} Leads`}
+            {sending ? '⏳ Αποστολή...' : `📤 Αποστολή σε ${(() => {
+              const base = selectedFilter.size > 0
+                ? leads.filter(l => selectedFilter.has(l.id) && !l.deleted_at)
+                : leads.filter(l => !l.deleted_at);
+              return base.filter(l => newCampaign.channel === 'email' ? l.email : l.phone).length;
+            })()} Leads`}
           </button>
         </div>
       )}

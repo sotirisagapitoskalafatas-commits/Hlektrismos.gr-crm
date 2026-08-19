@@ -18,10 +18,10 @@ create table if not exists public.crm_email_labels (
 
 alter table public.crm_email_labels enable row level security;
 
-create policy "crm_email_labels_select" on public.crm_email_labels for select to authenticated using (true);
-create policy "crm_email_labels_insert" on public.crm_email_labels for insert to authenticated with check (true);
-create policy "crm_email_labels_update" on public.crm_email_labels for update to authenticated using (true);
-create policy "crm_email_labels_delete" on public.crm_email_labels for delete to authenticated using (true);
+do $$ begin create policy "crm_email_labels_select" on public.crm_email_labels for select to authenticated using (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "crm_email_labels_insert" on public.crm_email_labels for insert to authenticated with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "crm_email_labels_update" on public.crm_email_labels for update to authenticated using (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "crm_email_labels_delete" on public.crm_email_labels for delete to authenticated using (true); exception when duplicate_object then null; end $$;
 
 -- Email settings table
 create table if not exists public.crm_email_settings (
@@ -33,9 +33,9 @@ create table if not exists public.crm_email_settings (
 
 alter table public.crm_email_settings enable row level security;
 
-create policy "crm_email_settings_select" on public.crm_email_settings for select to authenticated using (true);
-create policy "crm_email_settings_insert" on public.crm_email_settings for insert to authenticated with check (true);
-create policy "crm_email_settings_update" on public.crm_email_settings for update to authenticated using (true);
+do $$ begin create policy "crm_email_settings_select" on public.crm_email_settings for select to authenticated using (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "crm_email_settings_insert" on public.crm_email_settings for insert to authenticated with check (true); exception when duplicate_object then null; end $$;
+do $$ begin create policy "crm_email_settings_update" on public.crm_email_settings for update to authenticated using (true); exception when duplicate_object then null; end $$;
 
 -- Indexes
 create index if not exists idx_crm_emails_starred on public.crm_emails (starred) where starred = true;

@@ -238,6 +238,7 @@ export default function DashboardPage() {
   // Reports state
   const [reports, setReports] = useState<any[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
 
@@ -363,18 +364,20 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [leadsRes, agentsRes, sourcesRes, tariffsRes, usersRes] = await Promise.all([
+    const [leadsRes, agentsRes, sourcesRes, tariffsRes, usersRes, notesRes] = await Promise.all([
       supabase.from('hlektrismos_leads').select('*').order('created_at', { ascending: false }),
       supabase.from('ai_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_sources').select('*').order('created_at', { ascending: false }),
       supabase.from('market_tariffs').select('*').order('resource', { ascending: true }),
       supabase.from('crm_users').select('*').order('created_at', { ascending: false }),
+      supabase.from('lead_notes').select('*').order('created_at', { ascending: false }),
     ]);
     if (leadsRes.data) setLeads(leadsRes.data as Lead[]);
     if (agentsRes.data) setAgents(agentsRes.data as Agent[]);
     if (sourcesRes.data) setSources(sourcesRes.data as Source[]);
     if (tariffsRes.data) setTariffs(tariffsRes.data as Tariff[]);
     if (usersRes.data) setCrmUsers(usersRes.data as CrmUser[]);
+    if (notesRes.data) setLeadNotes(notesRes.data);
     setLoading(false);
   };
 
@@ -1081,6 +1084,46 @@ export default function DashboardPage() {
                   <p>Πηγές leads με GDPR-compliant lawful basis. Καμία εξαγωγή από third-party sites.</p>
                   <button className="btn btn-primary" onClick={() => setShowAddSource(!showAddSource)}><Plus size={16} /> Νέα Πηγή</button>
                 </div>
+
+                {/* Real-time Aggregate Metrics */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                  <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Σύνολο Leads</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>{leads.length}</div>
+                  </div>
+                  <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Αυτόν τον Μήνα</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#0066cc' }}>
+                      {leads.filter(l => { const d = new Date(l.created_at); const now = new Date(); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length}
+                    </div>
+                  </div>
+                  <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Ενεργοί</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e' }}>
+                      {leads.filter(l => l.status === 'new' || l.status === 'contacted' || l.status === 'qualified').length}
+                    </div>
+                  </div>
+                  <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Πηγές</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>{sources.length}</div>
+                  </div>
+                </div>
+
+                {/* B2B Scraper Source (always shown) */}
+                <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(0,102,204,0.04)', border: '1px solid rgba(0,102,204,0.15)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(0,102,204,0.1)', display: 'grid', placeItems: 'center' }}><Database size={16} style={{ color: '#0066cc' }} /></div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>SerpApi Google Maps Engine</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>B2B Scraper — Νόμιμη Συλλογή Δεδομένων</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,200,120,0.1)', color: '#00c878', fontWeight: 600 }}>Legitimate Interest (GDPR Art.6(1)(f))</span>
+                    <span className="dash-status-pill active" style={{ fontSize: 11 }}>active</span>
+                  </div>
+                </div>
+
                 {showAddSource && (
                   <div className="dash-add-form">
                     <input placeholder="Όνομα πηγής" value={newSource.name} onChange={(e) => setNewSource({ ...newSource, name: e.target.value })} />
@@ -1156,6 +1199,8 @@ export default function DashboardPage() {
                 setGenerating={setGeneratingReport}
                 toast={toast}
                 setToast={setToast}
+                leadNotes={leadNotes}
+                leads={leads}
               />
             )}
 
@@ -1905,7 +1950,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   );
 }
 
-function ReportsTab({ agents, reports, setReports, loading, setLoading, selectedReport, setSelectedReport, generating, setGenerating, toast, setToast }: {
+function ReportsTab({ agents, reports, setReports, loading, setLoading, selectedReport, setSelectedReport, generating, setGenerating, toast, setToast, leadNotes, leads }: {
   agents: Agent[];
   reports: any[];
   setReports: React.Dispatch<React.SetStateAction<any[]>>;
@@ -1917,9 +1962,22 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
   setGenerating: (v: boolean) => void;
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+  leadNotes: any[];
+  leads: Lead[];
 }) {
   const [reportNotes, setReportNotes] = useState('');
   const [reportPriority, setReportPriority] = useState('normal');
+
+  // Real metrics from database
+  const totalLeads = leads.length;
+  const thisMonthLeads = leads.filter(l => { const d = new Date(l.created_at); const now = new Date(); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
+  const totalEmailsSent = leadNotes.filter(n => n.note_type === 'email_sent').length;
+  const totalAiSummaries = leadNotes.filter(n => n.note_type === 'ai_summary').length;
+  const totalManualNotes = leadNotes.filter(n => n.note_type === 'manual').length;
+  const totalStatusChanges = leadNotes.filter(n => n.note_type === 'status_change').length;
+  const leadsByStatus = leads.reduce((acc, l) => { acc[l.status] = (acc[l.status] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const agentsActive = agents.filter(a => a.status === 'active').length;
+  const agentsPaused = agents.filter(a => a.status === 'paused').length;
 
   const loadReports = async () => {
     setLoading(true);
@@ -1988,6 +2046,51 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
           <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
             <FileText size={16} /> Master Report
           </button>
+        </div>
+      </div>
+
+      {/* Real Database Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Σύνολο Leads</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>{totalLeads}</div>
+        </div>
+        <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Emails Εστάλησαν</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#0066cc' }}>{totalEmailsSent}</div>
+        </div>
+        <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>AI Summaries</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#00c878' }}>{totalAiSummaries}</div>
+        </div>
+        <div className="dash-stat-card" style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Agents Active</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>{agentsActive} / {agents.length}</div>
+        </div>
+      </div>
+
+      {/* Lead Pipeline Breakdown */}
+      <div style={{ marginBottom: 20, padding: '14px 18px', background: 'var(--surface-2, #f5f7fa)', border: '1px solid var(--border)', borderRadius: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Lead Pipeline Breakdown</div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          {Object.entries(leadsByStatus).map(([status, count]) => (
+            <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className={`dash-status-pill ${status}`} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 12 }}>{status}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{count}</span>
+            </div>
+          ))}
+          {Object.keys(leadsByStatus).length === 0 && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>No leads yet</span>}
+        </div>
+      </div>
+
+      {/* Activity Summary */}
+      <div style={{ marginBottom: 20, padding: '14px 18px', background: 'var(--surface-2, #f5f7fa)', border: '1px solid var(--border)', borderRadius: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Activity Summary</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <div style={{ textAlign: 'center' }}><div style={{ fontSize: 20, fontWeight: 700, color: '#0066cc' }}>{totalEmailsSent}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Emails Sent</div></div>
+          <div style={{ textAlign: 'center' }}><div style={{ fontSize: 20, fontWeight: 700, color: '#00c878' }}>{totalAiSummaries}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>AI Summaries</div></div>
+          <div style={{ textAlign: 'center' }}><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{totalManualNotes}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Manual Notes</div></div>
+          <div style={{ textAlign: 'center' }}><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{totalStatusChanges}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Status Changes</div></div>
         </div>
       </div>
 

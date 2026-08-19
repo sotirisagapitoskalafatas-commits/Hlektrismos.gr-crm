@@ -216,7 +216,7 @@ img { display: block; max-width: 100%; }
 .price-cta { width: 100%; }
 
 /* ===== Contact form ===== */
-.contact-section { position: relative; padding: 80px 0; overflow: hidden; background: var(--section-bg-solid); backdrop-filter: blur(16px); }
+.contact-section { position: relative; padding: 60px 0; overflow: hidden; background: var(--section-bg-solid); backdrop-filter: blur(16px); }
 .contact-glow { position: absolute; width: 800px; height: 800px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(0,200,120,0.12), transparent 60%); filter: blur(80px); opacity: 0.5; }
 .contact-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 .contact-copy h2 { margin: 20px 0; font: 700 clamp(32px, 4.5vw, 52px)/1.1 var(--font-display); letter-spacing: -1.5px; color: var(--card-text); }
@@ -968,7 +968,6 @@ img { display: block; max-width: 100%; }
   background-image: url('/images/energy2.jpg');
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
   position: relative;
 }
 .section.section-bg-services::before {
@@ -984,7 +983,6 @@ img { display: block; max-width: 100%; }
   background-image: url('/images/energy3.jpg');
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
   position: relative;
 }
 .section.section-bg-about::before {
@@ -1000,8 +998,8 @@ img { display: block; max-width: 100%; }
   background-image: url('/images/energy5.jpg');
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
   position: relative;
+  padding: 60px 0;
 }
 .section.section-bg-faq::before {
   content: '';
@@ -1016,7 +1014,6 @@ img { display: block; max-width: 100%; }
   background-image: url('/images/energy6.jpg');
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
   position: relative;
 }
 .gdpr-section.section-bg-gdpr::before {
@@ -1032,7 +1029,6 @@ img { display: block; max-width: 100%; }
   background-image: url('/images/energy7.jpg');
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
   position: relative;
 }
 .contact-section.section-bg-contact::before {
@@ -1630,11 +1626,6 @@ img { display: block; max-width: 100%; }
 :root:not(.dark) .stat-cell span { color: rgba(26,26,46,0.6); }
 :root:not(.dark) .eyebrow { background: rgba(0,200,120,0.15); border-color: rgba(0,200,120,0.25); }
 :root:not(.dark) .section { background: rgba(245,247,250,0.92); }
-:root:not(.dark) .section-bg-services::before,
-:root:not(.dark) .section-bg-about::before,
-:root:not(.dark) .section-bg-faq::before,
-:root:not(.dark) .gdpr-section.section-bg-gdpr::before,
-:root:not(.dark) .contact-section.section-bg-contact::before { background: rgba(245,247,250,0.92); }
 :root:not(.dark) .advantages-section { background: rgba(245,247,250,0.92); }
 :root:not(.dark) .gdpr-shield { background: rgba(0,200,120,0.1); color: #00c878; }
 :root:not(.dark) .about-copy h2 { color: #1a1a2e; }

@@ -98,6 +98,10 @@ export default function LeadDetailSlideout({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  const [omnichannel, setOmnichannel] = useState<{ recommended_channel: string; reasoning: string; draft_message: string; next_steps: string[] } | null>(null);
+  const [omniLoading, setOmniLoading] = useState(false);
+  const [omniError, setOmniError] = useState<string | null>(null);
+
   const [notes, setNotes] = useState<LeadNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
@@ -198,6 +202,90 @@ export default function LeadDetailSlideout({
       setAiError(e.message || 'Failed to generate summary');
     }
     setAiLoading(false);
+  };
+
+  // AI Omnichannel Strategy
+  const generateOmnichannel = async () => {
+    setOmniLoading(true);
+    setOmniError(null);
+    setOmnichannel(null);
+    try {
+      const prompt = `You are an expert omnichannel outreach strategist for an energy company. Analyze this lead and recommend the BEST channel for initial contact. Respond ONLY with valid JSON (no markdown, no code fences).
+
+Lead Data:
+- Name: ${lead.first_name} ${lead.last_name}
+- Email: ${lead.email || 'N/A'}
+- Phone: ${lead.phone || 'N/A'}
+- Region: ${lead.region || 'N/A'}
+- Customer Type: ${lead.customer_type || 'N/A'}
+- Category: ${lead.customer_category || 'N/A'}
+- Property: ${lead.property_type || 'N/A'}
+- Provider: ${lead.provider || 'N/A'}
+- Comments: ${lead.comments || 'N/A'}
+
+Available channels: email, phone_call, sms, viber, in_person
+
+Return JSON with this exact structure:
+{
+  "recommended_channel": "email|phone_call|sms|viber|in_person",
+  "reasoning": "Brief explanation in Greek (2-3 sentences)",
+  "draft_message": "A professional draft message in Greek for the recommended channel",
+  "next_steps": ["step 1", "step 2", "step 3"]
+}`;
+
+      const { data, error } = await supabase.functions.invoke('orchestrator', {
+        body: {
+          message: prompt,
+          mode: 'chat',
+          api_key: hubApiKey || undefined,
+          model: hubModel || undefined,
+        },
+      });
+
+      if (error) throw error;
+      
+      // Parse JSON from response
+      let parsed;
+      try {
+        // Try to extract JSON from the response (might be wrapped in markdown)
+        const jsonMatch = data.reply.match(/\{[\s\S]*\}/);
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(data.reply);
+      } catch {
+        throw new Error('Failed to parse AI response. Raw: ' + data.reply.substring(0, 200));
+      }
+
+      setOmnichannel(parsed);
+
+      // Save as a note
+      await supabase.from('lead_notes').insert({
+        lead_id: lead.id,
+        content: `AI Omnichannel Strategy:\nChannel: ${parsed.recommended_channel}\nReasoning: ${parsed.reasoning}\n\nDraft:\n${parsed.draft_message}\n\nNext Steps:\n${parsed.next_steps?.map((s: string) => `• ${s}`).join('\n') || ''}`,
+        author: 'AI Agent',
+        note_type: 'ai_summary',
+      });
+      const { data: refreshedNotes } = await supabase
+        .from('lead_notes')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false });
+      if (refreshedNotes) setNotes(refreshedNotes);
+    } catch (e: any) {
+      setOmniError(e.message || 'Failed to generate strategy');
+    }
+    setOmniLoading(false);
+  };
+
+  // Send email via Edge Function
+  const sendEmail = async (to: string, subject: string, html: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: { to, subject, html, from_name: 'Hlektrismos.gr' },
+      });
+      if (error) throw error;
+      alert(`Email sent to ${to}!`);
+    } catch (e: any) {
+      alert(`Failed to send email: ${e.message}`);
+    }
   };
 
   // Add manual note
@@ -366,6 +454,109 @@ export default function LeadDetailSlideout({
             {!aiLoading && !aiSummary && !aiError && (
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
                 Click "Generate Summary" to get an AI-powered analysis of this lead.
+              </div>
+            )}
+          </section>
+
+          {/* AI Omnichannel Strategy Section */}
+          <section>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>
+                <Zap size={14} /> AI Omnichannel Strategy
+              </h3>
+              <button
+                onClick={generateOmnichannel}
+                disabled={omniLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
+                  border: '1px solid rgba(0,102,204,0.3)', background: omniLoading ? 'var(--surface-2, #f5f7fa)' : 'rgba(0,102,204,0.06)',
+                  color: omniLoading ? 'var(--text-muted)' : '#0066cc', fontSize: 12, fontWeight: 600,
+                  cursor: omniLoading ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                {omniLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={14} />}
+                {omniLoading ? 'Analyzing...' : omnichannel ? '🔄 Re-analyze' : '🤖 Start AI Outreach'}
+              </button>
+            </div>
+            {omniError && (
+              <div style={{ padding: 12, background: 'rgba(231,76,60,0.08)', borderRadius: 10, color: '#e74c3c', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertCircle size={14} /> {omniError}
+              </div>
+            )}
+            {omnichannel && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Recommended Channel */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(0,102,204,0.04)', border: '1px solid rgba(0,102,204,0.2)', borderRadius: 10 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,102,204,0.1)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    {omnichannel.recommended_channel === 'email' && <Mail size={18} style={{ color: '#0066cc' }} />}
+                    {omnichannel.recommended_channel === 'phone_call' && <Phone size={18} style={{ color: '#0066cc' }} />}
+                    {omnichannel.recommended_channel === 'sms' && <MessageSquare size={18} style={{ color: '#0066cc' }} />}
+                    {omnichannel.recommended_channel === 'viber' && <MessageSquare size={18} style={{ color: '#7b51d5' }} />}
+                    {omnichannel.recommended_channel === 'in_person' && <User size={18} style={{ color: '#0066cc' }} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Recommended Channel</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0066cc', textTransform: 'capitalize' }}>
+                      {omnichannel.recommended_channel === 'phone_call' ? '📞 Phone Call' :
+                       omnichannel.recommended_channel === 'email' ? '📧 Email' :
+                       omnichannel.recommended_channel === 'sms' ? '💬 SMS' :
+                       omnichannel.recommended_channel === 'viber' ? '💜 Viber' :
+                       '🤝 In Person'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reasoning */}
+                <div style={{ padding: '12px 14px', background: 'var(--surface-2, #f5f7fa)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Reasoning</div>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--text)' }}>{omnichannel.reasoning}</p>
+                </div>
+
+                {/* Draft Message */}
+                <div style={{ padding: '12px 14px', background: 'var(--surface-2, #f5f7fa)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Draft Message</div>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{omnichannel.draft_message}</p>
+                </div>
+
+                {/* Next Steps */}
+                {omnichannel.next_steps && omnichannel.next_steps.length > 0 && (
+                  <div style={{ padding: '12px 14px', background: 'rgba(0,200,120,0.04)', border: '1px solid rgba(0,200,120,0.2)', borderRadius: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Next Steps</div>
+                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, lineHeight: 1.7, color: 'var(--text)' }}>
+                      {omnichannel.next_steps.map((step: string, i: number) => <li key={i}>{step}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {omnichannel.recommended_channel === 'email' && lead.email && (
+                    <button
+                      onClick={() => {
+                        const subject = `Ενημέρωση - ${lead.first_name} ${lead.last_name}`;
+                        sendEmail(lead.email, subject, omnichannel.draft_message.replace(/\n/g, '<br>'));
+                      }}
+                      style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: 'none', background: '#0066cc', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                      <Send size={14} /> Send Email
+                    </button>
+                  )}
+                  {omnichannel.recommended_channel === 'phone_call' && lead.phone && (
+                    <a href={`tel:${lead.phone}`} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: 'none', background: '#00c878', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none', textAlign: 'center' }}>
+                      <Phone size={14} /> Call Now
+                    </a>
+                  )}
+                  {omnichannel.recommended_channel === 'sms' && lead.phone && (
+                    <a href={`sms:${lead.phone}`} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: 'none', background: '#f59e0b', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none', textAlign: 'center' }}>
+                      <MessageSquare size={14} /> Send SMS
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            {!omniLoading && !omnichannel && !omniError && (
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
+                Click "Start AI Outreach" to get an AI-powered channel recommendation and draft message.
               </div>
             )}
           </section>

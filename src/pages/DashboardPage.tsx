@@ -117,7 +117,7 @@ type Tariff = {
   created_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'rag-search';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'rag-search' | 'campaigns';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -635,6 +635,7 @@ export default function DashboardPage() {
     reports: 'Reports',
     calendar: '📅 Ημερολόγιο',
     'rag-search': '🔍 AI Market RAG',
+    campaigns: '📣 Campaigns',
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
     documents: '\u0395\u03b3\u03b3\u03c1\u03b1\u03c6\u03ac',
@@ -662,6 +663,7 @@ export default function DashboardPage() {
           <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
           <button className={tab === 'calendar' ? 'active' : ''} onClick={() => setTab('calendar')}><Calendar size={18} /> 📅 Ημερολόγιο</button>
           <button className={tab === 'rag-search' ? 'active' : ''} onClick={() => setTab('rag-search')}><Sparkles size={18} /> 🔍 AI Market RAG</button>
+          <button className={tab === 'campaigns' ? 'active' : ''} onClick={() => setTab('campaigns')}><Mail size={18} /> 📣 Campaigns</button>
           <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
         </nav>
         <div className="dash-sidebar-footer">
@@ -855,16 +857,28 @@ export default function DashboardPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ margin: 0 }}>Διαχείριση Leads — αναζήτηση, φίλτρα, ανάθεση σε AI agents.</p>
                     {selectedLeads.size > 0 ? (
-                      <button
-                        onClick={bulkSoftDeleteLeads}
-                        style={{
-                          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
-                          background: '#e74c3c', color: '#fff', border: 'none', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.15s',
-                        }}
-                      >
-                        <Trash2 size={14} /> Διαγραφή ({selectedLeads.size})
-                      </button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => setTab('campaigns')}
+                          style={{
+                            padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                            background: '#0066cc', color: '#fff', border: 'none', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.15s',
+                          }}
+                        >
+                          <Mail size={14} /> 📣 Καμπάνια ({selectedLeads.size})
+                        </button>
+                        <button
+                          onClick={bulkSoftDeleteLeads}
+                          style={{
+                            padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                            background: '#e74c3c', color: '#fff', border: 'none', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.15s',
+                          }}
+                        >
+                          <Trash2 size={14} /> Διαγραφή ({selectedLeads.size})
+                        </button>
+                      </div>
                     ) : (
                       <button className="btn btn-primary" onClick={() => { setSearch(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setLeadsSubTab('all'); }}>
                         <RefreshCw size={14} /> Επαναφορά Φίλτρων
@@ -1265,6 +1279,9 @@ export default function DashboardPage() {
               <div style={{ padding: 20, height: 'calc(100vh - 120px)' }}>
                 <MarketRAGSearch />
               </div>
+            )}
+            {tab === 'campaigns' && (
+              <CampaignsTab leads={leads} toast={toast} setToast={setToast} />
             )}
             {tab === 'documents' && (
               <DocumentGenerator toast={toast} setToast={setToast} />
@@ -2676,6 +2693,157 @@ function B2BScraperTab({ toast, setToast }: {
     </div>
   );
 }
+
+function CampaignsTab({ leads, toast, setToast }: { leads: Lead[]; toast: any; setToast: (v: any) => void }) {
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [newCampaign, setNewCampaign] = useState({
+    name: '', channel: 'email' as const, subject: '', body: '',
+    audience_filter: {} as any,
+  });
+
+  useEffect(() => { loadCampaigns(); }, []);
+
+  const loadCampaigns = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false });
+    if (data) setCampaigns(data);
+    setLoading(false);
+  };
+
+  const createAndSend = async () => {
+    if (!newCampaign.name || !newCampaign.body) { setToast({ msg: 'Πληρώστε όνομα και μήνυμα', type: 'info' }); return; }
+    setSending(true);
+    try {
+      // Filter leads based on audience
+      let targetLeads = leads.filter(l => !l.deleted_at);
+      if (newCampaign.channel === 'email') targetLeads = targetLeads.filter(l => l.email);
+      else targetLeads = targetLeads.filter(l => l.phone);
+
+      if (targetLeads.length === 0) { setToast({ msg: 'Δεν υπάρχουν leads με το απαραίτητο κανάλι', type: 'info' }); setSending(false); return; }
+
+      // Create campaign record
+      const { data: campaign } = await supabase.from('campaigns').insert({
+        name: newCampaign.name,
+        channel: newCampaign.channel,
+        subject: newCampaign.subject,
+        body: newCampaign.body,
+        status: 'running',
+        total_sends: targetLeads.length,
+      }).select().single();
+
+      // Call appropriate Edge Function
+      let result;
+      if (newCampaign.channel === 'email') {
+        const res = await supabase.functions.invoke('send-campaign-email', {
+          body: { campaign_id: campaign?.id, leads: targetLeads, subject: newCampaign.subject, html_body: newCampaign.body, from_name: 'Αλέξης - Hlektrismos.gr' },
+        });
+        result = res.data;
+      } else {
+        const res = await supabase.functions.invoke('send-sms', {
+          body: { campaign_id: campaign?.id, leads: targetLeads, message: newCampaign.body, channel: newCampaign.channel },
+        });
+        result = res.data;
+      }
+
+      if (campaign?.id) {
+        await supabase.from('campaigns').update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          total_sent: result?.sent || 0,
+          total_failed: result?.failed || 0,
+        }).eq('id', campaign.id);
+      }
+
+      setToast({ msg: `Καμπάνια ολοκληρώθηκε: ${result?.sent || 0} απεσταλμένα, ${result?.failed || 0} αποτυχίες`, type: 'success' });
+      setShowCreate(false);
+      setNewCampaign({ name: '', channel: 'email', subject: '', body: '', audience_filter: {} });
+      loadCampaigns();
+    } catch (e: any) {
+      setToast({ msg: `Σφάλμα: ${e.message}`, type: 'info' });
+    }
+    setSending(false);
+  };
+
+  const channelIcons: Record<string, string> = { email: '📧', sms: '📱', viber: '💬', whatsapp: '💬', voice: '📞' };
+  const statusColors: Record<string, string> = { draft: '#94a3b8', scheduled: '#f59e0b', running: '#3b82f6', completed: '#22c55e', paused: '#ef4444' };
+
+  return (
+    <div className="dash-content">
+      <div className="dash-content-header">
+        <p>Μαζικές καμπάνιες Email, SMS, Viber & AI Voice Calls — αυτόματη επικοινωνία με leads.</p>
+        <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}>
+          <Mail size={16} /> {showCreate ? 'Ακύρωση' : '📣 Νέα Καμπάνια'}
+        </button>
+      </div>
+
+      {showCreate && (
+        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: 14 }}>Δημιουργία Καμπάνιας</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 12 }}>Όνομα Καμπάνιας</label>
+              <input value={newCampaign.name} onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4 }} placeholder="π.χ. August B2C Promo" />
+            </div>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 12 }}>Κανάλι</label>
+              <select value={newCampaign.channel} onChange={(e) => setNewCampaign({ ...newCampaign, channel: e.target.value as any })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4 }}>
+                <option value="email">📧 Email (Resend)</option>
+                <option value="sms">📱 SMS (Infobip)</option>
+                <option value="viber">💬 Viber (Infobip)</option>
+                <option value="whatsapp">💬 WhatsApp (Infobip)</option>
+                <option value="📞 voice">📞 AI Voice Call (Vapi.ai)</option>
+              </select>
+            </div>
+          </div>
+          {newCampaign.channel === 'email' && (
+            <div style={{ marginTop: 12 }}>
+              <label style={{ fontWeight: 600, fontSize: 12 }}>Θέμα Email</label>
+              <input value={newCampaign.subject} onChange={(e) => setNewCampaign({ ...newCampaign, subject: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4 }} placeholder="Εξοικονομήστε στο ρεύμα σας!" />
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <label style={{ fontWeight: 600, fontSize: 12 }}>Μήνυμα {newCampaign.channel === 'email' ? '(HTML)' : ''}</label>
+            <textarea value={newCampaign.body} onChange={(e) => setNewCampaign({ ...newCampaign, body: e.target.value })} rows={6} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4, fontFamily: 'monospace', fontSize: 12 }} placeholder={newCampaign.channel === 'email' ? '<h2>Εξοικονομήστε!</h2><p>Γεια σου {{first_name}}, η Hlektrismos.gr μπορεί να μειώσει τον λογαριασμό σου...</p>' : 'Γεια σου {{first_name}}, η Hlektrismos.gr μπορεί να μειώσει τον λογαριασμό σου ρεύματος!'} />
+          </div>
+          <div style={{ marginTop: 12, padding: 12, background: '#f0fdf4', borderRadius: 8, fontSize: 12 }}>
+            📊 <strong>{leads.filter(l => !l.deleted_at && (newCampaign.channel === 'email' ? l.email : l.phone)).length}</strong> leads θα λάβουν αυτή την καμπάνια
+          </div>
+          <button onClick={createAndSend} disabled={sending} style={{ marginTop: 16, padding: '10px 24px', background: sending ? '#94a3b8' : '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer' }}>
+            {sending ? '⏳ Αποστολή...' : `📤 Αποστολή σε ${leads.filter(l => !l.deleted_at && (newCampaign.channel === 'email' ? l.email : l.phone)).length} Leads`}
+          </button>
+        </div>
+      )}
+
+      {loading ? <p>Φόρτωση...</p> : campaigns.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+          <Mail size={48} style={{ opacity: 0.3 }} />
+          <p>Δεν υπάρχουν καμπάνιες ακόμα.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {campaigns.map(c => (
+            <div key={c.id} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 10, padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{ fontSize: 24 }}>{channelIcons[c.channel] || '📧'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.subject || c.body?.slice(0, 60)}</div>
+              </div>
+              <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: `${statusColors[c.status] || '#94a3b8'}22`, color: statusColors[c.status] || '#94a3b8' }}>{c.status}</span>
+              <div style={{ textAlign: 'right', fontSize: 12 }}>
+                <div>📤 {c.total_sends || 0}</div>
+                <div style={{ color: '#22c55e' }}>✅ {c.total_sent || 0}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DeveloperAgentChat() {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
   const [input, setInput] = useState('');

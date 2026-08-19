@@ -29,6 +29,8 @@ const CATEGORIES = [
   { key: 'appearance', label: 'Εμφάνιση', icon: Palette, desc: 'Theme, colors, branding' },
   { key: 'tariffs', label: 'Τιμολόγια', icon: Zap, desc: 'Energy suppliers & formulas' },
   { key: 'email', label: '📧 Email', icon: Mail, desc: 'SMTP, IMAP, email delivery' },
+  { key: 'campaigns', label: '📣 Campaigns', icon: Mail, desc: 'Resend, Infobip bulk sending' },
+  { key: 'voice', label: '📞 Voice AI', icon: Phone, desc: 'Vapi.ai, ElevenLabs Greek voices' },
   { key: 'ai-assistant', label: '🤖 AI Widget', icon: Bot, desc: 'CRM AI chatbot widget' },
   { key: 'communications', label: 'Τηλεφωνία & SMS', icon: Phone, desc: 'PBX, SMS, Viber gateways' },
   { key: 'security', label: 'Ασφάλεια & GDPR', icon: Shield, desc: 'Audit logs & compliance' },
@@ -158,6 +160,8 @@ export default function SettingsPanel({ toast, setToast }: { toast: any; setToas
       case 'appearance': return <AppearanceSettings settings={settings} update={updateSetting} />;
       case 'tariffs': return <TariffsSettings settings={settings} update={updateSetting} />;
       case 'email': return <EmailSettings settings={settings} update={updateSetting} />;
+      case 'campaigns': return <CampaignSettings settings={settings} update={updateSetting} />;
+      case 'voice': return <VoiceSettings settings={settings} update={updateSetting} />;
       case 'ai-assistant': return <AiAssistantSettings />;
       case 'communications': return <CommunicationsSettings settings={settings} update={updateSetting} />;
       case 'security': return <SecuritySettings settings={settings} update={updateSetting} />;
@@ -727,6 +731,109 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
 
       <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.8 }}>
         ⚠️ Never use your real password. Always create an <strong>App Password</strong> from your email provider's security settings.
+      </div>
+    </div>
+  );
+}
+
+function CampaignSettings({ settings, update }: { settings: Record<string, any>; update: (k: string, v: any) => void }) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const getVal = (key: string) => {
+    const entry = settings[key];
+    if (entry && typeof entry === 'object' && entry.setting_value !== undefined) {
+      return String(entry.setting_value).replace(/"/g, '');
+    }
+    if (typeof entry === 'string') return entry.replace(/"/g, '');
+    return '';
+  };
+
+  const setVal = (key: string, val: string) => {
+    update(key, { setting_key: key, setting_value: JSON.stringify(val), category: 'email', description: '' });
+  };
+
+  const testResend = async () => {
+    setTesting(true);
+    setResult(null);
+    try {
+      const apiKey = getVal('RESEND_API_KEY');
+      if (!apiKey) { setResult({ ok: false, msg: 'Enter Resend API key first' }); setTesting(false); return; }
+      const res = await fetch('https://api.resend.com/domains', {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      setResult(res.ok ? { ok: true, msg: 'Resend API key is valid!' } : { ok: false, msg: `Invalid key (${res.status})` });
+    } catch (e: any) { setResult({ ok: false, msg: e.message }); }
+    setTesting(false);
+  };
+
+  return (
+    <div>
+      <h4 style={{ margin: '0 0 16px', fontSize: '14px' }}>📣 Bulk Campaign Settings</h4>
+      <div style={{ padding: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 20, fontSize: 12 }}>
+        <strong>⚡ Resend (Email):</strong> 3,000 free emails/month. Get API key at <code>resend.com/api-keys</code>
+      </div>
+      <FieldRow label="Resend API Key" desc="For bulk email campaigns (replaces SMTP for volume sending)">
+        <TextInput type="password" value={getVal('RESEND_API_KEY')} onChange={(v) => setVal('RESEND_API_KEY', v)} placeholder="re_xxxxxxxxxxxx" />
+      </FieldRow>
+      <button onClick={testResend} style={{ padding: '8px 16px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer', fontSize: 12, marginBottom: 20 }}>
+        {testing ? '⏳ Testing...' : '🧪 Test Resend API Key'}
+      </button>
+      {result && <div style={{ padding: 8, borderRadius: 6, background: result.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${result.ok ? '#bbf7d0' : '#fecaca'}`, fontSize: 12, marginBottom: 16 }}>{result.ok ? '✅' : '❌'} {result.msg}</div>}
+
+      <div style={{ padding: 12, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, marginBottom: 20, fontSize: 12 }}>
+        <strong>📱 Infobip (SMS + Viber + WhatsApp):</strong> Greek local numbers, official Viber Business API. Get key at <code>portal.infobip.com</code>
+      </div>
+      <FieldRow label="Infobip API Key" desc="For SMS, Viber, and WhatsApp campaigns">
+        <TextInput type="password" value={getVal('INFOBIP_API_KEY')} onChange={(v) => setVal('INFOBIP_API_KEY', v)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+      </FieldRow>
+      <FieldRow label="Infobip Base URL" desc="Default: https://api.infobip.com">
+        <TextInput value={getVal('INFOBIP_BASE_URL')} onChange={(v) => setVal('INFOBIP_BASE_URL', v)} placeholder="https://api.infobip.com" />
+      </FieldRow>
+
+      <div style={{ padding: 12, background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, marginTop: 20, marginBottom: 16, fontSize: 12 }}>
+        <strong>⚠️ Twilio (Alternative SMS):</strong> Only if not using Infobip. Get credentials at <code>console.twilio.com</code>
+      </div>
+      <FieldRow label="Twilio Account SID"><TextInput value={getVal('TWILIO_ACCOUNT_SID')} onChange={(v) => setVal('TWILIO_ACCOUNT_SID', v)} placeholder="ACxxxxxxxxxxxxxxxxxxxx" /></FieldRow>
+      <FieldRow label="Twilio Auth Token"><TextInput type="password" value={getVal('TWILIO_AUTH_TOKEN')} onChange={(v) => setVal('TWILIO_AUTH_TOKEN', v)} placeholder="your_auth_token" /></FieldRow>
+      <FieldRow label="Twilio Phone Number"><TextInput value={getVal('TWILIO_PHONE_NUMBER')} onChange={(v) => setVal('TWILIO_PHONE_NUMBER', v)} placeholder="+30XXXXXXXXXX" /></FieldRow>
+    </div>
+  );
+}
+
+function VoiceSettings({ settings, update }: { settings: Record<string, any>; update: (k: string, v: any) => void }) {
+  const getVal = (key: string) => {
+    const entry = settings[key];
+    if (entry && typeof entry === 'object' && entry.setting_value !== undefined) {
+      return String(entry.setting_value).replace(/"/g, '');
+    }
+    if (typeof entry === 'string') return entry.replace(/"/g, '');
+    return '';
+  };
+
+  const setVal = (key: string, val: string) => {
+    update(key, { setting_key: key, setting_value: JSON.stringify(val), category: 'voice', description: '' });
+  };
+
+  return (
+    <div>
+      <h4 style={{ margin: '0 0 16px', fontSize: '14px' }}>📞 AI Voice Calling (Greek el-GR)</h4>
+      <div style={{ padding: 12, background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 8, marginBottom: 20, fontSize: 12 }}>
+        <strong>🎙️ Vapi.ai:</strong> Outbound AI voice calls with Greek neural TTS (el-GR-NestorasNeural). ~$0.15/call.
+        Get API key at <code>vapi.ai/dashboard</code>
+      </div>
+      <FieldRow label="Vapi.ai API Key" desc="For AI voice calling with Greek voice">
+        <TextInput type="password" value={getVal('VAPI_API_KEY')} onChange={(v) => setVal('VAPI_API_KEY', v)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+      </FieldRow>
+      <FieldRow label="Vapi Phone Number ID" desc="The Twilio phone number registered in Vapi">
+        <TextInput value={getVal('VAPI_PHONE_NUMBER_ID')} onChange={(v) => setVal('VAPI_PHONE_NUMBER_ID', v)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+      </FieldRow>
+      <FieldRow label="ElevenLabs API Key" desc="Optional: For custom Greek voice cloning">
+        <TextInput type="password" value={getVal('ELEVENLABS_API_KEY')} onChange={(v) => setVal('ELEVENLABS_API_KEY', v)} placeholder="your_elevenlabs_key" />
+      </FieldRow>
+      <div style={{ padding: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginTop: 16, fontSize: 12 }}>
+        <strong>🇬🇷 Greek Voice:</strong> Uses Azure Neural TTS <code>el-GR-NestorasNeural</code> (male) or <code>el-GR-AthinaNeural</code> (female).
+        System prompt is injected with lead data (name, region, provider) for personalized calls.
       </div>
     </div>
   );

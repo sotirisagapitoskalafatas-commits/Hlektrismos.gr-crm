@@ -569,6 +569,41 @@ Return JSON with this exact structure:
             )}
           </section>
 
+          {/* AI Voice Call Section */}
+          {lead.phone && (
+            <section>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 12px' }}>
+                <Phone size={14} /> AI Voice Call
+              </h3>
+              <button
+                onClick={async () => {
+                  if (!confirm(`Κλήση στο ${lead.phone} με AI Agent;`)) return;
+                  try {
+                    const { data, error } = await supabase.functions.invoke('make-voice-call', {
+                      body: {
+                        lead_id: lead.id,
+                        phone: lead.phone,
+                        first_name: lead.first_name,
+                        last_name: lead.last_name,
+                        region: lead.region,
+                        company_name: lead.company_name,
+                        current_provider: lead.current_provider || lead.provider,
+                      },
+                    });
+                    if (error) throw error;
+                    alert(`✅ AI Call initiated! Call ID: ${data.call_id}`);
+                  } catch (e: any) {
+                    alert(`❌ Error: ${e.message}`);
+                  }
+                }}
+                style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #a855f7)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                <Phone size={16} /> Κλήση με AI Agent (Αλέξης)
+              </button>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>Ελληνική AI φωνή • Vapi.ai • ~€0.15/κλήση</p>
+            </section>
+          )}
+
           {/* Bill Files Section */}
           <section>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 12px' }}>
@@ -620,6 +655,22 @@ Return JSON with this exact structure:
                     <a href={file.url} download={file.name} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', textDecoration: 'none', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                       <Download size={12} /> Download
                     </a>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke('billing-ocr', {
+                            body: { lead_id: lead.id, file_url: file.url, file_type: file.type },
+                          });
+                          if (error) throw error;
+                          alert(`📄 OCR Extracted:\nProvider: ${data.data?.provider || 'N/A'}\nRate: €${data.data?.unit_rate_kwh || 'N/A'}/kWh\nMonthly: €${data.data?.monthly_cost_total || 'N/A'}\nConsumption: ${data.data?.consumption_kwh || 'N/A'} kWh`);
+                        } catch (e: any) {
+                          alert(`❌ OCR Error: ${e.message}`);
+                        }
+                      }}
+                      style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #7c3aed', background: '#faf5ff', color: '#7c3aed', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                    >
+                      <Zap size={12} /> Extract Bill Data
+                    </button>
                   </div>
                 ))}
               </div>

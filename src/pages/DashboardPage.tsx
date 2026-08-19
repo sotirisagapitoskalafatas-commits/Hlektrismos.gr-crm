@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Activity,
   Bot,
@@ -109,65 +109,65 @@ type Tariff = {
 type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents';
 
 const greekRegions = [
-  'ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
-  'Ξ‘Ο„Ο„ΞΉΞΊΞ®',
-  'Ξ‘ΞΈΞ®Ξ½Ξ±',
-  'Ξ ΞµΞΉΟΞ±ΞΉΞ¬Ο‚',
-  'ΞΞµΟƒΟƒΞ±Ξ»ΞΏΞ½Ξ―ΞΊΞ·',
-  'ΞΞµΞ½Ο„ΟΞΉΞΊΞ® ΞΞ±ΞΊΞµΞ΄ΞΏΞ½Ξ―Ξ±',
-  'Ξ”Ο…Ο„ΞΉΞΊΞ® ΞΞ±ΞΊΞµΞ΄ΞΏΞ½Ξ―Ξ±',
-  'Ξ‘Ξ½Ξ±Ο„ΞΏΞ»ΞΉΞΊΞ® ΞΞ±ΞΊΞµΞ΄ΞΏΞ½Ξ―Ξ± & ΞΟΞ¬ΞΊΞ·',
-  'Ξ‰Ο€ΞµΞΉΟΞΏΟ‚',
-  'ΞΞµΟƒΟƒΞ±Ξ»Ξ―Ξ±',
-  'Ξ™ΟΞ½ΞΉΞ± ΞΞ·ΟƒΞΉΞ¬',
-  'ΞΞ­ΟΞΊΟ…ΟΞ±',
-  'Ξ–Ξ¬ΞΊΟ…Ξ½ΞΈΞΏΟ‚',
-  'Ξ›ΞµΟ…ΞΊΞ¬Ξ΄Ξ±',
-  'ΞΞµΟ†Ξ±Ξ»Ξ»ΞΏΞ½ΞΉΞ¬',
-  'Ξ™ΞΈΞ¬ΞΊΞ·',
-  'Ξ Ξ±ΞΎΞΏΞ―',
-  'Ξ‘Ξ½Ο„ΞΉΞΊΞ­ΟΞ±',
-  'Ξ”Ο…Ο„ΞΉΞΊΞ® Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
-  'Ξ Ξ¬Ο„ΟΞ±',
-  'Ξ‘ΞΉΞ³Ξ±Ξ»ΞµΟ',
-  'Ξ£Ο„ΞµΟΞµΞ¬ Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±',
-  'Ξ›ΞΉΞ²Ξ±Ξ΄ΞµΞΉΞ¬',
-  'Ξ§Ξ±Ξ»ΞΊΞ―Ξ΄Ξ±',
-  'Ξ ΞµΞ»ΞΏΟ€ΟΞ½Ξ½Ξ·ΟƒΞΏΟ‚',
-  'ΞΞ·ΟƒΞΉΞ¬ Ξ‘ΞΉΞ³Ξ±Ξ―ΞΏΟ…',
-  'ΞΟΞΊΞΏΞ½ΞΏΟ‚',
-  'Ξ£Ξ±Ξ½Ο„ΞΏΟΞ―Ξ½Ξ·',
-  'Ξ Ξ¬ΟΞΏΟ‚',
-  'ΞΞ¬ΞΎΞΏΟ‚',
-  'ΞΞ®Ξ»ΞΏΟ‚',
-  'ΞΟΞ®Ο„Ξ·',
-  'Ξ—ΟΞ¬ΞΊΞ»ΞµΞΉΞΏ',
-  'Ξ§Ξ±Ξ½ΞΉΞ¬',
-  'Ξ΅Ξ­ΞΈΟ…ΞΌΞ½ΞΏ',
-  'Ξ›Ξ±ΟƒΞ―ΞΈΞΉ',
-  'Ξ’ΟΟΞµΞΉΞΏ Ξ‘ΞΉΞ³Ξ±Ξ―ΞΏ',
-  'Ξ›Ξ­ΟƒΞ²ΞΏΟ‚',
-  'Ξ§Ξ―ΞΏΟ‚',
-  'Ξ£Ξ¬ΞΌΞΏΟ‚',
-  'Ξ”Ο‰Ξ΄ΞµΞΊΞ¬Ξ½Ξ·ΟƒΞ±',
-  'Ξ΅ΟΞ΄ΞΏΟ‚',
-  'ΞΟ‰Ο‚',
-  'ΞΞ±Ξ»ΟΞΌΞ½ΞΏΟ‚',
+  'Όλη η Ελλάδα',
+  'Αττική',
+  'Αθήνα',
+  'Πειραιάς',
+  'Θεσσαλονίκη',
+  'Κεντρική Μακεδονία',
+  'Δυτική Μακεδονία',
+  'Ανατολική Μακεδονία & Θράκη',
+  'Ήπειρος',
+  'Θεσσαλία',
+  'Ιόνια Νησιά',
+  'Κέρκυρα',
+  'Ζάκυνθος',
+  'Λευκάδα',
+  'Κεφαλλονιά',
+  'Ιθάκη',
+  'Παξοί',
+  'Αντικέρα',
+  'Δυτική Ελλάδα',
+  'Πάτρα',
+  'Αιγαλεώ',
+  'Στερεά Ελλάδα',
+  'Λιβαδειά',
+  'Χαλκίδα',
+  'Πελοπόννησος',
+  'Νησιά Αιγαίου',
+  'Μύκονος',
+  'Σαντορίνη',
+  'Πάρος',
+  'Νάξος',
+  'Μήλος',
+  'Κρήτη',
+  'Ηράκλειο',
+  'Χανιά',
+  'Ρέθυμνο',
+  'Λασίθι',
+  'Βόρειο Αιγαίο',
+  'Λέσβος',
+  'Χίος',
+  'Σάμος',
+  'Δωδεκάνησα',
+  'Ρόδος',
+  'Κως',
+  'Καλύμνος',
 ];
 
 const handoffOptions = [
-  { value: 'Interest Confirmed', label: 'Ξ•Ξ½Ξ΄ΞΉΞ±Ο†Ξ­ΟΞΏΞ½ Ξ•Ο€ΞΉΞ²ΞµΞ²Ξ±ΞΉΟΞΈΞ·ΞΊΞµ' },
-  { value: 'Pricing Requested', label: 'Ξ‘Ξ―Ο„Ξ·ΞΌΞ± Ξ¤ΞΉΞΌΞΏΞ»ΟΞ³Ξ·ΟƒΞ·Ο‚' },
-  { value: 'Meeting Booked', label: 'Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ ΞΞ»ΞµΞ―ΟƒΟ„Ξ·ΞΊΞµ' },
-  { value: 'Contract Ready', label: 'ΞΟ„ΞΏΞΉΞΌΞΏ Ξ³ΞΉΞ± Ξ£ΟΞΌΞ²Ξ±ΟƒΞ·' },
-  { value: 'Complex Inquiry', label: 'Ξ£ΟΞ½ΞΈΞµΟ„ΞΏ Ξ‘Ξ―Ο„Ξ·ΞΌΞ±' },
-  { value: 'Technical Issue', label: 'Ξ¤ΞµΟ‡Ξ½ΞΉΞΊΟ Ξ ΟΟΞ²Ξ»Ξ·ΞΌΞ±' },
-  { value: 'Angry Lead', label: 'Ξ•Ξ½ΟΟ‡Ξ»Ξ·ΟƒΞ·/Ξ”Ο…ΟƒΞ±ΟΞ­ΟƒΞΊΞµΞΉΞ±' },
-  { value: 'Budget Discussion', label: 'Ξ£Ο…Ξ¶Ξ®Ο„Ξ·ΟƒΞ· Ξ ΟΞΏΟ‹Ο€ΞΏΞ»ΞΏΞ³ΞΉΟƒΞΌΞΏΟ' },
-  { value: 'Multi-property', label: 'Ξ ΞΏΞ»Ξ»Ξ±Ο€Ξ»Ξ¬ Ξ‘ΞΊΞ―Ξ½Ξ·Ο„Ξ±' },
+  { value: 'Interest Confirmed', label: 'Ενδιαφέρον Επιβεβαιώθηκε' },
+  { value: 'Pricing Requested', label: 'Αίτημα Τιμολόγησης' },
+  { value: 'Meeting Booked', label: 'Ραντεβού Κλείστηκε' },
+  { value: 'Contract Ready', label: 'Έτοιμο για Σύμβαση' },
+  { value: 'Complex Inquiry', label: 'Σύνθετο Αίτημα' },
+  { value: 'Technical Issue', label: 'Τεχνικό Πρόβλημα' },
+  { value: 'Angry Lead', label: 'Ενόχληση/Δυσαρέσκεια' },
+  { value: 'Budget Discussion', label: 'Συζήτηση Προϋπολογισμού' },
+  { value: 'Multi-property', label: 'Πολλαπλά Ακίνητα' },
   { value: 'B2B Decision Maker', label: 'B2B Decision Maker' },
-  { value: 'VIP Customer', label: 'VIP Ξ ΞµΞ»Ξ¬Ο„Ξ·Ο‚' },
-  { value: 'Legal/Compliance', label: 'ΞΞΏΞΌΞΉΞΊΟ/Compliance' },
+  { value: 'VIP Customer', label: 'VIP Πελάτης' },
+  { value: 'Legal/Compliance', label: 'Νομικό/Compliance' },
 ];
 
 function canActivateAI(lead: Lead): boolean {
@@ -266,7 +266,7 @@ export default function DashboardPage() {
     const filesToLoad = openLead.bill_files && openLead.bill_files.length > 0
       ? openLead.bill_files
       : openLead.bill_file_path
-        ? [{ path: openLead.bill_file_path, name: openLead.bill_file_name || 'Ξ›ΞΏΞ³Ξ±ΟΞΉΞ±ΟƒΞΌΟΟ‚', type: 'application/pdf', size: 0 }]
+        ? [{ path: openLead.bill_file_path, name: openLead.bill_file_name || 'Λογαριασμός', type: 'application/pdf', size: 0 }]
         : [];
 
     if (filesToLoad.length === 0) {
@@ -297,8 +297,8 @@ export default function DashboardPage() {
   const createNewConversation = () => {
     const newConv = {
       id: crypto.randomUUID(),
-      title: `ΞΞ­Ξ± Ξ£Ο…Ξ½ΞΏΞΌΞΉΞ»Ξ―Ξ± ${hubConversations.length + 1}`,
-      messages: [{ role: 'assistant' as const, text: 'Ξ“ΞµΞΉΞ± ΟƒΞΏΟ…! Ξ•Ξ―ΞΌΞ±ΞΉ ΞΏ Master Orchestrator Ο„Ξ·Ο‚ Hlektrismos.gr. Ξ ΟΟ‚ ΞΌΟ€ΞΏΟΟ Ξ½Ξ± ΟƒΞµ Ξ²ΞΏΞ·ΞΈΞ®ΟƒΟ‰ ΞΌΞµ Ο„Ξ± AI agents;' }],
+      title: `Νέα Συνομιλία ${hubConversations.length + 1}`,
+      messages: [{ role: 'assistant' as const, text: 'Γεια σου! Είμαι ο Master Orchestrator της Hlektrismos.gr. Πώς μπορώ να σε βοηθήσω με τα AI agents;' }],
       selectedAgents: [],
       contextId: null,
       createdAt: new Date(),
@@ -344,7 +344,7 @@ export default function DashboardPage() {
       // Create conversation objects from history
       const historyConvs = Array.from(convMap.entries()).map(([ctxId, msgs]) => ({
         id: ctxId,
-        title: msgs[0]?.content?.slice(0, 50) || `Ξ™ΟƒΟ„ΞΏΟΞΉΞΊΟ ${ctxId.slice(0, 8)}`,
+        title: msgs[0]?.content?.slice(0, 50) || `Ιστορικό ${ctxId.slice(0, 8)}`,
         messages: msgs.map(m => ({ role: m.role as 'user' | 'assistant', text: m.content })),
         selectedAgents: [],
         contextId: ctxId,
@@ -378,14 +378,14 @@ export default function DashboardPage() {
 
   const runAgents = async () => {
     setRunningAgents(true);
-    setToast({ msg: 'Ξ•ΞΊΞΊΞ―Ξ½Ξ·ΟƒΞ· Agent Engine...', type: 'info' });
+    setToast({ msg: 'Εκκίνηση Agent Engine...', type: 'info' });
     try {
       const { data, error } = await supabase.functions.invoke('agent-worker');
       if (error) throw error;
-      setToast({ msg: data.message || 'ΞΞΉ AI Agents ΞΏΞ»ΞΏΞΊΞ»Ξ®ΟΟ‰ΟƒΞ±Ξ½ Ο„Ξ·Ξ½ ΞµΞΊΟ„Ξ­Ξ»ΞµΟƒΞ·.', type: 'success' });
+      setToast({ msg: data.message || 'Οι AI Agents ολοκλήρωσαν την εκτέλεση.', type: 'success' });
       loadData();
     } catch (e) {
-      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ± ΞΊΞ±Ο„Ξ¬ Ο„Ξ·Ξ½ ΞµΞΊΟ„Ξ­Ξ»ΞµΟƒΞ· Ο„Ο‰Ξ½ Agents.', type: 'info' });
+      setToast({ msg: 'Σφάλμα κατά την εκτέλεση των Agents.', type: 'info' });
     }
     setRunningAgents(false);
   };
@@ -409,7 +409,7 @@ export default function DashboardPage() {
     await supabase.from('ai_agents').update(updates).eq('id', configAgent.id);
     setConfigAgent({ ...configAgent, ...updates });
     loadData();
-    setToast({ msg: 'Ξ— Ξ΄ΞΉΞ±ΞΌΟΟΟ†Ο‰ΟƒΞ· Ο„ΞΏΟ… agent Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΟ„Ξ·ΞΊΞµ.', type: 'success' });
+    setToast({ msg: 'Η διαμόρφωση του agent αποθηκεύτηκε.', type: 'success' });
   };
 
   const createSource = async () => {
@@ -433,20 +433,20 @@ export default function DashboardPage() {
   const softDeleteLead = async (leadId: string) => {
     await supabase.from('hlektrismos_leads').update({ deleted_at: new Date().toISOString() }).eq('id', leadId);
     setConfirmDeleteId(null);
-    setToast({ msg: 'Ξ¤ΞΏ lead ΞΌΞµΟ„Ξ±Ο†Ξ­ΟΞΈΞ·ΞΊΞµ ΟƒΟ„Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±.', type: 'success' });
+    setToast({ msg: 'Το lead μεταφέρθηκε στα διεγραμμένα.', type: 'success' });
     loadData();
   };
 
   const restoreLead = async (leadId: string) => {
     await supabase.from('hlektrismos_leads').update({ deleted_at: null }).eq('id', leadId);
-    setToast({ msg: 'Ξ¤ΞΏ lead Ξ±Ο€ΞΏΞΊΞ±Ο„Ξ±ΟƒΟ„Ξ¬ΞΈΞ·ΞΊΞµ.', type: 'success' });
+    setToast({ msg: 'Το lead αποκαταστάθηκε.', type: 'success' });
     loadData();
   };
 
   const permanentDeleteLead = async (leadId: string) => {
     await supabase.from('hlektrismos_leads').delete().eq('id', leadId);
     setConfirmDeleteId(null);
-    setToast({ msg: 'Ξ¤ΞΏ lead Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ ΞΌΟΞ½ΞΉΞΌΞ±.', type: 'success' });
+    setToast({ msg: 'Το lead διαγράφηκε μόνιμα.', type: 'success' });
     loadData();
   };
 
@@ -455,7 +455,7 @@ export default function DashboardPage() {
     const ids = Array.from(selectedLeads);
     await supabase.from('hlektrismos_leads').update({ deleted_at: new Date().toISOString() }).in('id', ids);
     setSelectedLeads(new Set());
-    setToast({ msg: `${ids.length} leads ΞΌΞµΟ„Ξ±Ο†Ξ­ΟΞΈΞ·ΞΊΞ±Ξ½ ΟƒΟ„Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±.`, type: 'success' });
+    setToast({ msg: `${ids.length} leads μεταφέρθηκαν στα διεγραμμένα.`, type: 'success' });
     loadData();
   };
 
@@ -479,20 +479,20 @@ export default function DashboardPage() {
   const softDeleteAgent = async (agentId: string) => {
     await supabase.from('ai_agents').update({ deleted_at: new Date().toISOString() }).eq('id', agentId);
     setConfirmDeleteAgentId(null);
-    setToast({ msg: 'Ξ¤ΞΏ agent ΞΌΞµΟ„Ξ±Ο†Ξ­ΟΞΈΞ·ΞΊΞµ ΟƒΟ„Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±.', type: 'success' });
+    setToast({ msg: 'Το agent μεταφέρθηκε στα διεγραμμένα.', type: 'success' });
     loadData();
   };
 
   const restoreAgent = async (agentId: string) => {
     await supabase.from('ai_agents').update({ deleted_at: null }).eq('id', agentId);
-    setToast({ msg: 'Ξ¤ΞΏ agent Ξ±Ο€ΞΏΞΊΞ±Ο„Ξ±ΟƒΟ„Ξ¬ΞΈΞ·ΞΊΞµ.', type: 'success' });
+    setToast({ msg: 'Το agent αποκαταστάθηκε.', type: 'success' });
     loadData();
   };
 
   const permanentDeleteAgent = async (agentId: string) => {
     await supabase.from('ai_agents').delete().eq('id', agentId);
     setConfirmDeleteAgentId(null);
-    setToast({ msg: 'Ξ¤ΞΏ agent Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ ΞΌΟΞ½ΞΉΞΌΞ±.', type: 'success' });
+    setToast({ msg: 'Το agent διαγράφηκε μόνιμα.', type: 'success' });
     loadData();
   };
 
@@ -501,16 +501,16 @@ export default function DashboardPage() {
     const now = new Date().toISOString();
     await supabase.from('market_tariffs').update({ updated_at: now }).in('resource', ['Electricity', 'Natural Gas', 'Photovoltaic']);
     setSyncing(false);
-    setToast({ msg: 'Ξ— Ξ²Ξ¬ΟƒΞ· Ξ³Ξ½ΟΟƒΞ·Ο‚ ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ.', type: 'success' });
+    setToast({ msg: 'Η βάση γνώσης ενημερώθηκε.', type: 'success' });
     loadData();
   };
 
   const updateTariffPrice = async (t: Tariff) => {
-    const newPrice = prompt(`Ξ•ΞΉΟƒΞ¬Ξ³ΞµΟ„Ξµ Ξ½Ξ­Ξ± Ο„ΞΉΞΌΞ® Ξ³ΞΉΞ± Ο„ΞΏ ${t.tariff_name}:`, t.price_eur.toString());
+    const newPrice = prompt(`Εισάγετε νέα τιμή για το ${t.tariff_name}:`, t.price_eur.toString());
     if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
       await supabase.from('market_tariffs').update({ price_eur: parseFloat(newPrice), updated_at: new Date().toISOString() }).eq('id', t.id);
       loadData();
-      setToast({ msg: 'Ξ— Ο„ΞΉΞΌΞ® ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ.', type: 'success' });
+      setToast({ msg: 'Η τιμή ενημερώθηκε.', type: 'success' });
     }
   };
 
@@ -601,21 +601,21 @@ export default function DashboardPage() {
     const activeAgent = configAgent || agents[0];
     if (!activeAgent) return '';
     const tariffLines = tariffs.map((t) => `  - ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n');
-    return `Ξ•Ξ―ΟƒΞ±ΞΉ ΞΏ ${activeAgent.name}, Ξ­Ξ½Ξ±Ο‚ Ξ±Ο…Ο„ΟΞ½ΞΏΞΌΞΏΟ‚ ${activeAgent.channel} agent Ο„Ξ·Ο‚ Hlektrismos.gr.\n\nΞ’Ξ‘Ξ£Ξ™ΞΞ PROMPT:\n${activeAgent.base_prompt || '(Ξ”ΞµΞ½ Ξ­Ο‡ΞµΞΉ ΞΏΟΞΉΟƒΟ„ΞµΞ― base prompt)'}\n\nΞ£Ξ¤ΞΞ§ΞΞ£: ${activeAgent.target_region || 'ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±'}\n\nΞ Ξ‘Ξ΅Ξ‘Ξ”ΞΞ£Ξ— Ξ£Ξ• Ξ‘ΞΞΞ΅Ξ©Ξ Ξ: ${activeAgent.handoff_condition || 'Interest Confirmed'}\n\nΞ–Ξ©ΞΞ¤Ξ‘ΞΞ‘ Ξ¤Ξ‘Ξ΅Ξ™Ξ¦Ξ‘ (RAG Knowledge Base):\n${tariffLines}\n\nΞΞ΄Ξ·Ξ³Ξ―ΞµΟ‚: Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½ΟΞ½Ξ·ΟƒΞµ ΞΌΞµ leads ΟƒΟ„Ξ·Ξ½ Ο€ΞµΟΞΉΞΏΟ‡Ξ® ΟƒΟ„ΟΟ‡ΞΏΟ…, Ο€ΟΟΟ„ΞµΞΉΞ½Ξµ Ο„Ξ± Ο€Ξ±ΟΞ±Ο€Ξ¬Ξ½Ο‰ Ο„ΞΉΞΌΞΏΞ»ΟΞ³ΞΉΞ±, ΞΊΞ±ΞΉ Ο€Ξ±ΟΞ¬Ξ΄Ο‰ΟƒΞµ ΟƒΞµ Ξ¬Ξ½ΞΈΟΟ‰Ο€ΞΏ ΟΟ„Ξ±Ξ½: ${activeAgent.handoff_condition || 'Interest Confirmed'}.`;
+    return `Είσαι ο ${activeAgent.name}, ένας αυτόνομος ${activeAgent.channel} agent της Hlektrismos.gr.\n\nΒΑΣΙΚΟ PROMPT:\n${activeAgent.base_prompt || '(Δεν έχει οριστεί base prompt)'}\n\nΣΤΟΧΟΣ: ${activeAgent.target_region || 'Όλη η Ελλάδα'}\n\nΠΑΡΑΔΟΣΗ ΣΕ ΑΝΘΡΩΠΟ: ${activeAgent.handoff_condition || 'Interest Confirmed'}\n\nΖΩΝΤΑΝΑ ΤΑΡΙΦΑ (RAG Knowledge Base):\n${tariffLines}\n\nΟδηγίες: Επικοινώνησε με leads στην περιοχή στόχου, πρότεινε τα παραπάνω τιμολόγια, και παράδωσε σε άνθρωπο όταν: ${activeAgent.handoff_condition || 'Interest Confirmed'}.`;
   };
 
   const tabLabels: Record<Tab, string> = {
-    overview: 'Ξ•Ο€ΞΉΟƒΞΊΟΟ€Ξ·ΟƒΞ·',
+    overview: 'Επισκόπηση',
     agents: 'AI Agents',
     leads: 'Leads',
-    sources: 'Ξ Ξ·Ξ³Ξ­Ο‚ Leads',
+    sources: 'Πηγές Leads',
     market: 'Market RAG',
     hub: 'Agent Hub',
     orchestrator: 'Orchestrator Director',
-    settings: 'Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ & Integrations',
-    email: 'π“§ Email',
+    settings: 'Ρυθμίσεις & Integrations',
+    email: '📧 Email',
     reports: 'Reports',
-    users: 'Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚',
+    users: 'Χρήστες',
     scraper: 'B2B Scraper',
     documents: '\u0395\u03b3\u03b3\u03c1\u03b1\u03c6\u03ac',
   };
@@ -628,18 +628,18 @@ export default function DashboardPage() {
           <span>Hlektrismos<span>.gr</span></span>
         </a>
         <nav className="dash-nav">
-          <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><LayoutDashboard size={18} /> Ξ•Ο€ΞΉΟƒΞΊΟΟ€Ξ·ΟƒΞ·</button>
+          <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><LayoutDashboard size={18} /> Επισκόπηση</button>
           <button className={tab === 'agents' ? 'active' : ''} onClick={() => setTab('agents')}><Bot size={18} /> AI Agents</button>
           <button className={tab === 'leads' ? 'active' : ''} onClick={() => setTab('leads')}><Users size={18} /> Leads</button>
-          <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={18} /> Ξ Ξ·Ξ³Ξ­Ο‚ Leads</button>
+          <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={18} /> Πηγές Leads</button>
           <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}><Globe size={18} /> Market RAG</button>
           <button className={tab === 'hub' ? 'active' : ''} onClick={() => setTab('hub')}><Sparkles size={18} /> Agent Hub</button>
           <button className={tab === 'orchestrator' ? 'active' : ''} onClick={() => setTab('orchestrator')}><Activity size={18} /> Orchestrator Director</button>
-          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Settings size={18} /> Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚</button>
+          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Settings size={18} /> Ρυθμίσεις</button>
           <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}><FileText size={18} /> Reports</button>
-          <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚</button>
+          <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Χρήστες</button>
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
-          <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> π“§ Email</button>
+          <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
           <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
         </nav>
         <div className="dash-sidebar-footer">
@@ -647,7 +647,7 @@ export default function DashboardPage() {
             <div className="dash-user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
             <span>{user?.email}</span>
           </div>
-          <button className="dash-logout" onClick={signOut}><LogOut size={16} /> Ξ‘Ο€ΞΏΟƒΟΞ½Ξ΄ΞµΟƒΞ·</button>
+          <button className="dash-logout" onClick={signOut}><LogOut size={16} /> Αποσύνδεση</button>
         </div>
       </aside>
 
@@ -667,7 +667,7 @@ export default function DashboardPage() {
         )}
 
         {loading ? (
-          <div className="dash-loading">Ξ¦ΟΟΟ„Ο‰ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½...</div>
+          <div className="dash-loading">Φόρτωση δεδομένων...</div>
         ) : (
           <>
             {tab === 'overview' && (
@@ -675,15 +675,15 @@ export default function DashboardPage() {
                 <div className="dash-stats-grid">
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,200,120,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(0,200,120,0.15)', cursor: 'pointer' }} onClick={() => setTab('leads')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.15)', color: '#00c878' }}><Users size={24} /></div>
-                    <div><strong style={{ fontSize: 32 }}>{leads.filter(l => !l.deleted_at).length}</strong><span>Ξ£ΟΞ½ΞΏΞ»ΞΏ Leads</span></div>
+                    <div><strong style={{ fontSize: 32 }}>{leads.filter(l => !l.deleted_at).length}</strong><span>Σύνολο Leads</span></div>
                   </div>
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(0,102,204,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(0,102,204,0.15)', cursor: 'pointer' }} onClick={() => setTab('agents')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.15)', color: '#0066cc' }}><Bot size={24} /></div>
-                    <div><strong style={{ fontSize: 32 }}>{agents.filter(a => !a.deleted_at && a.status === 'active').length}</strong><span>Ξ•Ξ½ΞµΟΞ³Ξ¬ AI Agents</span></div>
+                    <div><strong style={{ fontSize: 32 }}>{agents.filter(a => !a.deleted_at && a.status === 'active').length}</strong><span>Ενεργά AI Agents</span></div>
                   </div>
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.08), rgba(0,102,204,0.05))', border: '1px solid rgba(147,51,234,0.15)', cursor: 'pointer' }} onClick={() => setTab('email')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(147,51,234,0.15)', color: '#9333ea' }}><Mail size={24} /></div>
-                    <div><strong style={{ fontSize: 32 }}>{totalLeadsContacted}</strong><span>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</span></div>
+                    <div><strong style={{ fontSize: 32 }}>{totalLeadsContacted}</strong><span>Επικοινωνίες</span></div>
                   </div>
                   <div className="dash-stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,200,120,0.05))', border: '1px solid rgba(245,158,11,0.15)', cursor: 'pointer' }} onClick={() => setTab('reports')}>
                     <div className="dash-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><TrendingUp size={24} /></div>
@@ -694,8 +694,8 @@ export default function DashboardPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '24px' }}>
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>π“‹ Ξ ΟΟΟƒΟ†Ξ±Ο„Ξ± Leads</h3>
-                      <button onClick={() => setTab('leads')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Ξ ΟΞΏΞ²ΞΏΞ»Ξ® ΟΞ»Ο‰Ξ½ β†’</button>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>📋 Πρόσφατα Leads</h3>
+                      <button onClick={() => setTab('leads')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Προβολή όλων →</button>
                     </div>
                     {leads.filter(l => !l.deleted_at).slice(0, 5).map(l => (
                       <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -706,13 +706,13 @@ export default function DashboardPage() {
                         <span className={`dash-status-pill ${l.status}`}>{l.status}</span>
                       </div>
                     ))}
-                    {leads.filter(l => !l.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ leads.</p>}
+                    {leads.filter(l => !l.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν leads.</p>}
                   </div>
 
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>π¤– AI Agents Status</h3>
-                      <button onClick={() => setTab('agents')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· β†’</button>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>🤖 AI Agents Status</h3>
+                      <button onClick={() => setTab('agents')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Διαχείριση →</button>
                     </div>
                     {agents.filter(a => !a.deleted_at).slice(0, 5).map(a => (
                       <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -724,21 +724,21 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <span className={`dash-status-pill ${a.status}`}>
-                          {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
+                          {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
                         </span>
                       </div>
                     ))}
-                    {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ agents.</p>}
+                    {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν agents.</p>}
                   </div>
                 </div>
 
                 {/* Quick Actions */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '24px' }}>
                   {[
-                    { icon: 'π¤–', label: 'Agent Hub', tab: 'hub', desc: 'AI ΟƒΟ…Ξ½ΞΏΞΌΞΉΞ»Ξ―Ξ±' },
-                    { icon: 'π”', label: 'B2B Scraper', tab: 'scraper', desc: 'Ξ‘Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ· leads' },
-                    { icon: 'π“', label: 'Orchestrator', tab: 'orchestrator', desc: 'Director view' },
-                    { icon: 'π“', label: 'Email', tab: 'email', desc: 'Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· email' },
+                    { icon: '🤖', label: 'Agent Hub', tab: 'hub', desc: 'AI συνομιλία' },
+                    { icon: '🔍', label: 'B2B Scraper', tab: 'scraper', desc: 'Αναζήτηση leads' },
+                    { icon: '📊', label: 'Orchestrator', tab: 'orchestrator', desc: 'Director view' },
+                    { icon: '📈', label: 'Email', tab: 'email', desc: 'Διαχείριση email' },
                   ].map((action) => (
                     <button
                       key={action.tab}
@@ -762,14 +762,14 @@ export default function DashboardPage() {
             {tab === 'agents' && (
               <div className="dash-content">
                 <div className="dash-content-header">
-                  <p>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· AI Agents β€” Ο€Ξ±ΟΞ±ΞΊΞΏΞ»ΞΏΟΞΈΞ·ΟƒΞ· Ξ±Ο€ΟΞ΄ΞΏΟƒΞ·Ο‚, ΟΟΞΈΞΌΞΉΟƒΞ· Ο€Ξ±ΟΞ±ΞΌΞ­Ο„ΟΟ‰Ξ½, ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·/Ξ±Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·.</p>
-                  <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> ΞΞ­ΞΏ Agent</button>
+                  <p>Διαχείριση AI Agents — παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, ενεργοποίηση/απενεργοποίηση.</p>
+                  <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> Νέο Agent</button>
                 </div>
                 <div className="dash-table-wrap">
                   <table className="dash-table">
                     <thead>
                       <tr>
-                        <th>Agent</th><th>Channel</th><th>Status</th><th>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</th><th>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</th><th>Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚</th><th>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
+                        <th>Agent</th><th>Channel</th><th>Status</th><th>Περιοχή</th><th>Επικοινωνίες</th><th>Απαντήσεις</th><th>Ραντεβού</th><th>Ενέργεια</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -787,26 +787,26 @@ export default function DashboardPage() {
                           <td>{a.channel}</td>
                           <td>
                             <span className={`dash-status-pill ${a.status}`}>
-                              {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : a.status === 'paused' ? 'Ξ Ξ±Ο…ΞΌΞ­Ξ½ΞΏΟ‚' : a.status}
+                              {a.status === 'active' ? 'Ενεργός' : a.status === 'paused' ? 'Παυμένος' : a.status}
                             </span>
                           </td>
-                          <td>{a.target_region || 'β€”'}</td>
+                          <td>{a.target_region || '—'}</td>
                           <td><strong>{a.leads_contacted || 0}</strong></td>
                           <td><strong>{a.replies || 0}</strong></td>
                           <td><strong>{a.meetings_booked || 0}</strong></td>
                           <td>
                             <div className="dash-lead-actions">
-                              <button className="icon-btn" title="Ξ•Ξ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·/Ξ‘Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·" onClick={async () => {
+                              <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={async () => {
                                 const newStatus = a.status === 'active' ? 'paused' : 'active';
                                 await supabase.from('ai_agents').update({ status: newStatus }).eq('id', a.id);
                                 loadData();
                               }}>
                                 {a.status === 'active' ? <EyeOff size={14} /> : <Eye size={14} />}
                               </button>
-                              <button className="icon-btn" title="Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚" onClick={() => setConfigAgent(a)}>
+                              <button className="icon-btn" title="Ρυθμίσεις" onClick={() => setConfigAgent(a)}>
                                 <Settings size={14} />
                               </button>
-                              <button className="icon-btn" title="Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®" onClick={async () => {
+                              <button className="icon-btn" title="Διαγραφή" onClick={async () => {
                                 await supabase.from('ai_agents').update({ deleted_at: new Date().toISOString() }).eq('id', a.id);
                                 loadData();
                               }}>
@@ -817,7 +817,7 @@ export default function DashboardPage() {
                         </tr>
                       ))}
                       {agents.filter(a => !a.deleted_at).length === 0 && (
-                        <tr><td colSpan={8} className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ agents. Ξ Ξ±Ο„Ξ®ΟƒΟ„Ξµ "ΞΞ­ΞΏ Agent" Ξ³ΞΉΞ± Ξ½Ξ± Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΟƒΞµΟ„Ξµ.</td></tr>
+                        <tr><td colSpan={8} className="dash-empty">Δεν υπάρχουν agents. Πατήστε "Νέο Agent" για να δημιουργήσετε.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -830,7 +830,7 @@ export default function DashboardPage() {
                 {/* Content Header */}
                 <div className="dash-content-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ margin: 0 }}>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· Leads β€” Ξ±Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ·, Ο†Ξ―Ξ»Ο„ΟΞ±, Ξ±Ξ½Ξ¬ΞΈΞµΟƒΞ· ΟƒΞµ AI agents.</p>
+                    <p style={{ margin: 0 }}>Διαχείριση Leads — αναζήτηση, φίλτρα, ανάθεση σε AI agents.</p>
                     {selectedLeads.size > 0 ? (
                       <button
                         onClick={bulkSoftDeleteLeads}
@@ -840,11 +840,11 @@ export default function DashboardPage() {
                           display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.15s',
                         }}
                       >
-                        <Trash2 size={14} /> Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ® ({selectedLeads.size})
+                        <Trash2 size={14} /> Διαγραφή ({selectedLeads.size})
                       </button>
                     ) : (
                       <button className="btn btn-primary" onClick={() => { setSearch(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setLeadsSubTab('all'); }}>
-                        <RefreshCw size={14} /> Ξ•Ο€Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ¦Ξ―Ξ»Ο„ΟΟ‰Ξ½
+                        <RefreshCw size={14} /> Επαναφορά Φίλτρων
                       </button>
                     )}
                   </div>
@@ -852,13 +852,13 @@ export default function DashboardPage() {
                   {/* Sub-tabs (folders) */}
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                     {[
-                      { key: 'all', label: 'ΞΞ»Ξ±', icon: 'π“' },
-                      { key: 'new', label: 'ΞΞ­Ξ±', icon: 'π†•' },
-                      { key: 'contacted', label: 'Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ®ΞΈΞ·ΞΊΞµ', icon: 'π“' },
-                      { key: 'qualified', label: 'Qualified', icon: 'β…' },
-                      { key: 'converted', label: 'ΞΞµΟ„Ξ±Ο„ΟΞ¬Ο€Ξ·ΞΊΞµ', icon: 'π‰' },
-                      { key: 'lost', label: 'Ξ§Ξ±ΞΌΞ­Ξ½Ξ±', icon: 'β' },
-                      { key: 'deleted', label: 'Ξ”ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±', icon: 'π—‘οΈ' },
+                      { key: 'all', label: 'Όλα', icon: '📁' },
+                      { key: 'new', label: 'Νέα', icon: '🆕' },
+                      { key: 'contacted', label: 'Επικοινωνήθηκε', icon: '📞' },
+                      { key: 'qualified', label: 'Qualified', icon: '✅' },
+                      { key: 'converted', label: 'Μετατράπηκε', icon: '🎉' },
+                      { key: 'lost', label: 'Χαμένα', icon: '❌' },
+                      { key: 'deleted', label: 'Διεγραμμένα', icon: '🗑️' },
                     ].map((folder) => (
                       <button
                         key={folder.key}
@@ -890,13 +890,13 @@ export default function DashboardPage() {
                       <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                       <input
                         type="text"
-                        placeholder="Ξ‘Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ· ΞΌΞµ ΟΞ½ΞΏΞΌΞ±, email, Ο„Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ Ξ® Ο€ΞµΟΞΉΞΏΟ‡Ξ®..."
+                        placeholder="Αναζήτηση με όνομα, email, τηλέφωνο ή περιοχή..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)' }}
                       />
                       {search && (
-                        <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>β•</button>
+                        <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>✕</button>
                       )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -905,21 +905,21 @@ export default function DashboardPage() {
                         type="date"
                         value={dateFrom}
                         onChange={(e) => setDateFrom(e.target.value)}
-                        title="Ξ‘Ο€Ο"
+                        title="Από"
                         style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }}
                       />
-                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>β€”</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>—</span>
                       <input
                         type="date"
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}
-                        title="ΞΟ‰Ο‚"
+                        title="Έως"
                         style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }}
                       />
                     </div>
                     {(search || dateFrom || dateTo) && (
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        {filteredLeads.length} Ξ±Ο€ΞΏΟ„ΞµΞ»Ξ­ΟƒΞΌΞ±Ο„Ξ±
+                        {filteredLeads.length} αποτελέσματα
                       </span>
                     )}
                   </div>
@@ -939,7 +939,7 @@ export default function DashboardPage() {
                               style={{ accentColor: '#0066cc', cursor: 'pointer' }}
                             />
                           </th>
-                          <th>ΞΞ½ΞΏΞΌΞ±</th><th>Email</th><th>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</th><th>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</th><th>Ξ¤ΟΟ€ΞΏΟ‚</th><th>ΞΞ±Ο„Ξ·Ξ³ΞΏΟΞ―Ξ±</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
+                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -966,7 +966,7 @@ export default function DashboardPage() {
                               <td>{l.customer_type}</td>
                               <td>
                                 <select className="dash-status-select" value={l.customer_category || ''} onChange={(e) => updateLeadGdpr(l, 'customer_category', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                  <option value="" disabled>β€”</option>
+                                  <option value="" disabled>—</option>
                                   <option value="B2C_Household">B2C</option>
                                   <option value="B2B_Corporate">B2B</option>
                                 </select>
@@ -974,7 +974,7 @@ export default function DashboardPage() {
                               <td>
                                 <div className="gdpr-badge-wrap">
                                   <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                    <option value="" disabled>β€”</option>
+                                    <option value="" disabled>—</option>
                                     <option value="Consent">Consent</option>
                                     <option value="Legitimate_Interest">Leg. Interest</option>
                                   </select>
@@ -999,7 +999,7 @@ export default function DashboardPage() {
                                 <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
                                   <button
                                     onClick={() => softDeleteLead(l.id)}
-                                    title="ΞΞµΟ„Ξ±Ο†ΞΏΟΞ¬ ΟƒΟ„Ξ± Ξ”ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ±"
+                                    title="Μεταφορά στα Διεγραμμένα"
                                     style={{
                                       display: 'inline-flex', alignItems: 'center', gap: '4px',
                                       padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(231,76,60,0.3)',
@@ -1009,7 +1009,7 @@ export default function DashboardPage() {
                                     onMouseEnter={(e) => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(231,76,60,0.06)'; e.currentTarget.style.color = '#e74c3c'; }}
                                   >
-                                    <Trash2 size={13} /> Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®
+                                    <Trash2 size={13} /> Διαγραφή
                                   </button>
                                 </div>
                               </td>
@@ -1018,7 +1018,7 @@ export default function DashboardPage() {
                         })}
                       </tbody>
                     </table>
-                    {filteredLeads.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ξ²ΟΞ­ΞΈΞ·ΞΊΞ±Ξ½ leads ΟƒΞµ Ξ±Ο…Ο„ΟΞ½ Ο„ΞΏΞ½ Ο†Ξ¬ΞΊΞµΞ»ΞΏ.</p>}
+                    {filteredLeads.length === 0 && <p className="dash-empty">Δεν βρέθηκαν leads σε αυτόν τον φάκελο.</p>}
                   </div>
                 )}
 
@@ -1027,12 +1027,12 @@ export default function DashboardPage() {
                   <div className="dash-table-wrap">
                     <div className="dash-deleted-notice">
                       <AlertCircle size={16} />
-                      <span>Ξ¤Ξ± Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ± leads Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΞΏΞ½Ο„Ξ±ΞΉ ΞµΞ΄Ο. ΞΟ€ΞΏΟΞµΞ―Ο„Ξµ Ξ½Ξ± Ο„Ξ± Ξ±Ο€ΞΏΞΊΞ±Ο„Ξ±ΟƒΟ„Ξ®ΟƒΞµΟ„Ξµ Ξ® Ξ½Ξ± Ο„Ξ± Ξ΄ΞΉΞ±Ξ³ΟΞ¬ΟΞµΟ„Ξµ ΞΌΟΞ½ΞΉΞΌΞ±.</span>
+                      <span>Τα διεγραμμένα leads αποθηκεύονται εδώ. Μπορείτε να τα αποκαταστήσετε ή να τα διαγράψετε μόνιμα.</span>
                     </div>
                     <table className="dash-table">
                       <thead>
                         <tr>
-                          <th>ΞΞ½ΞΏΞΌΞ±</th><th>Email</th><th>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</th><th>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</th><th>Ξ¤ΟΟ€ΞΏΟ‚</th><th>Status</th><th>Ξ”ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
+                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Status</th><th>Διαγράφηκε</th><th>Ενέργεια</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1044,21 +1044,21 @@ export default function DashboardPage() {
                             <td>{l.region}</td>
                             <td>{l.customer_type}</td>
                             <td><span className={`dash-status-pill ${l.status}`}>{l.status}</span></td>
-                            <td>{l.deleted_at ? new Date(l.deleted_at).toLocaleDateString('el-GR') : 'β€”'}</td>
+                            <td>{l.deleted_at ? new Date(l.deleted_at).toLocaleDateString('el-GR') : '—'}</td>
                             <td>
                               <div className="dash-lead-actions">
-                                <button className="btn-restore-lead" onClick={() => restoreLead(l.id)} title="Ξ‘Ο€ΞΏΞΊΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·">
-                                  <RefreshCw size={14} /> Ξ‘Ο€ΞΏΞΊΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·
+                                <button className="btn-restore-lead" onClick={() => restoreLead(l.id)} title="Αποκατάσταση">
+                                  <RefreshCw size={14} /> Αποκατάσταση
                                 </button>
                                 {confirmDeleteId === l.id ? (
                                   <div className="dash-delete-confirm">
-                                    <span>ΞΟΞ½ΞΉΞΌΞ·;</span>
-                                    <button className="btn-delete-yes permanent" onClick={() => permanentDeleteLead(l.id)}>ΞΞ±ΞΉ</button>
-                                    <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>ΞΟ‡ΞΉ</button>
+                                    <span>Μόνιμη;</span>
+                                    <button className="btn-delete-yes permanent" onClick={() => permanentDeleteLead(l.id)}>Ναι</button>
+                                    <button className="btn-delete-no" onClick={() => setConfirmDeleteId(null)}>Όχι</button>
                                   </div>
                                 ) : (
-                                  <button className="btn-delete-lead permanent" onClick={() => setConfirmDeleteId(l.id)} title="ΞΟΞ½ΞΉΞΌΞ· Ξ΄ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®">
-                                    <X size={14} /> ΞΟΞ½ΞΉΞΌΞ· Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®
+                                  <button className="btn-delete-lead permanent" onClick={() => setConfirmDeleteId(l.id)} title="Μόνιμη διαγραφή">
+                                    <X size={14} /> Μόνιμη Διαγραφή
                                   </button>
                                 )}
                               </div>
@@ -1067,7 +1067,7 @@ export default function DashboardPage() {
                         ))}
                       </tbody>
                     </table>
-                    {deletedLeads.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ξ΄ΞΉΞµΞ³ΟΞ±ΞΌΞΌΞ­Ξ½Ξ± leads.</p>}
+                    {deletedLeads.length === 0 && <p className="dash-empty">Δεν υπάρχουν διεγραμμένα leads.</p>}
                   </div>
                 )}
               </div>
@@ -1076,12 +1076,12 @@ export default function DashboardPage() {
             {tab === 'sources' && (
               <div className="dash-content">
                 <div className="dash-content-header">
-                  <p>Ξ Ξ·Ξ³Ξ­Ο‚ leads ΞΌΞµ GDPR-compliant lawful basis. ΞΞ±ΞΌΞ―Ξ± ΞµΞΎΞ±Ξ³Ο‰Ξ³Ξ® Ξ±Ο€Ο third-party sites.</p>
-                  <button className="btn btn-primary" onClick={() => setShowAddSource(!showAddSource)}><Plus size={16} /> ΞΞ­Ξ± Ξ Ξ·Ξ³Ξ®</button>
+                  <p>Πηγές leads με GDPR-compliant lawful basis. Καμία εξαγωγή από third-party sites.</p>
+                  <button className="btn btn-primary" onClick={() => setShowAddSource(!showAddSource)}><Plus size={16} /> Νέα Πηγή</button>
                 </div>
                 {showAddSource && (
                   <div className="dash-add-form">
-                    <input placeholder="ΞΞ½ΞΏΞΌΞ± Ο€Ξ·Ξ³Ξ®Ο‚" value={newSource.name} onChange={(e) => setNewSource({ ...newSource, name: e.target.value })} />
+                    <input placeholder="Όνομα πηγής" value={newSource.name} onChange={(e) => setNewSource({ ...newSource, name: e.target.value })} />
                     <select value={newSource.type} onChange={(e) => setNewSource({ ...newSource, type: e.target.value })}>
                       <option value="opt-in">Opt-in</option>
                       <option value="partner">Partner</option>
@@ -1091,7 +1091,7 @@ export default function DashboardPage() {
                       <option value="consent">Consent</option>
                       <option value="legitimate-interest">Legitimate Interest</option>
                     </select>
-                    <button className="btn btn-primary" onClick={createSource}>Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ±</button>
+                    <button className="btn btn-primary" onClick={createSource}>Δημιουργία</button>
                   </div>
                 )}
                 <div className="dash-sources-grid">
@@ -1104,11 +1104,11 @@ export default function DashboardPage() {
                       </div>
                       <div className="dash-source-meta">
                         <div><span>Lawful Basis</span><strong>{s.lawful_basis}</strong></div>
-                        <div><span>Leads Ξ±Ο…Ο„ΟΞ½ Ο„ΞΏΞ½ ΞΌΞ®Ξ½Ξ±</span><strong>{s.leads_this_month}</strong></div>
+                        <div><span>Leads αυτόν τον μήνα</span><strong>{s.leads_this_month}</strong></div>
                       </div>
                     </div>
                   ))}
-                  {sources.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ο€Ξ·Ξ³Ξ­Ο‚. Ξ ΟΞΏΟƒΞΈΞ­ΟƒΟ„Ξµ Ο„Ξ·Ξ½ Ο€ΟΟΟ„Ξ· ΟƒΞ±Ο‚ Ο€Ξ·Ξ³Ξ®.</p>}
+                  {sources.length === 0 && <p className="dash-empty">Δεν υπάρχουν πηγές. Προσθέστε την πρώτη σας πηγή.</p>}
                 </div>
               </div>
             )}
@@ -1116,9 +1116,9 @@ export default function DashboardPage() {
             {tab === 'market' && (
               <div className="dash-content">
                 <div className="dash-content-header">
-                  <p>Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΞ¬ Ο„ΞΉΞΌΞΏΞ»ΟΞ³ΞΉΞ± Ξ±Ξ³ΞΏΟΞ¬Ο‚ Ο€ΞΏΟ… Ο„ΟΞΏΟ†ΞΏΞ΄ΞΏΟ„ΞΏΟΞ½ Ο„Ξ· Ξ²Ξ¬ΟƒΞ· Ξ³Ξ½ΟΟƒΞ·Ο‚ Ο„Ο‰Ξ½ AI agents (RAG pipeline).</p>
+                  <p>Δυναμικά τιμολόγια αγοράς που τροφοδοτούν τη βάση γνώσης των AI agents (RAG pipeline).</p>
                   <button className="btn btn-primary" onClick={syncTariffs} disabled={syncing}>
-                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Ξ£Ο…Ξ³Ο‡ΟΞΏΞ½ΞΉΟƒΞΌΟΟ‚...' : 'Sync Data'}
+                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Συγχρονισμός...' : 'Sync Data'}
                   </button>
                 </div>
                 <div className="rag-layout">
@@ -1127,26 +1127,26 @@ export default function DashboardPage() {
                     <div className="dash-table-wrap">
                       <table className="dash-table">
                         <thead>
-                          <tr><th>Ξ ΟΟΞΏΟ‚</th><th>Ξ¤Ξ±ΟΞ―Ο†Ξ±</th><th>Ξ¤ΞΉΞΌΞ®</th><th>ΞΞΏΞ½Ξ¬Ξ΄Ξ±</th><th>Ξ•Ξ½Ξ·ΞΌΞ­ΟΟ‰ΟƒΞ·</th></tr>
+                          <tr><th>Πόρος</th><th>Ταρίφα</th><th>Τιμή</th><th>Μονάδα</th><th>Ενημέρωση</th></tr>
                         </thead>
                         <tbody>
                           {tariffs.map((t) => (
                             <tr key={t.id}>
                               <td><span className={`rag-resource-tag ${t.resource.toLowerCase().replace(/\s/g, '-')}`}>{t.resource}</span></td>
                               <td>{t.tariff_name}</td>
-                              <td style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => updateTariffPrice(t)} title="ΞΞ»ΞΉΞΊ Ξ³ΞΉΞ± ΞµΟ€ΞµΞΎΞµΟΞ³Ξ±ΟƒΞ―Ξ±"><strong>{t.price_eur.toFixed(4)}</strong></td>
+                              <td style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => updateTariffPrice(t)} title="Κλικ για επεξεργασία"><strong>{t.price_eur.toFixed(4)}</strong></td>
                               <td>{t.unit}</td>
                               <td>{new Date(t.updated_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      {tariffs.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ο„ΞΉΞΌΞΏΞ»ΟΞ³ΞΉΞ±.</p>}
+                      {tariffs.length === 0 && <p className="dash-empty">Δεν υπάρχουν τιμολόγια.</p>}
                     </div>
                   </div>
                   <div className="rag-context-panel">
                     <h3 className="rag-section-title"><Bot size={18} /> Agent Context (RAG Output)</h3>
-                    <p className="rag-context-desc">Ξ¤ΞΏ Ξ±ΞΊΟΞΉΞ²Ξ­Ο‚ system prompt Ο€ΞΏΟ… Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³ΞµΞ―Ο„Ξ±ΞΉ Ξ±Ο€Ο Ο„ΞΏΞ½ ΟƒΟ…Ξ½Ξ΄Ο…Ξ±ΟƒΞΌΟ Live Tariffs + Base Prompt Template.</p>
+                    <p className="rag-context-desc">Το ακριβές system prompt που δημιουργείται από τον συνδυασμό Live Tariffs + Base Prompt Template.</p>
                     <div className="rag-agent-select">
                       <label>Agent</label>
                       <select value={configAgent?.id || agents[0]?.id || ''} onChange={(e) => { const found = agents.find((a) => a.id === e.target.value); if (found) setConfigAgent(found); }}>
@@ -1254,31 +1254,31 @@ export default function DashboardPage() {
             </div>
             <div className="modal-body">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                <div className="detail-group"><label>Email</label><span>{openLead.email || 'β€”'}</span></div>
-                <div className="detail-group"><label>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</label><span>{openLead.phone || 'β€”'}</span></div>
-                <div className="detail-group"><label>Ξ ΞµΟΞΉΞΏΟ‡Ξ®</label><span>{openLead.region || 'β€”'}</span></div>
-                <div className="detail-group"><label>Ξ¤ΟΟ€ΞΏΟ‚</label><span>{openLead.customer_type || 'β€”'}</span></div>
-                <div className="detail-group"><label>ΞΞ±Ο„Ξ·Ξ³ΞΏΟΞ―Ξ±</label><span>{openLead.customer_category || 'β€”'}</span></div>
-                <div className="detail-group"><label>Ξ Ξ¬ΟΞΏΟ‡ΞΏΟ‚</label><span>{openLead.provider || 'β€”'}</span></div>
+                <div className="detail-group"><label>Email</label><span>{openLead.email || '—'}</span></div>
+                <div className="detail-group"><label>Τηλέφωνο</label><span>{openLead.phone || '—'}</span></div>
+                <div className="detail-group"><label>Περιοχή</label><span>{openLead.region || '—'}</span></div>
+                <div className="detail-group"><label>Τύπος</label><span>{openLead.customer_type || '—'}</span></div>
+                <div className="detail-group"><label>Κατηγορία</label><span>{openLead.customer_category || '—'}</span></div>
+                <div className="detail-group"><label>Πάροχος</label><span>{openLead.provider || '—'}</span></div>
                 <div className="detail-group"><label>Status</label><span className={`dash-status-pill ${openLead.status}`}>{openLead.status}</span></div>
-                <div className="detail-group"><label>Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ</label><span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span></div>
-                {openLead.assigned_to && <div className="detail-group"><label>Ξ‘Ξ½Ο„ΞΉΟ€ΟΟΟƒΟ‰Ο€ΞΏΟ‚</label><span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span></div>}
-                {openLead.comments && <div className="detail-group" style={{ gridColumn: '1 / -1' }}><label>Ξ£Ο‡ΟΞ»ΞΉΞ±</label><span>{openLead.comments}</span></div>}
+                <div className="detail-group"><label>Δημιουργήθηκε</label><span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span></div>
+                {openLead.assigned_to && <div className="detail-group"><label>Αντιπρόσωπος</label><span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span></div>}
+                {openLead.comments && <div className="detail-group" style={{ gridColumn: '1 / -1' }}><label>Σχόλια</label><span>{openLead.comments}</span></div>}
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                <h4 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={18} /> Ξ‘Ξ½ΞµΞ²Ξ±ΟƒΞΌΞ­Ξ½Ξ± Ξ‘ΟΟ‡ΞµΞ―Ξ±</h4>
-                {billLoading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Ξ¦ΟΟΟ„Ο‰ΟƒΞ·...</div>}
+                <h4 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={18} /> Ανεβασμένα Αρχεία</h4>
+                {billLoading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Φόρτωση...</div>}
                 {billError && <div style={{ padding: 12, background: 'rgba(231,76,60,0.1)', borderRadius: 8, color: '#e74c3c', fontSize: 13 }}><AlertCircle size={14} /> {billError}</div>}
-                {!billLoading && !billError && billUrls.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}><FolderOpen size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ξ±Ξ½ΞµΞ²Ξ±ΟƒΞΌΞ­Ξ½Ξ± Ξ±ΟΟ‡ΞµΞ―Ξ±</div>}
+                {!billLoading && !billError && billUrls.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}><FolderOpen size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />Δεν υπάρχουν ανεβασμένα αρχεία</div>}
                 {billUrls.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{billUrls.map((file, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
                     {file.type === 'application/pdf' ? <FileText size={24} style={{ color: '#e74c3c', flexShrink: 0 }} /> : <ImageIcon size={24} style={{ color: '#00c878', flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 500, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}{file.size > 0 ? ` Β· ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}{file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}</div>
                     </div>
-                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><ExternalLink size={14} /> Ξ ΟΞΏΞ²ΞΏΞ»Ξ®</a>
-                    <a href={file.url} download={file.name} className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><Download size={14} /> Ξ›Ξ®ΟΞ·</a>
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><ExternalLink size={14} /> Προβολή</a>
+                    <a href={file.url} download={file.name} className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><Download size={14} /> Λήψη</a>
                   </div>
                 ))}</div>}
               </div>
@@ -1310,7 +1310,7 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
     <div className="drawer-overlay" onClick={onClose}>
       <div className="drawer" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
-          <h2><Settings size={20} /> Ξ”ΞΉΞ±ΞΌΟΟΟ†Ο‰ΟƒΞ· Agent</h2>
+          <h2><Settings size={20} /> Διαμόρφωση Agent</h2>
           <button className="drawer-close" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="drawer-body">
@@ -1318,11 +1318,11 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
             <h3 className="drawer-agent-name">{agent.name}</h3>
           </div>
           <div className="drawer-field">
-            <label>Ξ¤ΟΟ€ΞΏΟ‚ ΞΞ±Ξ½Ξ±Ξ»ΞΉΞΏΟ</label>
+            <label>Τύπος Καναλιού</label>
             <select value={channel} onChange={(e) => setChannel(e.target.value)}>
               <option value="email">Email</option>
               <option value="sms">SMS</option>
-              <option value="voice">Ξ¦Ο‰Ξ½Ξ®</option>
+              <option value="voice">Φωνή</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="telegram">Telegram</option>
               <option value="viber">Viber</option>
@@ -1331,14 +1331,14 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
             </select>
           </div>
           <div className="drawer-field">
-            <label>Ξ ΞµΟΞΉΞΏΟ‡Ξ® Ξ£Ο„ΟΟ‡ΞΏΟ…</label>
+            <label>Περιοχή Στόχου</label>
             <select value={region} onChange={(e) => setRegion(e.target.value)}>
-              <option value="">ΞΞ»Ξ· Ξ· Ξ•Ξ»Ξ»Ξ¬Ξ΄Ξ±</option>
+              <option value="">Όλη η Ελλάδα</option>
               {greekRegions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div className="drawer-field">
-            <label>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·</label>
+            <label>Κατάσταση</label>
             <div className="drawer-toggle-row">
               <button className={`drawer-toggle ${status === 'active' ? 'on' : ''}`} onClick={() => setStatus('active')}>Live</button>
               <button className={`drawer-toggle ${status === 'paused' ? 'off' : ''}`} onClick={() => setStatus('paused')}>Paused</button>
@@ -1346,27 +1346,27 @@ function AgentConfigDrawer({ agent, onClose, onSave }: {
           </div>
           <div className="drawer-field">
             <label>Base Prompt Template</label>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ξ“ΟΞ¬ΟΞµ Ο„ΞΉΟ‚ ΞΏΞ΄Ξ·Ξ³Ξ―ΞµΟ‚ Ξ³ΞΉΞ± Ο„ΞΏ LLM ΟƒΟ„Ξ± ΞµΞ»Ξ»Ξ·Ξ½ΞΉΞΊΞ¬..." rows={6} />
+            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Γράψε τις οδηγίες για το LLM στα ελληνικά..." rows={6} />
           </div>
           <div className="drawer-field">
-            <label>Ξ Ξ±ΟΞ¬Ξ΄ΞΏΟƒΞ· ΟƒΞµ Ξ†Ξ½ΞΈΟΟ‰Ο€ΞΏ ΞΟ„Ξ±Ξ½:</label>
+            <label>Παράδοση σε Άνθρωπο Όταν:</label>
             <select value={handoff} onChange={(e) => setHandoff(e.target.value)}>
               {handoffOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         </div>
         <div className="drawer-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Ξ†ΞΊΟ…ΟΞΏ</button>
-          <button className="btn btn-primary" onClick={handleSave}><CheckCircle2 size={16} /> Ξ‘Ο€ΞΏΞΈΞ®ΞΊΞµΟ…ΟƒΞ·</button>
+          <button className="btn btn-ghost" onClick={onClose}>Άκυρο</button>
+          <button className="btn btn-primary" onClick={handleSave}><CheckCircle2 size={16} /> Αποθήκευση</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
-   AGENT HUB β€” Chat Input Toolbar (Claude-style + menu, mic, voice)
-   β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β• */
+/* ═══════════════════════════════════════════════════════════════
+   AGENT HUB — Chat Input Toolbar (Claude-style + menu, mic, voice)
+   ═══════════════════════════════════════════════════════════════ */
 
 function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
   onSendMessage: (msg: string) => void;
@@ -1406,29 +1406,29 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
           color: 'var(--text)', fontSize: '13px'
         }}>
           <button onClick={() => fileInputRef.current?.click()} style={menuItemStyle}>
-            <span>π“ Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· Ξ±ΟΟ‡ΞµΞ―Ο‰Ξ½ Ξ® Ο†Ο‰Ο„ΞΏΞ³ΟΞ±Ο†ΞΉΟΞ½</span>
+            <span>📎 Προσθήκη αρχείων ή φωτογραφιών</span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-2)', padding: '2px 6px', borderRadius: '4px' }}>Ctrl+U</span>
           </button>
           <button onClick={() => onOpenSettings('skills')} style={menuItemStyle}>
-            <span>π“ Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· ΟƒΞµ project</span><span>β€Ί</span>
+            <span>📁 Προσθήκη σε project</span><span>›</span>
           </button>
           <button onClick={() => onOpenSettings('connectors')} style={menuItemStyle}>
-            <span>π™ Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· Ξ±Ο€Ο GitHub</span>
+            <span>🐙 Προσθήκη από GitHub</span>
           </button>
           <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
           <button onClick={() => onOpenSettings('skills')} style={menuItemStyle}>
-            <span>π› οΈ Skills (Ξ”ΞµΞΎΞΉΟΟ„Ξ·Ο„ΞµΟ‚)</span><span>β€Ί</span>
+            <span>🛠️ Skills (Δεξιότητες)</span><span>›</span>
           </button>
           <button onClick={() => onOpenSettings('connectors')} style={menuItemStyle}>
-            <span>π” Connectors (Ξ£Ο…Ξ½Ξ΄Ξ­ΟƒΞµΞΉΟ‚)</span><span>β€Ί</span>
+            <span>🔌 Connectors (Συνδέσεις)</span><span>›</span>
           </button>
           <button onClick={() => onOpenSettings('plugins')} style={menuItemStyle}>
-            <span>π§© Plugins (Ξ ΟΟΟƒΞΈΞµΟ„Ξ±)</span><span>β€Ί</span>
+            <span>🧩 Plugins (Πρόσθετα)</span><span>›</span>
           </button>
           <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
           <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} style={{ ...menuItemStyle, justifyContent: 'space-between' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>π Ξ‘Ξ½Ξ±Ξ¶Ξ®Ο„Ξ·ΟƒΞ· ΟƒΟ„ΞΏ Web</span>
-            {webSearchEnabled && <span style={{ color: '#10b981', fontWeight: 'bold' }}>β“</span>}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>🌐 Αναζήτηση στο Web</span>
+            {webSearchEnabled && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span>}
           </button>
         </div>
       )}
@@ -1445,11 +1445,11 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
           border: 'none', borderRadius: '50%', width: '32px', height: '32px',
           color: 'var(--text)', cursor: 'pointer', fontSize: '18px',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }} title="Ξ ΟΞΏΟƒΞΈΞ®ΞΊΞ· Ο…Ξ»ΞΉΞΊΞΏΟ & ΞµΟΞ³Ξ±Ξ»ΞµΞ―Ο‰Ξ½">+</button>
+        }} title="Προσθήκη υλικού & εργαλείων">+</button>
 
         <textarea
           value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown}
-          placeholder="Ξ£Ο„ΞµΞ―Ξ»Ο„Ξµ ΞΌΞ®Ξ½Ο…ΞΌΞ± ΟƒΟ„ΞΏΞ½ Agent Hub..." rows={1}
+          placeholder="Στείλτε μήνυμα στον Agent Hub..." rows={1}
           style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '14px', resize: 'none', fontFamily: 'inherit' }}
         />
 
@@ -1458,11 +1458,11 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
             background: isRecording ? 'rgba(239,68,68,0.15)' : 'transparent',
             border: 'none', borderRadius: '50%', width: '32px', height: '32px',
             color: isRecording ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
-          }} title="Ξ¦Ο‰Ξ½Ξ·Ο„ΞΉΞΊΞ® Ο…Ο€Ξ±Ξ³ΟΟΞµΟ…ΟƒΞ·">π™οΈ</button>
+          }} title="Φωνητική υπαγόρευση">🎙️</button>
           <button style={{
             background: 'transparent', border: 'none', borderRadius: '50%', width: '32px', height: '32px',
             color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px'
-          }} title="Live Voice Assistant Stream">π“</button>
+          }} title="Live Voice Assistant Stream">📊</button>
           <button
             onClick={() => {
               if (message.trim()) {
@@ -1480,7 +1480,7 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
               fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.15s',
             }}
-            title="Ξ‘Ο€ΞΏΟƒΟ„ΞΏΞ»Ξ® ΞΌΞ·Ξ½ΟΞΌΞ±Ο„ΞΏΟ‚"
+            title="Αποστολή μηνύματος"
           >
             <Send size={15} />
           </button>
@@ -1490,9 +1490,9 @@ function AgentChatInputToolbar({ onSendMessage, onOpenSettings }: {
   );
 }
 
-/* β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
-   AGENT HUB β€” Settings Modal (Claude-inspired, 6 tabs)
-   β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β• */
+/* ═══════════════════════════════════════════════════════════════
+   AGENT HUB — Settings Modal (Claude-inspired, 6 tabs)
+   ═══════════════════════════════════════════════════════════════ */
 
 function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
   isOpen: boolean; onClose: () => void; initialTab?: string;
@@ -1547,19 +1547,19 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
       <div style={{ width: '980px', height: '720px', background: 'var(--bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)', color: 'var(--text)' }}>
         {/* Left Sidebar Navigation */}
         <div style={{ width: '240px', background: 'var(--bg-2)', borderRight: '1px solid var(--border)', padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
-          <div style={{ fontSize: '15px', fontWeight: 'bold', padding: '0 8px', color: 'var(--text)' }}>Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ Agent</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', padding: '0 8px', color: 'var(--text)' }}>Ρυθμίσεις Agent</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div style={navSectionHeader}>Ξ“Ξ•ΞΞ™ΞΞ‘</div>
-            <button onClick={() => setActiveCategory('general')} style={navItemStyle(activeCategory === 'general')}>β™οΈ General</button>
-            <button onClick={() => setActiveCategory('visuals')} style={navItemStyle(activeCategory === 'visuals')}>π¨ Appearance & Visuals</button>
+            <div style={navSectionHeader}>ΓΕΝΙΚΑ</div>
+            <button onClick={() => setActiveCategory('general')} style={navItemStyle(activeCategory === 'general')}>⚙️ General</button>
+            <button onClick={() => setActiveCategory('visuals')} style={navItemStyle(activeCategory === 'visuals')}>🎨 Appearance & Visuals</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={navSectionHeader}>CAPABILITIES</div>
-            <button onClick={() => setActiveCategory('code')} style={navItemStyle(activeCategory === 'code')}>π’» Code & Execution</button>
-            <button onClick={() => setActiveCategory('connectors')} style={navItemStyle(activeCategory === 'connectors')}>π” Connectors</button>
-            <button onClick={() => setActiveCategory('security')} style={navItemStyle(activeCategory === 'security')}>π”’ Security & Tokens</button>
+            <button onClick={() => setActiveCategory('code')} style={navItemStyle(activeCategory === 'code')}>💻 Code & Execution</button>
+            <button onClick={() => setActiveCategory('connectors')} style={navItemStyle(activeCategory === 'connectors')}>🔌 Connectors</button>
+            <button onClick={() => setActiveCategory('security')} style={navItemStyle(activeCategory === 'security')}>🔒 Security & Tokens</button>
           </div>
-          <button onClick={onClose} style={{ marginTop: 'auto', padding: '10px', background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer' }}>β– ΞΞ»ΞµΞ―ΟƒΞΉΞΌΞΏ</button>
+          <button onClick={onClose} style={{ marginTop: 'auto', padding: '10px', background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer' }}>✖ Κλείσιμο</button>
         </div>
 
         {/* Right Content Pane */}
@@ -1611,7 +1611,7 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
               <div style={sectionContainer}>
                 <h3 style={sectionTitleStyle}>Code Execution & File Creation</h3>
                 <ToggleRow label="Code execution and file creation" description="The Agent can execute code and create and edit docs, spreadsheets, presentations, PDFs, and data reports." checked={codeExecution} onChange={setCodeExecution} />
-                <ToggleRow label="Allow network egress β οΈ" description="Allow the Agent to access common package managers to install packages and libraries." checked={networkEgress} onChange={setNetworkEgress} />
+                <ToggleRow label="Allow network egress ⚠️" description="Allow the Agent to access common package managers to install packages and libraries." checked={networkEgress} onChange={setNetworkEgress} />
               </div>
               <div style={sectionContainer}>
                 <h3 style={sectionTitleStyle}>Pull Requests</h3>
@@ -1627,15 +1627,15 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
           {activeCategory === 'connectors' && (
             <div>
               <h2 style={tabHeaderStyle}>Connectors</h2>
-              <p style={subTextStyle}>Ξ£Ο…Ξ½Ξ΄Ξ­ΟƒΟ„Ξµ ΞµΞΎΟ‰Ο„ΞµΟΞΉΞΊΞ­Ο‚ Ο€Ξ»Ξ±Ο„Ο†ΟΟΞΌΞµΟ‚ Ξ³ΞΉΞ± Ξ±Ο…Ο„ΟΞΌΞ±Ο„Ξ· Ξ±Ξ½Ξ¬ΞΊΟ„Ξ·ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½.</p>
+              <p style={subTextStyle}>Συνδέστε εξωτερικές πλατφόρμες για αυτόματη ανάκτηση δεδομένων.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '20px' }}>
                 {[
-                  { name: 'GitHub Integration', status: 'Connected', icon: 'π™', type: 'Web' },
-                  { name: 'Supabase Database', status: 'Connected', icon: 'β΅', type: 'Database' },
-                  { name: 'Vercel Deployments', status: 'Connected', icon: 'β–²', type: 'Web' },
-                  { name: 'Gmail Workspace', status: 'Disconnected', icon: 'π“§', type: 'Email' },
-                  { name: 'Google Drive', status: 'Disconnected', icon: 'π“', type: 'Storage' },
-                  { name: 'Railway App', status: 'Connected', icon: 'π‚', type: 'Web' },
+                  { name: 'GitHub Integration', status: 'Connected', icon: '🐙', type: 'Web' },
+                  { name: 'Supabase Database', status: 'Connected', icon: '⚡', type: 'Database' },
+                  { name: 'Vercel Deployments', status: 'Connected', icon: '▲', type: 'Web' },
+                  { name: 'Gmail Workspace', status: 'Disconnected', icon: '📧', type: 'Email' },
+                  { name: 'Google Drive', status: 'Disconnected', icon: '📁', type: 'Storage' },
+                  { name: 'Railway App', status: 'Connected', icon: '🚂', type: 'Web' },
                 ].map((conn, idx) => (
                   <div key={idx} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1657,7 +1657,7 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
                 <div style={helpTextStyle}>Created when you sign in to the Agent Hub. Revoke a token to sign out from that device.</div>
                 <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-2)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div><div style={{ fontWeight: 'bold', fontSize: '14px' }}>Agent Hub Web Session</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Created: 18 Aug 2026 β€Ά Last used: Just now</div></div>
+                    <div><div style={{ fontWeight: 'bold', fontSize: '14px' }}>Agent Hub Web Session</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Created: 18 Aug 2026 • Last used: Just now</div></div>
                     <button style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Revoke</button>
                   </div>
                 </div>
@@ -1675,9 +1675,9 @@ function AgentSettingsModal({ isOpen, onClose, initialTab = 'general' }: {
   );
 }
 
-/* β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
-   AGENT HUB TAB β€” Full Layout (Sidebar + Header + Chat + Input)
-   β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β• */
+/* ═══════════════════════════════════════════════════════════════
+   AGENT HUB TAB — Full Layout (Sidebar + Header + Chat + Input)
+   ═══════════════════════════════════════════════════════════════ */
 
 function AgentHubTab({ agents, conversations, activeConversationId, setActiveConversationId, hubMessages, setHubConversations, hubInput, setHubInput, hubLoading, setHubLoading, hubSelectedAgents, setHubSelectedAgents, endRef, toast, setToast, createNewConversation, deleteConversation, updateConversationTitle, toggleAgentInConversation }: {
   agents: Agent[];
@@ -1714,13 +1714,13 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   const [showHubSettings, setShowHubSettings] = useState(false);
 
   const GEMINI_MODELS = [
-    { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Latest)', desc: 'Ξ¤ΞΏ Ο€ΞΉΞΏ Ο€ΟΟΟƒΟ†Ξ±Ο„ΞΏ & Ο„Ξ±Ο‡Ο' },
-    { value: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro', desc: 'Ξ¤ΞΏ Ο€ΞΉΞΏ Ο€ΟΟΟƒΟ†Ξ±Ο„ΞΏ & Ξ­ΞΎΟ…Ο€Ξ½ΞΏ' },
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Ξ¤Ξ±Ο‡Ο, stable' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'ΞΞΎΟ…Ο€Ξ½ΞΏ, Ξ±ΟΞ³ΟΟ„ΞµΟΞΏ' },
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Ξ“ΟΞ®Ξ³ΞΏΟΞΏ, Ο€Ξ±Ξ»Ξ±ΞΉΟΟ„ΞµΟΞΏ' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Ξ•Ξ»Ξ±Ο†ΟΟ, budget-friendly' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', desc: 'ΞΞ»Ξ±ΟƒΞΉΞΊΟ pro ΞΌΞΏΞ½Ο„Ξ­Ξ»ΞΏ' },
+    { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Latest)', desc: 'Το πιο πρόσφατο & ταχύ' },
+    { value: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro', desc: 'Το πιο πρόσφατο & έξυπνο' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Ταχύ, stable' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'Έξυπνο, αργότερο' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Γρήγορο, παλαιότερο' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Ελαφρύ, budget-friendly' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', desc: 'Κλασικό pro μοντέλο' },
   ];
 
   useEffect(() => {
@@ -1780,7 +1780,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         if (c.id === activeConversationId) {
           return {
             ...c,
-            messages: [...c.messages, { role: 'assistant', text: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + (e.message || 'Ξ†Ξ³Ξ½Ο‰ΟƒΟ„ΞΏ ΟƒΟ†Ξ¬Ξ»ΞΌΞ±') }],
+            messages: [...c.messages, { role: 'assistant', text: 'Σφάλμα: ' + (e.message || 'Άγνωστο σφάλμα') }],
           };
         }
         return c;
@@ -1792,16 +1792,16 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   return (
     <div style={{ display: 'flex', height: '100%', width: '100%', background: 'var(--bg)', color: 'var(--text)' }}>
 
-      {/* β•β•β• INNER SIDEBAR: Ξ™Ξ£Ξ¤ΞΞ΅Ξ™ΞΞ Ξ£Ξ¥ΞΞΞΞ™Ξ›Ξ™Ξ©Ξ β•β•β• */}
+      {/* ═══ INNER SIDEBAR: ΙΣΤΟΡΙΚΟ ΣΥΝΟΜΙΛΙΩΝ ═══ */}
       <div style={{ width: '260px', borderRight: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
           <button onClick={createNewConversation} style={{ width: '100%', padding: '10px', background: 'var(--text)', color: 'var(--bg)', borderRadius: '8px', fontWeight: '600', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px' }}>
-            <Plus size={14} /> ΞΞ­Ξ± Ξ£Ο…Ξ½ΞΏΞΌΞΉΞ»Ξ―Ξ±
+            <Plus size={14} /> Νέα Συνομιλία
           </button>
         </div>
 
         <div style={{ padding: '12px', flex: 1, overflowY: 'auto' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontWeight: 600 }}>Ξ™ΟƒΟ„ΞΏΟΞΉΞΊΟ Ξ£Ο…Ξ½ΞΏΞΌΞΉΞ»ΞΉΟΞ½</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontWeight: 600 }}>Ιστορικό Συνομιλιών</div>
           {conversations.map((conv) => (
             <div
               key={conv.id}
@@ -1817,16 +1817,16 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             >
               <div style={{ overflow: 'hidden' }}>
                 <div style={{ fontWeight: activeConversationId === conv.id ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                  π’¬ {conv.title}
+                  💬 {conv.title}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{conv.messages.length} ΞΌΞ·Ξ½ΟΞΌΞ±Ο„Ξ± Β· {conv.updatedAt.toLocaleDateString('el-GR')}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{conv.messages.length} μηνύματα · {conv.updatedAt.toLocaleDateString('el-GR')}</div>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '12px', opacity: 0.6 }}>π—‘οΈ</button>
+              <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '12px', opacity: 0.6 }}>🗑️</button>
             </div>
           ))}
           {conversations.length === 0 && (
             <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '20px', padding: '20px', background: 'rgba(0,0,0,0.03)', borderRadius: '8px' }}>
-              Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ ΟƒΟ…Ξ½ΞΏΞΌΞΉΞ»Ξ―ΞµΟ‚.<br/>ΞΞµΞΊΞ―Ξ½Ξ± ΞΌΞΉΞ± Ξ½Ξ­Ξ±!
+              Δεν υπάρχουν συνομιλίες.<br/>Ξεκίνα μια νέα!
             </div>
           )}
         </div>
@@ -1834,20 +1834,20 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         {/* Settings Trigger */}
         <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
           <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            β™οΈ Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ Agent
+            ⚙️ Ρυθμίσεις Agent
           </button>
         </div>
       </div>
 
-      {/* β•β•β• KENTRIKO PARATHYRO CHAT β•β•β• */}
+      {/* ═══ KENTRIKO PARATHYRO CHAT ═══ */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
-        {/* HEADER: Ξ•Ξ Ξ™Ξ›ΞΞ“Ξ— ΞΞΞΞ¤Ξ•Ξ›ΞΞ¥ */}
+        {/* HEADER: ΕΠΙΛΟΓΗ ΜΟΝΤΕΛΟΥ */}
         <div style={{ padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '18px', fontWeight: 'bold' }}>Agent Hub</span>
             <span style={{ fontSize: '11px', background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '3px 10px', borderRadius: '12px' }}>
-              {hubLoading ? 'β³ Processing...' : 'β— Online'}
+              {hubLoading ? '⏳ Processing...' : '● Online'}
             </span>
             {hubApiKey && (
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -1856,7 +1856,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             )}
             {!hubApiKey && (
               <span style={{ fontSize: '11px', color: '#f59e0b' }}>
-                β οΈ Ξ§Ο‰ΟΞ―Ο‚ API Key
+                ⚠️ Χωρίς API Key
               </span>
             )}
           </div>
@@ -1868,26 +1868,26 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             >
               {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
-            <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }} title="Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚">β™οΈ</button>
+            <button onClick={() => setShowHubSettings(!showHubSettings)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }} title="Ρυθμίσεις">⚙️</button>
           </div>
         </div>
 
         {/* API Key Settings Panel (toggled) */}
         {showHubSettings && (
           <div style={{ padding: '16px 24px', background: 'var(--bg-2)', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>β™οΈ Ξ΅Ο…ΞΈΞΌΞ―ΟƒΞµΞΉΟ‚ API & ΞΞΏΞ½Ο„Ξ­Ξ»ΞΏΟ…</div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>⚙️ Ρυθμίσεις API & Μοντέλου</div>
             <div className="drawer-field">
               <label style={{ fontWeight: 500, fontSize: '12px' }}>Google Gemini API Key</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input type="password" value={hubApiKey} onChange={(e) => { setHubApiKey(e.target.value); localStorage.setItem('hub_api_key', e.target.value); }} placeholder="AIzaSy..." style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px', padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }} />
-                {hubApiKey && <button onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ padding: '6px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>ΞΞ±ΞΈΞ±ΟΞΉΟƒΞΌΟΟ‚</button>}
+                {hubApiKey && <button onClick={() => { setHubApiKey(''); localStorage.removeItem('hub_api_key'); }} style={{ padding: '6px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}>Καθαρισμός</button>}
               </div>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                Ξ›Ξ®ΟΞ· Ξ±Ο€Ο: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Google AI Studio</a> Β· Ξ¤ΞΏ ΞΊΞ»ΞµΞΉΞ΄Ξ― Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΞµΟ„Ξ±ΞΉ ΞΌΟΞ½ΞΏ ΟƒΟ„ΞΏΞ½ browser ΟƒΞΏΟ…
+                Λήψη από: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Google AI Studio</a> · Το κλειδί αποθηκεύεται μόνο στον browser σου
               </span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(0,102,204,0.08)', padding: '8px 12px', borderRadius: '8px' }}>
-              π’΅ <strong>Ξ ΟΟ‚ Ξ΄ΞΏΟ…Ξ»ΞµΟΞµΞΉ:</strong> Ξ¤ΞΏ API key ΟƒΞΏΟ… Ο‡ΟΞ·ΟƒΞΉΞΌΞΏΟ€ΞΏΞΉΞµΞ―Ο„Ξ±ΞΉ Ξ±Ο€ΞµΟ…ΞΈΞµΞ―Ξ±Ο‚ ΟƒΟ„Ξ· ΞΊΞ»Ξ®ΟƒΞ· Ο€ΟΞΏΟ‚ Google. Ξ”ΞµΞ½ Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΞµΟ„Ξ±ΞΉ ΟƒΟ„ΞΏΞ½ server.
+              💡 <strong>Πώς δουλεύει:</strong> Το API key σου χρησιμοποιείται απευθείας στη κλήση προς Google. Δεν αποθηκεύεται στον server.
             </div>
           </div>
         )}
@@ -1910,7 +1910,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
               <div key={i} style={{ display: 'flex', gap: '12px', maxWidth: '800px', width: '100%', margin: '0 auto', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
                 {/* Avatar */}
                 <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: m.role === 'assistant' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, border: '1px solid var(--border)' }}>
-                  {m.role === 'assistant' ? 'π¤–' : 'π‘¤'}
+                  {m.role === 'assistant' ? '🤖' : '👤'}
                 </div>
                 {/* Message Bubble */}
                 <div style={{
@@ -1925,9 +1925,9 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             ))}
             {hubLoading && (
               <div style={{ display: 'flex', gap: '12px', maxWidth: '800px', width: '100%', margin: '0 auto' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>π¤–</div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>🤖</div>
                 <div style={{ padding: '12px 16px', background: 'var(--bg-2)', borderRadius: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>
-                  Ξ£ΞΊΞ­Ο†Ο„ΞΏΞΌΞ±ΞΉ<span className="dot-anim">...</span>
+                  Σκέφτομαι<span className="dot-anim">...</span>
                 </div>
               </div>
             )}
@@ -1936,18 +1936,18 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
         ) : (
           /* EMPTY STATE */
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '40px' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>π¤–</div>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text)', margin: 0 }}>Ξ“ΞµΞΉΞ± ΟƒΞΏΟ…! Ξ•Ξ―ΞΌΞ±ΞΉ ΞΏ AI Agent</h3>
+            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🤖</div>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text)', margin: 0 }}>Γεια σου! Είμαι ο AI Agent</h3>
             <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '400px', margin: 0 }}>
-              Ξ ΟΟ‚ ΞΌΟ€ΞΏΟΟ Ξ½Ξ± ΟƒΞ±Ο‚ Ξ²ΞΏΞ·ΞΈΞ®ΟƒΟ‰ ΟƒΞ®ΞΌΞµΟΞ±; Ξ”ΞΏΞΊΞΉΞΌΞ¬ΟƒΟ„Ξµ ΞΌΞ―Ξ± Ξ±Ο€Ο Ο„ΞΉΟ‚ Ο€Ξ±ΟΞ±ΞΊΞ¬Ο„Ο‰ ΞµΞ½Ξ­ΟΞ³ΞµΞΉΞµΟ‚:
+              Πώς μπορώ να σας βοηθήσω σήμερα; Δοκιμάστε μία από τις παρακάτω ενέργειες:
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '8px' }}>
               {[
-                'π“ Ξ‘Ξ½Ξ¬Ξ»Ο…ΟƒΞ· Ο„Ο‰Ξ½ Leads ΞΌΞΏΟ…',
-                'π“‹ Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ± Report Ξ³ΞΉΞ± Market RAG',
-                'π” Ξ’ΟΞµΟ‚ Ξ½Ξ­Ξ± B2B leads ΟƒΟ„Ξ·Ξ½ Ξ‘Ο„Ο„ΞΉΞΊΞ®',
-                'π’° Ξ¤ΞΉΞΌΞ­Ο‚ ΟΞµΟΞΌΞ±Ο„ΞΏΟ‚ ΟƒΞ®ΞΌΞµΟΞ±',
-                'π“§ Ξ£Ο„ΞµΞ―Ξ»Ξµ email ΟƒΞµ lead',
+                '📊 Ανάλυση των Leads μου',
+                '📋 Δημιουργία Report για Market RAG',
+                '🔍 Βρες νέα B2B leads στην Αττική',
+                '💰 Τιμές ρεύματος σήμερα',
+                '📧 Στείλε email σε lead',
               ].map((suggestion, idx) => (
                 <button key={idx} onClick={() => { setHubInput(suggestion); createNewConversation(); }} style={{
                   padding: '8px 16px', background: 'var(--bg-2)', border: '1px solid var(--border)',
@@ -1968,7 +1968,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
             onOpenSettings={(tab) => setShowHubSettings(true)}
           />
           <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Ξ Agent Hub ΞΌΟ€ΞΏΟΞµΞ― Ξ½Ξ± ΞΊΞ¬Ξ½ΞµΞΉ Ξ»Ξ¬ΞΈΞ·. Ξ Ξ±ΟΞ±ΞΊΞ±Ξ»Ο ΞµΞ»Ξ­Ξ³Ο‡ΞµΟ„Ξµ Ο„ΞΉΟ‚ Ο€Ξ»Ξ·ΟΞΏΟ†ΞΏΟΞ―ΞµΟ‚.
+            Ο Agent Hub μπορεί να κάνει λάθη. Παρακαλώ ελέγχετε τις πληροφορίες.
           </div>
         </div>
       </div>
@@ -2006,46 +2006,46 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
 
   const generateReport = async (reportType: 'master' | 'on_demand', agentId?: string) => {
     setGenerating(true);
-    setToast({ msg: 'Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ± Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬Ο‚...', type: 'info' });
+    setToast({ msg: 'Δημιουργία αναφοράς...', type: 'info' });
     try {
       const { data, error } = await supabase.functions.invoke('orchestrator', {
         body: { mode: 'report', report_type: reportType, agent_id: agentId },
       });
       if (error) throw error;
-      setToast({ msg: 'Ξ— Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ!', type: 'success' });
+      setToast({ msg: 'Η αναφορά δημιουργήθηκε!', type: 'success' });
       loadReports();
       if (data.report) setSelectedReport({ content: data.report, title: reportType === 'master' ? 'Master Report' : `Agent Report`, metrics: data.metrics });
     } catch (e: any) {
-      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + e.message, type: 'info' });
+      setToast({ msg: 'Σφάλμα: ' + e.message, type: 'info' });
     }
     setGenerating(false);
   };
 
   const markAsRead = async (report: any) => {
     await supabase.from('agent_reports').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', report.id);
-    setToast({ msg: 'Ξ— Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ ΟƒΞ·ΞΌΞ¬Ξ½ΞΈΞ·ΞΊΞµ Ο‰Ο‚ Ξ±Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½Ξ·.', type: 'success' });
+    setToast({ msg: 'Η αναφορά σημάνθηκε ως αναγνωσμένη.', type: 'success' });
     loadReports();
   };
 
   const deleteReport = async (reportId: string) => {
-    if (!confirm('Ξ•Ξ―ΟƒΞ±ΞΉ ΟƒΞ―Ξ³ΞΏΟ…ΟΞΏΟ‚ ΟΟ„ΞΉ ΞΈΞ­Ξ»ΞµΞΉΟ‚ Ξ½Ξ± Ξ΄ΞΉΞ±Ξ³ΟΞ¬ΟΞµΞΉΟ‚ Ξ±Ο…Ο„Ξ® Ο„Ξ·Ξ½ Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬;')) return;
+    if (!confirm('Είσαι σίγουρος ότι θέλεις να διαγράψεις αυτή την αναφορά;')) return;
     await supabase.from('agent_reports').delete().eq('id', reportId);
     setSelectedReport(null);
-    setToast({ msg: 'Ξ— Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ.', type: 'success' });
+    setToast({ msg: 'Η αναφορά διαγράφηκε.', type: 'success' });
     loadReports();
   };
 
   const saveNotes = async () => {
     if (!selectedReport) return;
     await supabase.from('agent_reports').update({ notes: reportNotes }).eq('id', selectedReport.id);
-    setToast({ msg: 'ΞΞΉ ΟƒΞ·ΞΌΞµΞΉΟΟƒΞµΞΉΟ‚ Ξ±Ο€ΞΏΞΈΞ·ΞΊΞµΟΟ„Ξ·ΞΊΞ±Ξ½.', type: 'success' });
+    setToast({ msg: 'Οι σημειώσεις αποθηκεύτηκαν.', type: 'success' });
   };
 
   const updatePriority = async (priority: string) => {
     if (!selectedReport) return;
     await supabase.from('agent_reports').update({ priority }).eq('id', selectedReport.id);
     setReportPriority(priority);
-    setToast({ msg: `Ξ— Ο€ΟΞΏΟ„ΞµΟΞ±ΞΉΟΟ„Ξ·Ο„Ξ± Ξ¬Ξ»Ξ»Ξ±ΞΎΞµ ΟƒΞµ ${priority}.`, type: 'success' });
+    setToast({ msg: `Η προτεραιότητα άλλαξε σε ${priority}.`, type: 'success' });
     loadReports();
   };
 
@@ -2054,10 +2054,10 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
   return (
     <div className="dash-content reports-tab">
       <div className="dash-content-header">
-        <p>Ξ‘Ξ½Ξ±Ο†ΞΏΟΞ­Ο‚ Ξ±Ο€ΟΞ΄ΞΏΟƒΞ·Ο‚ AI agents ΞΊΞ±ΞΉ Master Orchestrator summary. {unreadCount > 0 && <span style={{ color: '#e74c3c', fontWeight: 600 }}>({unreadCount} ΞΌΞ· Ξ±Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½ΞµΟ‚)</span>}</p>
+        <p>Αναφορές απόδοσης AI agents και Master Orchestrator summary. {unreadCount > 0 && <span style={{ color: '#e74c3c', fontWeight: 600 }}>({unreadCount} μη αναγνωσμένες)</span>}</p>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={loadReports} disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'spin' : ''} /> Ξ‘Ξ½Ξ±Ξ½Ξ­Ο‰ΟƒΞ·
+            <RefreshCw size={16} className={loading ? 'spin' : ''} /> Ανανέωση
           </button>
           <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
             <FileText size={16} /> Master Report
@@ -2067,7 +2067,7 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
 
       <div className="reports-layout">
         <div className="reports-sidebar">
-          <h3>Ξ‘Ο€ΞΏΞΈΞ·ΞΊΞµΟ…ΞΌΞ­Ξ½ΞµΟ‚ Ξ‘Ξ½Ξ±Ο†ΞΏΟΞ­Ο‚</h3>
+          <h3>Αποθηκευμένες Αναφορές</h3>
           {reports.map((r) => (
             <div key={r.id} className={`report-item ${selectedReport?.id === r.id ? 'active' : ''}`} onClick={() => {
               setSelectedReport(r);
@@ -2078,12 +2078,12 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
               <div className="report-item-icon"><FileText size={14} /></div>
               <div>
                 <strong>{r.title}</strong>
-                <span>{new Date(r.created_at).toLocaleDateString('el-GR')} Β· {r.report_type}</span>
-                {!r.is_read && <span className="report-is-read unread" style={{ marginLeft: '6px' }}>β—</span>}
+                <span>{new Date(r.created_at).toLocaleDateString('el-GR')} · {r.report_type}</span>
+                {!r.is_read && <span className="report-is-read unread" style={{ marginLeft: '6px' }}>●</span>}
               </div>
             </div>
           ))}
-          {reports.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ξ±Ξ½Ξ±Ο†ΞΏΟΞ­Ο‚.</p>}
+          {reports.length === 0 && <p className="dash-empty">Δεν υπάρχουν αναφορές.</p>}
         </div>
 
         <div className="reports-main">
@@ -2096,7 +2096,7 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
                     <span>{new Date(selectedReport.created_at).toLocaleString('el-GR')}</span>
                     <span className="report-type-badge">{selectedReport.report_type}</span>
                     <span className={`report-priority ${selectedReport.priority || 'normal'}`}>
-                      {selectedReport.priority === 'high' ? 'Ξ¥ΟΞ·Ξ»Ξ®' : selectedReport.priority === 'low' ? 'Ξ§Ξ±ΞΌΞ·Ξ»Ξ®' : 'ΞΞ±Ξ½ΞΏΞ½ΞΉΞΊΞ®'}
+                      {selectedReport.priority === 'high' ? 'Υψηλή' : selectedReport.priority === 'low' ? 'Χαμηλή' : 'Κανονική'}
                     </span>
                   </div>
                 </div>
@@ -2106,15 +2106,15 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
                     value={selectedReport.priority || 'normal'} 
                     onChange={(e) => updatePriority(e.target.value)}
                   >
-                    <option value="low">Ξ§Ξ±ΞΌΞ·Ξ»Ξ® Ξ ΟΞΏΟ„ΞµΟΞ±ΞΉΟΟ„Ξ·Ο„Ξ±</option>
-                    <option value="normal">ΞΞ±Ξ½ΞΏΞ½ΞΉΞΊΞ®</option>
-                    <option value="high">Ξ¥ΟΞ·Ξ»Ξ® Ξ ΟΞΏΟ„ΞµΟΞ±ΞΉΟΟ„Ξ·Ο„Ξ±</option>
+                    <option value="low">Χαμηλή Προτεραιότητα</option>
+                    <option value="normal">Κανονική</option>
+                    <option value="high">Υψηλή Προτεραιότητα</option>
                   </select>
                   <button className="report-action-btn" onClick={() => markAsRead(selectedReport)}>
-                    <Eye size={14} /> {selectedReport.is_read ? 'Ξ‘Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½Ξ·' : 'Ξ£Ξ®ΞΌΞ±Ξ½ΟƒΞ· Ο‰Ο‚ Ξ‘Ξ½Ξ±Ξ³Ξ½Ο‰ΟƒΞΌΞ­Ξ½Ξ·'}
+                    <Eye size={14} /> {selectedReport.is_read ? 'Αναγνωσμένη' : 'Σήμανση ως Αναγνωσμένη'}
                   </button>
                   <button className="report-action-btn delete" onClick={() => deleteReport(selectedReport.id)}>
-                    <Trash2 size={14} /> Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®
+                    <Trash2 size={14} /> Διαγραφή
                   </button>
                 </div>
               </div>
@@ -2123,21 +2123,21 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
                 <div className="report-metrics">
                   <div><strong>{selectedReport.metrics.total_agents}</strong><span>Agents</span></div>
                   <div><strong>{selectedReport.metrics.total_leads}</strong><span>Leads</span></div>
-                  <div><strong>{selectedReport.metrics.total_meetings}</strong><span>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</span></div>
+                  <div><strong>{selectedReport.metrics.total_meetings}</strong><span>Ραντεβού</span></div>
                 </div>
               )}
               
               <div className="report-content">{selectedReport.content}</div>
               
               <div className="report-notes">
-                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>Ξ£Ξ·ΞΌΞµΞΉΟΟƒΞµΞΉΟ‚</h4>
+                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>Σημειώσεις</h4>
                 <textarea 
                   value={reportNotes} 
                   onChange={(e) => setReportNotes(e.target.value)}
-                  placeholder="Ξ ΟΞΏΟƒΞΈΞ­ΟƒΟ„Ξµ ΟƒΞ·ΞΌΞµΞΉΟΟƒΞµΞΉΟ‚ Ξ³ΞΉΞ± Ξ±Ο…Ο„Ξ® Ο„Ξ·Ξ½ Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬..."
+                  placeholder="Προσθέστε σημειώσεις για αυτή την αναφορά..."
                 />
                 <button className="btn btn-secondary" onClick={saveNotes} style={{ marginTop: '8px' }}>
-                  Ξ‘Ο€ΞΏΞΈΞ®ΞΊΞµΟ…ΟƒΞ· Ξ£Ξ·ΞΌΞµΞΉΟΟƒΞµΟ‰Ξ½
+                  Αποθήκευση Σημειώσεων
                 </button>
               </div>
               
@@ -2154,10 +2154,10 @@ function ReportsTab({ agents, reports, setReports, loading, setLoading, selected
           ) : (
             <div className="report-placeholder">
               <FileText size={48} />
-              <p>Ξ•Ο€ΞΉΞ»Ξ­ΞΎΟ„Ξµ ΞΌΞΉΞ± Ξ±Ξ½Ξ±Ο†ΞΏΟΞ¬ Ξ® Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΟƒΟ„Ξµ ΞΌΞΉΞ± Ξ½Ξ­Ξ±.</p>
+              <p>Επιλέξτε μια αναφορά ή δημιουργήστε μια νέα.</p>
               <div className="report-generate-grid">
                 <button className="btn btn-primary" onClick={() => generateReport('master')} disabled={generating}>
-                  <Sparkles size={16} /> Master Report (ΞΞ»ΞΏΞΉ ΞΏΞΉ Agents)
+                  <Sparkles size={16} /> Master Report (Όλοι οι Agents)
                 </button>
                 {agents.filter(a => a.status === 'active').map((a) => (
                   <button key={a.id} className="btn btn-secondary" onClick={() => generateReport('on_demand', a.id)} disabled={generating}>
@@ -2186,12 +2186,12 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const [editingUser, setEditingUser] = useState<CrmUser | null>(null);
 
   const roleLabels: Record<string, string> = {
-    admin: 'Ξ”ΞΉΞ±Ο‡ΞµΞΉΟΞΉΟƒΟ„Ξ®Ο‚',
-    management: 'Ξ”ΞΉΞΏΞ―ΞΊΞ·ΟƒΞ·',
-    sales: 'Ξ Ο‰Ξ»Ξ®ΟƒΞµΞΉΟ‚',
-    hr: 'Ξ‘Ξ½ΞΈΟΟΟ€ΞΉΞ½ΞΏ Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΟ',
-    it: 'Ξ¤ΞµΟ‡Ξ½ΞΏΞ»ΞΏΞ³Ξ―Ξ±',
-    secretary: 'Ξ“ΟΞ±ΞΌΞΌΞ±Ο„ΞµΞ―Ξ±',
+    admin: 'Διαχειριστής',
+    management: 'Διοίκηση',
+    sales: 'Πωλήσεις',
+    hr: 'Ανθρώπινο Δυναμικό',
+    it: 'Τεχνολογία',
+    secretary: 'Γραμματεία',
   };
 
   const roleColors: Record<string, string> = {
@@ -2210,7 +2210,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const toggleUserActive = async (user: CrmUser) => {
     const { error } = await supabase.from('crm_users').update({ is_active: !user.is_active }).eq('id', user.id);
     if (!error) {
-      setToast({ msg: `Ξ Ο‡ΟΞ®ΟƒΟ„Ξ·Ο‚ ${user.is_active ? 'Ξ±Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ' : 'ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ'}.`, type: 'success' });
+      setToast({ msg: `Ο χρήστης ${user.is_active ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'}.`, type: 'success' });
       loadData();
     }
   };
@@ -2218,7 +2218,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const updateUserRole = async (user: CrmUser, newRole: string) => {
     const { error } = await supabase.from('crm_users').update({ role: newRole }).eq('id', user.id);
     if (!error) {
-      setToast({ msg: `Ξ ΟΟΞ»ΞΏΟ‚ ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ ΟƒΞµ ${roleLabels[newRole]}.`, type: 'success' });
+      setToast({ msg: `Ο ρόλος ενημερώθηκε σε ${roleLabels[newRole]}.`, type: 'success' });
       loadData();
     }
   };
@@ -2226,7 +2226,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   const updateUserMaxLeads = async (user: CrmUser, maxLeads: number) => {
     const { error } = await supabase.from('crm_users').update({ max_leads: maxLeads }).eq('id', user.id);
     if (!error) {
-      setToast({ msg: `Ξ¤ΞΏ ΞΌΞ­Ξ³ΞΉΟƒΟ„ΞΏ Ο€Ξ»Ξ®ΞΈΞΏΟ‚ leads ΞµΞ½Ξ·ΞΌΞµΟΟΞΈΞ·ΞΊΞµ.`, type: 'success' });
+      setToast({ msg: `Το μέγιστο πλήθος leads ενημερώθηκε.`, type: 'success' });
       loadData();
     }
   };
@@ -2234,26 +2234,26 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Ξ”ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· Ο‡ΟΞ·ΟƒΟ„ΟΞ½ CRM ΞΌΞµ ΟΟΞ»ΞΏΟ…Ο‚ ΞΊΞ±ΞΉ Ξ±Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΞΊΞ±Ο„Ξ±Ξ½ΞΏΞΌΞ® leads ΟƒΟ„ΞΏΟ…Ο‚ Ο€Ο‰Ξ»Ξ·Ο„Ξ­Ο‚.</p>
+        <p>Διαχείριση χρηστών CRM με ρόλους και αυτόματη κατανομή leads στους πωλητές.</p>
         <button className="btn btn-primary" onClick={() => setShowAddUser(!showAddUser)}>
-          <Plus size={16} /> ΞΞ­ΞΏΟ‚ Ξ§ΟΞ®ΟƒΟ„Ξ·Ο‚
+          <Plus size={16} /> Νέος Χρήστης
         </button>
       </div>
 
       {showAddUser && (
         <div className="dash-add-form">
-          <input placeholder="Ξ Ξ»Ξ®ΟΞµΟ‚ ΟΞ½ΞΏΞΌΞ±" value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} />
+          <input placeholder="Πλήρες όνομα" value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} />
           <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
-            <option value="sales">Ξ Ο‰Ξ»Ξ®ΟƒΞµΞΉΟ‚</option>
-            <option value="secretary">Ξ“ΟΞ±ΞΌΞΌΞ±Ο„ΞµΞ―Ξ±</option>
-            <option value="hr">Ξ‘Ξ½ΞΈΟΟΟ€ΞΉΞ½ΞΏ Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΟ</option>
-            <option value="it">Ξ¤ΞµΟ‡Ξ½ΞΏΞ»ΞΏΞ³Ξ―Ξ±</option>
-            <option value="management">Ξ”ΞΉΞΏΞ―ΞΊΞ·ΟƒΞ·</option>
-            <option value="admin">Ξ”ΞΉΞ±Ο‡ΞµΞΉΟΞΉΟƒΟ„Ξ®Ο‚</option>
+            <option value="sales">Πωλήσεις</option>
+            <option value="secretary">Γραμματεία</option>
+            <option value="hr">Ανθρώπινο Δυναμικό</option>
+            <option value="it">Τεχνολογία</option>
+            <option value="management">Διοίκηση</option>
+            <option value="admin">Διαχειριστής</option>
           </select>
-          <input placeholder="Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} />
+          <input placeholder="Τηλέφωνο" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} />
           <input placeholder="Email" type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-          <input placeholder="ΞΟ‰Ξ΄ΞΉΞΊΟΟ‚" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+          <input placeholder="Κωδικός" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
           <button className="btn btn-primary" onClick={async () => {
             if (!newUser.full_name || !newUser.email || !newUser.password) return;
             const { error } = await supabase.rpc('create_crm_user', {
@@ -2263,31 +2263,31 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
               p_email: newUser.email,
               p_password: newUser.password,
             });
-            if (error) { setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' }); return; }
+            if (error) { setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' }); return; }
             setNewUser({ full_name: '', role: 'sales', phone: '', email: '', password: '' });
             setShowAddUser(false);
             loadData();
-            setToast({ msg: 'Ξ Ο‡ΟΞ®ΟƒΟ„Ξ·Ο‚ Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ.', type: 'success' });
-          }}>Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ±</button>
+            setToast({ msg: 'Ο χρήστης δημιουργήθηκε.', type: 'success' });
+          }}>Δημιουργία</button>
         </div>
       )}
 
       <div className="dash-users-stats">
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><Users size={20} /></div>
-          <div><strong>{crmUsers.length}</strong><span>Ξ£ΟΞ½ΞΏΞ»ΞΏ Ξ§ΟΞ·ΟƒΟ„ΟΞ½</span></div>
+          <div><strong>{crmUsers.length}</strong><span>Σύνολο Χρηστών</span></div>
         </div>
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><CheckCircle2 size={20} /></div>
-          <div><strong>{crmUsers.filter(u => u.is_active).length}</strong><span>Ξ•Ξ½ΞµΟΞ³ΞΏΞ―</span></div>
+          <div><strong>{crmUsers.filter(u => u.is_active).length}</strong><span>Ενεργοί</span></div>
         </div>
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><Bot size={20} /></div>
-          <div><strong>{crmUsers.filter(u => u.role === 'sales').length}</strong><span>Ξ Ο‰Ξ»Ξ·Ο„Ξ­Ο‚</span></div>
+          <div><strong>{crmUsers.filter(u => u.role === 'sales').length}</strong><span>Πωλητές</span></div>
         </div>
         <div className="dash-stat-card">
           <div className="dash-stat-icon"><TrendingUp size={20} /></div>
-          <div><strong>{leads.filter(l => !l.deleted_at && l.assigned_to).length}</strong><span>ΞΞ±Ο„Ξ±Ξ½ΞµΞΌΞ·ΞΌΞ­Ξ½Ξ± Leads</span></div>
+          <div><strong>{leads.filter(l => !l.deleted_at && l.assigned_to).length}</strong><span>Κατανεμημένα Leads</span></div>
         </div>
       </div>
 
@@ -2295,13 +2295,13 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
         <table className="dash-table">
           <thead>
             <tr>
-              <th>ΞΞ½ΞΏΞΌΞ±</th><th>Ξ΅ΟΞ»ΞΏΟ‚</th><th>Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ</th><th>Leads</th><th>ΞΞ­Ξ³. Leads</th><th>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·</th><th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞ±</th>
+              <th>Όνομα</th><th>Ρόλος</th><th>Τηλέφωνο</th><th>Leads</th><th>Μέγ. Leads</th><th>Κατάσταση</th><th>Ενέργεια</th>
             </tr>
           </thead>
           <tbody>
             {crmUsers.map((u) => (
               <tr key={u.id}>
-                <td><strong>{u.full_name || 'Ξ§Ο‰ΟΞ―Ο‚ ΟΞ½ΞΏΞΌΞ±'}</strong></td>
+                <td><strong>{u.full_name || 'Χωρίς όνομα'}</strong></td>
                 <td>
                   <select 
                     className="dash-status-select" 
@@ -2309,15 +2309,15 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
                     onChange={(e) => updateUserRole(u, e.target.value)}
                     style={{ borderLeft: `3px solid ${roleColors[u.role] || '#666'}` }}
                   >
-                    <option value="admin">Ξ”ΞΉΞ±Ο‡ΞµΞΉΟΞΉΟƒΟ„Ξ®Ο‚</option>
-                    <option value="management">Ξ”ΞΉΞΏΞ―ΞΊΞ·ΟƒΞ·</option>
-                    <option value="sales">Ξ Ο‰Ξ»Ξ®ΟƒΞµΞΉΟ‚</option>
-                    <option value="hr">Ξ‘Ξ½ΞΈΟΟΟ€ΞΉΞ½ΞΏ Ξ”Ο…Ξ½Ξ±ΞΌΞΉΞΊΟ</option>
-                    <option value="it">Ξ¤ΞµΟ‡Ξ½ΞΏΞ»ΞΏΞ³Ξ―Ξ±</option>
-                    <option value="secretary">Ξ“ΟΞ±ΞΌΞΌΞ±Ο„ΞµΞ―Ξ±</option>
+                    <option value="admin">Διαχειριστής</option>
+                    <option value="management">Διοίκηση</option>
+                    <option value="sales">Πωλήσεις</option>
+                    <option value="hr">Ανθρώπινο Δυναμικό</option>
+                    <option value="it">Τεχνολογία</option>
+                    <option value="secretary">Γραμματεία</option>
                   </select>
                 </td>
-                <td>{u.phone || 'β€”'}</td>
+                <td>{u.phone || '—'}</td>
                 <td>
                   <span className="user-lead-count" style={{ color: getLeadCountForUser(u.id) >= u.max_leads ? '#e74c3c' : '#00c878' }}>
                     {getLeadCountForUser(u.id)}
@@ -2334,13 +2334,13 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
                 </td>
                 <td>
                   <span className={`dash-status-pill ${u.is_active ? 'active' : 'paused'}`}>
-                    {u.is_active ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
+                    {u.is_active ? 'Ενεργός' : 'Ανενεργός'}
                   </span>
                 </td>
                 <td>
                   <div className="dash-lead-actions">
                     <button className="dash-agent-toggle" onClick={() => toggleUserActive(u)}>
-                      {u.is_active ? 'Ξ‘Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·' : 'Ξ•Ξ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·'}
+                      {u.is_active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}
                     </button>
                   </div>
                 </td>
@@ -2348,7 +2348,7 @@ function UsersTab({ crmUsers, setCrmUsers, leads, toast, setToast, loadData }: {
             ))}
           </tbody>
         </table>
-        {crmUsers.length === 0 && <p className="dash-empty">Ξ”ΞµΞ½ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ Ο‡ΟΞ®ΟƒΟ„ΞµΟ‚. Ξ ΟΞΏΟƒΞΈΞ­ΟƒΟ„Ξµ Ο„ΞΏΞ½ Ο€ΟΟΟ„ΞΏ ΟƒΞ±Ο‚ Ο‡ΟΞ®ΟƒΟ„Ξ·.</p>}
+        {crmUsers.length === 0 && <p className="dash-empty">Δεν υπάρχουν χρήστες. Προσθέστε τον πρώτο σας χρήστη.</p>}
       </div>
     </div>
   );
@@ -2733,13 +2733,13 @@ function DeveloperAgentChat() {
 
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: data?.message || 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ± Ξ±Ο€ΟΞΊΟΞΉΟƒΞ·Ο‚.',
+        content: data?.message || 'Σφάλμα απόκρισης.',
         timestamp: new Date(),
       }]);
     } catch (err: any) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ${err.message}. Ξ’ΞµΞ²Ξ±ΞΉΟ‰ΞΈΞµΞ―Ο„Ξµ ΟΟ„ΞΉ Ο„ΞΏ AI Developer Edge Function ΞµΞ―Ξ½Ξ±ΞΉ deployed.`,
+        content: `Σφάλμα: ${err.message}. Βεβαιωθείτε ότι το AI Developer Edge Function είναι deployed.`,
         timestamp: new Date(),
       }]);
     } finally {
@@ -2748,11 +2748,11 @@ function DeveloperAgentChat() {
   };
 
   const suggestions = [
-    'Ξ ΞΏΞΉΞΏΞΉ Ο€Ξ―Ξ½Ξ±ΞΊΞµΟ‚ Ο…Ο€Ξ¬ΟΟ‡ΞΏΟ…Ξ½ ΟƒΟ„Ξ· Ξ²Ξ¬ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½;',
-    'Ξ’ΞµΞ»Ο„Ξ―Ο‰ΟƒΞµ Ο„ΞΏ RLS policy ΟƒΟ„ΞΏΞ½ Ο€Ξ―Ξ½Ξ±ΞΊΞ± hlektrismos_leads',
-    'Ξ”Ξ·ΞΌΞΉΞΏΟΟΞ³Ξ·ΟƒΞµ Ξ­Ξ½Ξ± Ξ½Ξ­ΞΏ migration Ξ³ΞΉΞ± Ο€ΟΞΏΟƒΞΈΞ®ΞΊΞ· ΟƒΟ„Ξ®Ξ»Ξ·Ο‚',
-    'Ξ¤ΞΉ ΞΊΞ¬Ξ½ΞµΞΉ Ο„ΞΏ agent-worker edge function;',
-    'Ξ ΟΟ‚ ΞΌΟ€ΞΏΟΟ Ξ½Ξ± Ο€ΟΞΏΟƒΞΈΞ­ΟƒΟ‰ webhook ΟƒΟ„ΞΏ CRM;',
+    'Ποιοι πίνακες υπάρχουν στη βάση δεδομένων;',
+    'Βελτίωσε το RLS policy στον πίνακα hlektrismos_leads',
+    'Δημιούργησε ένα νέο migration για προσθήκη στήλης',
+    'Τι κάνει το agent-worker edge function;',
+    'Πώς μπορώ να προσθέσω webhook στο CRM;',
   ];
 
   return (
@@ -2761,7 +2761,7 @@ function DeveloperAgentChat() {
         <Database size={20} style={{ color: '#0066cc' }} />
         <div>
           <div style={{ fontWeight: 600, color: 'var(--text)' }}>AI Developer Agent</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Senior software engineer ΞΌΞµ ΞµΞΎΞµΞΉΞ΄Ξ―ΞΊΞµΟ…ΟƒΞ· ΟƒΞµ React, Supabase, TypeScript, DevOps</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Senior software engineer με εξειδίκευση σε React, Supabase, TypeScript, DevOps</div>
         </div>
       </div>
 
@@ -2771,7 +2771,7 @@ function DeveloperAgentChat() {
             <Database size={48} style={{ color: 'var(--text-muted)', marginBottom: '16px' }} />
             <h3 style={{ color: 'var(--text)', margin: '0 0 8px' }}>AI Developer Agent</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 24px' }}>
-              Ξ΅Ο‰Ο„Ξ®ΟƒΟ„Ξµ Ο„ΞΏΞ½ AI developer ΞΏΟ„ΞΉΞ΄Ξ®Ο€ΞΏΟ„Ξµ ΟƒΟ‡ΞµΟ„ΞΉΞΊΞ¬ ΞΌΞµ Ο„ΞΏΞ½ ΞΊΟΞ΄ΞΉΞΊΞ±, bugs, features, database, Ξ® DevOps.
+              Ρωτήστε τον AI developer οτιδήποτε σχετικά με τον κώδικα, bugs, features, database, ή DevOps.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
               {suggestions.map((s, i) => (
@@ -2808,7 +2808,7 @@ function DeveloperAgentChat() {
         {loading && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div style={{ padding: '12px 16px', borderRadius: '12px', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-              <span className="typing-dots">Ξ£ΞΊΞ­Ο†Ο„ΞΏΞΌΞ±ΞΉ<span>.</span><span>.</span><span>.</span></span>
+              <span className="typing-dots">Σκέφτομαι<span>.</span><span>.</span><span>.</span></span>
             </div>
           </div>
         )}
@@ -2820,7 +2820,7 @@ function DeveloperAgentChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-          placeholder="Ξ΅Ο‰Ο„Ξ®ΟƒΟ„Ξµ Ο„ΞΏΞ½ AI Developer..."
+          placeholder="Ρωτήστε τον AI Developer..."
           disabled={loading}
           style={{ flex: 1, padding: '10px 16px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', fontSize: '14px', outline: 'none' }}
         />
@@ -3694,7 +3694,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   const channelOptions = [
     { value: 'Email', label: 'Email' },
     { value: 'SMS', label: 'SMS' },
-    { value: 'Phone', label: 'Ξ¤Ξ·Ξ»Ξ­Ο†Ο‰Ξ½ΞΏ' },
+    { value: 'Phone', label: 'Τηλέφωνο' },
     { value: 'Web', label: 'Web' },
     { value: 'Social', label: 'Social Media' },
     { value: 'Push', label: 'Push Notification' },
@@ -3718,9 +3718,9 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
     const newStatus = agent.status === 'active' ? 'inactive' : 'active';
     const { error } = await supabase.from('ai_agents').update({ status: newStatus }).eq('id', agent.id);
     if (error) {
-      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' });
+      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
     } else {
-      setToast({ msg: `${agent.name} ${newStatus === 'active' ? 'ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ' : 'Ξ±Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞΉΞ®ΞΈΞ·ΞΊΞµ'}`, type: 'success' });
+      setToast({ msg: `${agent.name} ${newStatus === 'active' ? 'ενεργοποιήθηκε' : 'απενεργοποιήθηκε'}`, type: 'success' });
       loadData();
     }
   };
@@ -3736,9 +3736,9 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
       meetings_booked: 0,
     });
     if (error) {
-      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' });
+      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
     } else {
-      setToast({ msg: 'Ξ¤ΞΏ agent Ξ΄Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ®ΞΈΞ·ΞΊΞµ!', type: 'success' });
+      setToast({ msg: 'Το agent δημιουργήθηκε!', type: 'success' });
       setShowNewAgent(false);
       setNewAgent({ name: '', channel: 'Email', status: 'inactive' });
       loadData();
@@ -3746,12 +3746,12 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   };
 
   const deleteAgent = async (id: string) => {
-    if (!confirm('Ξ•Ξ―ΟƒΞ±ΞΉ ΟƒΞ―Ξ³ΞΏΟ…ΟΞΏΟ‚ ΟΟ„ΞΉ ΞΈΞ­Ξ»ΞµΞΉΟ‚ Ξ½Ξ± Ξ΄ΞΉΞ±Ξ³ΟΞ¬ΟΞµΞΉΟ‚ Ξ±Ο…Ο„Ο Ο„ΞΏ agent;')) return;
+    if (!confirm('Είσαι σίγουρος ότι θέλεις να διαγράψεις αυτό το agent;')) return;
     const { error } = await supabase.from('ai_agents').delete().eq('id', id);
     if (error) {
-      setToast({ msg: 'Ξ£Ο†Ξ¬Ξ»ΞΌΞ±: ' + error.message, type: 'info' });
+      setToast({ msg: 'Σφάλμα: ' + error.message, type: 'info' });
     } else {
-      setToast({ msg: 'Ξ¤ΞΏ agent Ξ΄ΞΉΞ±Ξ³ΟΞ¬Ο†Ξ·ΞΊΞµ.', type: 'success' });
+      setToast({ msg: 'Το agent διαγράφηκε.', type: 'success' });
       loadData();
     }
   };
@@ -3759,12 +3759,12 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
   return (
     <div className="dash-content orchestrator-tab">
       <div className="dash-content-header">
-        <p>ΞΞ»ΞΏΞΊΞ»Ξ·ΟΟ‰ΞΌΞ­Ξ½Ξ· Ξ΄ΞΉΞ±Ο‡ΞµΞ―ΟΞΉΟƒΞ· ΟΞ»Ο‰Ξ½ Ο„Ο‰Ξ½ AI Agents ΞΊΞ±ΞΉ Micro Agents. Ξ Ξ±ΟΞ±ΞΊΞΏΞ»ΞΏΟΞΈΞ·ΟƒΞ· Ξ±Ο€ΟΞ΄ΞΏΟƒΞ·Ο‚, ΟΟΞΈΞΌΞΉΟƒΞ· Ο€Ξ±ΟΞ±ΞΌΞ­Ο„ΟΟ‰Ξ½, ΞΊΞ±ΞΉ ΞΏΟΞ³Ξ¬Ξ½Ο‰ΟƒΞ· Ο„ΞΏΟ… pipeline ΞµΟ€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―Ξ±Ο‚.</p>
+        <p>Ολοκληρωμένη διαχείριση όλων των AI Agents και Micro Agents. Παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, και οργάνωση του pipeline επικοινωνίας.</p>
       </div>
 
       <div className="orchestrator-nav">
         <button className={selectedView === 'overview' ? 'active' : ''} onClick={() => setSelectedView('overview')}>
-          <LayoutDashboard size={16} /> Ξ•Ο€ΞΉΟƒΞΊΟΟ€Ξ·ΟƒΞ·
+          <LayoutDashboard size={16} /> Επισκόπηση
         </button>
         <button className={selectedView === 'agents' ? 'active' : ''} onClick={() => setSelectedView('agents')}>
           <Bot size={16} /> AI Agents ({agents.length})
@@ -3787,34 +3787,34 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
               <div className="dash-stat-icon"><Bot size={20} /></div>
               <div>
                 <strong>{agents.length}</strong>
-                <span>Ξ£ΟΞ½ΞΏΞ»ΞΏ Agents</span>
+                <span>Σύνολο Agents</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <div className="dash-stat-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}><Activity size={20} /></div>
               <div>
                 <strong>{activeAgents.length}</strong>
-                <span>Ξ•Ξ½ΞµΟΞ³ΞΏΞ― Agents</span>
+                <span>Ενεργοί Agents</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <div className="dash-stat-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}><Users size={20} /></div>
               <div>
                 <strong>{totalLeads}</strong>
-                <span>Leads ΟƒΟ„ΞΏ Pipeline</span>
+                <span>Leads στο Pipeline</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <div className="dash-stat-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}><TrendingUp size={20} /></div>
               <div>
                 <strong>{totalContacted}</strong>
-                <span>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</span>
+                <span>Επικοινωνίες</span>
               </div>
             </div>
           </div>
 
           <div className="orchestrator-performance">
-            <h3>Ξ‘Ο€ΟΞ΄ΞΏΟƒΞ· Agents</h3>
+            <h3>Απόδοση Agents</h3>
             <div className="dash-table-wrap">
               <table className="dash-table">
                 <thead>
@@ -3822,12 +3822,12 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                     <th>Agent</th>
                     <th>Channel</th>
                     <th>Status</th>
-                    <th>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</th>
-                    <th>Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚</th>
-                    <th>Ξ΅Ο…ΞΈΞΌΟΟ‚ Ξ‘Ο€Ξ¬Ξ½Ο„Ξ·ΟƒΞ·Ο‚</th>
-                    <th>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</th>
-                    <th>Ξ΅Ο…ΞΈΞΌΟΟ‚ Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</th>
-                    <th>Ξ•Ξ½Ξ­ΟΞ³ΞµΞΉΞµΟ‚</th>
+                    <th>Επικοινωνίες</th>
+                    <th>Απαντήσεις</th>
+                    <th>Ρυθμός Απάντησης</th>
+                    <th>Ραντεβού</th>
+                    <th>Ρυθμός Ραντεβού</th>
+                    <th>Ενέργειες</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3845,7 +3845,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                       <td>{a.channel}</td>
                       <td>
                         <span className={`dash-status-pill ${a.status}`}>
-                          {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
+                          {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
                         </span>
                       </td>
                       <td><strong>{a.leads_contacted || 0}</strong></td>
@@ -3865,13 +3865,13 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                       </td>
                       <td>
                         <div className="action-btns">
-                          <button className="icon-btn" title="Ξ•Ξ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·/Ξ‘Ο€ΞµΞ½ΞµΟΞ³ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·" onClick={() => toggleAgentStatus(a)}>
+                          <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={() => toggleAgentStatus(a)}>
                             {a.status === 'active' ? <Eye size={14} /> : <EyeOff size={14} />}
                           </button>
-                          <button className="icon-btn" title="Ξ΅ΟΞΈΞΌΞΉΟƒΞ·" onClick={() => setConfigAgent(a)}>
+                          <button className="icon-btn" title="Ρύθμιση" onClick={() => setConfigAgent(a)}>
                             <Settings size={14} />
                           </button>
-                          <button className="icon-btn delete" title="Ξ”ΞΉΞ±Ξ³ΟΞ±Ο†Ξ®" onClick={() => deleteAgent(a.id)}>
+                          <button className="icon-btn delete" title="Διαγραφή" onClick={() => deleteAgent(a.id)}>
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -3885,7 +3885,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
 
           <div className="orchestrator-summary-cards">
             <div className="summary-card">
-              <h4>ΞΞ±Ο„Ξ±Ξ½ΞΏΞΌΞ® Leads Ξ±Ξ½Ξ¬ Agent</h4>
+              <h4>Κατανομή Leads ανά Agent</h4>
               <div className="lead-distribution">
                 {agentStats.filter(a => a.status === 'active').map(a => (
                   <div key={a.id} className="distribution-item">
@@ -3900,22 +3900,22 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             </div>
 
             <div className="summary-card">
-              <h4>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ· Pipeline</h4>
+              <h4>Κατάσταση Pipeline</h4>
               <div className="pipeline-stats">
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">ΞΞ­Ξ± Leads</span>
+                  <span className="pipeline-label">Νέα Leads</span>
                   <span className="pipeline-value">{leads.filter(l => l.status === 'new' && !l.deleted_at).length}</span>
                 </div>
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">Ξ£Ξµ Ξ•ΞΎΞ­Ξ»ΞΉΞΎΞ·</span>
+                  <span className="pipeline-label">Σε Εξέλιξη</span>
                   <span className="pipeline-value" style={{ color: '#ffa500' }}>{leads.filter(l => l.status === 'contacted' && !l.deleted_at).length}</span>
                 </div>
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</span>
+                  <span className="pipeline-label">Ραντεβού</span>
                   <span className="pipeline-value" style={{ color: '#00c878' }}>{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length}</span>
                 </div>
                 <div className="pipeline-stat">
-                  <span className="pipeline-label">ΞΞ»ΞΏΞΊΞ»Ξ·ΟΟ‰ΞΌΞ­Ξ½Ξ±</span>
+                  <span className="pipeline-label">Ολοκληρωμένα</span>
                   <span className="pipeline-value" style={{ color: '#0066cc' }}>{leads.filter(l => l.status === 'converted' && !l.deleted_at).length}</span>
                 </div>
               </div>
@@ -3929,7 +3929,7 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
           <div className="orchestrator-agents-header">
             <h3>AI Agents</h3>
             <button className="btn btn-primary" onClick={() => setShowNewAgent(true)}>
-              <Plus size={16} /> ΞΞ­ΞΏ Agent
+              <Plus size={16} /> Νέο Agent
             </button>
           </div>
 
@@ -3937,11 +3937,11 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             <div className="new-agent-form">
               <div className="form-row">
                 <div className="form-group">
-                  <label>ΞΞ½ΞΏΞΌΞ± Agent</label>
+                  <label>Όνομα Agent</label>
                   <input
                     value={newAgent.name}
                     onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
-                    placeholder="Ο€.Ο‡. ΞΞ­ΞΏ Agent"
+                    placeholder="π.χ. Νέο Agent"
                   />
                 </div>
                 <div className="form-group">
@@ -3951,16 +3951,16 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>ΞΞ±Ο„Ξ¬ΟƒΟ„Ξ±ΟƒΞ·</label>
+                  <label>Κατάσταση</label>
                   <select value={newAgent.status} onChange={(e) => setNewAgent({ ...newAgent, status: e.target.value })}>
-                    <option value="active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</option>
-                    <option value="inactive">Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚</option>
+                    <option value="active">Ενεργός</option>
+                    <option value="inactive">Ανενεργός</option>
                   </select>
                 </div>
               </div>
               <div className="form-actions">
-                <button className="btn btn-ghost" onClick={() => setShowNewAgent(false)}>Ξ†ΞΊΟ…ΟΞΏ</button>
-                <button className="btn btn-primary" onClick={createAgent}><CheckCircle2 size={16} /> Ξ”Ξ·ΞΌΞΉΞΏΟ…ΟΞ³Ξ―Ξ±</button>
+                <button className="btn btn-ghost" onClick={() => setShowNewAgent(false)}>Άκυρο</button>
+                <button className="btn btn-primary" onClick={createAgent}><CheckCircle2 size={16} /> Δημιουργία</button>
               </div>
             </div>
           )}
@@ -3977,21 +3977,21 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                     <span className="agent-card-channel">{a.channel}</span>
                   </div>
                   <span className={`dash-status-pill ${a.status}`}>
-                    {a.status === 'active' ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
+                    {a.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
                   </span>
                 </div>
                 <div className="agent-card-stats">
                   <div className="agent-stat">
                     <span className="agent-stat-value">{a.leads_contacted || 0}</span>
-                    <span className="agent-stat-label">Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚</span>
+                    <span className="agent-stat-label">Επικοινωνίες</span>
                   </div>
                   <div className="agent-stat">
                     <span className="agent-stat-value">{a.replies || 0}</span>
-                    <span className="agent-stat-label">Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚</span>
+                    <span className="agent-stat-label">Απαντήσεις</span>
                   </div>
                   <div className="agent-stat">
                     <span className="agent-stat-value">{a.meetings_booked || 0}</span>
-                    <span className="agent-stat-label">Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</span>
+                    <span className="agent-stat-label">Ραντεβού</span>
                   </div>
                 </div>
                 {a.target_region && (
@@ -4008,10 +4008,10 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
                 <div className="agent-card-actions">
                   <button className="btn btn-secondary btn-sm" onClick={() => toggleAgentStatus(a)}>
                     {a.status === 'active' ? <EyeOff size={14} /> : <Eye size={14} />}
-                    {a.status === 'active' ? 'Ξ‘Ο€ΞµΞ½ΞµΟΞ³.' : 'Ξ•Ξ½ΞµΟΞ³.'}
+                    {a.status === 'active' ? 'Απενεργ.' : 'Ενεργ.'}
                   </button>
                   <button className="btn btn-primary btn-sm" onClick={() => setConfigAgent(a)}>
-                    <Settings size={14} /> Ξ΅ΟΞΈΞΌΞΉΟƒΞ·
+                    <Settings size={14} /> Ρύθμιση
                   </button>
                   <button className="btn btn-ghost btn-sm delete" onClick={() => deleteAgent(a.id)}>
                     <Trash2 size={14} />
@@ -4027,70 +4027,70 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
         <div className="orchestrator-micro-view">
           <div className="orchestrator-agents-header">
             <h3>Micro Agents</h3>
-            <p className="text-muted">Micro Agents ΞµΞ―Ξ½Ξ±ΞΉ ΞΌΞΉΞΊΟΞΏΞ― ΞµΞΎΞµΞΉΞ΄ΞΉΞΊΞµΟ…ΞΌΞ­Ξ½ΞΏΞΉ agent Ο€ΞΏΟ… ΞµΞΊΟ„ΞµΞ»ΞΏΟΞ½ ΟƒΟ…Ξ³ΞΊΞµΞΊΟΞΉΞΌΞ­Ξ½ΞµΟ‚ ΞµΟΞ³Ξ±ΟƒΞ―ΞµΟ‚ (Ο€.Ο‡. ΞµΞΎΞ±Ξ³Ο‰Ξ³Ξ® Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½, Ξ±Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΞΊΞ±Ο„Ξ·Ξ³ΞΏΟΞΉΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·, Ο€Ξ±ΟΞ±ΞΊΞΏΞ»ΞΏΟΞΈΞ·ΟƒΞ· emails).</p>
+            <p className="text-muted">Micro Agents είναι μικροί εξειδικευμένοι agent που εκτελούν συγκεκριμένες εργασίες (π.χ. εξαγωγή δεδομένων, αυτόματη κατηγοριοποίηση, παρακολούθηση emails).</p>
           </div>
           
           <div className="micro-agents-grid">
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}><Radar size={24} /></div>
               <h4>Lead Scraper</h4>
-              <p>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΟƒΟ…Ξ»Ξ»ΞΏΞ³Ξ® leads Ξ±Ο€Ο Ξ΄Ξ·ΞΌΟΟƒΞΉΞΏΟ…Ο‚ ΞΊΞ±Ο„Ξ±Ξ»ΟΞ³ΞΏΟ…Ο‚</p>
-              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
+              <p>Αυτόματη συλλογή leads από δημόσιους καταλόγους</p>
+              <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Leads ΟƒΟ…Ξ»Ξ»Ξ­Ο‡ΞΈΞ·ΞΊΞ±Ξ½: {leads.filter(l => !l.deleted_at).length}</span>
-                <span>ΞΞ±Ο„Ξ·Ξ³ΞΏΟΞ―ΞµΟ‚: B2B, B2C</span>
+                <span>Leads συλλέχθηκαν: {leads.filter(l => !l.deleted_at).length}</span>
+                <span>Κατηγορίες: B2B, B2C</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}><Mail size={24} /></div>
               <h4>Email Analyzer</h4>
-              <p>Ξ‘Ξ½Ξ¬Ξ»Ο…ΟƒΞ· ΞΊΞ±ΞΉ ΞΊΞ±Ο„Ξ·Ξ³ΞΏΟΞΉΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ· ΞµΞΉΟƒΞµΟΟ‡ΟΞΌΞµΞ½Ο‰Ξ½ emails</p>
-              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
+              <p>Ανάλυση και κατηγοριοποίηση εισερχόμενων emails</p>
+              <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―ΞµΟ‚: {totalContacted}</span>
-                <span>Ξ‘Ο€Ξ±Ξ½Ο„Ξ®ΟƒΞµΞΉΟ‚: {totalReplies}</span>
+                <span>Επικοινωνίες: {totalContacted}</span>
+                <span>Απαντήσεις: {totalReplies}</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}><MessageSquare size={24} /></div>
               <h4>Sentiment Detector</h4>
-              <p>Ξ‘Ξ½Ξ―Ο‡Ξ½ΞµΟ…ΟƒΞ· ΟƒΟ…Ξ½Ξ±ΞΉΟƒΞΈΞ®ΞΌΞ±Ο„ΞΏΟ‚ ΟƒΞµ ΞΌΞ·Ξ½ΟΞΌΞ±Ο„Ξ± Ο€ΞµΞ»Ξ±Ο„ΟΞ½</p>
-              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
+              <p>Ανίχνευση συναισθήματος σε μηνύματα πελατών</p>
+              <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Ξ‘Ξ½Ξ±Ξ»ΟΟƒΞµΞΉΟ‚: {totalReplies}</span>
-                <span>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· ΞΊΞ±Ο„Ξ·Ξ³ΞΏΟΞΉΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ·</span>
+                <span>Αναλύσεις: {totalReplies}</span>
+                <span>Αυτόματη κατηγοριοποίηση</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(138,43,226,0.1)', color: '#8a2be2' }}><TrendingUp size={24} /></div>
               <h4>Lead Scorer</h4>
-              <p>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· Ξ²Ξ±ΞΈΞΌΞΏΞ»ΟΞ³Ξ·ΟƒΞ· leads Ξ²Ξ¬ΟƒΞ· ΞµΞ½Ξ΄ΞΉΞ±Ο†Ξ­ΟΞΏΞ½Ο„ΞΏΟ‚</p>
-              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
+              <p>Αυτόματη βαθμολόγηση leads βάση ενδιαφέροντος</p>
+              <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Ξ’Ξ±ΞΈΞΌΞΏΞ»ΞΏΞ³Ξ®ΞΈΞ·ΞΊΞ±Ξ½: {leads.filter(l => !l.deleted_at).length}</span>
-                <span>Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ: {totalMeetings}</span>
+                <span>Βαθμολογήθηκαν: {leads.filter(l => !l.deleted_at).length}</span>
+                <span>Ραντεβού: {totalMeetings}</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(231,76,60,0.1)', color: '#e74c3c' }}><AlertCircle size={24} /></div>
               <h4>Notification Sender</h4>
-              <p>Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ· Ξ±Ο€ΞΏΟƒΟ„ΞΏΞ»Ξ® ΞµΞΉΞ΄ΞΏΟ€ΞΏΞΉΞ®ΟƒΞµΟ‰Ξ½ ΟƒΟ„Ξ·Ξ½ ΞΏΞΌΞ¬Ξ΄Ξ±</p>
-              <span className="micro-agent-status active">Ξ•Ξ½ΞµΟΞ³ΟΟ‚</span>
+              <p>Αυτόματη αποστολή ειδοποιήσεων στην ομάδα</p>
+              <span className="micro-agent-status active">Ενεργός</span>
               <div className="micro-agent-stats">
-                <span>Ξ•ΞΉΞ΄ΞΏΟ€ΞΏΞΉΞ®ΟƒΞµΞΉΟ‚: {totalMeetings}</span>
-                <span>Ξ΅ΞΏΞ®: Ξ‘Ο…Ο„ΟΞΌΞ±Ο„Ξ·</span>
+                <span>Ειδοποιήσεις: {totalMeetings}</span>
+                <span>Ροή: Αυτόματη</span>
               </div>
             </div>
             <div className="micro-agent-card">
               <div className="micro-agent-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}><Database size={24} /></div>
               <h4>Data Enricher</h4>
-              <p>Ξ•ΞΌΟ€Ξ»ΞΏΟ…Ο„ΞΉΟƒΞΌΟΟ‚ Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½ lead ΞΌΞµ Ξ΄Ξ·ΞΌΟΟƒΞΉΞ± Ο€Ξ»Ξ·ΟΞΏΟ†ΞΏΟΞ―ΞµΟ‚</p>
+              <p>Εμπλουτισμός δεδομένων lead με δημόσια πληροφορίες</p>
               <span className={`micro-agent-status ${crmUsers.length > 0 ? 'active' : 'inactive'}`}>
-                {crmUsers.length > 0 ? 'Ξ•Ξ½ΞµΟΞ³ΟΟ‚' : 'Ξ‘Ξ½ΞµΞ½ΞµΟΞ³ΟΟ‚'}
+                {crmUsers.length > 0 ? 'Ενεργός' : 'Ανενεργός'}
               </span>
               <div className="micro-agent-stats">
-                <span>Ξ§ΟΞ®ΟƒΟ„ΞµΟ‚ CRM: {crmUsers.length}</span>
-                <span>ΞΞ±Ο„Ξ±Ξ½ΞΏΞΌΞ®: {crmUsers.filter(u => u.role === 'sales').length} Ο€Ο‰Ξ»Ξ·Ο„Ξ­Ο‚</span>
+                <span>Χρήστες CRM: {crmUsers.length}</span>
+                <span>Κατανομή: {crmUsers.filter(u => u.role === 'sales').length} πωλητές</span>
               </div>
             </div>
           </div>
@@ -4100,51 +4100,51 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
       {selectedView === 'pipeline' && (
         <div className="orchestrator-pipeline-view">
           <h3>Pipeline Flow</h3>
-          <p className="text-muted">Ξ΅ΞΏΞ® ΞµΟΞ³Ξ±ΟƒΞΉΟΞ½ Ξ±Ο€Ο Ο„Ξ·Ξ½ ΟƒΟ…Ξ»Ξ»ΞΏΞ³Ξ® leads ΞΌΞ­Ο‡ΟΞΉ Ο„Ξ·Ξ½ ΞΌΞµΟ„Ξ±Ο„ΟΞΏΟ€Ξ® ΟƒΞµ Ο€ΞµΞ»Ξ¬Ο„Ξ·.</p>
+          <p className="text-muted">Ροή εργασιών από την συλλογή leads μέχρι την μετατροπή σε πελάτη.</p>
           
           <div className="pipeline-flow">
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(0,102,204,0.1)', color: '#0066cc' }}>
                 <Database size={24} />
               </div>
-              <h4>1. Ξ£Ο…Ξ»Ξ»ΞΏΞ³Ξ®</h4>
+              <h4>1. Συλλογή</h4>
               <p>B2B Scraper, Web Scraping, API Integrations</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'new' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">β†’</div>
+            <div className="pipeline-arrow">→</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(255,165,0,0.1)', color: '#ffa500' }}>
                 <Bot size={24} />
               </div>
-              <h4>2. Ξ•Ο€ΞΉΞΊΞΏΞΉΞ½Ο‰Ξ½Ξ―Ξ±</h4>
-              <p>AI Agents ΟƒΟ„Ξ­Ξ»Ξ½ΞΏΟ…Ξ½ Ξ±ΟΟ‡ΞΉΞΊΟ ΞΌΞ®Ξ½Ο…ΞΌΞ±</p>
+              <h4>2. Επικοινωνία</h4>
+              <p>AI Agents στέλνουν αρχικό μήνυμα</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'contacted' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">β†’</div>
+            <div className="pipeline-arrow">→</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>
                 <MessageSquare size={24} />
               </div>
-              <h4>3. Ξ£Ο…Ξ¶Ξ®Ο„Ξ·ΟƒΞ·</h4>
-              <p>AI Agents Ξ΄ΞΉΞµΞΎΞ¬Ξ³ΞΏΟ…Ξ½ ΟƒΟ…Ξ¶Ξ®Ο„Ξ·ΟƒΞ·</p>
+              <h4>3. Συζήτηση</h4>
+              <p>AI Agents διεξάγουν συζήτηση</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">β†’</div>
+            <div className="pipeline-arrow">→</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(138,43,226,0.1)', color: '#8a2be2' }}>
                 <Users size={24} />
               </div>
-              <h4>4. Ξ΅Ξ±Ξ½Ο„ΞµΞ²ΞΏΟ</h4>
-              <p>ΞΞ»ΞµΞ―ΟƒΞΉΞΌΞΏ ΟΞ±Ξ½Ο„ΞµΞ²ΞΏΟ ΞΌΞµ Ο€Ο‰Ξ»Ξ·Ο„Ξ®</p>
+              <h4>4. Ραντεβού</h4>
+              <p>Κλείσιμο ραντεβού με πωλητή</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'meeting_booked' && !l.deleted_at).length} leads</div>
             </div>
-            <div className="pipeline-arrow">β†’</div>
+            <div className="pipeline-arrow">→</div>
             <div className="pipeline-stage">
               <div className="pipeline-stage-icon" style={{ background: 'rgba(46,204,113,0.1)', color: '#2ecc71' }}>
                 <CheckCircle2 size={24} />
               </div>
-              <h4>5. ΞΞµΟ„Ξ±Ο„ΟΞΏΟ€Ξ®</h4>
-              <p>ΞΞ»ΞΏΞΊΞ»Ξ®ΟΟ‰ΟƒΞ· Ο€Ο‰Ξ»Ξ·ΟƒΞ·Ο‚</p>
+              <h4>5. Μετατροπή</h4>
+              <p>Ολοκλήρωση πωλησης</p>
               <div className="pipeline-stage-count">{leads.filter(l => l.status === 'converted' && !l.deleted_at).length} leads</div>
             </div>
           </div>
@@ -4153,28 +4153,28 @@ function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, set
             <h4>Agent Workflow Rules</h4>
             <div className="workflow-rules">
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> ΞΞ­ΞΏ lead ΞµΞΉΟƒΞ¬Ξ³ΞµΟ„Ξ±ΞΉ ΟƒΟ„Ξ· Ξ²Ξ¬ΟƒΞ·
+                <span className="rule-trigger">Trigger:</span> Νέο lead εισάγεται στη βάση
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Auto-assign ΟƒΞµ agent ΞΌΞµ Ξ»ΞΉΞ³ΟΟ„ΞµΟΞ± active leads
+                <span className="rule-action">Action:</span> Auto-assign σε agent με λιγότερα active leads
               </div>
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Agent ΟƒΟ„Ξ­Ξ»Ξ½ΞµΞΉ ΞΌΞ®Ξ½Ο…ΞΌΞ±
+                <span className="rule-trigger">Trigger:</span> Agent στέλνει μήνυμα
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Ξ•Ξ½Ξ·ΞΌΞ­ΟΟ‰ΟƒΞ· pipeline_status ΟƒΞµ "contacted"
+                <span className="rule-action">Action:</span> Ενημέρωση pipeline_status σε "contacted"
               </div>
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Lead Ξ±Ο€Ξ±Ξ½Ο„Ξ¬
+                <span className="rule-trigger">Trigger:</span> Lead απαντά
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Ξ‘ΟΞΎΞ·ΟƒΞ· replies count, ΞµΞ½Ξ·ΞΌΞ­ΟΟ‰ΟƒΞ· sentiment
+                <span className="rule-action">Action:</span> Αύξηση replies count, ενημέρωση sentiment
               </div>
               <div className="workflow-rule">
-                <span className="rule-trigger">Trigger:</span> Handoff condition ΟƒΟ…ΞΌΟ€Ξ»Ξ·ΟΟΞ½ΞµΟ„Ξ±ΞΉ
+                <span className="rule-trigger">Trigger:</span> Handoff condition συμπληρώνεται
               </div>
               <div className="workflow-rule">
-                <span className="rule-action">Action:</span> Ξ•ΞΉΞ΄ΞΏΟ€ΞΏΞ―Ξ·ΟƒΞ· Ο€Ο‰Ξ»Ξ·Ο„Ξ®, Ξ±Ξ»Ξ»Ξ±Ξ³Ξ® pipeline_status
+                <span className="rule-action">Action:</span> Ειδοποίηση πωλητή, αλλαγή pipeline_status
               </div>
             </div>
           </div>

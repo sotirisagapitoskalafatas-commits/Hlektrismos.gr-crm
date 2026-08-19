@@ -44,6 +44,7 @@ import MarketRagFolders from '@/components/MarketRagFolders';
 import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 import NotificationBell from '@/components/NotificationBell';
 import CalendarView from '@/components/CalendarView';
+import MarketRAGSearch from '@/components/MarketRAGSearch';
 
 type Lead = {
   id: string;
@@ -111,7 +112,7 @@ type Tariff = {
   updated_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'rag-search';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -624,6 +625,7 @@ export default function DashboardPage() {
     email: '📧 Email',
     reports: 'Reports',
     calendar: '📅 Ημερολόγιο',
+    'rag-search': '🔍 AI Market RAG',
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
     documents: '\u0395\u03b3\u03b3\u03c1\u03b1\u03c6\u03ac',
@@ -650,6 +652,7 @@ export default function DashboardPage() {
           <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
           <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
           <button className={tab === 'calendar' ? 'active' : ''} onClick={() => setTab('calendar')}><Calendar size={18} /> 📅 Ημερολόγιο</button>
+          <button className={tab === 'rag-search' ? 'active' : ''} onClick={() => setTab('rag-search')}><Sparkles size={18} /> 🔍 AI Market RAG</button>
           <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
         </nav>
         <div className="dash-sidebar-footer">
@@ -1247,6 +1250,11 @@ export default function DashboardPage() {
             )}
             {tab === 'calendar' && (
               <CalendarView leads={leads.filter(l => !l.deleted_at)} />
+            )}
+            {tab === 'rag-search' && (
+              <div style={{ padding: 20, height: 'calc(100vh - 120px)' }}>
+                <MarketRAGSearch />
+              </div>
             )}
             {tab === 'documents' && (
               <DocumentGenerator toast={toast} setToast={setToast} />

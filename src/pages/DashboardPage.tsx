@@ -1244,6 +1244,7 @@ export default function DashboardPage() {
               <OrchestratorDirectorTab
                 agents={agents}
                 leads={leads}
+                tariffs={tariffs}
                 crmUsers={crmUsers}
                 toast={toast}
                 setToast={setToast}
@@ -3650,9 +3651,10 @@ function EmailTab({ toast, setToast }: {
 }
 
 
-function OrchestratorDirectorTab({ agents, leads, crmUsers, toast, setToast, setConfigAgent, loadData }: {
+function OrchestratorDirectorTab({ agents, leads, tariffs, crmUsers, toast, setToast, setConfigAgent, loadData }: {
   agents: Agent[];
   leads: Lead[];
+  tariffs: Tariff[];
   crmUsers: CrmUser[];
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;

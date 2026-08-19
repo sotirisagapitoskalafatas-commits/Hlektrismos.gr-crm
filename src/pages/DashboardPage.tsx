@@ -2867,21 +2867,21 @@ function EmailTab({ toast, setToast }: {
   const [leads, setLeads] = useState<Array<{ id: string; first_name: string; last_name: string; email: string }>>([]);
 
   const folders = [
-    { id: 'inbox', label: '╬Χ╬╣╧Δ╬╡╧Β╧Θ╧Ν╬╝╬╡╬╜╬▒', icon: 'ΏθΥξ' },
-    { id: 'starred', label: '╬Σ╧Δ╧Ε╬φ╧Β╬╣╬▒', icon: 'έφΡ' },
-    { id: 'sent', label: '╬Σ╧Α╬╡╧Δ╧Ε╬▒╬╗╬╝╬φ╬╜╬▒', icon: 'ΏθΥν' },
-    { id: 'drafts', label: '╬ι╧Β╧Ν╧Θ╬╡╬╣╧Β╬▒', icon: 'ΏθΥζ' },
-    { id: 'important', label: '╬μ╬╖╬╝╬▒╬╜╧Ε╬╣╬║╬υ', icon: 'ΏθΠ╖Ύ╕Π' },
-    { id: 'archive', label: '╬Σ╧Β╧Θ╬╡╬ψ╬┐', icon: 'ΏθΥο' },
-    { id: 'spam', label: '╬Σ╬╜╬╡╧Α╬╣╬╕╧Ξ╬╝╬╖╧Ε╬▒', icon: 'έγιΎ╕Π' },
-    { id: 'trash', label: '╬Σ╧Α╬┐╧Β╧Β╬ψ╬╝╬╝╬▒╧Ε╬▒', icon: 'ΏθΩΣΎ╕Π' },
+    { id: 'inbox', label: 'Εισερχόμενα', icon: 'ΏθΥξ' },
+    { id: 'starred', label: 'Αστέρια', icon: 'έφΡ' },
+    { id: 'sent', label: 'Απεσταλμένα', icon: 'ΏθΥν' },
+    { id: 'drafts', label: 'Πρόχειρα', icon: 'ΏθΥζ' },
+    { id: 'important', label: 'Σημαντικά', icon: '🏷️' },
+    { id: 'archive', label: 'Αρχείο', icon: 'ΏθΥο' },
+    { id: 'spam', label: 'Ανεπιθύμητα', icon: '⚠️' },
+    { id: 'trash', label: 'Απορρίμματα', icon: '🗑️' },
   ];
 
   const providers = [
     { id: 'gmail', label: 'Gmail', icon: 'ΏθΥπ', host: 'imap.gmail.com', port: '993' },
     { id: 'outlook', label: 'Outlook / Microsoft 365', icon: 'ΏθΥχ', host: 'outlook.office365.com', port: '993' },
     { id: 'yahoo', label: 'Yahoo Mail', icon: 'ΏθΥυ', host: 'imap.mail.yahoo.com', port: '993' },
-    { id: 'custom', label: '╬ι╧Β╬┐╧Δ╬▒╧Β╬╝╬┐╧Δ╬╝╬φ╬╜╬┐ IMAP', icon: 'ΏθΦπ', host: '', port: '993' },
+    { id: 'custom', label: 'Προσαρμοσμένο IMAP', icon: 'ΏθΦπ', host: '', port: '993' },
   ];
 
   const labelColors = ['#0066cc', '#00c878', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -2966,7 +2966,7 @@ function EmailTab({ toast, setToast }: {
     await supabase.from('crm_emails').update({ is_read: true }).in('id', ids);
     setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, is_read: true } : e));
     setSelectedIds(new Set());
-    setToast({ msg: `${ids.length} emails ╧Δ╬╖╬╝╬υ╬╜╬╕╬╖╬║╬▒╬╜ ╧Κ╧Γ ╬▒╬╜╬▒╬│╬╜╧Κ╧Δ╬╝╬φ╬╜╬▒.`, type: 'success' });
+    setToast({ msg: `${ids.length} emails σημάνθηκαν ως αναγνωσμένα.`, type: 'success' });
   };
 
   const handleBulkDelete = async () => {
@@ -2974,14 +2974,14 @@ function EmailTab({ toast, setToast }: {
     await supabase.from('crm_emails').update({ folder: 'trash' }).in('id', ids);
     setEmails(prev => prev.map(e => ids.includes(e.id) ? { ...e, folder: 'trash' } : e));
     setSelectedIds(new Set());
-    setToast({ msg: `${ids.length} emails ╬╝╬╡╧Ε╬▒╧Η╬φ╧Β╬╕╬╖╬║╬▒╬╜ ╧Δ╧Ε╬▒ ╬▒╧Α╬┐╧Β╧Β╬ψ╬╝╬╝╬▒╧Ε╬▒.`, type: 'info' });
+    setToast({ msg: `${ids.length} emails μεταφέρθηκαν στα απορρίμματα.`, type: 'info' });
   };
 
   const handleDeleteEmail = async (id: string) => {
     await supabase.from('crm_emails').update({ folder: 'trash' }).eq('id', id);
     setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: 'trash' } : e));
     if (selectedEmail === id) setSelectedEmail(null);
-    setToast({ msg: '╬ν╬┐ email ╬╝╬╡╧Ε╬▒╧Η╬φ╧Β╬╕╬╖╬║╬╡ ╧Δ╧Ε╬▒ ╬▒╧Α╬┐╧Β╧Β╬ψ╬╝╬╝╬▒╧Ε╬▒.', type: 'info' });
+    setToast({ msg: 'Το email μεταφέρθηκε στα απορρίμματα.', type: 'info' });
   };
 
   const handlePermanentDelete = async (id: string) => {
@@ -3016,7 +3016,7 @@ function EmailTab({ toast, setToast }: {
     const { data } = await supabase.from('crm_email_labels').insert({ name: newLabel.name, color: newLabel.color }).select();
     if (data) setLabels(prev => [...prev, data[0]]);
     setNewLabel({ name: '', color: '#0066cc' });
-    setToast({ msg: '╬Ω ╬╡╧Ε╬╣╬║╬φ╧Ε╬▒ ╬┤╬╖╬╝╬╣╬┐╧Ζ╧Β╬│╬χ╬╕╬╖╬║╬╡!', type: 'success' });
+    setToast({ msg: 'Η ετικέτα δημιουργήθηκε!', type: 'success' });
   };
 
   const handleDeleteLabel = async (id: string) => {
@@ -3047,7 +3047,7 @@ function EmailTab({ toast, setToast }: {
     setEmails(prev => [newEmail, ...prev]);
     setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
     setShowCompose(false);
-    setToast({ msg: '╬ν╬┐ email ╧Δ╧Ε╬υ╬╗╬╕╬╖╬║╬╡!', type: 'success' });
+    setToast({ msg: 'Το email στάλθηκε!', type: 'success' });
   };
 
   const handleSaveDraft = async () => {
@@ -3057,7 +3057,7 @@ function EmailTab({ toast, setToast }: {
       to_email: composeData.to,
       cc: composeData.cc,
       bcc: composeData.bcc,
-      subject: composeData.subject || '(╬π╧Κ╧Β╬ψ╧Γ ╬╕╬φ╬╝╬▒)',
+      subject: composeData.subject || '(Χωρίς θέμα)',
       body: composeData.body,
       folder: 'drafts',
       is_read: true,
@@ -3071,7 +3071,7 @@ function EmailTab({ toast, setToast }: {
     setEmails(prev => [draft, ...prev]);
     setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false });
     setShowCompose(false);
-    setToast({ msg: '╬ν╬┐ ╧Α╧Β╧Ν╧Θ╬╡╬╣╧Β╬┐ ╬▒╧Α╬┐╬╕╬╖╬║╬╡╧Ξ╧Ε╬╖╬║╬╡.', type: 'info' });
+    setToast({ msg: 'Το πρόχειρο αποθηκεύτηκε.', type: 'info' });
   };
 
   const handleImportEmails = async () => {
@@ -3080,14 +3080,14 @@ function EmailTab({ toast, setToast }: {
     await new Promise(r => setTimeout(r, 2000));
     setSyncing(false);
     setShowImport(false);
-    setToast({ msg: `Emails ╬▒╧Α╧Ν ${importConfig.provider} ╬╡╬╣╧Δ╬χ╧Θ╬╕╬╖╧Δ╬▒╬╜ ╬╡╧Α╬╣╧Ε╧Ζ╧Θ╧Ο╧Γ!`, type: 'success' });
+    setToast({ msg: `Emails από ${importConfig.provider} εισήχθησαν επιτυχώς!`, type: 'success' });
   };
 
   const handleSync = async () => {
     setSyncing(true);
     await new Promise(r => setTimeout(r, 2000));
     setSyncing(false);
-    setToast({ msg: '╬ν╬▒ emails ╧Δ╧Ζ╬│╧Θ╧Β╬┐╬╜╬ψ╧Δ╧Ε╬╖╬║╬▒╬╜ ╬╡╧Α╬╣╧Ε╧Ζ╧Θ╧Ο╧Γ!', type: 'success' });
+    setToast({ msg: 'Τα emails συγχρονίστηκαν επιτυχώς!', type: 'success' });
   };
 
   const handleSaveSettings = async () => {
@@ -3096,13 +3096,13 @@ function EmailTab({ toast, setToast }: {
     }
     setEmailSettings(editingSettings);
     setShowSettings(false);
-    setToast({ msg: '╬θ╬╣ ╧Β╧Ζ╬╕╬╝╬ψ╧Δ╬╡╬╣╧Γ ╬▒╧Α╬┐╬╕╬╖╬║╬╡╧Ξ╧Ε╬╖╬║╬▒╬╜!', type: 'success' });
+    setToast({ msg: 'Οι ρυθμίσεις αποθηκεύτηκαν!', type: 'success' });
   };
 
   const handleLinkToLead = async (emailId: string, leadId: string) => {
     await supabase.from('crm_emails').update({ lead_id: leadId }).eq('id', emailId);
     setEmails(prev => prev.map(e => e.id === emailId ? { ...e, lead_id: leadId } : e));
-    setToast({ msg: '╬ν╬┐ email ╧Δ╧Ζ╬╜╬┤╬φ╬╕╬╖╬║╬╡ ╬╝╬╡ ╧Ε╬┐ lead!', type: 'success' });
+    setToast({ msg: 'Το email συνδέθηκε με το lead!', type: 'success' });
   };
 
   const folderLabelCounts: Record<string, number> = {};
@@ -3121,7 +3121,7 @@ function EmailTab({ toast, setToast }: {
           <div style={{ padding: '16px' }}>
             <button className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', borderRadius: '24px', fontSize: '14px', fontWeight: 600 }}
               onClick={() => { setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', replyTo: '', showCcBcc: false }); setShowCompose(true); }}>
-              έεΚΎ╕Π ╬μ╧Ξ╬╜╧Ε╬▒╬╛╬╖
+              ✉️ Σύνταξη
             </button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
@@ -3141,7 +3141,7 @@ function EmailTab({ toast, setToast }: {
             ))}
             <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>╬Χ╧Ε╬╣╬║╬φ╧Ε╬╡╧Γ</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ετικέτες</span>
                 <button onClick={() => setShowLabelManager(!showLabelManager)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '16px', padding: '0 4px' }}>+</button>
               </div>
               {labels.map(l => (
@@ -3155,10 +3155,10 @@ function EmailTab({ toast, setToast }: {
             </div>
             <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
               <button onClick={() => { setShowImport(true); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-                <span>ΏθΥξ</span> ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ Email
+                <span>ΏθΥξ</span> Εισαγωγή Email
               </button>
               <button onClick={() => { setShowSettings(true); setEditingSettings({ ...emailSettings }); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-                <span>έγβΎ╕Π</span> ╬κ╧Ζ╬╕╬╝╬ψ╧Δ╬╡╬╣╧Γ
+                <span>⚙️</span> Ρυθμίσεις
               </button>
             </div>
           </div>
@@ -3172,17 +3172,17 @@ function EmailTab({ toast, setToast }: {
               style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }} />
             {selectedIds.size > 0 ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedIds.size} ╬╡╧Α╬╣╬╗╬╡╬│╬╝╬φ╬╜╬▒</span>
-                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px' }} onClick={handleBulkMarkRead}>ΏθΥΨ ╬Σ╬╜╬▒╬│╬╜╧Κ╧Δ╬╝╬φ╬╜╬┐</button>
-                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px', color: '#ef4444' }} onClick={handleBulkDelete}>ΏθΩΣΎ╕Π ╬Φ╬╣╬▒╬│╧Β╬▒╧Η╬χ</button>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedIds.size} επιλεγμένα</span>
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px' }} onClick={handleBulkMarkRead}>✅ Αναγνωσμένο</button>
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px', color: '#ef4444' }} onClick={handleBulkDelete}>🗑️ Διαγραφή</button>
               </div>
             ) : (
-              <input type="text" placeholder="ΏθΦΞ ╬Σ╬╜╬▒╬╢╬χ╧Ε╬╖╧Δ╬╖ emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              <input type="text" placeholder="ΏθΦΞ Αναζήτηση emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ flex: 1, padding: '8px 14px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '20px', color: 'var(--text)', fontSize: '13px', outline: 'none' }} />
             )}
             <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
               <button className="btn btn-ghost" onClick={handleSync} disabled={syncing} style={{ fontSize: '13px', padding: '6px 12px' }}>
-                {syncing ? 'έΠ│' : 'ΏθΦΕ'} ╬μ╧Ζ╬│╧Θ╧Β╧Ν╬╜╬╣╧Δ╬╖
+                {syncing ? '⏳' : '🔄'} Συγχρόνιση
               </button>
             </div>
           </div>
@@ -3192,13 +3192,13 @@ function EmailTab({ toast, setToast }: {
             {/* Email list */}
             <div style={{ width: selectedEmail ? '380px' : '100%', borderRight: selectedEmail ? '1px solid var(--border)' : 'none', overflowY: 'auto' }}>
               {loading ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>╬ο╧Ν╧Β╧Ε╧Κ╧Δ╬╖...</div>
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>
               ) : filteredEmails.length === 0 ? (
                 <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <div style={{ fontSize: '48px', marginBottom: '12px' }}>ΏθΥφ</div>
-                  <p style={{ fontSize: '16px', margin: 0 }}>╬Φ╬╡╬╜ ╧Ζ╧Α╬υ╧Β╧Θ╬┐╧Ζ╬╜ emails</p>
+                  <p style={{ fontSize: '16px', margin: 0 }}>Δεν υπάρχουν emails</p>
                   <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
-                    {activeFolder === 'inbox' ? '╬ν╬┐ inbox ╧Δ╬▒╧Γ ╬╡╬ψ╬╜╬▒╬╣ ╬υ╬┤╬╡╬╣╬┐.' : '╬Φ╬╡╬╜ ╬▓╧Β╬φ╬╕╬╖╬║╬▒╬╜ emails ╧Δ╬╡ ╬▒╧Ζ╧Ε╧Ν╬╜ ╧Ε╬┐╬╜ ╧Η╬υ╬║╬╡╬╗╬┐.'}
+                    {activeFolder === 'inbox' ? 'Το inbox σας είναι άδειο.' : 'Δεν βρέθηκαν emails σε αυτόν τον φάκελο.'}
                   </p>
                 </div>
               ) : filteredEmails.map(email => (
@@ -3218,7 +3218,7 @@ function EmailTab({ toast, setToast }: {
                         {email.from_email}
                       </span>
                       <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
-                        {email.important && <span style={{ fontSize: '12px' }}>ΏθΠ╖Ύ╕Π</span>}
+                        {email.important && <span style={{ fontSize: '12px' }}>🏷️</span>}
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {new Date(email.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' })}
                         </span>
@@ -3249,8 +3249,8 @@ function EmailTab({ toast, setToast }: {
                   <div>
                     <h2 style={{ margin: '0 0 8px', fontSize: '20px', color: 'var(--text)' }}>{selectedEmailData.subject}</h2>
                     <div style={{ display: 'flex', gap: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>
-                      <span><strong>╬Σ╧Α╧Ν:</strong> {selectedEmailData.from_email}</span>
-                      <span><strong>╬ι╧Β╬┐╧Γ:</strong> {selectedEmailData.to_email}</span>
+                      <span><strong>Από:</strong> {selectedEmailData.from_email}</span>
+                      <span><strong>Προς:</strong> {selectedEmailData.to_email}</span>
                       {selectedEmailData.cc && <span><strong>CC:</strong> {selectedEmailData.cc}</span>}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -3262,11 +3262,11 @@ function EmailTab({ toast, setToast }: {
                       {selectedEmailData.starred ? 'έφΡ' : 'έαΗ'}
                     </button>
                     <button onClick={() => handleToggleImportant(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
-                      {selectedEmailData.important ? 'ΏθΠ╖Ύ╕Π' : 'ΏθΦΨ'}
+                      {selectedEmailData.important ? '🏷️' : 'ΏθΦΨ'}
                     </button>
                     <select value="" onChange={(e) => { if (e.target.value) handleAddLabel(selectedEmail, e.target.value); e.target.value = ''; }}
                       style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
-                      <option value="">ΏθΠ╖Ύ╕Π +╬Χ╧Ε╬╣╬║╬φ╧Ε╬▒</option>
+                      <option value="">🏷️ +Ετικέτα</option>
                       {labels.filter(l => !(selectedEmailData.labels || []).includes(l.name)).map(l => (
                         <option key={l.id} value={l.name}>{l.name}</option>
                       ))}
@@ -3277,7 +3277,7 @@ function EmailTab({ toast, setToast }: {
                       {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name}</option>)}
                     </select>
                     <button className="btn btn-ghost" onClick={() => handleMarkUnread(selectedEmail)} style={{ fontSize: '12px', padding: '4px 8px' }}>ΏθΥσ</button>
-                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmail)} style={{ color: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>ΏθΩΣΎ╕Π</button>
+                    <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmail)} style={{ color: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>🗑️</button>
                   </div>
                 </div>
                 {(selectedEmailData.labels || []).length > 0 && (
@@ -3300,11 +3300,11 @@ function EmailTab({ toast, setToast }: {
                   <button className="btn btn-primary" onClick={() => {
                     setComposeData({ to: selectedEmailData.from_email, cc: '', bcc: '', subject: `RE: ${selectedEmailData.subject}`, body: '', replyTo: selectedEmailData.id });
                     setShowCompose(true);
-                  }}>έΗσΎ╕Π ╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖</button>
+                  }}>↩️ Απάντηση</button>
                   <button className="btn btn-ghost" onClick={() => {
-                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- ╬ι╧Β╧Κ╧Ε╧Ν╧Ε╧Ζ╧Α╬┐ ╬╝╬χ╬╜╧Ζ╬╝╬▒ ---\n╬Σ╧Α╧Ν: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
+                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- Πρωτότυπο μήνυμα ---\nΑπό: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
                     setShowCompose(true);
-                  }}>έΗςΎ╕Π ╬ι╧Β╬┐╧Ο╬╕╬╖╧Δ╬╖</button>
+                  }}>↪️ Προώθηση</button>
                 </div>
               </div>
             )}
@@ -3333,19 +3333,19 @@ function EmailTab({ toast, setToast }: {
         }}>
           {/* Modal Header */}
           <div style={{ padding: '10px 16px', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>╬ζ╬φ╬┐ ╬ε╬χ╬╜╧Ζ╬╝╬▒</span>
+            <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>Νέο Μήνυμα</span>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button onClick={() => setIsFullScreen(!isFullScreen)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="╬ι╬╗╬χ╧Β╬╖╧Γ ╬┐╬╕╧Ν╬╜╬╖">
+              <button onClick={() => setIsFullScreen(!isFullScreen)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Πλήρης οθόνη">
                 {isFullScreen ? 'ΏθΩΩ' : 'ΏθΩΨ'}
               </button>
-              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="╬γ╬╗╬╡╬ψ╧Δ╬╣╬╝╬┐">έεΨ</button>
+              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Κλείσιμο">έεΨ</button>
             </div>
           </div>
 
           {/* Form Inputs */}
           <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>╬ι╧Β╬┐╧Γ</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '45px' }}>Προς</span>
               <input
                 value={composeData.to}
                 onChange={e => setComposeData({...composeData, to: e.target.value})}
@@ -3371,7 +3371,7 @@ function EmailTab({ toast, setToast }: {
 
             <div style={{ borderBottom: '1px solid var(--border)' }}>
               <input
-                placeholder="╬α╬φ╬╝╬▒"
+                placeholder="Θέμα"
                 value={composeData.subject}
                 onChange={e => setComposeData({...composeData, subject: e.target.value})}
                 style={{ width: '100%', padding: '8px 0', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}
@@ -3394,7 +3394,7 @@ function EmailTab({ toast, setToast }: {
 
             {/* Body Input Area */}
             <textarea
-              placeholder="╬Υ╧Β╬υ╧Ι╧Ε╬╡ ╧Ε╬┐ ╬╝╬χ╬╜╧Ζ╬╝╬υ ╧Δ╬▒╧Γ..."
+              placeholder="Γράψτε το μήνυμά σας..."
               value={composeData.body}
               onChange={e => setComposeData({...composeData, body: e.target.value})}
               style={{
@@ -3411,38 +3411,38 @@ function EmailTab({ toast, setToast }: {
               {/* Send Split Button */}
               <div style={{ display: 'inline-flex', borderRadius: '20px', overflow: 'hidden', background: '#0066cc', marginRight: '8px' }}>
                 <button onClick={handleSendEmail} style={{ padding: '8px 16px', background: 'transparent', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>
-                  ╬Σ╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ
+                  Αποστολή
                 </button>
                 <button onClick={() => setShowScheduleSend(!showScheduleSend)} style={{ padding: '8px 8px', background: '#0052a3', color: '#fff', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '10px' }}>
-                  έΨ╝
+                  ✖
                 </button>
               </div>
 
               {/* Toolbar Control Buttons */}
-              <button title="╬Χ╧Α╬╣╬╗╬┐╬│╬φ╧Γ ╬╝╬┐╧Β╧Η╬┐╧Α╬┐╬ψ╬╖╧Δ╬╖╧Γ" onClick={() => setShowFormattingToolbar(!showFormattingToolbar)} style={{ background: showFormattingToolbar ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }}>Aa</button>
-              <button title="╬Χ╧Α╬╣╧Δ╧Ξ╬╜╬▒╧Ι╬╖ ╬▒╧Β╧Θ╬╡╬ψ╧Κ╬╜" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΥΟ</button>
-              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Δ╧Ζ╬╜╬┤╬φ╧Δ╬╝╬┐╧Ζ" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΦΩ</button>
-              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθαΑ</button>
-              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╬▒╧Β╧Θ╬╡╬ψ╧Κ╬╜ CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΥΒ</button>
-              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Η╧Κ╧Ε╬┐╬│╧Β╬▒╧Η╬ψ╬▒╧Γ" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΨ╝Ύ╕Π</button>
-              <button title="╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Ζ╧Α╬┐╬│╧Β╬▒╧Η╬χ╧Γ" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΨΛΎ╕Π</button>
+              <button title="Επιλογές μορφοποίησης" onClick={() => setShowFormattingToolbar(!showFormattingToolbar)} style={{ background: showFormattingToolbar ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }}>Aa</button>
+              <button title="Επισύναψη αρχείων" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΥΟ</button>
+              <button title="Εισαγωγή συνδέσμου" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΦΩ</button>
+              <button title="Εισαγωγή emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθαΑ</button>
+              <button title="Εισαγωγή αρχείων CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΥΒ</button>
+              <button title="Εισαγωγή φωτογραφίας" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>🖼️</button>
+              <button title="Εισαγωγή υπογραφής" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>📎</button>
 
               {/* Context Menu Toggle */}
-              <button title="╬ι╬╡╧Β╬╣╧Δ╧Δ╧Ν╧Ε╬╡╧Β╬╡╧Γ ╬╡╧Α╬╣╬╗╬┐╬│╬φ╧Γ" onClick={() => setShowMoreOptions(!showMoreOptions)} style={{ background: showMoreOptions ? 'var(--bg-2)' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>έΜχ</button>
+              <button title="Περισσότερες επιλογές" onClick={() => setShowMoreOptions(!showMoreOptions)} style={{ background: showMoreOptions ? 'var(--bg-2)' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>έΜχ</button>
             </div>
 
             {/* Discard Draft Button */}
-            <button title="╬Σ╧Α╧Ν╧Β╧Β╬╣╧Ι╬╖ ╧Α╧Β╬┐╧Δ╧Θ╬╡╬┤╬ψ╬┐╧Ζ" onClick={() => setShowCompose(false)} style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)' }}>ΏθΩΣΎ╕Π</button>
+            <button title="Απόρριψη προσχεδίου" onClick={() => setShowCompose(false)} style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)' }}>🗑️</button>
 
             {/* Schedule Send Dropdown Menu */}
             {showScheduleSend && (
               <div style={{ position: 'absolute', bottom: '50px', left: '16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '8px 0', width: '200px' }}>
-                <div style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬╣╧Δ╬╝╧Ν╧Γ ╬▒╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ╧Γ</div>
-                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: '╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬ψ╧Δ╧Ε╬╖╬║╬╡ ╬│╬╣╬▒ ╬▒╧Ξ╧Β╬╣╬┐ 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΝΖ ╬Σ╧Ξ╧Β╬╣╬┐ ╧Ε╬┐ ╧Α╧Β╧Κ╬ψ (08:00)
+                <div style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>Προγραμματισμός αποστολής</div>
+                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για αύριο 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΝΖ Αύριο το πρωί (08:00)
                 </button>
-                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: '╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬ψ╧Δ╧Ε╬╖╬║╬╡ ╬│╬╣╬▒ ╧Ε╬╖ ╬Φ╬╡╧Ζ╧Ε╬φ╧Β╬▒ 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΥΖ ╬Φ╬╡╧Ζ╧Ε╬φ╧Β╬▒ ╧Ε╬┐ ╧Α╧Β╧Κ╬ψ (08:00)
+                <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για τη Δευτέρα 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΥΖ Δευτέρα το πρωί (08:00)
                 </button>
               </div>
             )}
@@ -3451,20 +3451,20 @@ function EmailTab({ toast, setToast }: {
             {showMoreOptions && (
               <div style={{ position: 'absolute', bottom: '50px', left: '210px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '6px 0', width: '220px' }}>
                 <button onClick={() => { setIsFullScreen(!isFullScreen); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΩΨ ╬ι╧Β╬┐╬╡╧Α╬╣╬╗╬┐╬│╬χ ╧Δ╬╡ ╧Α╬╗╬χ╧Β╬╖ ╬┐╬╕╧Ν╬╜╬╖
+                  ΏθΩΨ Προεπιλογή σε πλήρη οθόνη
                 </button>
                 <button onClick={() => { setIsPlainText(!isPlainText); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  {isPlainText ? 'έεΥ ╬δ╬╡╬╣╧Ε╬┐╧Ζ╧Β╬│╬ψ╬▒ ╬▒╧Α╬╗╬┐╧Ξ ╬║╬╡╬╣╬╝╬φ╬╜╬┐╧Ζ' : 'ΏθΥζ ╬δ╬╡╬╣╧Ε╬┐╧Ζ╧Β╬│╬ψ╬▒ ╬▒╧Α╬╗╬┐╧Ξ ╬║╬╡╬╣╬╝╬φ╬╜╬┐╧Ζ'}
+                  {isPlainText ? 'έεΥ Λειτουργία απλού κειμένου' : 'ΏθΥζ Λειτουργία απλού κειμένου'}
                 </button>
                 <button onClick={() => { window.print(); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΨρΎ╕Π ╬Χ╬║╧Ε╧Ξ╧Α╧Κ╧Δ╬╖
+                  🖨️ Εκτύπωση
                 </button>
                 <button onClick={() => { setShowLabelManager(true); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΠ╖Ύ╕Π ╬Χ╧Ε╬╣╬║╬φ╧Ε╬▒...
+                  🏷️ Ετικέτα...
                 </button>
                 <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }}></div>
-                <button onClick={() => { setToast({ msg: '╬Φ╬╖╬╝╬╣╬┐╧Ζ╧Β╬│╬χ╬╕╬╖╬║╬╡ ╧Δ╧Ξ╬╜╬┤╬╡╧Δ╬╝╬┐╧Γ ╧Δ╧Ζ╬╜╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ', type: 'info' }); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΥΖ ╬ι╧Β╬┐╬│╧Β╬▒╬╝╬╝╬▒╧Ε╬╣╧Δ╬╝╧Ν╧Γ ╧Δ╧Ζ╬╜╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ
+                <button onClick={() => { setToast({ msg: 'Δημιουργήθηκε σύνδεσμος συνάντησης', type: 'info' }); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                  ΏθΥΖ Προγραμματισμός συνάντησης
                 </button>
               </div>
             )}
@@ -3476,10 +3476,10 @@ function EmailTab({ toast, setToast }: {
       {showImport && (
         <div className="modal-overlay" onClick={() => setShowImport(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
-            <div className="modal-header"><h3>ΏθΥξ ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
+            <div className="modal-header"><h3>ΏθΥξ Εισαγωγή Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
-                ╬μ╧Ζ╬╜╬┤╬φ╧Δ╧Ε╬╡ ╧Ε╬┐╬╜ email ╬╗╬┐╬│╬▒╧Β╬╣╬▒╧Δ╬╝╧Ν ╧Δ╬▒╧Γ ╬│╬╣╬▒ ╬╡╬╣╧Δ╬▒╬│╧Κ╬│╬χ ╧Ζ╧Α╬▒╧Β╧Θ╧Ν╬╜╧Ε╧Κ╬╜ emails ╧Δ╧Ε╬┐ CRM.
+                Συνδέστε τον email λογαριασμό σας για εισαγωγή υπαρχόντων emails στο CRM.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 {providers.map(p => (
@@ -3498,7 +3498,7 @@ function EmailTab({ toast, setToast }: {
                   <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
                 </div>
                 <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing} style={{ width: '100%', padding: '12px' }}>
-                  {syncing ? 'έΠ│ ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ...' : 'ΏθΥξ ╬Χ╬╣╧Δ╬▒╬│╧Κ╬│╬χ Emails'}
+                  {syncing ? '⏳ Εισαγωγή...' : 'ΏθΥξ Εισαγωγή Emails'}
                 </button>
               </div>
             </div>
@@ -3510,20 +3510,20 @@ function EmailTab({ toast, setToast }: {
       {showLabelManager && (
         <div className="modal-overlay" onClick={() => setShowLabelManager(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className="modal-header"><h3>ΏθΠ╖Ύ╕Π ╬Φ╬╣╬▒╧Θ╬╡╬ψ╧Β╬╣╧Δ╬╖ ╬Χ╧Ε╬╣╬║╬╡╧Ε╧Ο╬╜</h3><button className="modal-close" onClick={() => setShowLabelManager(false)}>x</button></div>
+            <div className="modal-header"><h3>🏷️ Διαχείριση Ετικετών</h3><button className="modal-close" onClick={() => setShowLabelManager(false)}>x</button></div>
             <div className="modal-body">
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <input placeholder="╬ζ╬φ╬▒ ╬╡╧Ε╬╣╬║╬φ╧Ε╬▒..." value={newLabel.name} onChange={(e) => setNewLabel({ ...newLabel, name: e.target.value })}
+                <input placeholder="Νέα ετικέτα..." value={newLabel.name} onChange={(e) => setNewLabel({ ...newLabel, name: e.target.value })}
                   style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
                 <input type="color" value={newLabel.color} onChange={(e) => setNewLabel({ ...newLabel, color: e.target.value })}
                   style={{ width: '40px', height: '36px', padding: '2px', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer' }} />
-                <button className="btn btn-primary" onClick={handleCreateLabel}>╬ι╧Β╬┐╧Δ╬╕╬χ╬║╬╖</button>
+                <button className="btn btn-primary" onClick={handleCreateLabel}>Προσθήκη</button>
               </div>
               {labels.map(l => (
                 <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: l.color }} />
                   <span style={{ flex: 1, fontSize: '14px', color: 'var(--text)' }}>{l.name}</span>
-                  <button onClick={() => handleDeleteLabel(l.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>ΏθΩΣΎ╕Π</button>
+                  <button onClick={() => handleDeleteLabel(l.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑️</button>
                 </div>
               ))}
             </div>
@@ -3535,59 +3535,59 @@ function EmailTab({ toast, setToast }: {
       {showSettings && editingSettings.general && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflow: 'auto' }}>
-            <div className="modal-header"><h3>έγβΎ╕Π ╬κ╧Ζ╬╕╬╝╬ψ╧Δ╬╡╬╣╧Γ Email</h3><button className="modal-close" onClick={() => setShowSettings(false)}>x</button></div>
+            <div className="modal-header"><h3>⚙️ Ρυθμίσεις Email</h3><button className="modal-close" onClick={() => setShowSettings(false)}>x</button></div>
             <div className="modal-body">
-              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>╬Υ╬╡╬╜╬╣╬║╬υ</h4>
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Γενικά</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ι╧Ζ╬║╬╜╧Ν╧Ε╬╖╧Ε╬▒</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Πυκνότητα</label>
                   <select value={editingSettings.general.density} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, density: e.target.value } })}
                     style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
                     <option value="default">Default</option>
-                    <option value="comfortable">╬Η╬╜╬╡╧Ε╬╖</option>
-                    <option value="compact">╬μ╧Ζ╬╝╧Α╬▒╬│╬χ╧Γ</option>
+                    <option value="comfortable">Άνετη</option>
+                    <option value="compact">Συμπαγής</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ν╧Ξ╧Α╬┐╧Γ Inbox</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Τύπος Inbox</label>
                   <select value={editingSettings.general.inbox_type} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, inbox_type: e.target.value } })}
                     style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
                     <option value="default">Default</option>
-                    <option value="important">╬μ╬╖╬╝╬▒╬╜╧Ε╬╣╬║╬υ ╧Α╧Β╧Ο╧Ε╬▒</option>
-                    <option value="unread">╬ε╬╖ ╬▒╬╜╬▒╬│╬╜╧Κ╧Δ╬╝╬φ╬╜╬▒ ╧Α╧Β╧Ο╧Ε╬▒</option>
-                    <option value="starred">╬Σ╧Δ╧Ε╬φ╧Β╬╣╬▒ ╧Α╧Β╧Ο╧Ε╬▒</option>
+                    <option value="important">Σημαντικά πρώτα</option>
+                    <option value="unread">Μη αναγνωσμένα πρώτα</option>
+                    <option value="starred">Αστέρια πρώτα</option>
                     <option value="priority">Priority Inbox</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ι╬▒╧Β╬υ╬╕╧Ζ╧Β╬┐ ╬▒╬╜╬υ╬│╬╜╧Κ╧Δ╬╖╧Γ</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Παράθυρο ανάγνωσης</label>
                   <select value={editingSettings.general.reading_pane} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, reading_pane: e.target.value } })}
                     style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value="no_split">╬π╧Κ╧Β╬ψ╧Γ ╬┤╬╣╬▒╬ψ╧Β╬╡╧Δ╬╖</option>
-                    <option value="right">╬Φ╬╡╬╛╬╣╬υ ╧Ε╬┐╧Ζ inbox</option>
-                    <option value="below">╬γ╬υ╧Ε╧Κ ╬▒╧Α╧Ν ╧Ε╬┐ inbox</option>
+                    <option value="no_split">Χωρίς διαίρεση</option>
+                    <option value="right">Δεξιά του inbox</option>
+                    <option value="below">Κάτω από το inbox</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬Σ╬║╧Ξ╧Β╧Κ╧Δ╬╖ ╬▒╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ╧Γ (╬┤╬╡╧Ζ╧Ε.)</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ακύρωση αποστολής (δευτ.)</label>
                   <select value={editingSettings.general.undo_send} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, undo_send: parseInt(e.target.value) } })}
                     style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value={5}>5 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
-                    <option value={10}>10 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
-                    <option value={20}>20 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
-                    <option value={30}>30 ╬┤╬╡╧Ζ╧Ε╬╡╧Β╧Ν╬╗╬╡╧Α╧Ε╬▒</option>
+                    <option value={5}>5 δευτερόλεπτα</option>
+                    <option value={10}>10 δευτερόλεπτα</option>
+                    <option value={20}>20 δευτερόλεπτα</option>
+                    <option value={30}>30 δευτερόλεπτα</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ι╧Β╬┐╬╡╧Α╬╣╬╗╬╡╬│╬╝╬φ╬╜╬╖ ╬▒╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Προεπιλεγμένη απάντηση</label>
                   <select value={editingSettings.general.default_reply} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, default_reply: e.target.value } })}
                     style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
-                    <option value="reply">╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖</option>
-                    <option value="reply_all">╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖ ╧Δ╬╡ ╧Ν╬╗╬┐╧Ζ╧Γ</option>
+                    <option value="reply">Απάντηση</option>
+                    <option value="reply_all">Απάντηση σε όλους</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬ε╬φ╬│╬╣╧Δ╧Ε╬┐ ╧Δ╬╡╬╗╬ψ╬┤╬▒╧Γ</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Μέγιστο σελίδας</label>
                   <select value={editingSettings.general.max_page_size} onChange={(e) => setEditingSettings({ ...editingSettings, general: { ...editingSettings.general, max_page_size: parseInt(e.target.value) } })}
                     style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
                     <option value={25}>25</option>
@@ -3598,11 +3598,11 @@ function EmailTab({ toast, setToast }: {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
                 {[
-                  { key: 'hover_actions', label: '╬Χ╬╜╬φ╧Β╬│╬╡╬╣╬╡╧Γ hover' },
-                  { key: 'send_archive', label: '╬γ╬┐╧Ζ╬╝╧Α╬ψ "╬Σ╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ & ╬Σ╧Β╧Θ╬╡╬╣╬┐╬╕╬φ╧Ε╬╖╧Δ╬╖"' },
-                  { key: 'snippets', label: '╬Σ╧Α╬┐╧Δ╧Α╬υ╧Δ╬╝╬▒╧Ε╬▒ ╬╝╬╖╬╜╧Ζ╬╝╬υ╧Ε╧Κ╬╜' },
-                  { key: 'conversation_view', label: '╬ι╧Β╬┐╬▓╬┐╬╗╬χ ╧Δ╧Ζ╬╢╬χ╧Ε╬╖╧Δ╬╖╧Γ (threading)' },
-                  { key: 'keyboard_shortcuts', label: '╬ι╬╗╬χ╬║╧Ε╧Β╬▒ ╧Δ╧Ζ╬╜╧Ε╬┐╬╝╬╡╧Ξ╧Δ╬╡╧Κ╬╜' },
+                  { key: 'hover_actions', label: 'Ενέργειες hover' },
+                  { key: 'send_archive', label: 'Κουμπί "Αποστολή & Αρχειοθέτηση"' },
+                  { key: 'snippets', label: 'Αποσπάσματα μηνυμάτων' },
+                  { key: 'conversation_view', label: 'Προβολή συζήτησης (threading)' },
+                  { key: 'keyboard_shortcuts', label: 'Πλήκτρα συντομεύσεων' },
                 ].map(opt => (
                   <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
                     <input type="checkbox" checked={editingSettings.general[opt.key]}
@@ -3613,43 +3613,43 @@ function EmailTab({ toast, setToast }: {
                 ))}
               </div>
 
-              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>╬ξ╧Α╬┐╬│╧Β╬▒╧Η╬χ</h4>
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Υπογραφή</h4>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
                   <input type="checkbox" checked={editingSettings.signature?.enabled || false}
                     onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, enabled: e.target.checked } })}
                     style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
-                  ╬Χ╬╜╬╡╧Β╬│╬┐╧Α╬┐╬ψ╬╖╧Δ╬╖ ╧Ζ╧Α╬┐╬│╧Β╬▒╧Η╬χ╧Γ
+                  Ενεργοποίηση υπογραφής
                 </label>
                 {editingSettings.signature?.enabled && (
                   <textarea value={editingSettings.signature?.content || ''} onChange={(e) => setEditingSettings({ ...editingSettings, signature: { ...editingSettings.signature, content: e.target.value } })}
-                    placeholder="╬ν╧Β╬φ╧Θ╬┐╧Ζ╧Δ╬▒ ╧Ζ╧Α╬┐╬│╧Β╬▒╧Η╬χ..."
+                    placeholder="Τρέχουσα υπογραφή..."
                     style={{ width: '100%', minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
                 )}
               </div>
 
-              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>╬Σ╧Ζ╧Ε╧Ν╬╝╬▒╧Ε╬╖ ╬Σ╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖ (Vacation Responder)</h4>
+              <h4 style={{ margin: '0 0 12px', color: 'var(--text)' }}>Αυτόματη Απάντηση (Vacation Responder)</h4>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' }}>
                   <input type="checkbox" checked={editingSettings.vacation?.enabled || false}
                     onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, enabled: e.target.checked } })}
                     style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
-                  ╬Χ╬╜╬╡╧Β╬│╬┐╧Α╬┐╬ψ╬╖╧Δ╬╖ ╬▒╧Ζ╧Ε╧Ν╬╝╬▒╧Ε╬╖╧Γ ╬▒╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ
+                  Ενεργοποίηση αυτόματης απάντησης
                 </label>
                 {editingSettings.vacation?.enabled && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <input placeholder="╬α╬φ╬╝╬▒" value={editingSettings.vacation?.subject || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, subject: e.target.value } })} />
+                    <input placeholder="Θέμα" value={editingSettings.vacation?.subject || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, subject: e.target.value } })} />
                     <textarea value={editingSettings.vacation?.message || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, message: e.target.value } })}
-                      placeholder="╬ε╬χ╬╜╧Ζ╬╝╬▒ ╬▒╧Ζ╧Ε╧Ν╬╝╬▒╧Ε╬╖╧Γ ╬▒╧Α╬υ╬╜╧Ε╬╖╧Δ╬╖╧Γ..."
+                      placeholder="Μήνυμα αυτόματης απάντησης..."
                       style={{ minHeight: '80px', padding: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical' }} />
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬Σ╧Α╧Ν</label>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Από</label>
                         <input type="date" value={editingSettings.vacation?.start_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, start_date: e.target.value } })}
                           style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>╬Ι╧Κ╧Γ</label>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Έως</label>
                         <input type="date" value={editingSettings.vacation?.end_date || ''} onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, end_date: e.target.value } })}
                           style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }} />
                       </div>
@@ -3658,15 +3658,15 @@ function EmailTab({ toast, setToast }: {
                       <input type="checkbox" checked={editingSettings.vacation?.contacts_only || false}
                         onChange={(e) => setEditingSettings({ ...editingSettings, vacation: { ...editingSettings.vacation, contacts_only: e.target.checked } })}
                         style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
-                      ╬Σ╧Α╬┐╧Δ╧Ε╬┐╬╗╬χ ╬╝╧Ν╬╜╬┐ ╧Δ╬╡ ╬╡╧Α╬▒╧Η╬φ╧Γ
+                      Αποστολή μόνο σε επαφές
                     </label>
                   </div>
                 )}
               </div>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>╬Η╬║╧Ζ╧Β╬┐</button>
-                <button className="btn btn-primary" onClick={handleSaveSettings}>╬Σ╧Α╬┐╬╕╬χ╬║╬╡╧Ζ╧Δ╬╖ ╬κ╧Ζ╬╕╬╝╬ψ╧Δ╬╡╧Κ╬╜</button>
+                <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>Άκυρο</button>
+                <button className="btn btn-primary" onClick={handleSaveSettings}>Αποθήκευση Ρυθμίσεων</button>
               </div>
             </div>
           </div>

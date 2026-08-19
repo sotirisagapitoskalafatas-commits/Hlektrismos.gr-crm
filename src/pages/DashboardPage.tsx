@@ -39,6 +39,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import SettingsPanel from '@/components/SettingsPanel';
 import DocumentGenerator from '@/components/DocumentGenerator';
+import LeadDetailSlideout from '@/components/LeadDetailSlideout';
+import MarketRagFolders from '@/components/MarketRagFolders';
 
 type Lead = {
   id: string;
@@ -1114,49 +1116,7 @@ export default function DashboardPage() {
             )}
 
             {tab === 'market' && (
-              <div className="dash-content">
-                <div className="dash-content-header">
-                  <p>Δυναμικά τιμολόγια αγοράς που τροφοδοτούν τη βάση γνώσης των AI agents (RAG pipeline).</p>
-                  <button className="btn btn-primary" onClick={syncTariffs} disabled={syncing}>
-                    <RefreshCw size={16} className={syncing ? 'spin' : ''} /> {syncing ? 'Συγχρονισμός...' : 'Sync Data'}
-                  </button>
-                </div>
-                <div className="rag-layout">
-                  <div className="rag-tariffs-panel">
-                    <h3 className="rag-section-title"><TrendingUp size={18} /> Live Tariffs (DAM)</h3>
-                    <div className="dash-table-wrap">
-                      <table className="dash-table">
-                        <thead>
-                          <tr><th>Πόρος</th><th>Ταρίφα</th><th>Τιμή</th><th>Μονάδα</th><th>Ενημέρωση</th></tr>
-                        </thead>
-                        <tbody>
-                          {tariffs.map((t) => (
-                            <tr key={t.id}>
-                              <td><span className={`rag-resource-tag ${t.resource.toLowerCase().replace(/\s/g, '-')}`}>{t.resource}</span></td>
-                              <td>{t.tariff_name}</td>
-                              <td style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => updateTariffPrice(t)} title="Κλικ για επεξεργασία"><strong>{t.price_eur.toFixed(4)}</strong></td>
-                              <td>{t.unit}</td>
-                              <td>{new Date(t.updated_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {tariffs.length === 0 && <p className="dash-empty">Δεν υπάρχουν τιμολόγια.</p>}
-                    </div>
-                  </div>
-                  <div className="rag-context-panel">
-                    <h3 className="rag-section-title"><Bot size={18} /> Agent Context (RAG Output)</h3>
-                    <p className="rag-context-desc">Το ακριβές system prompt που δημιουργείται από τον συνδυασμό Live Tariffs + Base Prompt Template.</p>
-                    <div className="rag-agent-select">
-                      <label>Agent</label>
-                      <select value={configAgent?.id || agents[0]?.id || ''} onChange={(e) => { const found = agents.find((a) => a.id === e.target.value); if (found) setConfigAgent(found); }}>
-                        {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    </div>
-                    <pre className="rag-context-window">{generateAgentContext()}</pre>
-                  </div>
-                </div>
-              </div>
+              <MarketRagFolders />
             )}
 
             {tab === 'hub' && (
@@ -1246,45 +1206,11 @@ export default function DashboardPage() {
       )}
 
       {openLead && (
-        <div className="modal-overlay" onClick={() => setOpenLead(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, width: '95vw', maxHeight: '85vh', overflow: 'auto' }}>
-            <div className="modal-header">
-              <h3 style={{ margin: 0 }}>{openLead.first_name} {openLead.last_name}</h3>
-              <button className="modal-close" onClick={() => setOpenLead(null)}>x</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                <div className="detail-group"><label>Email</label><span>{openLead.email || '—'}</span></div>
-                <div className="detail-group"><label>Τηλέφωνο</label><span>{openLead.phone || '—'}</span></div>
-                <div className="detail-group"><label>Περιοχή</label><span>{openLead.region || '—'}</span></div>
-                <div className="detail-group"><label>Τύπος</label><span>{openLead.customer_type || '—'}</span></div>
-                <div className="detail-group"><label>Κατηγορία</label><span>{openLead.customer_category || '—'}</span></div>
-                <div className="detail-group"><label>Πάροχος</label><span>{openLead.provider || '—'}</span></div>
-                <div className="detail-group"><label>Status</label><span className={`dash-status-pill ${openLead.status}`}>{openLead.status}</span></div>
-                <div className="detail-group"><label>Δημιουργήθηκε</label><span>{new Date(openLead.created_at).toLocaleDateString('el-GR')}</span></div>
-                {openLead.assigned_to && <div className="detail-group"><label>Αντιπρόσωπος</label><span>{crmUsers.find(u => u.id === openLead.assigned_to)?.full_name || openLead.assigned_to}</span></div>}
-                {openLead.comments && <div className="detail-group" style={{ gridColumn: '1 / -1' }}><label>Σχόλια</label><span>{openLead.comments}</span></div>}
-              </div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                <h4 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={18} /> Ανεβασμένα Αρχεία</h4>
-                {billLoading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Φόρτωση...</div>}
-                {billError && <div style={{ padding: 12, background: 'rgba(231,76,60,0.1)', borderRadius: 8, color: '#e74c3c', fontSize: 13 }}><AlertCircle size={14} /> {billError}</div>}
-                {!billLoading && !billError && billUrls.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}><FolderOpen size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />Δεν υπάρχουν ανεβασμένα αρχεία</div>}
-                {billUrls.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{billUrls.map((file, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
-                    {file.type === 'application/pdf' ? <FileText size={24} style={{ color: '#e74c3c', flexShrink: 0 }} /> : <ImageIcon size={24} style={{ color: '#00c878', flexShrink: 0 }} />}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}{file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}</div>
-                    </div>
-                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><ExternalLink size={14} /> Προβολή</a>
-                    <a href={file.url} download={file.name} className="btn btn-ghost" style={{ fontSize: 12, flexShrink: 0, textDecoration: 'none' }}><Download size={14} /> Λήψη</a>
-                  </div>
-                ))}</div>}
-              </div>
-            </div>
-          </div>
-        </div>
+        <LeadDetailSlideout
+          lead={openLead}
+          onClose={() => setOpenLead(null)}
+          crmUsers={crmUsers}
+        />
       )}
     </div>
   );
@@ -2359,19 +2285,15 @@ function B2BScraperTab({ toast, setToast }: {
 }) {
   const [scrapeConfig, setScrapeConfig] = useState({
     category: 'energy',
-    region: '',
-    maxResults: 50,
-    source: 'auto',
+    region: 'Αττική',
+    maxResults: 20,
     importToDb: false,
-    apifyToken: '',
-    googleApiKey: '',
   });
   const [scraping, setScraping] = useState(false);
   const [scrapeResults, setScrapeResults] = useState<any[]>([]);
   const [scrapeSourceInfo, setScrapeSourceInfo] = useState<any>(null);
   const [scrapeHistory, setScrapeHistory] = useState<any[]>([]);
   const [selectedForImport, setSelectedForImport] = useState<Set<number>>(new Set());
-  const [showApiConfig, setShowApiConfig] = useState(false);
 
   const categories = [
     { value: 'energy', label: 'Εταιρείες Ενέργειας' },
@@ -2380,7 +2302,7 @@ function B2BScraperTab({ toast, setToast }: {
     { value: 'real_estate', label: 'Ακίνητα & Μεσιτικά' },
     { value: 'construction', label: 'Κατασκευαστικές & Εργοληπτικές' },
     { value: 'restaurant', label: 'Εστιατόρια & Ταβέρνες' },
-    { value: 'hotel', ξενοδοχεία: 'Ξενοδοχεία & Ενοικιαζόμενα' },
+    { value: 'hotel', label: 'Ξενοδοχεία & Ενοικιαζόμενα' },
     { value: 'retail', label: 'Λιανικό Εμπόριο & Καταστήματα' },
     { value: 'technology', label: 'Τεχνολογία & Software' },
     { value: 'healthcare', label: 'Υγεία & Ιατρικά' },
@@ -2396,13 +2318,6 @@ function B2BScraperTab({ toast, setToast }: {
     { value: 'other', label: 'Άλλες Επιχειρήσεις' },
   ];
 
-  const sources = [
-    { value: 'auto', label: 'Αυτόματο (όλες οι πηγές)', desc: 'Apify → Google Places → Custom Search' },
-    { value: 'apify', label: 'Apify (Google Maps Scraper)', desc: 'Αυθεντικά δεδομένα Google Maps' },
-    { value: 'google_places', label: 'Google Places API', desc: 'Nearby Search API' },
-    { value: 'google_search', label: 'Google Custom Search', desc: 'Web search results' },
-  ];
-
   const greekRegions = [
     'Αττική', 'Θεσσαλονίκη', 'Κεντρική Ελλάδα', 'Πελοπόννησος',
     'Κρήτη', 'Ιόνια Νησιά', 'Θεσσαλία', 'Ήπειρος',
@@ -2410,22 +2325,9 @@ function B2BScraperTab({ toast, setToast }: {
     'Ανατολική Μακεδονία & Θράκη', 'Βόρειο Αιγαίο',
   ];
 
-  const loadSavedConfig = async () => {
-    const { data } = await supabase.from('crm_settings').select('value').eq('key', 'scraper_apify_token').single();
-    if (data?.value?.token && !scrapeConfig.apifyToken) {
-      setScrapeConfig(prev => ({ ...prev, apifyToken: data.value.token }));
-    }
-    const { data: gData } = await supabase.from('crm_settings').select('value').eq('key', 'scraper_google_key').single();
-    if (gData?.value?.key && !scrapeConfig.googleApiKey) {
-      setScrapeConfig(prev => ({ ...prev, googleApiKey: gData.value.key }));
-    }
-  };
-
-  useEffect(() => { loadSavedConfig(); }, []);
-
   const startScrape = async () => {
     setScraping(true);
-    setToast({ msg: 'Εκκίνηση B2B scraping...', type: 'info' });
+    setToast({ msg: 'Εκκίνηση B2B scraping via SerpApi Google Maps...', type: 'info' });
 
     try {
       const { data, error } = await supabase.functions.invoke('scrape-b2b', {
@@ -2433,10 +2335,7 @@ function B2BScraperTab({ toast, setToast }: {
           category: scrapeConfig.category,
           region: scrapeConfig.region,
           maxResults: scrapeConfig.maxResults,
-          source: scrapeConfig.source,
           importToDb: false,
-          apifyToken: scrapeConfig.apifyToken,
-          googleApiKey: scrapeConfig.googleApiKey,
         },
       });
 
@@ -2449,10 +2348,10 @@ function B2BScraperTab({ toast, setToast }: {
           date: new Date(),
           category: scrapeConfig.category,
           region: scrapeConfig.region || 'Όλη Ελλάδα',
-          source: data.source_info?.api || scrapeConfig.source,
+          source: data.source_info?.api || 'SerpApi',
           count: data.businesses.length,
         }]);
-        setToast({ msg: `Βρέθηκαν ${data.businesses.length} B2B leads (${data.source_info?.api})!`, type: 'success' });
+        setToast({ msg: `Βρέθηκαν ${data.businesses.length} B2B leads (SerpApi Google Maps)!`, type: 'success' });
       } else if (data?.error) {
         setToast({ msg: data.error, type: 'info' });
       }
@@ -2463,18 +2362,11 @@ function B2BScraperTab({ toast, setToast }: {
     }
   };
 
-  const saveApiConfig = async () => {
-    await supabase.from('crm_settings').upsert({ key: 'scraper_apify_token', value: { token: scrapeConfig.apifyToken }, category: 'scraper' });
-    await supabase.from('crm_settings').upsert({ key: 'scraper_google_key', value: { key: scrapeConfig.googleApiKey }, category: 'scraper' });
-    setToast({ msg: 'API keys αποθηκεύτηκαν!', type: 'success' });
-    setShowApiConfig(false);
-  };
-
   const exportToCsv = () => {
     if (scrapeResults.length === 0) return;
-    const headers = ['Εταιρεία', 'Κατηγορία', 'Περιοχή', 'Τηλέφωνο', 'Email', 'Ιστοσελίδα', 'Διεύθυνση', 'Πηγή', 'Αξιολόγηση', 'Reviews'];
+    const headers = ['Εταιρεία', 'Κατηγορία', 'Περιοχή', 'Τηλέφωνο', 'Ιστοσελίδα', 'Διεύθυνση', 'Πηγή', 'Αξιολόγηση', 'Reviews'];
     const rows = scrapeResults.map(r => [
-      r.company, r.category, r.region, r.phone, r.email, r.website, r.address, r.source, r.rating || '', r.totalReviews || ''
+      r.company, r.category, r.region, r.phone, r.website, r.address, r.source, r.rating || '', r.totalReviews || ''
     ]);
 
     const BOM = '\uFEFF';
@@ -2501,10 +2393,7 @@ function B2BScraperTab({ toast, setToast }: {
           category: scrapeConfig.category,
           region: scrapeConfig.region,
           maxResults: toImport.length,
-          source: scrapeConfig.source,
           importToDb: true,
-          apifyToken: scrapeConfig.apifyToken,
-          googleApiKey: scrapeConfig.googleApiKey,
         },
       });
 
@@ -2524,59 +2413,16 @@ function B2BScraperTab({ toast, setToast }: {
     }
   };
 
-  const hasApiKeys = !!(scrapeConfig.apifyToken || scrapeConfig.googleApiKey);
-
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Αυτοματοποιημένη συλλογή B2B leads από Google Maps και web sources. Real δεδομένα εταιρειών με GDPR-compliant lawful basis.</p>
+        <p>Αυτοματοποιημένη συλλογή B2B leads από Google Maps μέσω SerpApi. Real δεδομένα εταιρειών με GDPR-compliant lawful basis.</p>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-ghost" onClick={() => setShowApiConfig(!showApiConfig)}>
-            <Settings size={16} /> API Keys
-          </button>
-          <button className="btn btn-primary" onClick={startScrape} disabled={scraping || !hasApiKeys}>
+          <button className="btn btn-primary" onClick={startScrape} disabled={scraping}>
             <Radar size={16} className={scraping ? 'spin' : ''} /> {scraping ? 'Scraping...' : 'Εκκίνηση Scraping'}
           </button>
         </div>
       </div>
-
-      {showApiConfig && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>API Configuration</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className="drawer-field">
-              <label>Apify API Token</label>
-              <input type="password" placeholder="apify_api_..." value={scrapeConfig.apifyToken} onChange={(e) => setScrapeConfig({ ...scrapeConfig, apifyToken: e.target.value })} />
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Για real Google Maps data. <a href="https://console.apify.com/account/integrations" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Πάρτε token →</a>
-              </span>
-            </div>
-            <div className="drawer-field">
-              <label>Google Maps API Key</label>
-              <input type="password" placeholder="AIza..." value={scrapeConfig.googleApiKey} onChange={(e) => setScrapeConfig({ ...scrapeConfig, googleApiKey: e.target.value })} />
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Places API + Custom Search. <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Πάρτε key →</a>
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button className="btn btn-primary" onClick={saveApiConfig}><CheckCircle2 size={14} /> Αποθήκευση</button>
-            <button className="btn btn-ghost" onClick={() => setShowApiConfig(false)}>Άκυρο</button>
-          </div>
-        </div>
-      )}
-
-      {!hasApiKeys && (
-        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
-          <div>
-            <strong style={{ fontSize: '13px' }}>Χρειάζεται API Key</strong>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              Προσθέστε Apify token ή Google Maps API key για real scraping. Πατήστε "API Keys" παραπάνω.
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="scraper-config">
         <h3>Ρυθμίσεις Scraping</h3>
@@ -2590,26 +2436,25 @@ function B2BScraperTab({ toast, setToast }: {
           <div className="drawer-field">
             <label>Περιοχή Στόχου</label>
             <select value={scrapeConfig.region} onChange={(e) => setScrapeConfig({ ...scrapeConfig, region: e.target.value })}>
-              <option value="">Όλη η Ελλάδα</option>
               {greekRegions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div className="drawer-field">
-            <label>Πηγή Δεδομένων</label>
-            <select value={scrapeConfig.source} onChange={(e) => setScrapeConfig({ ...scrapeConfig, source: e.target.value })}>
-              {sources.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <label>Μέγιστο Αποτελέσματα</label>
+            <input type="number" min="5" max="60" value={scrapeConfig.maxResults} onChange={(e) => setScrapeConfig({ ...scrapeConfig, maxResults: parseInt(e.target.value) || 20 })} />
           </div>
           <div className="drawer-field">
-            <label>Μέγιστο Αποτελέσματα</label>
-            <input type="number" min="10" max="500" value={scrapeConfig.maxResults} onChange={(e) => setScrapeConfig({ ...scrapeConfig, maxResults: parseInt(e.target.value) || 50 })} />
+            <label>Πηγή</label>
+            <div style={{ padding: '10px 14px', background: 'var(--surface-2, #f5f7fa)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Globe size={14} style={{ color: '#00c878' }} /> SerpApi Google Maps Engine
+            </div>
           </div>
         </div>
       </div>
 
       {scrapeSourceInfo && (
         <div style={{ background: 'rgba(0,200,120,0.06)', border: '1px solid rgba(0,200,120,0.15)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px' }}>
-          <strong>Source:</strong> {scrapeSourceInfo.api} {scrapeSourceInfo.apify && '✓ Apify'} {scrapeSourceInfo.google_places && '✓ Google Places'} {scrapeSourceInfo.custom_search && '✓ Custom Search'}
+          <strong>Engine:</strong> {scrapeSourceInfo.api} | <strong>Query:</strong> {scrapeSourceInfo.query} | <strong>Region:</strong> {scrapeSourceInfo.region} ({scrapeSourceInfo.ll})
         </div>
       )}
 
@@ -2634,7 +2479,7 @@ function B2BScraperTab({ toast, setToast }: {
               <thead>
                 <tr>
                   <th style={{ width: '40px' }}><input type="checkbox" checked={selectedForImport.size === scrapeResults.length} onChange={toggleSelectAll} /></th>
-                  <th>Εταιρεία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Τηλέφωνο</th><th>Email</th><th>Ιστοσελίδα</th><th>Πηγή</th><th>Rating</th>
+                  <th>Εταιρεία</th><th>Κατηγορία</th><th>Περιοχή</th><th>Τηλέφωνο</th><th>Ιστοσελίδα</th><th>Διεύθυνση</th><th>Rating</th>
                 </tr>
               </thead>
               <tbody>
@@ -2649,9 +2494,8 @@ function B2BScraperTab({ toast, setToast }: {
                     <td>{r.category}</td>
                     <td>{r.region}</td>
                     <td>{r.phone || '—'}</td>
-                    <td>{r.email || '—'}</td>
                     <td>{r.website ? <a href={r.website.startsWith('http') ? r.website : `https://${r.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>{r.website.replace(/^https?:\/\//, '').slice(0, 30)}</a> : '—'}</td>
-                    <td><span className="dash-status-pill">{r.source}</span></td>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.address || '—'}</td>
                     <td>{r.rating ? `${r.rating} ★ (${r.totalReviews || 0})` : '—'}</td>
                   </tr>
                 ))}
@@ -2687,16 +2531,16 @@ function B2BScraperTab({ toast, setToast }: {
 
       <div className="scraper-info" style={{ marginTop: '24px' }}>
         <h3>Πληροφορίες</h3>
-        <p>Αυτό το εργαλείο χρησιμοποιεί <strong>Apify actors</strong> και <strong>Google Maps API</strong> για real scraping επιχειρήσεων. Όλα τα δεδομένα συλλέγονται με <strong>Legitimate Interest</strong> lawful basis και σέβονται τον GDPR.</p>
+        <p>Αυτό το εργαλείο χρησιμοποιεί <strong>SerpApi Google Maps Engine</strong> για real-time scraping επιχειρήσεων από Google Maps. Το API key αποθηκεύεται ασφαλώς στη βάση δεδομένων.</p>
         <ul>
-          <li><strong>Apify</strong> — Google Maps scraper actor, real δεδομένα (τηλέφωνα, email, website, rating)</li>
-          <li><strong>Google Places API</strong> — Nearby Search + Place Details enrichment</li>
-          <li><strong>Google Custom Search</strong> — Web search fallback</li>
+          <li><strong>SerpApi</strong> — Google Maps engine (engine=google_maps) με real δεδομένα</li>
           <li><strong>20 κατηγορίες</strong> επιχειρήσεων: ενέργεια, solar, EV, ακίνητα, tech, hospitality, retail κ.λπ.</li>
-          <li><strong>14 περιοχές</strong> της Ελλάδας + όλη η Ελλάδα</li>
+          <li><strong>14 περιοχές</strong> της Ελλάδας με ακριβείς συντεταγμένες Google Maps</li>
+          <li>Αυτόματο <strong>φιλτράρισμα</strong> — μόνο αποτελέσματα με τηλέφωνο</li>
           <li>Αυτόματη <strong>deduplication</strong> by company name + phone</li>
           <li>Εξαγωγή σε <strong>CSV</strong> με BOM για ελληνικούς χαρακτήρες</li>
-          <li>Αυτόματη εισαγωγή leads στη βάση δεδομένων</li>
+          <li>Αυτόματη εισαγωγή leads στη βάση δεδομένων με status "Νέο Lead"</li>
+          <li><strong>GDPR</strong> — Legitimate Interest lawful basis</li>
         </ul>
       </div>
     </div>

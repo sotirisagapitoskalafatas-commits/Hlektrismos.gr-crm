@@ -963,7 +963,7 @@ img { display: block; max-width: 100%; }
   pointer-events: none;
 }
 
-/* ===== Section Background Images ===== */
+/* ===== Section Background Images (Light Mode Only) ===== */
 .section.section-bg-services {
   background-image: url('/images/energy2.jpg');
   background-size: cover;
@@ -974,7 +974,7 @@ img { display: block; max-width: 100%; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(6,10,18,0.92);
+  background: rgba(255,255,255,0.92);
   z-index: 0;
 }
 .section.section-bg-services > * { position: relative; z-index: 1; }
@@ -989,7 +989,7 @@ img { display: block; max-width: 100%; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(6,10,18,0.92);
+  background: rgba(255,255,255,0.92);
   z-index: 0;
 }
 .section.section-bg-about > * { position: relative; z-index: 1; }
@@ -1005,7 +1005,7 @@ img { display: block; max-width: 100%; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(6,10,18,0.92);
+  background: rgba(255,255,255,0.92);
   z-index: 0;
 }
 .section.section-bg-faq > * { position: relative; z-index: 1; }
@@ -1020,7 +1020,7 @@ img { display: block; max-width: 100%; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(6,10,18,0.92);
+  background: rgba(255,255,255,0.92);
   z-index: 0;
 }
 .gdpr-section.section-bg-gdpr > * { position: relative; z-index: 1; }
@@ -1035,7 +1035,7 @@ img { display: block; max-width: 100%; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(6,10,18,0.92);
+  background: rgba(255,255,255,0.92);
   z-index: 0;
 }
 .contact-section.section-bg-contact > * { position: relative; z-index: 1; }

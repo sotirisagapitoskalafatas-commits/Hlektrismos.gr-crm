@@ -2867,21 +2867,21 @@ function EmailTab({ toast, setToast }: {
   const [leads, setLeads] = useState<Array<{ id: string; first_name: string; last_name: string; email: string }>>([]);
 
   const folders = [
-    { id: 'inbox', label: 'Εισερχόμενα', icon: 'ΏθΥξ' },
-    { id: 'starred', label: 'Αστέρια', icon: 'έφΡ' },
-    { id: 'sent', label: 'Απεσταλμένα', icon: 'ΏθΥν' },
-    { id: 'drafts', label: 'Πρόχειρα', icon: 'ΏθΥζ' },
-    { id: 'important', label: 'Σημαντικά', icon: '🏷️' },
-    { id: 'archive', label: 'Αρχείο', icon: 'ΏθΥο' },
-    { id: 'spam', label: 'Ανεπιθύμητα', icon: '⚠️' },
+    { id: 'inbox', label: 'Εισερχόμενα', icon: '📥' },
+    { id: 'starred', label: 'Αστέρια', icon: '⭐' },
+    { id: 'sent', label: 'Απεσταλμένα', icon: '📤' },
+    { id: 'drafts', label: 'Πρόχειρα', icon: '📝' },
+    { id: 'important', label: 'Σημαντικά', icon: '⚡' },
+    { id: 'archive', label: 'Αρχείο', icon: '🗂️' },
+    { id: 'spam', label: 'Ανεπιθύμητα', icon: '🚫' },
     { id: 'trash', label: 'Απορρίμματα', icon: '🗑️' },
   ];
 
   const providers = [
-    { id: 'gmail', label: 'Gmail', icon: 'ΏθΥπ', host: 'imap.gmail.com', port: '993' },
-    { id: 'outlook', label: 'Outlook / Microsoft 365', icon: 'ΏθΥχ', host: 'outlook.office365.com', port: '993' },
-    { id: 'yahoo', label: 'Yahoo Mail', icon: 'ΏθΥυ', host: 'imap.mail.yahoo.com', port: '993' },
-    { id: 'custom', label: 'Προσαρμοσμένο IMAP', icon: 'ΏθΦπ', host: '', port: '993' },
+    { id: 'gmail', label: 'Gmail', icon: '📧', host: 'imap.gmail.com', port: '993' },
+    { id: 'outlook', label: 'Outlook / Microsoft 365', icon: '📨', host: 'outlook.office365.com', port: '993' },
+    { id: 'yahoo', label: 'Yahoo Mail', icon: '📬', host: 'imap.mail.yahoo.com', port: '993' },
+    { id: 'custom', label: 'Προσαρμοσμένο IMAP', icon: '📩', host: '', port: '993' },
   ];
 
   const labelColors = ['#0066cc', '#00c878', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -3155,7 +3155,7 @@ function EmailTab({ toast, setToast }: {
             </div>
             <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: '8px' }}>
               <button onClick={() => { setShowImport(true); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-                <span>ΏθΥξ</span> Εισαγωγή Email
+                <span>📥</span> Εισαγωγή Email
               </button>
               <button onClick={() => { setShowSettings(true); setEditingSettings({ ...emailSettings }); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 12px', background: 'transparent', color: 'var(--text)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
                 <span>⚙️</span> Ρυθμίσεις
@@ -3177,7 +3177,7 @@ function EmailTab({ toast, setToast }: {
                 <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 10px', color: '#ef4444' }} onClick={handleBulkDelete}>🗑️ Διαγραφή</button>
               </div>
             ) : (
-              <input type="text" placeholder="ΏθΦΞ Αναζήτηση emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              <input type="text" placeholder="🔍 Αναζήτηση emails..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ flex: 1, padding: '8px 14px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '20px', color: 'var(--text)', fontSize: '13px', outline: 'none' }} />
             )}
             <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
@@ -3195,7 +3195,7 @@ function EmailTab({ toast, setToast }: {
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>
               ) : filteredEmails.length === 0 ? (
                 <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>ΏθΥφ</div>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
                   <p style={{ fontSize: '16px', margin: 0 }}>Δεν υπάρχουν emails</p>
                   <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
                     {activeFolder === 'inbox' ? 'Το inbox σας είναι άδειο.' : 'Δεν βρέθηκαν emails σε αυτόν τον φάκελο.'}
@@ -3210,7 +3210,7 @@ function EmailTab({ toast, setToast }: {
                     onChange={() => handleToggleSelect(email.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
                   <button onClick={(e) => { e.stopPropagation(); handleToggleStar(email.id); }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: 0, flexShrink: 0, opacity: email.starred ? 1 : 0.3 }}>
-                    {email.starred ? 'έφΡ' : 'έαΗ'}
+                    {email.starred ? '⭐' : '☆'}
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
@@ -3235,7 +3235,7 @@ function EmailTab({ toast, setToast }: {
                         const lbl = labels.find(ll => ll.name === l);
                         return <span key={l} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>{l}</span>;
                       })}
-                      {email.lead_id && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>ΏθΦΩ Lead</span>}
+                      {email.lead_id && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,200,120,0.1)', color: '#00c878' }}>🔗 Lead</span>}
                     </div>
                   </div>
                 </div>
@@ -3259,10 +3259,10 @@ function EmailTab({ toast, setToast }: {
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                     <button onClick={() => handleToggleStar(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
-                      {selectedEmailData.starred ? 'έφΡ' : 'έαΗ'}
+                      {selectedEmailData.starred ? '⭐' : '☆'}
                     </button>
                     <button onClick={() => handleToggleImportant(selectedEmail)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
-                      {selectedEmailData.important ? '🏷️' : 'ΏθΦΨ'}
+                      {selectedEmailData.important ? '🏷️' : '🏷️'}
                     </button>
                     <select value="" onChange={(e) => { if (e.target.value) handleAddLabel(selectedEmail, e.target.value); e.target.value = ''; }}
                       style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
@@ -3273,10 +3273,10 @@ function EmailTab({ toast, setToast }: {
                     </select>
                     <select value={selectedEmailData.lead_id || ''} onChange={(e) => handleLinkToLead(selectedEmail, e.target.value)}
                       style={{ padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}>
-                      <option value="">ΏθΦΩ Lead</option>
+                      <option value="">🔗 Lead</option>
                       {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name}</option>)}
                     </select>
-                    <button className="btn btn-ghost" onClick={() => handleMarkUnread(selectedEmail)} style={{ fontSize: '12px', padding: '4px 8px' }}>ΏθΥσ</button>
+                    <button className="btn btn-ghost" onClick={() => handleMarkUnread(selectedEmail)} style={{ fontSize: '12px', padding: '4px 8px' }}>👁️</button>
                     <button className="btn btn-ghost" onClick={() => handleDeleteEmail(selectedEmail)} style={{ color: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>🗑️</button>
                   </div>
                 </div>
@@ -3287,7 +3287,7 @@ function EmailTab({ toast, setToast }: {
                       return (
                         <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: lbl ? lbl.color + '20' : '#0066cc20', color: lbl ? lbl.color : '#0066cc' }}>
                           {l}
-                          <button onClick={() => handleRemoveLabel(selectedEmail, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '10px', padding: 0 }}>έεΧ</button>
+                          <button onClick={() => handleRemoveLabel(selectedEmail, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '10px', padding: 0 }}>✕</button>
                         </span>
                       );
                     })}
@@ -3312,7 +3312,7 @@ function EmailTab({ toast, setToast }: {
         </div>
       </div>
 
-      {/* Compose Modal έΑΦ Gmail-Style Enhanced */}
+      {/* Compose Modal ✉️ Gmail-Style Enhanced */}
       {showCompose && (
         <div style={{
           position: 'fixed',
@@ -3336,9 +3336,9 @@ function EmailTab({ toast, setToast }: {
             <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>Νέο Μήνυμα</span>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button onClick={() => setIsFullScreen(!isFullScreen)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Πλήρης οθόνη">
-                {isFullScreen ? 'ΏθΩΩ' : 'ΏθΩΨ'}
+                {isFullScreen ? '🖨️' : '🖥️'}
               </button>
-              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Κλείσιμο">έεΨ</button>
+              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)' }} title="Κλείσιμο">✕</button>
             </div>
           </div>
 
@@ -3385,10 +3385,10 @@ function EmailTab({ toast, setToast }: {
                 <button style={{ fontStyle: 'italic', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>I</button>
                 <button style={{ textDecoration: 'underline', padding: '2px 8px', border: '1px solid var(--border)', background: 'var(--bg)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)' }}>U</button>
                 <div style={{ height: '16px', width: '1px', background: 'var(--border)' }}></div>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>ΏθΟρ</button>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>έΚκ</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>•</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>—</button>
                 <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>1.</button>
-                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>έΑλ</button>
+                <button style={{ padding: '2px 6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}>🔗</button>
               </div>
             )}
 
@@ -3420,10 +3420,10 @@ function EmailTab({ toast, setToast }: {
 
               {/* Toolbar Control Buttons */}
               <button title="Επιλογές μορφοποίησης" onClick={() => setShowFormattingToolbar(!showFormattingToolbar)} style={{ background: showFormattingToolbar ? 'var(--primary-10, rgba(0,102,204,0.1))' : 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', color: 'var(--text)' }}>Aa</button>
-              <button title="Επισύναψη αρχείων" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΥΟ</button>
-              <button title="Εισαγωγή συνδέσμου" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>ΏθΦΩ</button>
-              <button title="Εισαγωγή emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθαΑ</button>
-              <button title="Εισαγωγή αρχείων CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>ΏθΥΒ</button>
+              <button title="Επισύναψη αρχείων" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>📎</button>
+              <button title="Εισαγωγή συνδέσμου" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--text)' }}>🔗</button>
+              <button title="Εισαγωγή emoji" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>😊</button>
+              <button title="Εισαγωγή αρχείων CRM" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>📁</button>
               <button title="Εισαγωγή φωτογραφίας" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>🖼️</button>
               <button title="Εισαγωγή υπογραφής" style={{ background: 'transparent', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>📎</button>
 
@@ -3439,10 +3439,10 @@ function EmailTab({ toast, setToast }: {
               <div style={{ position: 'absolute', bottom: '50px', left: '16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '8px 0', width: '200px' }}>
                 <div style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>Προγραμματισμός αποστολής</div>
                 <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για αύριο 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΝΖ Αύριο το πρωί (08:00)
+                  📅 Αύριο το πρωί (08:00)
                 </button>
                 <button onClick={() => { setShowScheduleSend(false); setToast({ msg: 'Προγραμματίστηκε για τη Δευτέρα 08:00', type: 'info' }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΥΖ Δευτέρα το πρωί (08:00)
+                  📅 Δευτέρα το πρωί (08:00)
                 </button>
               </div>
             )}
@@ -3451,10 +3451,10 @@ function EmailTab({ toast, setToast }: {
             {showMoreOptions && (
               <div style={{ position: 'absolute', bottom: '50px', left: '210px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1100, padding: '6px 0', width: '220px' }}>
                 <button onClick={() => { setIsFullScreen(!isFullScreen); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΩΨ Προεπιλογή σε πλήρη οθόνη
+                  🖥️ Προεπιλογή σε πλήρη οθόνη
                 </button>
                 <button onClick={() => { setIsPlainText(!isPlainText); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  {isPlainText ? 'έεΥ Λειτουργία απλού κειμένου' : 'ΏθΥζ Λειτουργία απλού κειμένου'}
+                  {isPlainText ? '📝 Λειτουργία απλού κειμένου' : '📝 Λειτουργία απλού κειμένου'}
                 </button>
                 <button onClick={() => { window.print(); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
                   🖨️ Εκτύπωση
@@ -3464,7 +3464,7 @@ function EmailTab({ toast, setToast }: {
                 </button>
                 <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }}></div>
                 <button onClick={() => { setToast({ msg: 'Δημιουργήθηκε σύνδεσμος συνάντησης', type: 'info' }); setShowMoreOptions(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
-                  ΏθΥΖ Προγραμματισμός συνάντησης
+                  📅 Προγραμματισμός συνάντησης
                 </button>
               </div>
             )}
@@ -3476,7 +3476,7 @@ function EmailTab({ toast, setToast }: {
       {showImport && (
         <div className="modal-overlay" onClick={() => setShowImport(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
-            <div className="modal-header"><h3>ΏθΥξ Εισαγωγή Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
+            <div className="modal-header"><h3>📥 Εισαγωγή Emails</h3><button className="modal-close" onClick={() => setShowImport(false)}>x</button></div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
                 Συνδέστε τον email λογαριασμό σας για εισαγωγή υπαρχόντων emails στο CRM.
@@ -3498,7 +3498,7 @@ function EmailTab({ toast, setToast }: {
                   <input placeholder="Port" value={importConfig.imapPort} onChange={(e) => setImportConfig({ ...importConfig, imapPort: e.target.value })} style={{ flex: 1 }} />
                 </div>
                 <button className="btn btn-primary" onClick={handleImportEmails} disabled={syncing} style={{ width: '100%', padding: '12px' }}>
-                  {syncing ? '⏳ Εισαγωγή...' : 'ΏθΥξ Εισαγωγή Emails'}
+                  {syncing ? '⏳ Εισαγωγή...' : '📥 Εισαγωγή Emails'}
                 </button>
               </div>
             </div>

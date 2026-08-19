@@ -539,86 +539,139 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
   const s = settings.email_config || {};
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardProvider, setWizardProvider] = useState('');
 
-  const testConnection = async () => {
+  const testSmtp = async () => {
     setTesting(true);
     setTestResult(null);
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          to: s.smtp_user || s.from_email,
-          subject: "Test Email from Hlektrismos.gr CRM",
-          html: "<p>This is a test email. If you received this, your SMTP configuration is working correctly.</p>",
-          from_name: s.from_name || "Hlektrismos.gr CRM",
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ to: s.smtp_user || s.from_email, subject: "Test Email from Hlektrismos.gr", html: "<p>SMTP test OK ✅</p>", from_name: s.from_name || "Hlektrismos.gr" }),
       });
       const data = await res.json();
-      setTestResult(data.success
-        ? { ok: true, msg: "Test email sent successfully!" }
-        : { ok: false, msg: data.error || "Failed to send test email" });
-    } catch (err: any) {
-      setTestResult({ ok: false, msg: err.message || "Connection error" });
-    }
+      setTestResult(data.success ? { ok: true, msg: "SMTP test email sent!" } : { ok: false, msg: data.error || "Failed" });
+    } catch (err: any) { setTestResult({ ok: false, msg: err.message }); }
     setTesting(false);
+  };
+
+  const testImap = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      setSyncResult(data.success ? { ok: true, msg: data.message || "IMAP sync OK!" } : { ok: false, msg: data.error || "IMAP failed" });
+    } catch (err: any) { setSyncResult({ ok: false, msg: err.message }); }
+    setSyncing(false);
+  };
+
+  const applyWizardPreset = (provider: string) => {
+    const presets: Record<string, any> = {
+      gmail: { smtp_host: 'smtp.gmail.com', smtp_port: 587, imap_host: 'imap.gmail.com', imap_port: 993 },
+      outlook: { smtp_host: 'smtp.office365.com', smtp_port: 587, imap_host: 'outlook.office365.com', imap_port: 993 },
+      cpanel: { smtp_host: '', smtp_port: 587, imap_host: '', imap_port: 993 },
+    };
+    const p = presets[provider] || {};
+    update('email_config', { ...s, ...p });
+    setWizardProvider(provider);
+    setShowWizard(true);
   };
 
   return (
     <div>
-      <h4 style={{ margin: '0 0 16px', fontSize: '14px' }}>📧 SMTP Email Configuration</h4>
-      <p style={{ margin: '0 0 16px', fontSize: '12px', color: 'var(--text-muted)' }}>
-        Configure your SMTP server to send emails directly from the CRM. Supports Gmail, Outlook, and custom SMTP servers.
-      </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <FieldRow label="SMTP Host" desc="e.g. smtp.gmail.com">
-          <TextInput value={s.smtp_host || ''} onChange={(v) => update('email_config', { ...s, smtp_host: v })} placeholder="smtp.gmail.com" />
-        </FieldRow>
-        <FieldRow label="SMTP Port" desc="587 (STARTTLS) or 465 (TLS)">
-          <NumberInput value={s.smtp_port || 587} onChange={(v) => update('email_config', { ...s, smtp_port: v })} min={25} max={65535} />
-        </FieldRow>
-        <FieldRow label="Email Address" desc="Login username (usually your email)">
-          <TextInput value={s.smtp_user || ''} onChange={(v) => update('email_config', { ...s, smtp_user: v })} placeholder="your@email.gr" />
-        </FieldRow>
-        <FieldRow label="App Password" desc="Use App Password, NOT your real password">
-          <TextInput type="password" value={s.smtp_password || ''} onChange={(v) => update('email_config', { ...s, smtp_password: v })} placeholder="xxxx-xxxx-xxxx-xxxx" />
-        </FieldRow>
-        <FieldRow label="From Name" desc="Sender display name">
-          <TextInput value={s.from_name || ''} onChange={(v) => update('email_config', { ...s, from_name: v })} placeholder="Hlektrismos.gr" />
-        </FieldRow>
-        <FieldRow label="From Email" desc="Reply-to address (defaults to Email Address)">
-          <TextInput value={s.from_email || ''} onChange={(v) => update('email_config', { ...s, from_email: v })} placeholder="info@hlektrismos.gr" />
-        </FieldRow>
-      </div>
-      <div style={{ marginTop: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <button
-          onClick={testConnection}
-          disabled={testing || !s.smtp_host}
-          style={{
-            padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--primary, #0066cc)',
-            background: 'var(--primary, #0066cc)', color: '#fff', fontSize: '13px', fontWeight: 600,
-            cursor: testing ? 'wait' : 'pointer', opacity: (!s.smtp_host || testing) ? 0.5 : 1,
-          }}
-        >
-          {testing ? '⏳ Testing...' : '🧪 Send Test Email'}
-        </button>
-        {testResult && (
-          <span style={{ fontSize: '12px', color: testResult.ok ? '#22c55e' : '#ef4444' }}>
-            {testResult.ok ? '✅' : '❌'} {testResult.msg}
-          </span>
+      <h4 style={{ margin: '0 0 16px', fontSize: '14px' }}>📧 Email Configuration (SMTP + IMAP)</h4>
+
+      {/* Setup Wizard Toggle */}
+      <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(0,102,204,0.04)', border: '1px solid rgba(0,102,204,0.15)', borderRadius: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>🧙 Quick Setup Wizard</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[['gmail', 'Gmail'], ['outlook', 'Outlook / 365'], ['cpanel', 'cPanel / Custom']].map(([key, label]) => (
+            <button key={key} onClick={() => applyWizardPreset(key)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: wizardProvider === key ? 'rgba(0,102,204,0.1)' : '#fff', color: 'var(--text)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{label}</button>
+          ))}
+        </div>
+        {showWizard && (
+          <div style={{ marginTop: 12, padding: '10px 14px', background: '#fff', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, lineHeight: 1.7, color: 'var(--text-muted)' }}>
+            {wizardProvider === 'gmail' && (
+              <ol style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Go to <strong>myaccount.google.com</strong> → Security</li>
+                <li>Enable <strong>2-Step Verification</strong> (required)</li>
+                <li>Go to <strong>App Passwords</strong> (search in Google Account settings)</li>
+                <li>Create a new App Password for "Mail"</li>
+                <li>Copy the 16-character password and paste it in <strong>App Password</strong> fields below</li>
+                <li>SMTP: <code>smtp.gmail.com:587</code> | IMAP: <code>imap.gmail.com:993</code></li>
+              </ol>
+            )}
+            {wizardProvider === 'outlook' && (
+              <ol style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Go to <strong>account.microsoft.com</strong> → Security</li>
+                <li>Enable <strong>Two-step verification</strong></li>
+                <li>Go to <strong>Advanced security options</strong> → App passwords</li>
+                <li>Create a new App password</li>
+                <li>SMTP: <code>smtp.office365.com:587</code> | IMAP: <code>outlook.office365.com:993</code></li>
+              </ol>
+            )}
+            {wizardProvider === 'cpanel' && (
+              <ol style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Check your hosting control panel for SMTP/IMAP settings</li>
+                <li>Typical SMTP: <code>mail.yourdomain.gr:587</code> (STARTTLS)</li>
+                <li>Typical IMAP: <code>mail.yourdomain.gr:993</code> (SSL)</li>
+                <li>Use your full email address as username</li>
+                <li>Contact your hosting provider if unsure</li>
+              </ol>
+            )}
+          </div>
         )}
       </div>
-      <div style={{ marginTop: '20px', padding: '12px 16px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-        <h5 style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--text)' }}>📋 Quick Setup Guide</h5>
-        <ul style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)', paddingLeft: '16px', lineHeight: 1.8 }}>
-          <li><strong>Gmail:</strong> smtp.gmail.com / Port 587 / Use App Password (not your real password)</li>
-          <li><strong>Outlook:</strong> smtp.office365.com / Port 587 / Use App Password</li>
-          <li><strong>Custom:</strong> Check your provider's SMTP settings</li>
-          <li>⚠️ Never use your real password — always use an App Password</li>
-        </ul>
+
+      {/* Outgoing (SMTP) */}
+      <div style={{ marginBottom: 20 }}>
+        <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>📤 Outgoing (SMTP)</h5>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <FieldRow label="SMTP Host"><TextInput value={s.smtp_host || ''} onChange={(v) => update('email_config', { ...s, smtp_host: v })} placeholder="smtp.gmail.com" /></FieldRow>
+          <FieldRow label="SMTP Port" desc="587 (STARTTLS) or 465 (TLS)"><NumberInput value={s.smtp_port || 587} onChange={(v) => update('email_config', { ...s, smtp_port: v })} min={25} max={65535} /></FieldRow>
+          <FieldRow label="Email / Username"><TextInput value={s.smtp_user || ''} onChange={(v) => update('email_config', { ...s, smtp_user: v })} placeholder="your@email.gr" /></FieldRow>
+          <FieldRow label="App Password" desc="NOT your real password"><TextInput type="password" value={s.smtp_password || ''} onChange={(v) => update('email_config', { ...s, smtp_password: v })} placeholder="xxxx-xxxx-xxxx-xxxx" /></FieldRow>
+          <FieldRow label="From Name"><TextInput value={s.from_name || ''} onChange={(v) => update('email_config', { ...s, from_name: v })} placeholder="Hlektrismos.gr" /></FieldRow>
+          <FieldRow label="From Email"><TextInput value={s.from_email || ''} onChange={(v) => update('email_config', { ...s, from_email: v })} placeholder="info@hlektrismos.gr" /></FieldRow>
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button onClick={testSmtp} disabled={testing || !s.smtp_host} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #0066cc', background: '#0066cc', color: '#fff', fontSize: 13, fontWeight: 600, cursor: testing ? 'wait' : 'pointer', opacity: (!s.smtp_host || testing) ? 0.5 : 1 }}>
+            {testing ? '⏳ Testing...' : '🧪 Test SMTP Connection'}
+          </button>
+          {testResult && <span style={{ fontSize: 12, color: testResult.ok ? '#22c55e' : '#ef4444' }}>{testResult.ok ? '✅' : '❌'} {testResult.msg}</span>}
+        </div>
+      </div>
+
+      {/* Incoming (IMAP) */}
+      <div style={{ marginBottom: 20 }}>
+        <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>📥 Incoming (IMAP)</h5>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <FieldRow label="IMAP Host"><TextInput value={s.imap_host || ''} onChange={(v) => update('email_config', { ...s, imap_host: v })} placeholder="imap.gmail.com" /></FieldRow>
+          <FieldRow label="IMAP Port" desc="993 (SSL) or 143 (STARTTLS)"><NumberInput value={s.imap_port || 993} onChange={(v) => update('email_config', { ...s, imap_port: v })} min={143} max={993} /></FieldRow>
+          <FieldRow label="Email / Username"><TextInput value={s.imap_user || ''} onChange={(v) => update('email_config', { ...s, imap_user: v })} placeholder="your@email.gr" /></FieldRow>
+          <FieldRow label="App Password"><TextInput type="password" value={s.imap_password || ''} onChange={(v) => update('email_config', { ...s, imap_password: v })} placeholder="xxxx-xxxx-xxxx-xxxx" /></FieldRow>
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button onClick={testImap} disabled={syncing || !s.imap_host} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #00c878', background: '#00c878', color: '#fff', fontSize: 13, fontWeight: 600, cursor: syncing ? 'wait' : 'pointer', opacity: (!s.imap_host || syncing) ? 0.5 : 1 }}>
+            {syncing ? '⏳ Syncing...' : '📥 Test IMAP & Sync Now'}
+          </button>
+          {syncResult && <span style={{ fontSize: 12, color: syncResult.ok ? '#22c55e' : '#ef4444' }}>{syncResult.ok ? '✅' : '❌'} {syncResult.msg}</span>}
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.8 }}>
+        ⚠️ Never use your real password. Always create an <strong>App Password</strong> from your email provider's security settings.
       </div>
     </div>
   );

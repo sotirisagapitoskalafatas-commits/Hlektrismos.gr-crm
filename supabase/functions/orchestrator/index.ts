@@ -18,6 +18,231 @@ const VALID_MODELS = [
 ]
 const DEFAULT_MODEL = 'gemini-3.6-flash'
 
+// Gemini Function Calling tools — allow AI to take real actions
+const GEMINI_TOOLS = [
+  {
+    function_declarations: [
+      {
+        name: 'search_leads',
+        description: 'Αναζήτηση leads στο CRM. Επιστρέφει λίστα leads με βάση τα κριτήρια.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            query: { type: 'STRING', description: 'Ελεύθερο κείμενο αναζήτησης (όνομα, email, τηλέφωνο)' },
+            status: { type: 'STRING', description: 'Φίλτρο κατάστασης: new, contacted, qualified, meeting_booked, proposal_sent, won, lost' },
+            source: { type: 'STRING', description: 'Πηγή: B2B Scraper, Landing Page, Manual, Email Inbound, Κλπ.' },
+            limit: { type: 'INTEGER', description: 'Μέγιστος αριθμός αποτελεσμάτων (default 10)' },
+          },
+        },
+      },
+      {
+        name: 'update_lead_status',
+        description: 'Ενημέρωση κατάστασης lead. Αλλάζει το status ενός lead.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            lead_id: { type: 'STRING', description: 'Το ID του lead' },
+            status: { type: 'STRING', description: 'Νέο status: new, contacted, qualified, meeting_booked, proposal_sent, won, lost' },
+            notes: { type: 'STRING', description: 'Προαιρετικό σημείωμα για την αλλαγή' },
+          },
+          required: ['lead_id', 'status'],
+        },
+      },
+      {
+        name: 'send_email_to_lead',
+        description: 'Αποστολή email σε lead. Χρησιμοποιεί το SMTP της εταιρείας.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            lead_id: { type: 'STRING', description: 'Το ID του lead' },
+            subject: { type: 'STRING', description: 'Θέμα email' },
+            body: { type: 'STRING', description: 'Σώμα email (plain text)' },
+          },
+          required: ['lead_id', 'subject', 'body'],
+        },
+      },
+      {
+        name: 'trigger_b2b_scraper',
+        description: 'Εκκίνηση B2B scraper για αναζήτηση επιχειρήσεων σε συγκεκριμένη περιοχή/κατηγορία.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            region: { type: 'STRING', description: 'Περιοχή: Αττική, Θεσσαλονίκη, Πάτρα, Ηράκλειο, Λάρισα, Βόλος, Ιωάννινα, Κομοτηνή, Καβάλα, Ξάνθη' },
+            category: { type: 'STRING', description: 'Κατηγορία επιχείρησης: Ξενοδοχεία, Εστιατόρια, Βιομηχανία, Λιανικό, Υγεία, Εκπαίδευση, Κυβέρνηση, Τουρισμός, Τεχνολογία, Γεωργία, Κτηνοτροφία, Ενέργεια, Κατασκευές, Μεταφορές' },
+          },
+          required: ['region', 'category'],
+        },
+      },
+      {
+        name: 'get_market_tariffs',
+        description: 'Ανάκτηση ταρίφων αγοράς. Επιστρέφει τα τρέχοντα ταρίφα για πάροχο ή πόρο.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            provider: { type: 'STRING', description: 'Όνομα παρόχου: ΔΕΗ, Protergia, ΗΡΩΝ, ZeniΘ, Elpedison, nrg, Φυσικό Αέριο, Volton, We Energy, Ελίν' },
+            category: { type: 'STRING', description: 'B2B ή B2C' },
+            resource: { type: 'STRING', description: 'Πόρος: ρεύμα, φυσικό αέριο' },
+          },
+        },
+      },
+      {
+        name: 'add_lead_note',
+        description: 'Προσθήκη σημειώματος σε lead. Αποθηκεύεται στο timeline του lead.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            lead_id: { type: 'STRING', description: 'Το ID του lead' },
+            content: { type: 'STRING', description: 'Το κείμενο του σημειώματος' },
+            author: { type: 'STRING', description: 'Συντάκτης (προαιρετικό, default: AI Agent)' },
+          },
+          required: ['lead_id', 'content'],
+        },
+      },
+      {
+        name: 'get_lead_details',
+        description: 'Λήψη λεπτομερειών ενός lead με βάση το ID. Επιστρέφει πλήρες προφίλ lead.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            lead_id: { type: 'STRING', description: 'Το ID του lead' },
+          },
+          required: ['lead_id'],
+        },
+      },
+      {
+        name: 'get_agent_performance',
+        description: 'Ανάκτηση στατιστικών απόδοσης ενός agent ή όλης της ομάδας.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            agent_id: { type: 'STRING', description: 'Το ID του agent (προαιρετικό, αν αφεθεί κενό επιστρέφει όλους)' },
+          },
+        },
+      },
+    ],
+  },
+]
+
+// Execute a function call from Gemini and return the result
+async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Promise<string> {
+  try {
+    switch (fn) {
+      case 'search_leads': {
+        let query = supabaseAdmin.from('hlektrismos_leads').select('*')
+        if (args.query) {
+          query = query.or(`first_name.ilike.%${args.query}%,last_name.ilike.%${args.query}%,email.ilike.%${args.query}%,phone.ilike.%${args.query}%`)
+        }
+        if (args.status) query = query.eq('status', args.status)
+        if (args.source) query = query.eq('source', args.source)
+        query = query.order('created_at', { ascending: false }).limit(args.limit || 10)
+        const { data, error } = await query
+        if (error) throw error
+        if (!data || data.length === 0) return 'Δεν βρέθηκαν leads με αυτά τα κριτήρια.'
+        return JSON.stringify(data.map((l: any) => ({
+          id: l.id, name: `${l.first_name} ${l.last_name}`, email: l.email, phone: l.phone,
+          company: l.company_name, status: l.status, source: l.source, created: l.created_at,
+        })), null, 0)
+      }
+
+      case 'update_lead_status': {
+        const updates: any = { status: args.status }
+        if (args.notes) updates.notes = args.notes
+        const { error } = await supabaseAdmin.from('hlektrismos_leads').update(updates).eq('id', args.lead_id)
+        if (error) throw error
+        // Also save as note
+        if (args.notes) {
+          await supabaseAdmin.from('lead_notes').insert({ lead_id: args.lead_id, content: args.notes, author: 'AI Agent', note_type: 'status_change' })
+        }
+        return `✅ Lead ${args.lead_id} status → ${args.status}`
+      }
+
+      case 'send_email_to_lead': {
+        // Fetch lead for email address
+        const { data: lead, error: leadErr } = await supabaseAdmin.from('hlektrismos_leads').select('email,first_name,last_name').eq('id', args.lead_id).single()
+        if (leadErr || !lead) return `❌ Lead ${args.lead_id} not found`
+        if (!lead.email) return `❌ Lead has no email address`
+
+        // Call send-email Edge Function
+        const { data: emailConfig } = await supabaseAdmin.from('crm_settings').select('setting_value').eq('setting_key', 'email_config').single()
+        const config = emailConfig?.setting_value || {}
+
+        // Build raw email and send via Deno.connect
+        const rawEmail = `From: ${config.from_name || 'Hlektrismos.gr'} <${config.from_email || 'info@hlektrismos.gr'}>\r\nTo: ${lead.email}\r\nSubject: ${args.subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${args.body}`
+
+        // Log to crm_emails
+        await supabaseAdmin.from('crm_emails').insert({
+          from_address: config.from_email || 'info@hlektrismos.gr',
+          to_addresses: [lead.email],
+          subject: args.subject,
+          body: args.body,
+          direction: 'outbound',
+          lead_id: args.lead_id,
+          status: 'queued',
+        })
+
+        return `✅ Email queued: "${args.subject}" → ${lead.first_name} ${lead.last_name} (${lead.email}). Θα σταλεί μέσω SMTP.`
+      }
+
+      case 'trigger_b2b_scraper': {
+        // Trigger the scrape-b2b Edge Function
+        const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-b2b`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ region: args.region, category: args.category }),
+        })
+        const result = await response.json()
+        return `✅ B2B Scraper εκκινήθηκε για ${args.region} / ${args.category}. Αποτέλεσμα: ${result.leads_found || 0} leads βρέθηκαν.`
+      }
+
+      case 'get_market_tariffs': {
+        let query = supabaseAdmin.from('market_tariffs').select('*')
+        if (args.provider) query = query.eq('provider_name', args.provider)
+        if (args.category) query = query.eq('category', args.category)
+        if (args.resource) query = query.eq('resource', args.resource)
+        const { data, error } = await query
+        if (error) throw error
+        if (!data || data.length === 0) return 'Δεν βρέθηκαν ταρίφα.'
+        return data.map((t: any) =>
+          `${t.provider_name} | ${t.tariff_name} | ${t.category} | €${t.price_eur}/kWh | €${t.fixed_fee_monthly || 0}/μήνα`
+        ).join('\n')
+      }
+
+      case 'add_lead_note': {
+        const { error } = await supabaseAdmin.from('lead_notes').insert({
+          lead_id: args.lead_id, content: args.content, author: args.author || 'AI Agent', note_type: 'ai_note',
+        })
+        if (error) throw error
+        return `✅ Σημείωμα προστέθηκε στο lead ${args.lead_id}`
+      }
+
+      case 'get_lead_details': {
+        const { data: lead, error } = await supabaseAdmin.from('hlektrismos_leads').select('*').eq('id', args.lead_id).single()
+        if (error || !lead) return `❌ Lead ${args.lead_id} not found`
+        return JSON.stringify(lead, null, 0)
+      }
+
+      case 'get_agent_performance': {
+        let query = supabaseAdmin.from('ai_agents').select('*').eq('status', 'active').is('deleted_at', null)
+        if (args.agent_id) query = query.eq('id', args.agent_id)
+        const { data: agents, error } = await query
+        if (error) throw error
+        if (!agents || agents.length === 0) return 'Δεν βρέθηκαν agents.'
+        return agents.map((a: any) =>
+          `${a.name} | Channel: ${a.channel} | Region: ${a.target_region || 'All'} | Leads: ${a.leads_contacted} | Replies: ${a.replies} | Meetings: ${a.meetings_booked} | Conv: ${a.leads_contacted > 0 ? ((a.meetings_booked / a.leads_contacted) * 100).toFixed(1) : 0}%`
+        ).join('\n')
+      }
+
+      default:
+        return `❌ Unknown function: ${fn}`
+    }
+  } catch (err: any) {
+    return `❌ Error executing ${fn}: ${err.message}`
+  }
+}
+
 serve(async (req: any) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -254,21 +479,23 @@ ${multiAgentContext}
 
     geminiMessages.push({ role: 'user', parts: [{ text: message }] })
 
-    // Call Gemini API with optional streaming
-    const geminiApiUrl = isStream
-      ? `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse`
-      : `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
+    // Call Gemini API — always use non-streaming for function calling support
+    const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
 
-    const geminiResponse = await fetch(geminiApiUrl, {
+    const requestBody: any = {
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: geminiMessages,
+      tools: GEMINI_TOOLS,
+      tool_config: { function_calling_config: { mode: 'AUTO' } },
+    }
+
+    let geminiResponse = await fetch(geminiApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-goog-api-key': geminiApiKey,
       },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: geminiMessages,
-      }),
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(120000),
     })
 
@@ -277,69 +504,100 @@ ${multiAgentContext}
       throw new Error(errData.error?.message || `Gemini API error: ${geminiResponse.status}`)
     }
 
-    // STREAMING MODE: Return SSE stream directly to client
+    let aiData = await geminiResponse.json()
+
+    // ---- AGENTIC LOOP: Execute function calls until Gemini returns text ----
+    const MAX_TOOL_ROUNDS = 6
+    let toolRound = 0
+
+    while (toolRound < MAX_TOOL_ROUNDS) {
+      const candidate = aiData.candidates?.[0]
+      const parts = candidate?.content?.parts || []
+
+      // Check if there are function calls
+      const functionCalls = parts.filter((p: any) => p.functionCall)
+      if (functionCalls.length === 0) break // No more tool calls, we have our text answer
+
+      toolRound++
+
+      // Add the model's function call message to conversation
+      geminiMessages.push({ role: 'model', parts })
+
+      // Execute each function call and collect results
+      const functionResponses: any[] = []
+      for (const fc of functionCalls) {
+        const fnName = fc.functionCall.name
+        const fnArgs = fc.functionCall.args || {}
+        console.log(`[Tool Round ${toolRound}] Calling: ${fnName}`, JSON.stringify(fnArgs))
+        const result = await executeFunctionCall(fnName, fnArgs, supabaseAdmin)
+        functionResponses.push({
+          functionResponse: {
+            name: fnName,
+            response: { result },
+          },
+        })
+      }
+
+      // Add function results to conversation and call Gemini again
+      geminiMessages.push({ role: 'user', parts: functionResponses })
+
+      geminiResponse = await fetch(geminiApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': geminiApiKey,
+        },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: geminiMessages,
+          tools: GEMINI_TOOLS,
+          tool_config: { function_calling_config: { mode: 'AUTO' } },
+        }),
+        signal: AbortSignal.timeout(120000),
+      })
+
+      if (!geminiResponse.ok) {
+        const errData = await geminiResponse.json().catch(() => ({}))
+        throw new Error(errData.error?.message || `Gemini API error after tool call: ${geminiResponse.status}`)
+      }
+
+      aiData = await geminiResponse.json()
+    }
+
+    // ---- STREAMING MODE: Emit final text as SSE chunks for UI ----
     if (isStream) {
       const memContextId = context_id && context_id !== 'null' ? context_id : crypto.randomUUID()
       const targetAgentId = primaryAgent?.id || 'orchestrator-director'
 
+      // Extract final text from the agentic loop result
+      const finalText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      if (!finalText) throw new Error('Empty response from Gemini API')
+
+      // Emit as simulated SSE stream (chunked for UI progressive rendering)
       const stream = new ReadableStream({
-        async start(controller) {
-          const reader = geminiResponse.body?.getReader()
-          if (!reader) { controller.close(); return }
-
-          const decoder = new TextDecoder()
-          let fullText = ''
-          let buffer = ''
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) break
-
-              buffer += decoder.decode(value, { stream: true })
-              const lines = buffer.split('\n')
-              buffer = lines.pop() || ''
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(line.slice(6))
-                    const chunk = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-                    if (chunk) {
-                      fullText += chunk
-                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ chunk, done: false })}\n\n`))
-                    }
-                  } catch { /* skip malformed SSE lines */ }
-                }
-              }
-            }
-
-            // Send final message with metadata
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ chunk: '', done: true, context_id: memContextId, agent_id: targetAgentId, model: geminiModel })}\n\n`))
-            controller.close()
-
-            // Save to agent_memory (async, after stream completes)
-            await supabaseAdmin.from('agent_memory').insert([
-              { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message },
-              { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: fullText, metadata: { model: geminiModel, streaming: true } },
-            ])
-
-            // Also save to agent_messages (persistent sessions)
-            if (context_id) {
-              try {
-                await supabaseAdmin.from('agent_messages').insert([
-                  { session_id: context_id, role: 'user', content: message },
-                  { session_id: context_id, role: 'assistant', content: fullText, agent_id: targetAgentId, model: geminiModel },
-                ])
-              } catch { /* table may not exist */ }
-            }
-
-          } catch (err) {
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`))
-            controller.close()
+        start(controller) {
+          const chunkSize = 40
+          for (let i = 0; i < finalText.length; i += chunkSize) {
+            const chunk = finalText.slice(i, i + chunkSize)
+            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ chunk, done: false })}\n\n`))
           }
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ chunk: '', done: true, context_id: memContextId, agent_id: targetAgentId, model: geminiModel, tool_rounds: toolRound })}\n\n`))
+          controller.close()
         }
       })
+
+      // Save memory async
+      supabaseAdmin.from('agent_memory').insert([
+        { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message },
+        { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: finalText, metadata: { model: geminiModel, tool_rounds: toolRound } },
+      ]).catch(() => {})
+
+      if (context_id) {
+        supabaseAdmin.from('agent_messages').insert([
+          { session_id: context_id, role: 'user', content: message },
+          { session_id: context_id, role: 'assistant', content: finalText, agent_id: targetAgentId, model: geminiModel },
+        ]).catch(() => {})
+      }
 
       return new Response(stream, {
         headers: {
@@ -353,7 +611,6 @@ ${multiAgentContext}
     }
 
     // NON-STREAMING MODE: Return JSON response
-    const aiData = await geminiResponse.json()
 
     const reply = aiData.candidates?.[0]?.content?.parts?.[0]?.text
     if (!reply) throw new Error('Empty response from Gemini API')

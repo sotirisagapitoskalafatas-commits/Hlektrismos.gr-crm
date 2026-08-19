@@ -41,6 +41,10 @@ type Tariff = {
   unit: string;
   provider_name: string | null;
   program_name: string | null;
+  category: string | null;
+  b2c_url: string | null;
+  b2b_url: string | null;
+  fixed_fee_monthly: number | null;
   last_verified: string | null;
 };
 
@@ -53,6 +57,26 @@ const PROVIDER_COLORS: Record<string, string> = {
   'ΔΕΗ': '#1a73e8',
   'Protergia': '#00c878',
   'ΗΡΩΝ': '#f59e0b',
+  'ZeniΘ': '#8b5cf6',
+  'Elpedison': '#ef4444',
+  'nrg': '#06b6d4',
+  'Φυσικό Αέριο': '#f97316',
+  'Volton': '#ec4899',
+  'We Energy': '#14b8a6',
+  'Ελίν': '#6366f1',
+};
+
+const PROVIDER_URLS: Record<string, { b2c: string; b2b: string }> = {
+  'ΔΕΗ': { b2c: 'https://www.dei.gr/el/gia-to-spiti/revma/', b2b: 'https://www.dei.gr/el/gia-tin-epixeirisi/revma/' },
+  'Protergia': { b2c: 'https://www.protergia.gr/spiti/oikiako-reuma-proionta/', b2b: 'https://www.protergia.gr/epixeirisi/epaggelmatiko-reuma-proionta/' },
+  'ΗΡΩΝ': { b2c: 'https://www.heron.gr/gia-to-spiti/revma/', b2b: 'https://www.heron.gr/gia-tin-epicheirisi/revma/' },
+  'ZeniΘ': { b2c: 'https://zenith.gr/el/for-home/electricity/', b2b: 'https://zenith.gr/el/for-business/electricity/' },
+  'Elpedison': { b2c: 'https://www.elpedison.gr/gr/gia-to-spiti/reuma/', b2b: 'https://www.elpedison.gr/gr/gia-tin-epixeirisi/reuma/' },
+  'nrg': { b2c: 'https://www.nrg.gr/el/gia-to-spiti/reuma', b2b: 'https://www.nrg.gr/el/gia-tin-epixeirisi/reuma' },
+  'Φυσικό Αέριο': { b2c: 'https://www.fysikoaeriohellas.gr/gia-to-spiti/reuma/', b2b: 'https://www.fysikoaeriohellas.gr/gia-tin-epicheirisi/reuma/' },
+  'Volton': { b2c: 'https://volton.gr/gia-to-spiti/reuma/', b2b: 'https://volton.gr/gia-tin-epicheirisi/reuma/' },
+  'We Energy': { b2c: 'https://weenergy.gr/gia-to-spiti/ilektriki-energeia/', b2b: 'https://weenergy.gr/gia-tin-epixeirisi/ilektriki-energeia/' },
+  'Ελίν': { b2c: 'https://energy.elin.gr/gia-to-spiti/reuma/', b2b: 'https://energy.elin.gr/gia-tin-epixeirisi/reuma/' },
 };
 
 const ENERGY_ICONS: Record<string, string> = {
@@ -70,6 +94,8 @@ export default function MarketRagFolders() {
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [selectedDoc, setSelectedDoc] = useState<ProviderDoc | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -84,6 +110,20 @@ export default function MarketRagFolders() {
     if (docsRes.data) setDocs(docsRes.data);
     if (tariffsRes.data) setTariffs(tariffsRes.data);
     setLoading(false);
+  };
+
+  const syncTariffs = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await supabase.functions.invoke('sync-market-tariffs', { body: { action: 'sync' } });
+      if (res.error) throw res.error;
+      setSyncMsg(res.data?.message || 'Sync complete');
+      loadData(); // refresh
+    } catch (e: any) {
+      setSyncMsg('Sync failed: ' + (e.message || 'Unknown error'));
+    }
+    setSyncing(false);
   };
 
   const toggleProvider = (name: string) => {
@@ -135,10 +175,17 @@ export default function MarketRagFolders() {
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Browse energy provider programs and market tariffs. Documents are indexed for RAG retrieval by AI agents.</p>
-        <button className="btn btn-ghost" onClick={loadData}>
-          <RefreshCw size={16} /> Refresh
-        </button>
+        <p>Browse 10 Greek energy provider programs and market tariffs. Documents are indexed for RAG retrieval by AI agents.</p>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-ghost" onClick={loadData}>
+            <RefreshCw size={16} /> Refresh
+          </button>
+          <button className="btn btn-primary" onClick={syncTariffs} disabled={syncing} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {syncing ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={16} />}
+            {syncing ? 'Syncing...' : '🔄 Sync Tariffs Now'}
+          </button>
+        </div>
+        {syncMsg && <div style={{ marginTop: 8, fontSize: 12, color: '#22c55e' }}>✅ {syncMsg}</div>}
       </div>
 
       {/* Category Tabs */}
@@ -235,6 +282,16 @@ export default function MarketRagFolders() {
                 <span style={{ padding: '4px 10px', borderRadius: 8, background: `${color}15`, color, fontSize: 12, fontWeight: 700 }}>
                   {folder.docs.length} docs
                 </span>
+                {PROVIDER_URLS[folder.name] && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <a href={PROVIDER_URLS[folder.name].b2c} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(0,102,204,0.08)', color: '#0066cc', fontSize: 10, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      🏠 B2C <ExternalLink size={10} />
+                    </a>
+                    <a href={PROVIDER_URLS[folder.name].b2b} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(0,200,120,0.08)', color: '#00c878', fontSize: 10, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      🏢 B2B <ExternalLink size={10} />
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Documents list */}
@@ -346,21 +403,31 @@ export default function MarketRagFolders() {
           <table className="dash-table">
             <thead>
               <tr>
-                <th>Resource</th>
-                <th>Tariff Name</th>
-                <th>Price</th>
-                <th>Unit</th>
                 <th>Provider</th>
+                <th>Program</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Fixed Fee</th>
+                <th>Links</th>
               </tr>
             </thead>
             <tbody>
               {filteredTariffs.map((t) => (
                 <tr key={t.id}>
-                  <td><strong>{t.resource}</strong></td>
+                  <td><strong style={{ color: PROVIDER_COLORS[t.provider_name || ''] || 'var(--text)' }}>{t.provider_name || '—'}</strong></td>
                   <td>{t.tariff_name}</td>
-                  <td style={{ fontWeight: 700, color: '#00c878' }}>€{t.price_eur}</td>
-                  <td>{t.unit}</td>
-                  <td>{t.provider_name || '—'}</td>
+                  <td><span style={{ padding: '2px 8px', borderRadius: 6, background: t.category === 'B2B' ? 'rgba(0,200,120,0.1)' : 'rgba(0,102,204,0.1)', color: t.category === 'B2B' ? '#00c878' : '#0066cc', fontSize: 11, fontWeight: 600 }}>{t.category || '—'}</span></td>
+                  <td style={{ fontWeight: 700, color: '#00c878' }}>€{t.price_eur}/kWh</td>
+                  <td style={{ fontWeight: 600 }}>€{t.fixed_fee_monthly || 0}/mo</td>
+                  <td>
+                    {t.provider_name && PROVIDER_URLS[t.provider_name] && (
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <a href={t.category === 'B2B' ? PROVIDER_URLS[t.provider_name].b2b : PROVIDER_URLS[t.provider_name].b2c} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <ExternalLink size={10} /> View
+                        </a>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

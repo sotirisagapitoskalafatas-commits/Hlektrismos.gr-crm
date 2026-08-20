@@ -75,6 +75,8 @@ type Lead = {
   last_contact_at?: string | null;
   ai_paused?: boolean | null;
   company_name?: string | null;
+  monthly_kwh?: number | null;
+  consumption_kwh?: number | null;
 };
 
 type Agent = {

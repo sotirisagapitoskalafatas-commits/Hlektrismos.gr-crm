@@ -123,7 +123,9 @@ serve(async (req) => {
       if (extractedData.provider) updates.current_provider = extractedData.provider;
       if (extractedData.unit_rate_kwh) updates.monthly_cost = extractedData.monthly_cost_total || extractedData.unit_rate_kwh * (extractedData.consumption_kwh || 800);
       if (extractedData.consumption_kwh) updates.consumption_kwh = extractedData.consumption_kwh;
+      if (extractedData.consumption_kwh) updates.monthly_kwh = extractedData.consumption_kwh;
       if (extractedData.contract_end_date) updates.contract_end_date = extractedData.contract_end_date;
+      if (extractedData.unit_rate_kwh) updates.unit_rate_kwh = extractedData.unit_rate_kwh;
 
       if (Object.keys(updates).length > 0) {
         await supabase.from("hlektrismos_leads").update(updates).eq("id", lead_id);

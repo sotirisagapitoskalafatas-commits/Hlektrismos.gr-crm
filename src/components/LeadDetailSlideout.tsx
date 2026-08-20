@@ -23,6 +23,10 @@ import {
   UserCheck,
   Upload,
   CheckCircle2,
+  Star,
+  AlertTriangle,
+  RefreshCw,
+  TrendingDown,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { uploadDocument, updateLeadBillFiles, UploadedFile } from '@/lib/storage';
@@ -55,6 +59,8 @@ type Lead = {
   converted_at?: string | null;
   last_contact_at?: string | null;
   company_name?: string | null;
+  monthly_kwh?: number | null;
+  consumption_kwh?: number | null;
 };
 
 type CrmUser = {
@@ -121,7 +127,14 @@ export default function LeadDetailSlideout({
   const [currentProvider, setCurrentProvider] = useState(lead.current_provider || '');
   const [programName, setProgramName] = useState(lead.program_name || '');
   const [unitRate, setUnitRate] = useState(lead.unit_rate_kwh?.toString() || '');
+  const [monthlyKwh, setMonthlyKwh] = useState(lead.monthly_kwh?.toString() || lead.consumption_kwh?.toString() || '');
   const [savingEnergy, setSavingEnergy] = useState(false);
+
+  // Recommendation engine
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [showRecs, setShowRecs] = useState(false);
+  const [sendingOffer, setSendingOffer] = useState<string | null>(null);
 
   // Bill upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -352,6 +365,7 @@ Return JSON with this exact structure:
       if (currentProvider !== (lead.current_provider || '')) updates.current_provider = currentProvider || null;
       if (programName !== (lead.program_name || '')) updates.program_name = programName || null;
       if (unitRate !== (lead.unit_rate_kwh?.toString() || '')) updates.unit_rate_kwh = unitRate ? parseFloat(unitRate) : null;
+      if (monthlyKwh !== (lead.monthly_kwh?.toString() || lead.consumption_kwh?.toString() || '')) updates.monthly_kwh = monthlyKwh ? parseFloat(monthlyKwh) : null;
       if (Object.keys(updates).length > 0) {
         await supabase.from('hlektrismos_leads').update(updates).eq('id', lead.id);
         // Log as note
@@ -367,6 +381,69 @@ Return JSON with this exact structure:
       console.error('Failed to save energy fields:', e);
     }
     setSavingEnergy(false);
+  };
+
+  // Fetch tariff recommendations based on monthly_kwh and customer_type
+  const fetchRecommendations = async () => {
+    const kwh = parseFloat(monthlyKwh);
+    if (!kwh || kwh <= 0) {
+      alert('Εισάγετε κατανάλωση kWh/μήνα για να λάβετε προτάσεις.');
+      return;
+    }
+    setLoadingRecs(true);
+    setShowRecs(true);
+    try {
+      const customerType = lead.customer_type === 'business' ? 'B2B' : 'B2C';
+      const { data, error } = await supabase.rpc('recommend_tariffs', {
+        p_customer_type: customerType,
+        p_monthly_kwh: kwh,
+      });
+      if (error) throw error;
+      // Calculate savings vs current cost
+      const currentCost = lead.unit_rate_kwh ? (kwh * lead.unit_rate_kwh) : null;
+      const enriched = (data || []).map((r: any) => ({
+        ...r,
+        savings_vs_current: currentCost ? Math.max(0, currentCost - r.estimated_monthly_cost) : 0,
+      }));
+      setRecommendations(enriched);
+    } catch (e: any) {
+      console.error('Failed to fetch recommendations:', e);
+      setRecommendations([]);
+    }
+    setLoadingRecs(false);
+  };
+
+  // Send offer via send-offer Edge Function
+  const sendOffer = async (rec: any) => {
+    setSendingOffer(rec.tariff_id);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-offer', {
+        body: {
+          lead_id: lead.id,
+          tariff_id: rec.tariff_id,
+          provider_name: rec.provider_name,
+          program_name: rec.program_name,
+          estimated_cost: rec.estimated_monthly_cost,
+          savings: rec.savings_vs_current,
+          customer_name: `${lead.first_name} ${lead.last_name}`,
+          customer_phone: lead.phone,
+          customer_email: lead.email,
+        },
+      });
+      if (error) throw error;
+      alert(`✅ Προσφορά στάλθηκε στον/στην ${lead.first_name} ${lead.last_name}!`);
+      // Log as note
+      await supabase.from('lead_notes').insert({
+        lead_id: lead.id,
+        content: `📧 Προσφορά στάλθηκε: ${rec.provider_name} - ${rec.program_name} (€${rec.estimated_monthly_cost}/μήνα, εξοικονόμηση €${rec.savings_vs_current?.toFixed(2) || '0'}/μήνα)`,
+        author: 'CRM User',
+        note_type: 'offer_sent',
+      });
+    } catch (e: any) {
+      console.error('Failed to send offer:', e);
+      alert('Αποτυχία αποστολής προσφοράς: ' + e.message);
+    }
+    setSendingOffer(null);
   };
 
   // Upload bill file
@@ -572,7 +649,7 @@ Return JSON with this exact structure:
                   style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: '#fff', color: 'var(--text)' }}
                 >
                   <option value="">Επιλέξτε...</option>
-                  {['ΔΕΗ', 'Protergia', 'ΗΡΩΝ', 'ZeniΘ', 'Elpedison', 'nrg', 'Φυσικό Αέριο', 'Volton', 'We Energy', 'Ελίν'].map(p => (
+                  {['ΔΕΗ', 'Protergia', 'ΗΡΩΝ', 'ZeniΘ', 'nrg', 'Φυσικό Αέριο', 'Volton', 'We Energy', 'Ελίν', 'Enerwave'].map(p => (
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
@@ -599,6 +676,19 @@ Return JSON with this exact structure:
                 />
               </div>
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Κατανάλωση kWh/μήνα</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={monthlyKwh}
+                  onChange={e => setMonthlyKwh(e.target.value)}
+                  placeholder="π.χ. 300"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: '#fff', color: 'var(--text)' }}
+                />
+              </div>
+            </div>
             <button
               onClick={saveEnergyFields}
               disabled={savingEnergy}
@@ -611,6 +701,157 @@ Return JSON with this exact structure:
               {savingEnergy ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 size={13} />}
               {savingEnergy ? 'Αποθήκευση...' : 'Αποθήκευση Στοιχείων'}
             </button>
+            <button
+              onClick={async () => {
+                if (!confirm('Αυτό θα ενημερώσει τις τιμές από τις επίσημες σελίδες των παρόχων. Συνέχεια;')) return;
+                setSavingEnergy(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke('scrape-program-details');
+                  if (error) throw error;
+                  alert(`✅ Ενημερώθηκαν ${data?.updated || 0} τιμολόγια (${data?.failed || 0} αποτυχίες)`);
+                } catch (e: any) {
+                  alert('Αποτυχία: ' + e.message);
+                }
+                setSavingEnergy(false);
+              }}
+              disabled={savingEnergy}
+              style={{
+                marginTop: 6, padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12, fontWeight: 600,
+                cursor: savingEnergy ? 'not-allowed' : 'pointer',
+                background: 'var(--surface)', color: 'var(--text)',
+                display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+              }}
+            >
+              <RefreshCw size={13} /> Ενημέρωση Τιμών από Παρόχους
+            </button>
+          </section>
+
+          {/* Smart Recommendations Engine */}
+          <section>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 12px' }}>
+              <Star size={14} /> Έξυπνες Προτάσεις
+            </h3>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button
+                onClick={fetchRecommendations}
+                disabled={loadingRecs || !monthlyKwh}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600,
+                  cursor: loadingRecs || !monthlyKwh ? 'not-allowed' : 'pointer',
+                  background: loadingRecs ? 'var(--surface-2)' : '#0ea5e9', color: loadingRecs ? 'var(--text-muted)' : '#fff',
+                  display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+                }}
+              >
+                {loadingRecs ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <TrendingDown size={13} />}
+                {loadingRecs ? 'Αναζήτηση...' : 'Εύρεση Καλύτερης Τιμής'}
+              </button>
+              {!showRecs && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                  Εισάγετε κατανάλωση kWh και πατήστε
+                </span>
+              )}
+            </div>
+
+            {showRecs && !loadingRecs && recommendations.length === 0 && (
+              <div style={{ padding: '12px 16px', background: '#fff7ed', borderRadius: 8, border: '1px solid #fed7aa', fontSize: 12, color: '#9a3412' }}>
+                Δεν βρέθηκαν προτάσεις για αυτή την κατανάλωση.
+              </div>
+            )}
+
+            {recommendations.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {recommendations.map((rec, idx) => (
+                  <div
+                    key={rec.tariff_id}
+                    style={{
+                      padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)',
+                      background: idx === 0 ? 'linear-gradient(135deg, #ecfdf5, #f0fdf4)' : 'var(--surface)',
+                      position: 'relative',
+                    }}
+                  >
+                    {idx === 0 && (
+                      <span style={{
+                        position: 'absolute', top: -8, right: 12, background: '#10b981', color: '#fff',
+                        fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                        textTransform: 'uppercase', letterSpacing: '0.05em',
+                      }}>
+                        ⭐ ΚΑΛΥΤΕΡΗ ΤΙΜΗ
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                          {rec.provider_name} — {rec.program_name}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 3 }}>
+                          <span style={{
+                            display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+                            background: rec.tariff_color === 'green' ? '#10b981' : rec.tariff_color === 'blue' ? '#3b82f6' : rec.tariff_color === 'yellow' ? '#f59e0b' : rec.tariff_color === 'orange' ? '#f97316' : '#9ca3af',
+                          }} />
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {rec.tariff_color} · {rec.verification_status === 'verified' ? '✅ Επιβεβαιωμένο' : '⚠️ Χρειάζεται Επιβεβαίωση'}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#10b981' }}>
+                          €{rec.estimated_monthly_cost}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>€/μήνα</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                      <span>€{rec.base_price_day}/kWh</span>
+                      {rec.base_price_night && <span>Νύχτα: €{rec.base_price_night}/kWh</span>}
+                      {rec.fixed_fee_monthly > 0 && <span>Σταθερό: €{rec.fixed_fee_monthly}/μήνα</span>}
+                      {rec.discounted_price_day && <span style={{ color: '#10b981' }}>Έκπτωση: €{rec.discounted_price_day}/kWh</span>}
+                    </div>
+                    {rec.savings_vs_current > 0 && (
+                      <div style={{
+                        fontSize: 11, fontWeight: 600, color: '#10b981', marginBottom: 8,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                        <TrendingDown size={12} /> Εξοικονόμηση: €{rec.savings_vs_current.toFixed(2)}/μήνα (€{(rec.savings_vs_current * 12).toFixed(2)}/χρόνο)
+                      </div>
+                    )}
+                    {rec.discount_conditions && (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>
+                        📋 {rec.discount_conditions}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => sendOffer(rec)}
+                        disabled={sendingOffer === rec.tariff_id}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 11, fontWeight: 600,
+                          cursor: sendingOffer === rec.tariff_id ? 'not-allowed' : 'pointer',
+                          background: '#00c878', color: '#fff',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        {sendingOffer === rec.tariff_id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={11} />}
+                        {sendingOffer === rec.tariff_id ? 'Αποστολή...' : 'Αποστολή Προσφοράς'}
+                      </button>
+                      {rec.official_url && (
+                        <a
+                          href={rec.official_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11, fontWeight: 600,
+                            background: 'var(--surface)', color: 'var(--text)',
+                            display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none',
+                          }}
+                        >
+                          <ExternalLink size={11} /> Επίσημη Σελίδα
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Status Conversion */}

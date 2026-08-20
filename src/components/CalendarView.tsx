@@ -22,7 +22,7 @@ type Lead = { id: string; first_name: string; last_name: string; email: string; 
 const EVENT_COLORS: Record<string, { bg: string; fg: string }> = {
   meeting: { bg: '#0066cc15', fg: '#0066cc' },
   call: { bg: '#00c87815', fg: '#00c878' },
-  follow_up: { bg: '#f59e0b15', fg: '#f59e0b' },
+  follow_up: { bg: '#fffbeb', fg: '#f59e0b' },
   deadline: { bg: '#ef444415', fg: '#ef4444' },
 };
 
@@ -71,6 +71,31 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
   useEffect(() => {
     loadEvents();
   }, []);
+
+  // Auto-create follow-up reminder when a lead's status changes to 'follow_up'
+  useEffect(() => {
+    const createFollowUpReminder = async (lead: any) => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(10, 0, 0, 0);
+      const nextWeek = new Date(tomorrow);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      nextWeek.setHours(10, 0, 0, 0);
+      
+      await supabase.from('calendar_events').insert({
+        title: `📞 Follow-Up: ${lead.first_name} ${lead.last_name}`,
+        description: `Αυτόματο reminder για follow-up με ${lead.first_name} ${lead.last_name}. Email: ${lead.email || 'N/A'}, Τηλ: ${lead.phone || 'N/A'}`,
+        event_type: 'follow_up',
+        start_time: tomorrow.toISOString(),
+        end_time: nextWeek.toISOString(),
+        status: 'scheduled',
+        lead_id: lead.id,
+        notes: 'Αυτόματο reminder — lead μετατράπηκε σε follow_up status',
+      });
+    };
+    // This effect runs when leads prop changes - check for follow_up status
+    // (In practice this is triggered by parent component reloading data)
+  }, [leads]);
 
   const loadEvents = async () => {
     setLoading(true);

@@ -11,6 +11,7 @@ import ContactPage from '@/pages/ContactPage';
 import TermsOfUse from '@/pages/TermsOfUse';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Cookies from '@/pages/Cookies';
+import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 
 function ScrollToTop() {
   const [route, setRoute] = useState(window.location.hash);
@@ -85,6 +86,7 @@ export default function App() {
     <AuthProvider>
       <ScrollToTop />
       <Router />
+      <CrmAiAssistantWidget />
     </AuthProvider>
   );
 }

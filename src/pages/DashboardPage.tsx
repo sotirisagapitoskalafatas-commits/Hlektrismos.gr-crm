@@ -117,7 +117,7 @@ type Tariff = {
   created_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'rag-search' | 'campaigns';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -221,6 +221,18 @@ export default function DashboardPage() {
   const [billUrls, setBillUrls] = useState<Array<{ url: string; name: string; type: string; size: number }>>([]);
   const [billLoading, setBillLoading] = useState(false);
   const [billError, setBillError] = useState<string | null>(null);
+
+  // Sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    general: true,
+    sales: true,
+    market: true,
+    ai: true,
+    workspace: true,
+    admin: true,
+  });
 
   const [runningAgents, setRunningAgents] = useState(false);
 
@@ -627,57 +639,136 @@ export default function DashboardPage() {
     agents: 'AI Agents',
     leads: 'Leads',
     sources: 'Πηγές Leads',
-    market: 'Market RAG',
+    market: 'Φάκελοι Παρόχων',
     hub: 'Agent Hub',
     orchestrator: 'Orchestrator Director',
     settings: 'Ρυθμίσεις & Integrations',
     email: '📧 Email',
     reports: 'Reports',
     calendar: '📅 Ημερολόγιο',
-    'rag-search': '🔍 AI Market RAG',
+    'market-search': '🔍 AI Σύμβουλος Αγοράς',
     campaigns: '📣 Campaigns',
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
-    documents: '\u0395\u03b3\u03b3\u03c1\u03b1\u03c6\u03ac',
+    documents: 'Έγγραφα',
   };
+
+  const toggleCategory = (cat: string) => setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+
+  const navCategories = [
+    { key: 'general', label: '📊 Γενικά', items: [
+      { tab: 'overview' as Tab, icon: '🏠', label: 'Επισκόπηση' },
+      { tab: 'calendar' as Tab, icon: '📅', label: 'Ημερολόγιο' },
+    ]},
+    { key: 'sales', label: '💼 Πωλήσεις', items: [
+      { tab: 'leads' as Tab, icon: '🎯', label: 'Leads' },
+      { tab: 'scraper' as Tab, icon: '🏢', label: 'B2B Scraper' },
+      { tab: 'sources' as Tab, icon: '📥', label: 'Πηγές Leads' },
+    ]},
+    { key: 'market', label: '⚡ Αγορά & RAG', items: [
+      { tab: 'market' as Tab, icon: '📂', label: 'Φάκελοι Παρόχων' },
+      { tab: 'market-search' as Tab, icon: '🔍', label: 'AI Σύμβουλος' },
+    ]},
+    { key: 'ai', label: '🤖 AI Σύστημα', items: [
+      { tab: 'hub' as Tab, icon: '🧠', label: 'Agent Hub' },
+      { tab: 'agents' as Tab, icon: '🤖', label: 'AI Agents' },
+      { tab: 'orchestrator' as Tab, icon: '⚙️', label: 'Orchestrator Director' },
+    ]},
+    { key: 'workspace', label: '✉️ Workspace', items: [
+      { tab: 'email' as Tab, icon: '📧', label: 'Email' },
+      { tab: 'campaigns' as Tab, icon: '📣', label: 'Campaigns' },
+      { tab: 'documents' as Tab, icon: '📄', label: 'Έγγραφα' },
+    ]},
+    { key: 'admin', label: '⚙️ Διαχείριση', items: [
+      { tab: 'reports' as Tab, icon: '📈', label: 'Reports' },
+      { tab: 'users' as Tab, icon: '👥', label: 'Χρήστες' },
+      { tab: 'settings' as Tab, icon: '🛠️', label: 'Ρυθμίσεις' },
+    ]},
+  ];
+
+  const handleNavClick = (t: Tab) => {
+    setTab(t);
+    setIsMobileMenuOpen(false);
+  };
+
+  const sidebarContent = (
+    <>
+      <a href="#/" className="dash-brand">
+        <svg viewBox="0 0 100 100" className="dash-brand-logo" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#0EA5E9" />
+              <stop offset="100%" stopColor="#0B2545" />
+            </linearGradient>
+            <filter id="subtleShadow" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0B2545" floodOpacity="0.25"/>
+            </filter>
+          </defs>
+          <circle cx="50" cy="50" r="43" fill="none" stroke="url(#brandGradient)" strokeWidth="4.5" filter="url(#subtleShadow)" />
+          <circle cx="50" cy="50" r="35" fill="none" stroke="url(#brandGradient)" strokeWidth="1.5" opacity="0.5" />
+          <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradient)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadow)" />
+        </svg>
+        <span className="dash-brand-text">Hlektrismos.gr</span>
+      </a>
+
+      <nav className="dash-nav">
+        {navCategories.map((cat) => (
+          <div key={cat.key} className="accordion-group">
+            <div className="accordion-header" onClick={() => toggleCategory(cat.key)}>
+              <span className="accordion-label">{cat.label}</span>
+              <span className={`chevron ${expandedCategories[cat.key] ? 'open' : ''}`}>▶</span>
+            </div>
+            <div className={`accordion-items ${expandedCategories[cat.key] ? '' : 'collapsed'}`} style={{ maxHeight: expandedCategories[cat.key] ? `${cat.items.length * 44}px` : '0' }}>
+              {cat.items.map((item) => (
+                <button
+                  key={item.tab}
+                  className={tab === item.tab ? 'active' : ''}
+                  onClick={() => handleNavClick(item.tab)}
+                  title={item.label}
+                >
+                  <span>{item.icon}</span>
+                  <span className="accordion-item">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="dash-sidebar-footer">
+        <div className="dash-user">
+          <div className="dash-user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
+          <span>{user?.email}</span>
+        </div>
+        <button className="dash-logout" onClick={signOut}><LogOut size={16} /> <span>Αποσύνδεση</span></button>
+      </div>
+    </>
+  );
 
   return (
     <div className="dashboard-shell">
-      <aside className="dash-sidebar">
-        <a href="#/" className="dash-brand">
-          <span className="brand-mark"><Zap size={16} fill="currentColor" /></span>
-          <span>Hlektrismos<span>.gr</span></span>
-        </a>
-        <nav className="dash-nav">
-          <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><LayoutDashboard size={18} /> Επισκόπηση</button>
-          <button className={tab === 'agents' ? 'active' : ''} onClick={() => setTab('agents')}><Bot size={18} /> AI Agents</button>
-          <button className={tab === 'leads' ? 'active' : ''} onClick={() => setTab('leads')}><Users size={18} /> Leads</button>
-          <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={18} /> Πηγές Leads</button>
-          <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}><Globe size={18} /> Market RAG</button>
-          <button className={tab === 'hub' ? 'active' : ''} onClick={() => setTab('hub')}><Sparkles size={18} /> Agent Hub</button>
-          <button className={tab === 'orchestrator' ? 'active' : ''} onClick={() => setTab('orchestrator')}><Activity size={18} /> Orchestrator Director</button>
-          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Settings size={18} /> Ρυθμίσεις</button>
-          <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}><FileText size={18} /> Reports</button>
-          <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}><Users size={18} /> Χρήστες</button>
-          <button className={tab === 'scraper' ? 'active' : ''} onClick={() => setTab('scraper')}><Radar size={18} /> B2B Scraper</button>
-          <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}><Mail size={18} /> 📧 Email</button>
-          <button className={tab === 'calendar' ? 'active' : ''} onClick={() => setTab('calendar')}><Calendar size={18} /> 📅 Ημερολόγιο</button>
-          <button className={tab === 'rag-search' ? 'active' : ''} onClick={() => setTab('rag-search')}><Sparkles size={18} /> 🔍 AI Market RAG</button>
-          <button className={tab === 'campaigns' ? 'active' : ''} onClick={() => setTab('campaigns')}><Mail size={18} /> 📣 Campaigns</button>
-          <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={18} /> Έγγραφα</button>
-        </nav>
-        <div className="dash-sidebar-footer">
-          <div className="dash-user">
-            <div className="dash-user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
-            <span>{user?.email}</span>
-          </div>
-          <button className="dash-logout" onClick={signOut}><LogOut size={16} /> Αποσύνδεση</button>
-        </div>
+      {/* Mobile backdrop */}
+      <div className={`mobile-backdrop ${isMobileMenuOpen ? 'visible' : ''}`} onClick={() => setIsMobileMenuOpen(false)} />
+
+      {/* Desktop sidebar */}
+      <aside className={`dash-sidebar ${isSidebarOpen ? '' : 'collapsed'}`}>
+        {sidebarContent}
+        <button className="sidebar-collapse-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)} title={isSidebarOpen ? 'Σύμπτυξη' : 'Επέκταση'} style={{ position: 'absolute', top: 12, right: 10 }}>
+          {isSidebarOpen ? '◀' : '▶'}
+        </button>
+      </aside>
+
+      {/* Mobile sidebar */}
+      <aside className={`dash-sidebar mobile-only-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} style={{ position: 'fixed', left: isMobileMenuOpen ? 0 : -280, top: 0, bottom: 0, zIndex: 60, transition: 'left 0.25s ease' }}>
+        {sidebarContent}
       </aside>
 
       <div className="dash-main">
         <header className="dash-header">
-          <h1>{tabLabels[tab]}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="mobile-hamburger" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>☰</button>
+            <h1>{tabLabels[tab]}</h1>
+          </div>
           <div className="dash-header-right">
             <NotificationBell />
             <span className="dash-live"><span className="dash-live-dot" /> Live</span>
@@ -758,25 +849,29 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Quick Actions */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', marginTop: '24px' }}>
                   {[
                     { icon: '🤖', label: 'Agent Hub', tab: 'hub', desc: 'AI συνομιλία' },
                     { icon: '🔍', label: 'B2B Scraper', tab: 'scraper', desc: 'Αναζήτηση leads' },
                     { icon: '📊', label: 'Orchestrator', tab: 'orchestrator', desc: 'Director view' },
                     { icon: '📈', label: 'Email', tab: 'email', desc: 'Διαχείριση email' },
+                    { icon: '📂', label: 'Φάκελοι Παρόχων', tab: 'market', desc: 'Τιμολόγια 10 παρόχων', color: '#0B2545' },
+                    { icon: '🔍', label: 'AI Σύμβουλος', tab: 'market-search', desc: 'RAEYE AI αναζήτηση', color: '#0EA5E9' },
                   ].map((action) => (
                     <button
                       key={action.tab}
                       onClick={() => setTab(action.tab as Tab)}
                       style={{
-                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px',
+                        background: action.color ? `${action.color}08` : 'var(--surface)',
+                        border: `1px solid ${action.color ? `${action.color}25` : 'var(--border)'}`,
+                        borderRadius: '12px',
                         padding: '16px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = action.color || 'var(--primary)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = action.color ? `${action.color}25` : 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
                       <div style={{ fontSize: '24px', marginBottom: '6px' }}>{action.icon}</div>
-                      <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>{action.label}</div>
+                      <div style={{ fontWeight: 600, fontSize: '13px', color: action.color || 'var(--text)' }}>{action.label}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{action.desc}</div>
                     </button>
                   ))}
@@ -1275,7 +1370,7 @@ export default function DashboardPage() {
             {tab === 'calendar' && (
               <CalendarView leads={leads.filter(l => !l.deleted_at)} />
             )}
-            {tab === 'rag-search' && (
+            {tab === 'market-search' && (
               <div style={{ padding: 20, height: 'calc(100vh - 120px)' }}>
                 <MarketRAGSearch />
               </div>

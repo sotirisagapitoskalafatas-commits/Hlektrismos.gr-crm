@@ -313,7 +313,6 @@ export default function LandingPage() {
       lawful_basis: form.consent ? 'Consent' : null,
       customer_category: form.propertyType === 'Σπίτι' ? 'B2C_Household' : 'B2B_Corporate',
       pipeline_status: 'new',
-      source: 'Landing Page',
       status: 'new',
     });
     setSubmitting(false);

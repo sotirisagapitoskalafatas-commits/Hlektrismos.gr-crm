@@ -225,14 +225,7 @@ export default function DashboardPage() {
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    general: true,
-    sales: true,
-    market: true,
-    ai: true,
-    workspace: true,
-    admin: true,
-  });
+  const [activeCategory, setActiveCategory] = useState<string | null>('general');
 
   const [runningAgents, setRunningAgents] = useState(false);
 
@@ -653,7 +646,12 @@ export default function DashboardPage() {
     documents: 'Έγγραφα',
   };
 
-  const toggleCategory = (cat: string) => setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  const toggleCategory = (cat: string) => {
+    // If sidebar is collapsed, expand it first
+    if (!isSidebarOpen) setIsSidebarOpen(true);
+    // Exclusive: close if already open, otherwise open this one
+    setActiveCategory(prev => prev === cat ? null : cat);
+  };
 
   const navCategories = [
     { key: 'general', label: '📊 Γενικά', items: [
@@ -693,7 +691,7 @@ export default function DashboardPage() {
 
   const sidebarContent = (
     <>
-      <a href="#/" className="dash-brand">
+      <div className="dash-brand" onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ cursor: 'pointer' }} title="Toggle Sidebar">
         <svg viewBox="0 0 100 100" className="dash-brand-logo" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -709,30 +707,33 @@ export default function DashboardPage() {
           <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradient)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadow)" />
         </svg>
         <span className="dash-brand-text">Hlektrismos.gr</span>
-      </a>
+      </div>
 
       <nav className="dash-nav">
-        {navCategories.map((cat) => (
-          <div key={cat.key} className="accordion-group">
-            <div className="accordion-header" onClick={() => toggleCategory(cat.key)}>
-              <span className="accordion-label">{cat.label}</span>
-              <span className={`chevron ${expandedCategories[cat.key] ? 'open' : ''}`}>▶</span>
+        {navCategories.map((cat) => {
+          const isOpen = activeCategory === cat.key;
+          return (
+            <div key={cat.key} className="accordion-group">
+              <div className="accordion-header" onClick={() => toggleCategory(cat.key)}>
+                <span className="accordion-label">{cat.label}</span>
+                <span className={`chevron ${isOpen ? 'open' : ''}`}>▶</span>
+              </div>
+              <div className={`accordion-items ${isOpen ? '' : 'collapsed'}`} style={{ maxHeight: isOpen ? `${cat.items.length * 44}px` : '0' }}>
+                {cat.items.map((item) => (
+                  <button
+                    key={item.tab}
+                    className={tab === item.tab ? 'active' : ''}
+                    onClick={() => handleNavClick(item.tab)}
+                    title={item.label}
+                  >
+                    <span>{item.icon}</span>
+                    <span className="accordion-item">{item.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className={`accordion-items ${expandedCategories[cat.key] ? '' : 'collapsed'}`} style={{ maxHeight: expandedCategories[cat.key] ? `${cat.items.length * 44}px` : '0' }}>
-              {cat.items.map((item) => (
-                <button
-                  key={item.tab}
-                  className={tab === item.tab ? 'active' : ''}
-                  onClick={() => handleNavClick(item.tab)}
-                  title={item.label}
-                >
-                  <span>{item.icon}</span>
-                  <span className="accordion-item">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="dash-sidebar-footer">
@@ -753,9 +754,6 @@ export default function DashboardPage() {
       {/* Desktop sidebar */}
       <aside className={`dash-sidebar ${isSidebarOpen ? '' : 'collapsed'}`}>
         {sidebarContent}
-        <button className="sidebar-collapse-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)} title={isSidebarOpen ? 'Σύμπτυξη' : 'Επέκταση'} style={{ position: 'absolute', top: 12, right: 10 }}>
-          {isSidebarOpen ? '◀' : '▶'}
-        </button>
       </aside>
 
       {/* Mobile sidebar */}

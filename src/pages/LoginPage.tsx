@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { ArrowRight, Lock, Mail, Zap } from 'lucide-react';
+import { ArrowRight, Lock, Mail } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
@@ -51,8 +51,21 @@ export default function LoginPage() {
       </div>
       <div className="login-card-wrap">
         <a href="#/" className="login-brand">
-          <span className="brand-mark"><Zap size={18} fill="currentColor" /></span>
-          <span>Hlektrismos<span>.gr</span></span>
+          <svg viewBox="0 0 100 100" style={{ width: 72, height: 72 }} xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="brandGradientLogin" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#0EA5E9" />
+                <stop offset="100%" stopColor="#0B2545" />
+              </linearGradient>
+              <filter id="subtleShadowLogin" x="-10%" y="-10%" width="120%" height="120%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0B2545" floodOpacity="0.25"/>
+              </filter>
+            </defs>
+            <circle cx="50" cy="50" r="43" fill="none" stroke="url(#brandGradientLogin)" strokeWidth="4.5" filter="url(#subtleShadowLogin)" />
+            <circle cx="50" cy="50" r="35" fill="none" stroke="url(#brandGradientLogin)" strokeWidth="1.5" opacity="0.5" />
+            <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradientLogin)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadowLogin)" />
+          </svg>
+          <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0B2545, #0EA5E9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hlektrismos.gr</span>
         </a>
         <div className="login-card">
           <h1>{mode === 'login' ? 'Σύνδεση Dashboard' : 'Δημιουργία Λογαριασμού'}</h1>

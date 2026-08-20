@@ -335,7 +335,23 @@ export default function LandingPage() {
 
       <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
         <div className="container nav-wrap">
-          <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
+          <a href="#top" className="brand">
+            <svg viewBox="0 0 100 100" style={{ width: 34, height: 34 }} xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="brandGradientHeader" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#0EA5E9" />
+                  <stop offset="100%" stopColor="#0B2545" />
+                </linearGradient>
+                <filter id="subtleShadowHeader" x="-10%" y="-10%" width="120%" height="120%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0B2545" floodOpacity="0.25"/>
+                </filter>
+              </defs>
+              <circle cx="50" cy="50" r="43" fill="none" stroke="url(#brandGradientHeader)" strokeWidth="4.5" filter="url(#subtleShadowHeader)" />
+              <circle cx="50" cy="50" r="35" fill="none" stroke="url(#brandGradientHeader)" strokeWidth="1.5" opacity="0.5" />
+              <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradientHeader)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadowHeader)" />
+            </svg>
+            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0B2545, #0EA5E9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hlektrismos.gr</span>
+          </a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
             <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
             <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
@@ -678,7 +694,23 @@ export default function LandingPage() {
         <div className="container">
           <div className="footer-grid">
             <div className="footer-brand">
-              <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
+              <a href="#top" className="brand">
+                <svg viewBox="0 0 100 100" style={{ width: 34, height: 34 }} xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="brandGradientFooter" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#0EA5E9" />
+                      <stop offset="100%" stopColor="#0B2545" />
+                    </linearGradient>
+                    <filter id="subtleShadowFooter" x="-10%" y="-10%" width="120%" height="120%">
+                      <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0B2545" floodOpacity="0.25"/>
+                    </filter>
+                  </defs>
+                  <circle cx="50" cy="50" r="43" fill="none" stroke="url(#brandGradientFooter)" strokeWidth="4.5" filter="url(#subtleShadowFooter)" />
+                  <circle cx="50" cy="50" r="35" fill="none" stroke="url(#brandGradientFooter)" strokeWidth="1.5" opacity="0.5" />
+                  <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradientFooter)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadowFooter)" />
+                </svg>
+                <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0B2545, #0EA5E9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hlektrismos.gr</span>
+              </a>
               <p>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
               <div className="footer-contact-info">
                 <a href="https://maps.app.goo.gl/6h38xGoe2mW7mqTb8" target="_blank" rel="noopener noreferrer">Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</a>

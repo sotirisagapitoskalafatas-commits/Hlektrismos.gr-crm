@@ -19,6 +19,21 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Kill Switch: check if AI is paused for this lead
+    if (lead_id) {
+      const { data: leadCheck } = await supabase
+        .from("hlektrismos_leads")
+        .select("ai_paused")
+        .eq("id", lead_id)
+        .single();
+      if (leadCheck?.ai_paused) {
+        return new Response(
+          JSON.stringify({ error: "AI is paused for this lead (Kill Switch active)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Fetch Vapi credentials from crm_settings
     const { data: settings } = await supabase
       .from("crm_settings")

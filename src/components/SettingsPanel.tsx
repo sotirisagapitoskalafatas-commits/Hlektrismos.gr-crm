@@ -481,6 +481,15 @@ function AppearanceSettings({ settings, update }: { settings: Record<string, any
         <FieldRow label="Secondary Color"><ColorInput value={s.secondary_color || '#00c878'} onChange={(v) => update('appearance_config', { ...s, secondary_color: v })} /></FieldRow>
         <FieldRow label="Background Color"><ColorInput value={s.bg_color || '#ffffff'} onChange={(v) => update('appearance_config', { ...s, bg_color: v })} /></FieldRow>
         <FieldRow label="Surface Color"><ColorInput value={s.surface_color || '#f8fafc'} onChange={(v) => update('appearance_config', { ...s, surface_color: v })} /></FieldRow>
+        <FieldRow label="Border Radius">
+          <SelectInput value={s.border_radius || '10px'} onChange={(v) => update('appearance_config', { ...s, border_radius: v })} options={[
+            { value: '0px', label: 'None (0px)' },
+            { value: '6px', label: 'Small (6px)' },
+            { value: '10px', label: 'Medium (10px)' },
+            { value: '16px', label: 'Large (16px)' },
+            { value: '24px', label: 'XL (24px)' },
+          ]} />
+        </FieldRow>
         <FieldRow label="Theme Mode">
           <SelectInput value={s.theme_mode || 'light'} onChange={(v) => update('appearance_config', { ...s, theme_mode: v })} options={[
             { value: 'light', label: 'Light' },

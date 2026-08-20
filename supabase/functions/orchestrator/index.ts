@@ -148,6 +148,35 @@ const GEMINI_TOOLS = [
           },
         },
       },
+      {
+        name: 'check_calendar_availability',
+        description: 'Έλεγχος διαθεσιμότητας στο ημερολόγιο για συγκεκριμένη ώρα/ημερομηνία. Επιστρέφει true/false και ποια events υπάρχουν ήδη.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            check_date: { type: 'STRING', description: 'Ημερομηνία ελέγχου (ISO 8601, π.χ. 2026-08-25T14:00:00)' },
+            duration_minutes: { type: 'NUMBER', description: 'Διάρκεια σε λεπτά (default: 30)' },
+          },
+          required: ['check_date'],
+        },
+      },
+      {
+        name: 'book_appointment',
+        description: 'Κλείσιμο ραντεβού/κλήσης με lead. Ελέγχει διαθεσιμότητα, δημιουργεί event, στέλνει email confirmation και ενημερώνει το lead.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            lead_id: { type: 'STRING', description: 'Lead ID' },
+            title: { type: 'STRING', description: 'Τίτλος ραντεβού (π.χ. "Τηλεφωνική συζήτηση προσφοράς")' },
+            start_time: { type: 'STRING', description: 'Ημερομηνία/ώρα έναρξης (ISO 8601)' },
+            duration_minutes: { type: 'NUMBER', description: 'Διάρκεια σε λεπτά (default: 30)' },
+            event_type: { type: 'STRING', description: 'meeting, call, follow_up' },
+            location: { type: 'STRING', description: 'Τοποθεσία (π.χ. Zoom, τηλέφωνο, γραφείο)' },
+            send_confirmation: { type: 'BOOLEAN', description: 'Αποστολή email confirmation (default: true)' },
+          },
+          required: ['lead_id', 'title', 'start_time'],
+        },
+      },
     ],
   },
 ]
@@ -311,6 +340,139 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
         return events.map((e: any) =>
           `${e.status === 'scheduled' ? '📅' : e.status === 'completed' ? '✅' : '❌'} ${e.title} | ${new Date(e.start_time).toLocaleString('el-GR')} | ${e.event_type}${e.location ? ` | ${e.location}` : ''}`
         ).join('\n')
+      }
+
+      case 'check_calendar_availability': {
+        const checkDate = new Date(args.check_date)
+        const duration = args.duration_minutes || 30
+        const endDate = new Date(checkDate.getTime() + duration * 60000)
+
+        const { data: conflicts } = await supabaseAdmin
+          .from('calendar_events')
+          .select('id, title, start_time, end_time, event_type')
+          .eq('status', 'scheduled')
+          .lte('start_time', endDate.toISOString())
+          .gte('end_time', checkDate.toISOString())
+
+        const isAvailable = !conflicts || conflicts.length === 0
+        const conflictList = conflicts?.map((c: any) =>
+          `  - ${c.title} (${c.event_type}) ${new Date(c.start_time).toLocaleString('el-GR')}`
+        ).join('\n') || '  (none)'
+
+        return JSON.stringify({
+          available: isAvailable,
+          check_time: checkDate.toLocaleString('el-GR'),
+          duration_minutes: duration,
+          conflicting_events: conflicts?.length || 0,
+          details: isAvailable ? 'Η ώρα είναι διαθέσιμη.' : `Υπάρχουν ${conflicts?.length} συγκρούσεις:\n${conflictList}`,
+        })
+      }
+
+      case 'book_appointment': {
+        // 1. Check availability
+        const bookStart = new Date(args.start_time)
+        const bookDuration = args.duration_minutes || 30
+        const bookEnd = new Date(bookStart.getTime() + bookDuration * 60000)
+
+        const { data: existing } = await supabaseAdmin
+          .from('calendar_events')
+          .select('id, title')
+          .eq('status', 'scheduled')
+          .lte('start_time', bookEnd.toISOString())
+          .gte('end_time', bookStart.toISOString())
+
+        if (existing && existing.length > 0) {
+          return `❌ Η ώρα ${bookStart.toLocaleString('el-GR')} δεν είναι διαθέσιμη. Υπάρχει ήδη: "${existing[0].title}". Ζητήστε άλλη ώρα.`
+        }
+
+        // 2. Fetch lead info
+        const { data: lead } = await supabaseAdmin
+          .from('hlektrismos_leads')
+          .select('id, first_name, last_name, email')
+          .eq('id', args.lead_id)
+          .single()
+
+        if (!lead) return `❌ Lead ${args.lead_id} δεν βρέθηκε.`
+
+        // 3. Create calendar event
+        const { data: evt, error: evtErr } = await supabaseAdmin.from('calendar_events').insert({
+          lead_id: args.lead_id,
+          title: args.title,
+          event_type: args.event_type || 'meeting',
+          start_time: bookStart.toISOString(),
+          end_time: bookEnd.toISOString(),
+          location: args.location || '',
+          status: 'scheduled',
+          notes: `Booked by AI Agent for ${lead.first_name} ${lead.last_name}`,
+        }).select().single()
+
+        if (evtErr) throw evtErr
+
+        // 4. Add lead note
+        await supabaseAdmin.from('lead_notes').insert({
+          lead_id: args.lead_id,
+          content: `📅 Ραντεβού κλείστηκε: "${args.title}" στις ${bookStart.toLocaleString('el-GR')}${args.location ? ` (${args.location})` : ''} (${bookDuration} λεπτά)`,
+          author: 'AI Agent',
+          note_type: 'calendar_event',
+        })
+
+        // 5. Send confirmation email if requested
+        if (args.send_confirmation !== false && lead.email) {
+          try {
+            const { data: emailConfig } = await supabaseAdmin.from('crm_settings').select('setting_value').eq('setting_key', 'email_config').single()
+            const config = emailConfig?.setting_value || {}
+
+            const confirmationBody = `Γεια σας ${lead.first_name},\n\nΤο ραντεβού σας "${args.title}" έχει προγραμματιστεί:\n\n📅 Ημερομηνία: ${bookStart.toLocaleDateString('el-GR')}\n⏰ Ώρα: ${bookStart.toLocaleTimeString('el-GR')}\n⏱️ Διάρκεια: ${bookDuration} λεπτά\n📍 Τοποθεσία: ${args.location || 'Τηλεφωνικά'}\n\nΘα επικοινωνήσουμε μαζί σας σύντομα.\n\nΜε εκτίμηση,\nHlektrismos.gr`
+
+            const rawEmail = `From: ${config.from_name || 'Hlektrismos.gr'} <${config.from_email || 'info@hlektrismos.gr'}>\r\nTo: ${lead.email}\r\nSubject: ✅ Επιβεβαίωση ραντεβού - ${args.title}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${confirmationBody}`
+
+            // Send via SMTP using port 465
+            const encoder = new TextEncoder()
+            const hostname = config.smtp_host || 'smtp.gmail.com'
+            const port = 465
+            const conn = await Deno.connect({ hostname, port, transport: 'tls' } as any)
+
+            const reader = conn.readable.getReader()
+            const writer = conn.writable.getWriter()
+
+            const readResponse = async () => {
+              const chunks: Uint8Array[] = []
+              while (true) {
+                const { value, done } = await reader.read()
+                if (done) break
+                chunks.push(value)
+                const text = new TextDecoder().decode(value)
+                if (text.includes('\r\n')) break
+              }
+              return new TextDecoder().decode(new Uint8Array([...chunks.flatMap(c => [...c])]))
+            }
+
+            await readResponse()
+            await writer.write(encoder.encode(`EHLO hlektrismos.gr\r\n`))
+            await readResponse()
+            await writer.write(encoder.encode(`AUTH LOGIN\r\n`))
+            await readResponse()
+            await writer.write(encoder.encode(btoa(config.smtp_user || '') + '\r\n'))
+            await readResponse()
+            await writer.write(encoder.encode(btoa(config.smtp_pass || '') + '\r\n'))
+            await readResponse()
+            await writer.write(encoder.encode(`MAIL FROM:<${config.from_email || 'info@hlektrismos.gr'}>\r\n`))
+            await readResponse()
+            await writer.write(encoder.encode(`RCPT TO:<${lead.email}>\r\n`))
+            await readResponse()
+            await writer.write(encoder.encode(`DATA\r\n`))
+            await readResponse()
+            await writer.write(encoder.encode(rawEmail + `\r\n.\r\n`))
+            await readResponse()
+            await writer.write(encoder.encode(`QUIT\r\n`))
+            await readResponse()
+            conn.close()
+          } catch (emailErr) {
+            console.log('Confirmation email failed:', emailErr)
+          }
+        }
+
+        return `✅ Ραντεβού κλείστηκε: "${args.title}" για ${lead.first_name} ${lead.last_name} στις ${bookStart.toLocaleString('el-GR')}${args.location ? ` (${args.location})` : ''}`
       }
 
       default:

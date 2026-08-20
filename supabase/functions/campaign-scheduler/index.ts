@@ -41,6 +41,11 @@ serve(async (req) => {
     let errors = 0;
 
     for (const lead of leads) {
+      // Kill Switch: skip leads with AI paused
+      if (lead.ai_paused) {
+        continue;
+      }
+
       try {
         // Determine best channel
         let channel = "email";

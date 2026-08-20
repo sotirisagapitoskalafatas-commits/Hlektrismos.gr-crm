@@ -42,6 +42,13 @@ serve(async (req) => {
     const results = { sent: 0, failed: 0, errors: [] as string[] };
 
     for (const lead of leads) {
+      // Kill Switch: skip leads with AI paused
+      if (lead.ai_paused) {
+        results.failed++;
+        results.errors.push(`${lead.phone}: AI paused`);
+        continue;
+      }
+
       if (!lead.phone) {
         results.failed++;
         results.errors.push(`${lead.first_name || lead.company_name}: no phone`);

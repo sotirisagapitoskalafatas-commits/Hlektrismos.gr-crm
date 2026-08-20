@@ -45,6 +45,7 @@ type Lead = {
   bill_files?: Array<{ path: string; name: string; type: string; size: number }> | null;
   assigned_to?: string | null;
   assigned_at?: string | null;
+  ai_paused?: boolean | null;
 };
 
 type CrmUser = {
@@ -373,6 +374,26 @@ Return JSON with this exact structure:
             <span className={`dash-status-pill ${lead.status}`} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, fontWeight: 600 }}>
               {lead.status}
             </span>
+            {/* Kill Switch: Pause AI */}
+            <button
+              onClick={async () => {
+                const newVal = !lead.ai_paused;
+                if (newVal && !confirm(`Παύση AI για ${lead.first_name} ${lead.last_name}; Το AI δεν θα στείλει emails/κλήσεις/SMS.`)) return;
+                if (!newVal && !confirm(`Επαναφορά AI για ${lead.first_name} ${lead.last_name};`)) return;
+                await supabase.from('hlektrismos_leads').update({ ai_paused: newVal }).eq('id', lead.id);
+                await supabase.from('lead_notes').insert({ lead_id: lead.id, content: newVal ? '🛑 AI PAUSED by user' : '✅ AI RESUMED by user', author: user?.email || 'CRM User', note_type: 'system' });
+                onClose();
+              }}
+              style={{
+                padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: lead.ai_paused ? '#fef2f2' : '#f0fdf4',
+                color: lead.ai_paused ? '#dc2626' : '#16a34a',
+                border: `1px solid ${lead.ai_paused ? '#fecaca' : '#bbf7d0'}`,
+                display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
+              }}
+            >
+              {lead.ai_paused ? '🛑 AI Παυμένο' : '▶ AI Ενεργό'}
+            </button>
             <button
               onClick={onClose}
               style={{

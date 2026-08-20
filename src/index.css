@@ -471,21 +471,28 @@ img { display: block; max-width: 100%; }
 .login-back:hover { color: var(--accent); }
 
 /* ===== Dashboard ===== */
-.dashboard-shell { display: flex; min-height: 100vh; background: var(--bg-2); }
+.dashboard-shell { display: flex; min-height: 100vh; background: #F8FAFC; }
 
-/* Sidebar */
-.dash-sidebar { width: 240px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px 10px; position: sticky; top: 0; height: 100vh; background: #fff; overflow-y: auto; overflow-x: hidden; transition: width 0.2s ease; z-index: 60; }
+/* Sidebar — Glassmorphism */
+.dash-sidebar { width: 240px; flex-shrink: 0; border-right: 1px solid rgba(226,232,240,0.6); display: flex; flex-direction: column; padding: 16px 10px; position: sticky; top: 0; height: 100vh; background: var(--crm-surface, rgba(255,255,255,0.7)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 4px 0 24px rgba(0,0,0,0.02); overflow-y: auto; overflow-x: hidden; transition: width 0.2s ease; z-index: 60; }
+
+/* Dynamic Theming — injected CSS vars from crm_settings.appearance_config */
+.dashboard-shell { background: var(--crm-bg, #F8FAFC); }
+.dash-sidebar .accordion-header { color: var(--crm-primary, #0066cc); }
+.dash-sidebar .accordion-header:hover { background: color-mix(in srgb, var(--crm-primary, #0066cc) 8%, transparent); }
+.dash-sidebar .accordion-item.active { background: color-mix(in srgb, var(--crm-primary, #0066cc) 10%, transparent); color: var(--crm-primary, #0066cc); border-left-color: var(--crm-primary, #0066cc); }
+.dash-sidebar .dash-brand-logo { border-radius: var(--crm-radius, 10px); }
 .dash-sidebar.collapsed { width: 68px; }
 .dash-sidebar.collapsed .dash-brand-text,
 .dash-sidebar.collapsed .accordion-label,
-.dash-sidebar.collapsed .accordion-item span,
+.dash-sidebar.collapsed .accordion-item,
+.dash-sidebar.collapsed .accordion-header,
+.dash-sidebar.collapsed .accordion-items,
 .dash-sidebar.collapsed .dash-user span,
-.dash-sidebar.collapsed .dash-logout span,
-.dash-sidebar.collapsed .accordion-header-text { display: none; }
-.dash-sidebar.collapsed .dash-nav button { justify-content: center; padding: 10px; gap: 0; }
-.dash-sidebar.collapsed .dash-nav button span.icon-only { display: inline-flex; }
-.dash-sidebar.collapsed .accordion-header { justify-content: center; padding: 8px; }
-.dash-sidebar.collapsed .accordion-header .chevron { display: none; }
+.dash-sidebar.collapsed .dash-logout span { display: none; }
+.dash-sidebar.collapsed .dash-brand { justify-content: center; padding: 6px 4px 12px; }
+.dash-sidebar.collapsed .dash-brand-logo { width: 36px; height: 36px; }
+.dash-sidebar.collapsed .dash-nav { align-items: center; }
 
 /* Brand */
 .dash-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 20px; border-radius: 10px; transition: background 0.15s; }
@@ -523,7 +530,7 @@ img { display: block; max-width: 100%; }
 
 /* Main content */
 .dash-main { flex: 1; min-width: 0; overflow-x: hidden; }
-.dash-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 32px; border-bottom: 1px solid var(--border); background: #fff; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 32px; border-bottom: 1px solid rgba(226,232,240,0.6); background: var(--crm-surface, rgba(255,255,255,0.7)); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; }
 .dash-header h1 { margin: 0; font: 700 22px var(--font-display); }
 .dash-header-right { display: flex; align-items: center; gap: 16px; }
 .dash-live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent); font-weight: 600; }

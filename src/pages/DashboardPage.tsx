@@ -199,6 +199,7 @@ export default function DashboardPage() {
   const [sources, setSources] = useState<Source[]>([]);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [crmUsers, setCrmUsers] = useState<CrmUser[]>([]);
+  const [userRole, setUserRole] = useState<string>('admin');
   const [loading, setLoading] = useState(true);
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
@@ -266,6 +267,26 @@ export default function DashboardPage() {
       return () => clearTimeout(t);
     }
   }, [toast]);
+
+  // Real-time theming: inject CSS variables from crm_settings
+  useEffect(() => {
+    const loadTheme = async () => {
+      const { data } = await supabase.from('crm_settings').select('setting_value').eq('setting_key', 'appearance_config').single();
+      if (!data?.setting_value) return;
+      const s = data.setting_value;
+      const root = document.documentElement;
+      if (s.primary_color) root.style.setProperty('--crm-primary', s.primary_color);
+      if (s.secondary_color) root.style.setProperty('--crm-secondary', s.secondary_color);
+      if (s.bg_color) root.style.setProperty('--crm-bg', s.bg_color);
+      if (s.surface_color) root.style.setProperty('--crm-surface', s.surface_color);
+      if (s.border_radius) root.style.setProperty('--crm-radius', s.border_radius);
+      if (s.logo_url) {
+        const logoEl = document.querySelector('.dash-brand-logo') as HTMLImageElement | SVGElement;
+        if (logoEl && logoEl.tagName === 'IMG') (logoEl as HTMLImageElement).src = s.logo_url;
+      }
+    };
+    loadTheme();
+  }, []);
 
   // Fetch a signed URL for the uploaded bill whenever a lead detail is opened.
   useEffect(() => {
@@ -378,8 +399,22 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     setLoading(true);
+
+    // RBAC: Fetch user role first to determine lead filtering
+    let currentRole = 'admin';
+    if (user?.id) {
+      const { data: myProfile } = await supabase.from('crm_users').select('role').eq('id', user.id).single();
+      if (myProfile?.role) { currentRole = myProfile.role; setUserRole(myProfile.role); }
+    }
+
+    // RBAC: Sales users only see their own assigned leads
+    let leadsQuery = supabase.from('hlektrismos_leads').select('*').order('created_at', { ascending: false });
+    if (currentRole === 'sales' && user?.id) {
+      leadsQuery = leadsQuery.eq('assigned_to', user.id);
+    }
+
     const [leadsRes, agentsRes, sourcesRes, tariffsRes, usersRes, notesRes] = await Promise.all([
-      supabase.from('hlektrismos_leads').select('*').order('created_at', { ascending: false }),
+      leadsQuery,
       supabase.from('ai_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_sources').select('*').order('created_at', { ascending: false }),
       supabase.from('market_tariffs').select('*').order('provider_name', { ascending: true }),
@@ -684,7 +719,35 @@ export default function DashboardPage() {
     ]},
   ];
 
+  // RBAC: Filter nav categories based on user role
+  const allowedTabsByRole: Record<string, Tab[]> = {
+    admin: ['overview', 'leads', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar'],
+    management: ['overview', 'leads', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar'],
+    sales: ['overview', 'leads', 'market', 'hub', 'email', 'campaigns', 'documents', 'market-search', 'calendar'],
+    secretary: ['overview', 'leads', 'email', 'calendar'],
+    it: ['overview', 'settings', 'hub', 'orchestrator'],
+  };
+  const allowedTabs = allowedTabsByRole[userRole] || allowedTabsByRole.admin;
+
+  const visibleNavCategories = navCategories
+    .map(cat => ({ ...cat, items: cat.items.filter(item => allowedTabs.includes(item.tab)) }))
+    .filter(cat => cat.items.length > 0);
+
+  // RBAC: Redirect to overview if user lands on a restricted tab
+  useEffect(() => {
+    if (!loading && !allowedTabs.includes(tab)) {
+      setTab('overview');
+    }
+  }, [tab, loading, allowedTabs]);
+
+  const canManage = ['admin', 'management'].includes(userRole);
+  const canEditSettings = userRole === 'admin';
+
   const handleNavClick = (t: Tab) => {
+    if (!allowedTabs.includes(t)) {
+      setToast({ msg: 'Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα.', type: 'info' });
+      return;
+    }
     setTab(t);
     setIsMobileMenuOpen(false);
   };
@@ -710,27 +773,43 @@ export default function DashboardPage() {
       </div>
 
       <nav className="dash-nav">
-        {navCategories.map((cat) => {
+        {visibleNavCategories.map((cat) => {
           const isOpen = activeCategory === cat.key;
           return (
             <div key={cat.key} className="accordion-group">
-              <div className="accordion-header" onClick={() => toggleCategory(cat.key)}>
-                <span className="accordion-label">{cat.label}</span>
-                <span className={`chevron ${isOpen ? 'open' : ''}`}>▶</span>
-              </div>
-              <div className={`accordion-items ${isOpen ? '' : 'collapsed'}`} style={{ maxHeight: isOpen ? `${cat.items.length * 44}px` : '0' }}>
-                {cat.items.map((item) => (
-                  <button
-                    key={item.tab}
-                    className={tab === item.tab ? 'active' : ''}
-                    onClick={() => handleNavClick(item.tab)}
-                    title={item.label}
-                  >
-                    <span>{item.icon}</span>
-                    <span className="accordion-item">{item.label}</span>
-                  </button>
-                ))}
-              </div>
+              {/* Collapsed: show only category icon */}
+              {isSidebarOpen === false ? (
+                <div
+                  className="collapsed-cat-icon"
+                  onClick={() => { setIsSidebarOpen(true); setActiveCategory(cat.key); }}
+                  title={cat.label}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 18, margin: '2px auto', transition: 'background 0.15s', background: isOpen ? 'rgba(0,102,204,0.08)' : 'transparent' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = isOpen ? 'rgba(0,102,204,0.08)' : 'transparent'; }}
+                >
+                  {cat.label.split(' ')[0]}
+                </div>
+              ) : (
+                <>
+                  <div className="accordion-header" onClick={() => toggleCategory(cat.key)}>
+                    <span className="accordion-label">{cat.label}</span>
+                    <span className={`chevron ${isOpen ? 'open' : ''}`}>▶</span>
+                  </div>
+                  <div className={`accordion-items ${isOpen ? '' : 'collapsed'}`} style={{ maxHeight: isOpen ? `${cat.items.length * 44}px` : '0' }}>
+                    {cat.items.map((item) => (
+                      <button
+                        key={item.tab}
+                        className={tab === item.tab ? 'active' : ''}
+                        onClick={() => handleNavClick(item.tab)}
+                        title={item.label}
+                      >
+                        <span>{item.icon}</span>
+                        <span className="accordion-item">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
@@ -881,7 +960,7 @@ export default function DashboardPage() {
               <div className="dash-content">
                 <div className="dash-content-header">
                   <p>Διαχείριση AI Agents — παρακολούθηση απόδοσης, ρύθμιση παραμέτρων, ενεργοποίηση/απενεργοποίηση.</p>
-                  <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> Νέο Agent</button>
+                  {canManage && <button className="btn btn-primary" onClick={() => setConfigAgent(null)}><Plus size={16} /> Νέο Agent</button>}
                 </div>
                 <div className="dash-table-wrap">
                   <table className="dash-table">
@@ -913,6 +992,7 @@ export default function DashboardPage() {
                           <td><strong>{a.replies || 0}</strong></td>
                           <td><strong>{a.meetings_booked || 0}</strong></td>
                           <td>
+                            {canManage ? (
                             <div className="dash-lead-actions">
                               <button className="icon-btn" title="Ενεργοποίηση/Απενεργοποίηση" onClick={async () => {
                                 const newStatus = a.status === 'active' ? 'paused' : 'active';
@@ -931,6 +1011,7 @@ export default function DashboardPage() {
                                 <Trash2 size={14} />
                               </button>
                             </div>
+                            ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>👁️ Μόνο ανάγνωση</span>}
                           </td>
                         </tr>
                       ))}
@@ -2796,6 +2877,7 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
   const [newCampaign, setNewCampaign] = useState({
     name: '', channel: 'email' as const, subject: '', body: '',
     audience_filter: {} as any,
+    require_approval: true,
   });
 
   useEffect(() => {
@@ -2826,24 +2908,28 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
 
       if (targetLeads.length === 0) { setToast({ msg: 'Δεν υπάρχουν leads με το απαραίτητο κανάλι (email/τηλέφωνο)', type: 'info' }); setSending(false); return; }
 
+      const approvalStatus = newCampaign.require_approval ? 'draft' : 'auto';
+
       // Create campaign record
       const { data: campaign } = await supabase.from('campaigns').insert({
         name: newCampaign.name,
         channel: newCampaign.channel,
         subject: newCampaign.subject,
         body: newCampaign.body,
-        status: 'running',
+        status: newCampaign.require_approval ? 'draft' : 'running',
+        approval_status: approvalStatus,
         total_sends: targetLeads.length,
       }).select().single();
 
-      // Call appropriate Edge Function
-      let result;
-      if (newCampaign.channel === 'email') {
-        const res = await supabase.functions.invoke('send-campaign-email', {
-          body: { campaign_id: campaign?.id, leads: targetLeads, subject: newCampaign.subject, html_body: newCampaign.body, from_name: 'Αλέξης - Hlektrismos.gr' },
-        });
-        result = res.data;
-      } else if (newCampaign.channel === 'voice') {
+      // Call appropriate Edge Function only if no approval required
+      let result: any;
+      if (!newCampaign.require_approval && campaign?.id) {
+        if (newCampaign.channel === 'email') {
+          const res = await supabase.functions.invoke('send-campaign-email', {
+            body: { campaign_id: campaign?.id, leads: targetLeads, subject: newCampaign.subject, html_body: newCampaign.body, from_name: 'Αλέξης - Hlektrismos.gr' },
+          });
+          result = res.data;
+        } else if (newCampaign.channel === 'voice') {
         // Voice calls — call make-voice-call for each lead sequentially
         let sent = 0, failed = 0;
         for (const lead of targetLeads) {
@@ -2866,7 +2952,7 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
         result = res.data;
       }
 
-      if (campaign?.id) {
+      if (campaign?.id && !newCampaign.require_approval) {
         await supabase.from('campaigns').update({
           status: 'completed',
           completed_at: new Date().toISOString(),
@@ -2875,7 +2961,10 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
         }).eq('id', campaign.id);
       }
 
-      setToast({ msg: `Καμπάνια ολοκληρώθηκε: ${result?.sent || 0} απεσταλμένα, ${result?.failed || 0} αποτυχίες`, type: 'success' });
+      const msg = newCampaign.require_approval
+        ? 'Καμπάνια αποθηκεύτηκε ως DRAFT — χρειάζεται έγκριση από admin'
+        : `Καμπάνια ολοκληρώθηκε: ${result?.sent || 0} απεσταλμένα, ${result?.failed || 0} αποτυχίες`;
+      setToast({ msg, type: newCampaign.require_approval ? 'info' : 'success' });
       setShowCreate(false);
       setNewCampaign({ name: '', channel: 'email', subject: '', body: '', audience_filter: {} });
       loadCampaigns();
@@ -2887,6 +2976,34 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
 
   const channelIcons: Record<string, string> = { email: '📧', sms: '📱', viber: '💬', whatsapp: '💬', voice: '📞' };
   const statusColors: Record<string, string> = { draft: '#94a3b8', scheduled: '#f59e0b', running: '#3b82f6', completed: '#22c55e', paused: '#ef4444' };
+  const approvalColors: Record<string, string> = { draft: '#f59e0b', auto: '#0066cc', approved: '#22c55e', rejected: '#ef4444' };
+  const approvalLabels: Record<string, string> = { draft: '⏳ DRAFT', auto: '⚡ Auto', approved: '✅ Approved', rejected: '❌ Rejected' };
+
+  const approveCampaign = async (c: any) => {
+    await supabase.from('campaigns').update({ approval_status: 'approved', status: 'running', approved_by: 'CRM User', approved_at: new Date().toISOString() }).eq('id', c.id);
+    let targetLeads = leads.filter(l => !l.deleted_at);
+    if (c.channel === 'email') targetLeads = targetLeads.filter(l => l.email);
+    else targetLeads = targetLeads.filter(l => l.phone);
+    try {
+      if (c.channel === 'email') {
+        await supabase.functions.invoke('send-campaign-email', { body: { campaign_id: c.id, leads: targetLeads, subject: c.subject, html_body: c.body, from_name: 'Αλέξης - Hlektrismos.gr' } });
+      } else if (c.channel === 'voice') {
+        for (const lead of targetLeads) { try { await supabase.functions.invoke('make-voice-call', { body: { lead_id: lead.id, phone: lead.phone, first_name: lead.first_name, last_name: lead.last_name, region: lead.region, current_provider: lead.provider } }); } catch {} }
+      } else {
+        await supabase.functions.invoke('send-sms', { body: { campaign_id: c.id, leads: targetLeads, message: c.body, channel: c.channel } });
+      }
+      await supabase.from('campaigns').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', c.id);
+    } catch (e) { console.error('Campaign send error:', e); }
+    setToast({ msg: `Καμπάνια "${c.name}" εγκρίθηκε και απεστάλη!`, type: 'success' });
+    loadCampaigns();
+  };
+
+  const rejectCampaign = async (c: any) => {
+    if (!confirm(`Απόρριψη καμπάνιας "${c.name}";`)) return;
+    await supabase.from('campaigns').update({ approval_status: 'rejected', status: 'paused', approved_by: 'CRM User', approved_at: new Date().toISOString() }).eq('id', c.id);
+    setToast({ msg: `Καμπάνια "${c.name}" απορρίφθηκε`, type: 'info' });
+    loadCampaigns();
+  };
 
   return (
     <div className="dash-content">
@@ -2945,6 +3062,17 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
             })()}</strong> leads θα λάβουν αυτή την καμπάνια
             {selectedFilter.size > 0 && <span style={{ color: '#0066cc', marginLeft: 8 }}>(επιλεγμένοι: {selectedFilter.size})</span>}
           </div>
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={newCampaign.require_approval}
+                onChange={(e) => setNewCampaign({ ...newCampaign, require_approval: e.target.checked })}
+                style={{ width: 16, height: 16, accentColor: '#0066cc' }}
+              />
+              Απαιτείται έγκριση από admin πριν την αποστολή (Draft Mode)
+            </label>
+          </div>
           <button onClick={createAndSend} disabled={sending} style={{ marginTop: 16, padding: '10px 24px', background: sending ? '#94a3b8' : '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer' }}>
             {sending ? '⏳ Αποστολή...' : `📤 Αποστολή σε ${(() => {
               const base = selectedFilter.size > 0
@@ -2971,6 +3099,15 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.subject || c.body?.slice(0, 60)}</div>
               </div>
               <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: `${statusColors[c.status] || '#94a3b8'}22`, color: statusColors[c.status] || '#94a3b8' }}>{c.status}</span>
+              {c.approval_status && c.approval_status !== 'auto' && (
+                <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: `${approvalColors[c.approval_status]}18`, color: approvalColors[c.approval_status] }}>{approvalLabels[c.approval_status]}</span>
+              )}
+              {c.approval_status === 'draft' && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => approveCampaign(c)} style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #22c55e', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✅ Έγκριση</button>
+                  <button onClick={() => rejectCampaign(c)} style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #ef4444', background: '#fef2f2', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>❌ Απόρριψη</button>
+                </div>
+              )}
               <div style={{ textAlign: 'right', fontSize: 12 }}>
                 <div>📤 {c.total_sends || 0}</div>
                 <div style={{ color: '#22c55e' }}>✅ {c.total_sent || 0}</div>

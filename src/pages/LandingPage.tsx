@@ -276,18 +276,26 @@ export default function LandingPage() {
     setFormError('');
     setSubmitting(true);
 
+    // Try to upload files, but don't block the lead insert if upload fails
     const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
+    let fileWarning = '';
     for (const file of form.billFiles) {
-      const { uploadDocument } = await import('@/lib/storage');
-      const { data, error: uploadError } = await uploadDocument(file);
-      if (uploadError) {
-        setSubmitting(false);
-        setFormError(uploadError);
-        return;
+      try {
+        const { uploadDocument } = await import('@/lib/storage');
+        const { data, error: uploadError } = await uploadDocument(file);
+        if (uploadError) {
+          fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε. Θα μπορέσετε να το ανεβάσετε αργότερα.`;
+          console.error('File upload error:', uploadError);
+        } else if (data) {
+          uploadedFiles.push(data);
+        }
+      } catch (uploadErr) {
+        fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`;
+        console.error('File upload exception:', uploadErr);
       }
-      if (data) uploadedFiles.push(data);
     }
 
+    // Insert lead (even without files)
     const { error } = await supabase.from('hlektrismos_leads').insert({
       first_name: form.firstName,
       last_name: form.lastName,
@@ -304,10 +312,16 @@ export default function LandingPage() {
       consent: form.consent,
       lawful_basis: form.consent ? 'Consent' : null,
       customer_category: form.propertyType === 'Σπίτι' ? 'B2C_Household' : 'B2B_Corporate',
-      pipeline_status: 'new'
+      pipeline_status: 'new',
+      source: 'Landing Page',
+      status: 'new',
     });
     setSubmitting(false);
-    if (error) { setFormError('Κάτι πήγε στραβά. Δοκιμάστε ξανά.'); return; }
+    if (error) {
+      console.error('Lead insert error:', error);
+      setFormError(`Σφάλμα καταχώρησης: ${error.message || 'Παρακαλώ δοκιμάστε ξανά.'}`);
+      return;
+    }
 
     // Auto-trigger OCR for uploaded bill files in background
     if (uploadedFiles.length > 0) {
@@ -321,6 +335,9 @@ export default function LandingPage() {
       }
     }
 
+    if (fileWarning) {
+      setFormError(fileWarning);
+    }
     setSubmitted(true);
     setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
   };

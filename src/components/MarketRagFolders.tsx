@@ -65,6 +65,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   Volton: '#4f46e5',
   'We Energy': '#0d9488',
   'Ελίν': '#b91c1c',
+  'Enerwave': '#0ea5e9',
 };
 
 const COLOR_BADGES: Record<string, { bg: string; fg: string; label: string }> = {

@@ -42,6 +42,7 @@ const OFFICIAL_URLS: Record<string, Record<string, string>> = {
   "Φυσικό Αέριο": { B2C: "https://www.fysikoaeriohellas.gr/antistoixisi/spiti/", B2B: "https://www.fysikoaeriohellas.gr/antistoixisi/epixeirisi/" },
   "Ελίν": { B2C: "https://energy.elin.gr/antistoixisi/spiti/", B2B: "https://energy.elin.gr/antistoixisi/epixeirisi/" },
   "We Energy": { B2C: "https://weenergy.gr/antistoixisi/spiti/", B2B: "https://weenergy.gr/antistoixisi/epixeirisi/" },
+  "Enerwave": { B2C: "https://www.enerwave.gr/el/gia-to-spiti/revma/", B2B: "https://www.enerwave.gr/el/gia-tin-epicheirisi/revma-gia-mikres-mesaies-epicheiriseis/" },
 };
 
 Deno.serve(async (req: Request) => {

@@ -523,12 +523,88 @@ function AppearanceSettings({ settings, update }: { settings: Record<string, any
 
 function TariffsSettings({ settings, update }: { settings: Record<string, any>; update: (k: string, v: any) => void }) {
   const s = settings.energy_tariffs_config || {};
+  const [tariffs, setTariffs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editRow, setEditRow] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, any>>({});
+  const [saving, setSaving] = useState(false);
+  const [filterProvider, setFilterProvider] = useState<string>('all');
+
+  useEffect(() => { loadTariffs(); }, []);
+
+  const loadTariffs = async () => {
+    setLoading(true);
+    const { data } = await supabase.rpc('get_active_tariff_prices');
+    if (data) setTariffs(data);
+    setLoading(false);
+  };
+
+  const startEdit = (t: any) => {
+    setEditRow(t.tariff_id);
+    setEditValues({
+      official_url: t.official_url || '',
+      base_price_day: t.base_price_day ?? '',
+      base_price_night: t.base_price_night ?? '',
+      fixed_fee_monthly: t.fixed_fee_monthly ?? '',
+      discounted_price_day: t.discounted_price_day ?? '',
+      discount_conditions: t.discount_conditions || '',
+    });
+  };
+
+  const saveRow = async (t: any) => {
+    setSaving(true);
+    try {
+      // Update energy_tariffs.official_url
+      if (editValues.official_url !== (t.official_url || '')) {
+        await supabase.from('energy_tariffs').update({ official_url: editValues.official_url || null }).eq('id', t.tariff_id);
+      }
+      // Update or insert energy_tariff_prices
+      const priceUpdate: any = {};
+      if (editValues.base_price_day !== '') priceUpdate.base_price_day = Number(editValues.base_price_day);
+      if (editValues.base_price_night !== '') priceUpdate.base_price_night = Number(editValues.base_price_night) || null;
+      if (editValues.fixed_fee_monthly !== '') priceUpdate.fixed_fee_monthly = Number(editValues.fixed_fee_monthly);
+      if (editValues.discounted_price_day !== '') priceUpdate.discounted_price_day = Number(editValues.discounted_price_day) || null;
+      if (editValues.discount_conditions !== undefined) priceUpdate.discount_conditions = editValues.discount_conditions || null;
+      priceUpdate.unit_rate_kwh = priceUpdate.base_price_day ?? undefined;
+
+      if (Object.keys(priceUpdate).length > 0 && t.validity_from) {
+        // Find existing price record for this tariff+validity
+        const { data: existing } = await supabase
+          .from('energy_tariff_prices')
+          .select('id')
+          .eq('tariff_id', t.tariff_id)
+          .eq('validity_from', t.validity_from)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from('energy_tariff_prices').update(priceUpdate).eq('id', existing.id);
+        } else {
+          await supabase.from('energy_tariff_prices').insert({
+            tariff_id: t.tariff_id,
+            validity_from: t.validity_from || new Date().toISOString().split('T')[0],
+            verification_status: 'needs_review',
+            ...priceUpdate,
+          });
+        }
+      }
+      setEditRow(null);
+      await loadTariffs();
+    } catch (e) {
+      console.error('Save failed:', e);
+    }
+    setSaving(false);
+  };
+
+  const providers = [...new Set(tariffs.map((t) => t.provider_name))];
+  const filtered = filterProvider === 'all' ? tariffs : tariffs.filter((t) => t.provider_name === filterProvider);
+
   return (
     <div>
       <h4 style={{ margin: '0 0 16px', fontSize: '14px' }}>⚡ Energy Suppliers & Formulas</h4>
       <FieldRow label="Energy Providers">
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {(s.providers || []).map((p: string) => (
+          {providers.map((p: string) => (
             <span key={p} style={{ padding: '4px 12px', borderRadius: '12px', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', fontSize: '12px', fontWeight: 500 }}>{p}</span>
           ))}
         </div>
@@ -545,6 +621,148 @@ function TariffsSettings({ settings, update }: { settings: Record<string, any>; 
         <FieldRow label="Μπλε (€/kWh)"><NumberInput value={s.price_tiers?.blue || 0.10} onChange={(v) => update('energy_tariffs_config', { ...s, price_tiers: { ...s.price_tiers, blue: v } })} min={0} max={1} /></FieldRow>
         <FieldRow label="Κίτρινο (€/kWh)"><NumberInput value={s.price_tiers?.yellow || 0.12} onChange={(v) => update('energy_tariffs_config', { ...s, price_tiers: { ...s.price_tiers, yellow: v } })} min={0} max={1} /></FieldRow>
         <FieldRow label="Πορτοκαλί (€/kWh)"><NumberInput value={s.price_tiers?.orange || 0.15} onChange={(v) => update('energy_tariffs_config', { ...s, price_tiers: { ...s.price_tiers, orange: v } })} min={0} max={1} /></FieldRow>
+      </div>
+
+      {/* ─── Individual Tariff Editor ─── */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h4 style={{ margin: 0, fontSize: '14px' }}>📋 Edit Tariffs (Prices & Links)</h4>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select
+              value={filterProvider}
+              onChange={(e) => setFilterProvider(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)' }}
+            >
+              <option value="all">All Providers</option>
+              {providers.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <button onClick={loadTariffs} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <RefreshCw size={12} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>Loading tariffs...</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Provider</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Program</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Type</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Official URL</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Price Day €/kWh</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Price Night</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Fixed €/mo</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Disc. Price</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Discount Conditions</th>
+                  <th style={{ padding: '8px 6px', fontWeight: 600, color: 'var(--text-muted)' }}>Status</th>
+                  <th style={{ padding: '8px 6px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((t) => {
+                  const isEditing = editRow === t.tariff_id;
+                  return (
+                    <tr key={t.tariff_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 6px', fontWeight: 600, whiteSpace: 'nowrap' }}>{t.provider_name}</td>
+                      <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{t.program_name}</td>
+                      <td style={{ padding: '8px 6px' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: t.customer_type === 'B2C' ? '#eff6ff' : '#f0fdf4', color: t.customer_type === 'B2C' ? '#2563eb' : '#16a34a', fontSize: 10, fontWeight: 600 }}>
+                          {t.customer_type}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 6px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {isEditing ? (
+                          <input value={editValues.official_url} onChange={(e) => setEditValues({ ...editValues, official_url: e.target.value })}
+                            style={{ width: '180px', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, background: '#fff' }} />
+                        ) : t.official_url ? (
+                          <a href={t.official_url} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontSize: 11 }}>🔗 Link</a>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {isEditing ? (
+                          <input type="number" step="0.0001" value={editValues.base_price_day} onChange={(e) => setEditValues({ ...editValues, base_price_day: e.target.value })}
+                            style={{ width: '80px', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, background: '#fff' }} />
+                        ) : t.base_price_day != null ? (
+                          <span style={{ fontWeight: 700, color: '#00c878' }}>€{t.base_price_day}</span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {isEditing ? (
+                          <input type="number" step="0.0001" value={editValues.base_price_night} onChange={(e) => setEditValues({ ...editValues, base_price_night: e.target.value })}
+                            style={{ width: '80px', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, background: '#fff' }} />
+                        ) : t.base_price_night != null ? (
+                          <span style={{ fontWeight: 600, color: '#7c3aed' }}>€{t.base_price_night}</span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {isEditing ? (
+                          <input type="number" step="0.01" value={editValues.fixed_fee_monthly} onChange={(e) => setEditValues({ ...editValues, fixed_fee_monthly: e.target.value })}
+                            style={{ width: '60px', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, background: '#fff' }} />
+                        ) : t.fixed_fee_monthly != null && t.fixed_fee_monthly > 0 ? (
+                          <span>€{t.fixed_fee_monthly}/mo</span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {isEditing ? (
+                          <input type="number" step="0.0001" value={editValues.discounted_price_day} onChange={(e) => setEditValues({ ...editValues, discounted_price_day: e.target.value })}
+                            style={{ width: '80px', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, background: '#fff' }} />
+                        ) : t.discounted_price_day != null ? (
+                          <span style={{ color: '#059669', fontWeight: 600 }}>€{t.discounted_price_day}</span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {isEditing ? (
+                          <input value={editValues.discount_conditions} onChange={(e) => setEditValues({ ...editValues, discount_conditions: e.target.value })}
+                            placeholder="e.g. Direct debit"
+                            style={{ width: '120px', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, background: '#fff' }} />
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.discount_conditions || '—'}</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
+                        <span style={{
+                          padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                          background: t.verification_status === 'verified' ? '#dcfce7' : t.verification_status === 'needs_review' ? '#fef9c3' : '#f1f5f9',
+                          color: t.verification_status === 'verified' ? '#16a34a' : t.verification_status === 'needs_review' ? '#ca8a04' : '#64748b',
+                        }}>
+                          {t.verification_status === 'verified' ? '✓ Verified' : t.verification_status === 'needs_review' ? '⚠ Review' : t.verification_status || '—'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {isEditing ? (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => saveRow(t)} disabled={saving}
+                              style={{ padding: '4px 8px', borderRadius: 4, border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                              {saving ? '...' : '💾'}
+                            </button>
+                            <button onClick={() => setEditRow(null)}
+                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 11 }}>
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => startEdit(t)}
+                            style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#2563eb' }}>
+                            ✏️ Edit
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>No tariffs found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

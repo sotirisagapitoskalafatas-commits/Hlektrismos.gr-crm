@@ -12,7 +12,37 @@ const GREEK_MONTHS = [
   "Σεπτεμβρίου", "Οκτωβρίου", "Νοεμβρίου", "Δεκεμβρίου",
 ];
 
-const TARIFF_EXTRACTION_PROMPT = `You are a Greek energy market analyst. Extract all energy provider tariffs found in the provided text. Return STRICTLY a JSON array of objects with keys: provider_name, program_name, customer_type (B2C/B2B), tariff_color (blue/green/yellow/orange), energy_type (electricity/gas/solar), unit_rate_kwh (number), fixed_fee_monthly (number). Map to RAEYE color standards. No markdown.`;
+const TARIFF_EXTRACTION_PROMPT = `You are a Greek energy market analyst. Extract ALL energy provider tariffs from the provided text. Return STRICTLY a JSON array of objects with these keys:
+- provider_name: Greek provider name (ΔΕΗ, Protergia, ΗΡΩΝ, Elpedison, Φυσικό Αέριο, nrg, ZeniΘ, Volton, Ελίν, We Energy, Enerwave, Eunice)
+- program_name: Exact tariff program name in Greek
+- customer_type: "B2C" or "B2B"
+- tariff_color: "green" (Ειδικό/Πράσινο), "blue" (Σταθερό), "yellow" (Κυμαινόμενο), or "orange" (Δυναμικό)
+- energy_type: "electricity", "gas", "solar", or "ev_charging"
+- base_price_day: daytime electricity price in €/kWh (number, 4 decimal places)
+- base_price_night: nighttime electricity price in €/kWh if available (number or null)
+- unit_rate_kwh: average or single rate in €/kWh (number)
+- fixed_fee_monthly: fixed monthly charge in € (number, 0 if none)
+- discounted_price_day: discounted daytime price if applicable (number or null)
+- discounted_price_night: discounted nighttime price if applicable (number or null)
+- discount_conditions: text describing discount conditions (string or null, e.g. "Direct debit", "e-bill", "Online only")
+- official_url: official provider page URL for this program if found (string or null)
+
+RAEYE color standards: green = Ειδικό (social tariff), blue = Σταθερό (fixed), yellow = Κυμαινόμενο (variable), orange = Δυναμικό (dynamic).
+Return ONLY the JSON array, no markdown, no explanation.`;
+
+// Official URLs per provider — used as fallback when scraper doesn't find them
+const OFFICIAL_URLS: Record<string, Record<string, string>> = {
+  "ΔΕΗ": { B2C: "https://myhome-online.gr/el/products", B2B: "https://mybusiness-online.gr/el/products" },
+  "Protergia": { B2C: "https://www.protergia.gr/antistoixisi/spiti/", B2B: "https://www.protergia.gr/antistoixisi/epixeirisi/" },
+  "ΗΡΩΝ": { B2C: "https://www.heron.gr/antistoixisi/spiti/", B2B: "https://www.heron.gr/antistoixisi/epixeirisi/" },
+  "nrg": { B2C: "https://www.nrg.gr/antistoixisi/spiti", B2B: "https://www.nrg.gr/antistoixisi/epixeirisi" },
+  "Elpedison": { B2C: "https://www.elpedison.gr/antistoixisi/spiti", B2B: "https://www.elpedison.gr/antistoixisi/epixeirisi" },
+  "ZeniΘ": { B2C: "https://zenith.gr/antistoixisi/spiti/", B2B: "https://zenith.gr/antistoixisi/epixeirisi/" },
+  "Volton": { B2C: "https://volton.gr/antistoixisi/spiti/", B2B: "https://volton.gr/antistoixisi/epixeirisi/" },
+  "Φυσικό Αέριο": { B2C: "https://www.fysikoaeriohellas.gr/antistoixisi/spiti/", B2B: "https://www.fysikoaeriohellas.gr/antistoixisi/epixeirisi/" },
+  "Ελίν": { B2C: "https://energy.elin.gr/antistoixisi/spiti/", B2B: "https://energy.elin.gr/antistoixisi/epixeirisi/" },
+  "We Energy": { B2C: "https://weenergy.gr/antistoixisi/spiti/", B2B: "https://weenergy.gr/antistoixisi/epixeirisi/" },
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -43,6 +73,7 @@ Deno.serve(async (req: Request) => {
     const currentMonth = GREEK_MONTHS[now.getMonth()];
     const currentYear = now.getFullYear();
     const validityMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const validityFrom = `${validityMonth}-01`;
 
     console.log(`[autonomous-tariff-scraper] Starting scrape for ${currentMonth} ${currentYear} (validity: ${validityMonth})`);
 
@@ -143,8 +174,14 @@ Deno.serve(async (req: Request) => {
       customer_type: string;
       tariff_color: string;
       energy_type: string;
+      base_price_day: number | null;
+      base_price_night: number | null;
       unit_rate_kwh: number;
       fixed_fee_monthly: number;
+      discounted_price_day: number | null;
+      discounted_price_night: number | null;
+      discount_conditions: string | null;
+      official_url: string | null;
     }> = [];
 
     try {
@@ -171,56 +208,109 @@ Deno.serve(async (req: Request) => {
     console.log(`[gemini] Extracted ${tariffs.length} tariff records`);
 
     // ─── Phase 3: Database Update ──────────────────────────────────────────
-    console.log(`[db] Truncating market_tariffs...`);
 
-    const { error: truncateError } = await supabase.rpc("exec_sql", {
-      query: "TRUNCATE TABLE market_tariffs",
-    });
+    // 3a. Upsert energy_tariffs (product catalog)
+    console.log(`[db] Upserting ${tariffs.length} energy_tariffs...`);
 
-    if (truncateError) {
-      // Fallback: delete all rows manually
-      console.warn("[db] exec_sql truncate failed, falling back to delete...");
-      const { error: deleteError } = await supabase
+    const tariffCatalogInserts = tariffs.map((t) => ({
+      provider_name: t.provider_name,
+      program_name: t.program_name,
+      customer_type: (t.customer_type || "B2C") as "B2C" | "B2B",
+      tariff_color: t.tariff_color || "green",
+      energy_type: t.energy_type || "electricity",
+      official_url: t.official_url || OFFICIAL_URLS[t.provider_name]?.[t.customer_type || "B2C"] || null,
+      is_active: true,
+    }));
+
+    const { data: insertedCatalog, error: catalogError } = await supabase
+      .from("energy_tariffs")
+      .upsert(tariffCatalogInserts, { onConflict: "provider_name,program_name" })
+      .select("id, provider_name, program_name");
+
+    if (catalogError) {
+      console.error("[db] energy_tariffs upsert error:", catalogError);
+      throw new Error(`Failed to upsert energy_tariffs: ${catalogError.message}`);
+    }
+
+    console.log(`[db] Upserted ${insertedCatalog?.length || 0} energy_tariffs`);
+
+    // Build a map of tariff_id by (provider_name, program_name)
+    const tariffIdMap = new Map<string, string>();
+    for (const t of insertedCatalog || []) {
+      tariffIdMap.set(`${t.provider_name}::${t.program_name}`, t.id);
+    }
+
+    // 3b. Insert energy_tariff_prices (pricing history)
+    console.log(`[db] Inserting ${tariffs.length} energy_tariff_prices...`);
+
+    const priceInserts = tariffs
+      .filter((t) => {
+        const id = tariffIdMap.get(`${t.provider_name}::${t.program_name}`);
+        return id != null;
+      })
+      .map((t) => ({
+        tariff_id: tariffIdMap.get(`${t.provider_name}::${t.program_name}`)!,
+        base_price_day: t.base_price_day ?? t.unit_rate_kwh ?? null,
+        base_price_night: t.base_price_night ?? null,
+        unit_rate_kwh: t.unit_rate_kwh ?? null,
+        fixed_fee_monthly: t.fixed_fee_monthly ?? 0,
+        discounted_price_day: t.discounted_price_day ?? null,
+        discounted_price_night: t.discounted_price_night ?? null,
+        discount_conditions: t.discount_conditions ?? null,
+        validity_from: validityFrom,
+        verification_status: "needs_review" as const,
+        source_url: t.official_url || null,
+      }));
+
+    const { data: insertedPrices, error: priceError } = await supabase
+      .from("energy_tariff_prices")
+      .upsert(priceInserts, { onConflict: "tariff_id,validity_from" })
+      .select("id");
+
+    if (priceError) {
+      console.error("[db] energy_tariff_prices insert error:", priceError);
+      // Non-fatal — catalog is already saved
+      console.warn("[db] Continuing despite price insert failure...");
+    } else {
+      console.log(`[db] Inserted ${insertedPrices?.length || 0} energy_tariff_prices`);
+    }
+
+    // 3c. Also update legacy market_tariffs for backward compatibility
+    console.log(`[db] Updating legacy market_tariffs for backward compat...`);
+
+    const { error: legacyDeleteErr } = await supabase
+      .from("market_tariffs")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+
+    if (legacyDeleteErr) {
+      console.warn("[db] Legacy market_tariffs delete failed:", legacyDeleteErr.message);
+    } else {
+      const legacyInserts = tariffs.map((t) => ({
+        provider_name: t.provider_name,
+        program_name: t.program_name,
+        customer_type: t.customer_type || "B2C",
+        tariff_color: t.tariff_color || "green",
+        energy_type: t.energy_type || "electricity",
+        unit_rate_kwh: Number(t.unit_rate_kwh) || 0,
+        fixed_fee_monthly: Number(t.fixed_fee_monthly) || 0,
+        validity_month: validityMonth,
+        source_url: t.official_url || "",
+        category: t.customer_type || "B2C",
+        resource: t.energy_type === "gas" ? "αέριο" : "ρεύμα",
+        last_verified: new Date().toISOString(),
+      }));
+
+      const { error: legacyInsertErr } = await supabase
         .from("market_tariffs")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+        .insert(legacyInserts);
 
-      if (deleteError) {
-        console.error("[db] Delete fallback also failed:", deleteError);
-        throw new Error(`Failed to truncate market_tariffs: ${deleteError.message}`);
+      if (legacyInsertErr) {
+        console.warn("[db] Legacy market_tariffs insert failed:", legacyInsertErr.message);
       }
     }
 
-    console.log(`[db] Inserting ${tariffs.length} tariff records...`);
-
-    const tariffInserts = tariffs.map((t) => ({
-      provider_name: t.provider_name,
-      program_name: t.program_name,
-      customer_type: t.customer_type || "B2C",
-      tariff_color: t.tariff_color || "green",
-      energy_type: t.energy_type || "electricity",
-      unit_rate_kwh: Number(t.unit_rate_kwh) || 0,
-      fixed_fee_monthly: Number(t.fixed_fee_monthly) || 0,
-      validity_month: validityMonth,
-      source_url: "",
-      category: t.customer_type || "B2C",
-      resource: t.energy_type === "gas" ? "αέριο" : "ρεύμα",
-      last_verified: new Date().toISOString(),
-    }));
-
-    const { data: insertedTariffs, error: insertError } = await supabase
-      .from("market_tariffs")
-      .insert(tariffInserts)
-      .select("provider_name");
-
-    if (insertError) {
-      console.error("[db] Bulk insert error:", insertError);
-      throw new Error(`Failed to insert tariffs: ${insertError.message}`);
-    }
-
-    console.log(`[db] Inserted ${(insertedTariffs || []).length} tariff records`);
-
-    // Upsert unique providers into rag_document_endpoints
+    // 3d. Upsert unique providers into rag_document_endpoints
     const uniqueProviders = [...new Set(tariffs.map((t) => t.provider_name))];
     console.log(`[db] Upserting ${uniqueProviders.length} providers into rag_document_endpoints...`);
 
@@ -235,7 +325,7 @@ Deno.serve(async (req: Request) => {
             provider_name: provider,
             customer_type: custType,
             endpoint_label: `${provider} — ${custType === "B2B" ? "Επιχείρηση" : "Οικιακό"}`,
-            endpoint_url: `https://www.google.com/search?q=${encodeURIComponent(`τιμολόγιο ${provider} ${custType}`)}`,
+            endpoint_url: OFFICIAL_URLS[provider]?.[custType] || `https://www.google.com/search?q=${encodeURIComponent(`τιμολόγιο ${provider} ${custType}`)}`,
             file_type: "html",
             sync_frequency: "monthly",
             last_synced_at: new Date().toISOString(),
@@ -260,7 +350,7 @@ Deno.serve(async (req: Request) => {
         duration_ms: durationMs,
       });
     } catch {
-      // Non-critical — do not fail the function
+      // Non-critical
     }
 
     console.log(`[autonomous-tariff-scraper] Completed in ${durationMs}ms — ${tariffs.length} tariffs, ${uniqueProviders.length} providers`);
@@ -269,6 +359,8 @@ Deno.serve(async (req: Request) => {
       success: true,
       validity_month: validityMonth,
       tariffs_inserted: tariffs.length,
+      prices_inserted: insertedPrices?.length || 0,
+      catalog_inserted: insertedCatalog?.length || 0,
       providers: uniqueProviders,
       search_query: searchQuery,
       results_scanned: organicResults.length,
@@ -282,7 +374,6 @@ Deno.serve(async (req: Request) => {
     const durationMs = Date.now() - startTime;
     console.error(`[autonomous-tariff-scraper] Fatal error: ${err.message}`, err);
 
-    // Log failure
     try {
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
@@ -295,7 +386,7 @@ Deno.serve(async (req: Request) => {
         duration_ms: durationMs,
       });
     } catch {
-      // Swallow logging failure
+      // Swallow
     }
 
     return new Response(JSON.stringify({

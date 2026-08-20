@@ -14,19 +14,34 @@ import {
   RefreshCw,
   Tag,
   Euro,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  Link2,
+  Info,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import TariffDetailSlideout from './TariffDetailSlideout';
 
-type Tariff = {
-  id: string;
+type TariffRow = {
+  tariff_id: string;
   provider_name: string;
   program_name: string;
   customer_type: string;
   tariff_color: string | null;
+  energy_type: string | null;
+  official_url: string | null;
+  requires_dual_zone_meter: boolean;
+  base_price_day: number | null;
+  base_price_night: number | null;
   unit_rate_kwh: number | null;
   fixed_fee_monthly: number | null;
-  energy_type: string | null;
-  created_at: string;
+  discounted_price_day: number | null;
+  discounted_price_night: number | null;
+  discount_conditions: string | null;
+  validity_from: string | null;
+  validity_until: string | null;
+  verification_status: string;
 };
 
 type ProviderInfo = {
@@ -35,35 +50,45 @@ type ProviderInfo = {
   b2c: number;
   b2b: number;
   total: number;
+  verified: number;
+  needsReview: number;
 };
 
 const PROVIDER_COLORS: Record<string, string> = {
   'ΔΕΗ': '#1e40af',
-  'Protergia': '#dc2626',
+  Protergia: '#dc2626',
   'ΗΡΩΝ': '#059669',
   'ZeniΘ': '#d97706',
-  'Elpedison': '#7c3aed',
-  'nrg': '#0891b2',
+  Elpedison: '#7c3aed',
+  nrg: '#0891b2',
   'Φυσικό Αέριο': '#be185d',
-  'Volton': '#4f46e5',
+  Volton: '#4f46e5',
   'We Energy': '#0d9488',
   'Ελίν': '#b91c1c',
 };
 
+const COLOR_BADGES: Record<string, { bg: string; fg: string; label: string }> = {
+  green: { bg: '#dcfce7', fg: '#16a34a', label: 'Πράσινο' },
+  blue: { bg: '#dbeafe', fg: '#2563eb', label: 'Μπλε' },
+  yellow: { bg: '#fef9c3', fg: '#ca8a04', label: 'Κίτρινο' },
+  orange: { bg: '#ffedd5', fg: '#ea580c', label: 'Πορτοκαλί' },
+};
+
 const ENERGY_ICONS: Record<string, string> = {
-  Electricity: '⚡',
-  'Natural Gas': '🔥',
-  Photovoltaic: '☀️',
-  'EV Charging': '🚗',
+  electricity: '⚡',
+  gas: '🔥',
+  solar: '☀️',
+  ev_charging: '🚗',
 };
 
 export default function MarketRagFolders() {
-  const [tariffs, setTariffs] = useState<Tariff[]>([]);
+  const [tariffs, setTariffs] = useState<TariffRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<'B2B' | 'B2C'>('B2C');
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [selectedTariff, setSelectedTariff] = useState<TariffRow | null>(null);
 
   useEffect(() => {
     loadTariffs();
@@ -71,11 +96,40 @@ export default function MarketRagFolders() {
 
   const loadTariffs = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('market_tariffs')
-      .select('*')
-      .order('provider_name');
-    if (data) setTariffs(data);
+    const { data, error } = await supabase.rpc('get_active_tariff_prices');
+    if (error) {
+      console.error('[MarketRagFolders] RPC error, falling back to direct query:', error);
+      const { data: fallback } = await supabase
+        .from('market_tariffs')
+        .select('*')
+        .order('provider_name');
+      if (fallback) {
+        setTariffs(
+          fallback.map((t: any) => ({
+            tariff_id: t.id,
+            provider_name: t.provider_name,
+            program_name: t.program_name,
+            customer_type: t.customer_type,
+            tariff_color: t.tariff_color,
+            energy_type: t.energy_type || 'electricity',
+            official_url: t.source_url,
+            requires_dual_zone_meter: false,
+            base_price_day: t.unit_rate_kwh,
+            base_price_night: null,
+            unit_rate_kwh: t.unit_rate_kwh,
+            fixed_fee_monthly: t.fixed_fee_monthly,
+            discounted_price_day: null,
+            discounted_price_night: null,
+            discount_conditions: null,
+            validity_from: null,
+            validity_until: null,
+            verification_status: 'unverified',
+          }))
+        );
+      }
+    } else if (data) {
+      setTariffs(data);
+    }
     setLoading(false);
   };
 
@@ -102,13 +156,18 @@ export default function MarketRagFolders() {
 
   const providers = [...new Set(tariffs.map((t) => t.provider_name))];
 
-  const providerCounts: ProviderInfo[] = providers.map((p) => ({
-    name: p,
-    color: PROVIDER_COLORS[p] || '#64748b',
-    b2c: tariffs.filter((t) => t.provider_name === p && t.customer_type === 'B2C').length,
-    b2b: tariffs.filter((t) => t.provider_name === p && t.customer_type === 'B2B').length,
-    total: tariffs.filter((t) => t.provider_name === p).length,
-  }));
+  const providerCounts: ProviderInfo[] = providers.map((p) => {
+    const pTariffs = tariffs.filter((t) => t.provider_name === p);
+    return {
+      name: p,
+      color: PROVIDER_COLORS[p] || '#64748b',
+      b2c: pTariffs.filter((t) => t.customer_type === 'B2C').length,
+      b2b: pTariffs.filter((t) => t.customer_type === 'B2B').length,
+      total: pTariffs.length,
+      verified: pTariffs.filter((t) => t.verification_status === 'verified').length,
+      needsReview: pTariffs.filter((t) => t.verification_status === 'needs_review').length,
+    };
+  });
 
   const filteredByCategory = tariffs.filter((t) => t.customer_type === activeCategory);
 
@@ -137,8 +196,35 @@ export default function MarketRagFolders() {
 
   return (
     <div className="dash-content">
+      {selectedTariff && (
+        <TariffDetailSlideout
+          tariff={{
+            tariff_id: selectedTariff.tariff_id,
+            provider_name: selectedTariff.provider_name,
+            program_name: selectedTariff.program_name,
+            customer_type: selectedTariff.customer_type,
+            tariff_color: selectedTariff.tariff_color,
+            energy_type: selectedTariff.energy_type,
+            official_url: selectedTariff.official_url,
+            terms_pdf_url: null,
+            requires_dual_zone_meter: selectedTariff.requires_dual_zone_meter,
+            base_price_day: selectedTariff.base_price_day,
+            base_price_night: selectedTariff.base_price_night,
+            unit_rate_kwh: selectedTariff.unit_rate_kwh,
+            fixed_fee_monthly: selectedTariff.fixed_fee_monthly,
+            discounted_price_day: selectedTariff.discounted_price_day,
+            discounted_price_night: selectedTariff.discounted_price_night,
+            discount_conditions: selectedTariff.discount_conditions,
+            validity_from: selectedTariff.validity_from,
+            validity_until: selectedTariff.validity_until,
+            verification_status: selectedTariff.verification_status,
+          }}
+          onClose={() => setSelectedTariff(null)}
+        />
+      )}
+
       <div className="dash-content-header">
-        <p>Browse energy provider programs and market tariffs. Data is fetched dynamically from the database.</p>
+        <p>Ετήσιο κατάλογος προγραμμάτων ενέργειας. Δεδομένα από τη βάση δεδομένων με επίσημες συνδέσεις παρόχων.</p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="btn btn-ghost" onClick={loadTariffs}>
             <RefreshCw size={16} /> Refresh
@@ -277,6 +363,45 @@ export default function MarketRagFolders() {
                     {count} tariff{count !== 1 ? 's' : ''} &middot; {pc.b2c} B2C, {pc.b2b} B2B
                   </div>
                 </div>
+                {/* Verification badges on provider header */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {pc.verified > 0 && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: '#dcfce7',
+                        color: '#16a34a',
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <ShieldCheck size={10} />
+                      {pc.verified}
+                    </span>
+                  )}
+                  {pc.needsReview > 0 && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: '#fef9c3',
+                        color: '#ca8a04',
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <ShieldAlert size={10} />
+                      {pc.needsReview}
+                    </span>
+                  )}
+                </div>
                 <span style={{ padding: '4px 10px', borderRadius: 8, background: `${pc.color}15`, color: pc.color, fontSize: 12, fontWeight: 700 }}>
                   {count} plans
                 </span>
@@ -290,44 +415,76 @@ export default function MarketRagFolders() {
                       No tariffs found for this category
                     </div>
                   )}
-                  {providerTariffs.map((t) => (
-                    <div
-                      key={t.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '12px 14px',
-                        borderRadius: 10,
-                        border: '1px solid transparent',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      <FileText size={18} style={{ color: pc.color, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{t.program_name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                          <span>{ENERGY_ICONS[t.energy_type || ''] || '⚡'} {t.energy_type || '—'}</span>
-                          {t.unit_rate_kwh != null && <span>€{t.unit_rate_kwh}/kWh</span>}
-                          {t.fixed_fee_monthly != null && t.fixed_fee_monthly > 0 && <span>€{t.fixed_fee_monthly}/mo fixed</span>}
+                  {providerTariffs.map((t) => {
+                    const colorBadge = t.tariff_color ? COLOR_BADGES[t.tariff_color] : null;
+                    const isVerified = t.verification_status === 'verified';
+                    const needsReview = t.verification_status === 'needs_review';
+                    return (
+                      <div
+                        key={t.tariff_id}
+                        onClick={() => setSelectedTariff(t)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 14px',
+                          borderRadius: 10,
+                          border: '1px solid transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#f8fafc';
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.borderColor = 'transparent';
+                        }}
+                      >
+                        <FileText size={18} style={{ color: pc.color, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{t.program_name}</span>
+                            {/* Verification indicator */}
+                            {isVerified && (
+                              <ShieldCheck size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                            )}
+                            {needsReview && (
+                              <ShieldAlert size={13} style={{ color: '#ca8a04', flexShrink: 0 }} />
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            <span>{ENERGY_ICONS[t.energy_type || ''] || '⚡'} {t.energy_type || '—'}</span>
+                            {t.unit_rate_kwh != null && <span>€{t.unit_rate_kwh}/kWh</span>}
+                            {t.fixed_fee_monthly != null && t.fixed_fee_monthly > 0 && <span>€{t.fixed_fee_monthly}/mo fixed</span>}
+                            {t.discounted_price_day != null && (
+                              <span style={{ color: '#059669', fontWeight: 500 }}>€{t.discounted_price_day}/kWh (disc.)</span>
+                            )}
+                          </div>
                         </div>
+                        {/* Color badge */}
+                        {colorBadge && (
+                          <span
+                            style={{
+                              padding: '3px 10px',
+                              borderRadius: 6,
+                              background: colorBadge.bg,
+                              color: colorBadge.fg,
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {colorBadge.label}
+                          </span>
+                        )}
+                        {/* Official URL indicator */}
+                        {t.official_url && (
+                          <Link2 size={12} style={{ color: '#2563eb', flexShrink: 0, opacity: 0.5 }} />
+                        )}
                       </div>
-                      {t.tariff_color && (
-                        <span
-                          style={{
-                            padding: '3px 10px',
-                            borderRadius: 6,
-                            background: t.tariff_color,
-                            color: '#fff',
-                            fontSize: 11,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {t.tariff_color}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -349,52 +506,104 @@ export default function MarketRagFolders() {
                 <th>Color</th>
                 <th>€/kWh</th>
                 <th>Fixed Fee</th>
-                <th>Energy Type</th>
+                <th>Energy</th>
+                <th>Verified</th>
+                <th>Link</th>
               </tr>
             </thead>
             <tbody>
-              {filteredByCategory.map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <strong style={{ color: PROVIDER_COLORS[t.provider_name] || 'var(--text)' }}>
-                      {t.provider_name}
-                    </strong>
-                  </td>
-                  <td>{t.program_name}</td>
-                  <td>
-                    {t.tariff_color ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '2px 10px',
-                          borderRadius: 6,
-                          background: t.tariff_color,
-                          color: '#fff',
-                          fontSize: 11,
-                          fontWeight: 600,
-                        }}
-                      >
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
-                        {t.tariff_color}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ fontWeight: 700, color: '#00c878' }}>
-                    {t.unit_rate_kwh != null ? `€${t.unit_rate_kwh}` : '—'}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>
-                    {t.fixed_fee_monthly != null && t.fixed_fee_monthly > 0 ? `€${t.fixed_fee_monthly}/mo` : '—'}
-                  </td>
-                  <td>{t.energy_type || '—'}</td>
-                </tr>
-              ))}
+              {filteredByCategory.map((t) => {
+                const isVerified = t.verification_status === 'verified';
+                const needsReview = t.verification_status === 'needs_review';
+                return (
+                  <tr
+                    key={t.tariff_id}
+                    onClick={() => setSelectedTariff(t)}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+                  >
+                    <td>
+                      <strong style={{ color: PROVIDER_COLORS[t.provider_name] || 'var(--text)' }}>
+                        {t.provider_name}
+                      </strong>
+                    </td>
+                    <td>{t.program_name}</td>
+                    <td>
+                      {t.tariff_color && COLOR_BADGES[t.tariff_color] ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '2px 10px',
+                            borderRadius: 6,
+                            background: COLOR_BADGES[t.tariff_color].bg,
+                            color: COLOR_BADGES[t.tariff_color].fg,
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: COLOR_BADGES[t.tariff_color].fg,
+                              display: 'inline-block',
+                            }}
+                          />
+                          {COLOR_BADGES[t.tariff_color].label}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 700, color: '#00c878' }}>
+                      {t.unit_rate_kwh != null ? `€${t.unit_rate_kwh}` : '—'}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>
+                      {t.fixed_fee_monthly != null && t.fixed_fee_monthly > 0 ? `€${t.fixed_fee_monthly}/mo` : '—'}
+                    </td>
+                    <td>{t.energy_type || '—'}</td>
+                    <td>
+                      {isVerified && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#16a34a', fontSize: 11, fontWeight: 600 }}>
+                          <ShieldCheck size={12} />
+                        </span>
+                      )}
+                      {needsReview && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#ca8a04', fontSize: 11, fontWeight: 600 }}>
+                          <ShieldAlert size={12} />
+                        </span>
+                      )}
+                      {!isVerified && !needsReview && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#94a3b8', fontSize: 11 }}>
+                          <ShieldQuestion size={12} />
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {t.official_url ? (
+                        <a
+                          href={t.official_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: '#2563eb' }}
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      ) : (
+                        <span style={{ color: '#cbd5e1' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredByCategory.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
                     No tariffs for {activeCategory}
                   </td>
                 </tr>

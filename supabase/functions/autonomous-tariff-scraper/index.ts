@@ -32,14 +32,14 @@ Return ONLY the JSON array, no markdown, no explanation.`;
 
 // Official URLs per provider — used as fallback when scraper doesn't find them
 const OFFICIAL_URLS: Record<string, Record<string, string>> = {
-  "ΔΕΗ": { B2C: "https://myhome-online.gr/el/products", B2B: "https://mybusiness-online.gr/el/products" },
+  "ΔΕΗ": { B2C: "https://www.dei.gr/el/gia-to-spiti/", B2B: "https://www.dei.gr/el/gia-tin-epixeirisi/" },
   "Protergia": { B2C: "https://www.protergia.gr/spiti/oikiako-reuma-proionta/", B2B: "https://www.protergia.gr/epixeirhsh/epaggelmatiko-reuma/" },
-  "ΗΡΩΝ": { B2C: "https://www.heron.gr/antistoixisi/spiti/", B2B: "https://www.heron.gr/antistoixisi/epixeirisi/" },
+  "ΗΡΩΝ": { B2C: "https://heron.gr/energy/electricity/gia-to-spiti/", B2B: "https://heron.gr/energy/electricity/epixeirisi/" },
   "nrg": { B2C: "https://www.nrg.gr/el/idiotes/revma", B2B: "https://www.nrg.gr/el/epixiriseis/revma" },
   "ZeniΘ": { B2C: "https://zenith.gr/el/for-the-home/electricity/", B2B: "https://zenith.gr/el/services-for-the-business/electricity/" },
   "Volton": { B2C: "https://volton.gr/gia-to-spiti/revma/", B2B: "https://volton.gr/gia-tin-epicheirisi/revma/" },
-  "Φυσικό Αέριο": { B2C: "https://www.fysikoaeriohellas.gr/antistoixisi/spiti/", B2B: "https://www.fysikoaeriohellas.gr/antistoixisi/epixeirisi/" },
-  "Ελίν": { B2C: "https://energy.elin.gr/antistoixisi/spiti/", B2B: "https://energy.elin.gr/antistoixisi/epixeirisi/" },
+  "Φυσικό Αέριο": { B2C: "https://fysikoaerioellados.gr/el/home/revma/", B2B: "https://fysikoaerioellados.gr/el/business/revma/" },
+  "Ελίν": { B2C: "https://energy.elin.gr/ilektriki-energeia-new/gia-to-spiti-ilektriko-reyma-on/", B2B: "https://energy.elin.gr/ilektriki-energeia-new/gia-tin-epicheirisi-ilektriko-reyma/" },
   "Enerwave": { B2C: "https://www.enerwave.gr/el/gia-to-spiti/revma/", B2B: "https://www.enerwave.gr/el/gia-tin-epicheirisi/revma-gia-mikres-mesaies-epicheiriseis/" },
   "Eunice Power": { B2C: "https://eunice-power.gr/hlektrikh-energeia/gia-to-spiti/", B2B: "https://eunice-power.gr/hlektrikh-energeia/gia-tin-epixeirhsh/" },
 };

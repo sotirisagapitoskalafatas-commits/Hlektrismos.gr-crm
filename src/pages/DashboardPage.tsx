@@ -2922,34 +2922,30 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
       }).select().single();
 
       // Call appropriate Edge Function only if no approval required
-      let result: any;
+      let result: any = { sent: 0, failed: 0 };
       if (!newCampaign.require_approval && campaign?.id) {
         if (newCampaign.channel === 'email') {
           const res = await supabase.functions.invoke('send-campaign-email', {
-            body: { campaign_id: campaign?.id, leads: targetLeads, subject: newCampaign.subject, html_body: newCampaign.body, from_name: 'Αλέξης - Hlektrismos.gr' },
+            body: { campaign_id: campaign.id, leads: targetLeads, subject: newCampaign.subject, html_body: newCampaign.body, from_name: 'Αλέξης - Hlektrismos.gr' },
           });
           result = res.data;
         } else if (newCampaign.channel === 'voice') {
-        // Voice calls — call make-voice-call for each lead sequentially
-        let sent = 0, failed = 0;
-        for (const lead of targetLeads) {
-          try {
-            const res = await supabase.functions.invoke('make-voice-call', {
-              body: {
-                lead_id: lead.id, phone: lead.phone, first_name: lead.first_name,
-                last_name: lead.last_name, region: lead.region,
-                current_provider: lead.provider,
-              },
-            });
-            if (res.error) failed++; else sent++;
-          } catch { failed++; }
+          let sent = 0, failed = 0;
+          for (const lead of targetLeads) {
+            try {
+              const res = await supabase.functions.invoke('make-voice-call', {
+                body: { lead_id: lead.id, phone: lead.phone, first_name: lead.first_name, last_name: lead.last_name, region: lead.region, current_provider: lead.provider },
+              });
+              if (res.error) failed++; else sent++;
+            } catch { failed++; }
+          }
+          result = { sent, failed };
+        } else {
+          const res = await supabase.functions.invoke('send-sms', {
+            body: { campaign_id: campaign.id, leads: targetLeads, message: newCampaign.body, channel: newCampaign.channel },
+          });
+          result = res.data;
         }
-        result = { sent, failed };
-      } else {
-        const res = await supabase.functions.invoke('send-sms', {
-          body: { campaign_id: campaign?.id, leads: targetLeads, message: newCampaign.body, channel: newCampaign.channel },
-        });
-        result = res.data;
       }
 
       if (campaign?.id && !newCampaign.require_approval) {

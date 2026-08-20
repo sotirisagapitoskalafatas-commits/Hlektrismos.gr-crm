@@ -62,9 +62,9 @@ const PROVIDER_COLORS: Record<string, string> = {
   nrg: '#0891b2',
   'Φυσικό Αέριο': '#be185d',
   Volton: '#4f46e5',
-  'We Energy': '#0d9488',
   'Ελίν': '#b91c1c',
   'Enerwave': '#0ea5e9',
+  'Eunice Power': '#7c3aed',
 };
 
 const COLOR_BADGES: Record<string, { bg: string; fg: string; label: string }> = {

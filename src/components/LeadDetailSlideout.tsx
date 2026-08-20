@@ -649,7 +649,7 @@ Return JSON with this exact structure:
                   style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: '#fff', color: 'var(--text)' }}
                 >
                   <option value="">Επιλέξτε...</option>
-                  {['ΔΕΗ', 'Protergia', 'ΗΡΩΝ', 'ZeniΘ', 'nrg', 'Φυσικό Αέριο', 'Volton', 'We Energy', 'Ελίν', 'Enerwave'].map(p => (
+                  {['ΔΕΗ', 'Protergia', 'ΗΡΩΝ', 'ZeniΘ', 'nrg', 'Φυσικό Αέριο', 'Volton', 'Ελίν', 'Enerwave', 'Eunice Power'].map(p => (
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>

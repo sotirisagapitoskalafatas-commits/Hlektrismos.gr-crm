@@ -36,12 +36,12 @@ const OFFICIAL_URLS: Record<string, Record<string, string>> = {
   "Protergia": { B2C: "https://www.protergia.gr/spiti/oikiako-reuma-proionta/", B2B: "https://www.protergia.gr/epixeirhsh/epaggelmatiko-reuma/" },
   "ΗΡΩΝ": { B2C: "https://www.heron.gr/antistoixisi/spiti/", B2B: "https://www.heron.gr/antistoixisi/epixeirisi/" },
   "nrg": { B2C: "https://www.nrg.gr/el/idiotes/revma", B2B: "https://www.nrg.gr/el/epixiriseis/revma" },
-  "ZeniΘ": { B2C: "https://zenith.gr/antistoixisi/spiti/", B2B: "https://zenith.gr/antistoixisi/epixeirisi/" },
-  "Volton": { B2C: "https://volton.gr/antistoixisi/spiti/", B2B: "https://volton.gr/antistoixisi/epixeirisi/" },
+  "ZeniΘ": { B2C: "https://zenith.gr/el/for-the-home/electricity/", B2B: "https://zenith.gr/el/services-for-the-business/electricity/" },
+  "Volton": { B2C: "https://volton.gr/gia-to-spiti/revma/", B2B: "https://volton.gr/gia-tin-epicheirisi/revma/" },
   "Φυσικό Αέριο": { B2C: "https://www.fysikoaeriohellas.gr/antistoixisi/spiti/", B2B: "https://www.fysikoaeriohellas.gr/antistoixisi/epixeirisi/" },
   "Ελίν": { B2C: "https://energy.elin.gr/antistoixisi/spiti/", B2B: "https://energy.elin.gr/antistoixisi/epixeirisi/" },
-  "We Energy": { B2C: "https://weenergy.gr/antistoixisi/spiti/", B2B: "https://weenergy.gr/antistoixisi/epixeirisi/" },
   "Enerwave": { B2C: "https://www.enerwave.gr/el/gia-to-spiti/revma/", B2B: "https://www.enerwave.gr/el/gia-tin-epicheirisi/revma-gia-mikres-mesaies-epicheiriseis/" },
+  "Eunice Power": { B2C: "https://eunice-power.gr/hlektrikh-energeia/gia-to-spiti/", B2B: "https://eunice-power.gr/hlektrikh-energeia/gia-tin-epixeirhsh/" },
 };
 
 Deno.serve(async (req: Request) => {

@@ -13,6 +13,8 @@ CREATE POLICY "leads_admin_full" ON hlektrismos_leads FOR ALL USING (EXISTS (SEL
 CREATE POLICY "leads_sales_own" ON hlektrismos_leads FOR SELECT USING (EXISTS (SELECT 1 FROM crm_users WHERE id = auth.uid() AND role = 'sales') AND (assigned_to = auth.uid() OR assigned_to IS NULL));
 CREATE POLICY "leads_secretary_read" ON hlektrismos_leads FOR SELECT USING (EXISTS (SELECT 1 FROM crm_users WHERE id = auth.uid() AND role = 'secretary'));
 CREATE POLICY "leads_it_read" ON hlektrismos_leads FOR SELECT USING (EXISTS (SELECT 1 FROM crm_users WHERE id = auth.uid() AND role = 'it'));
+CREATE POLICY "leads_anon_insert" ON hlektrismos_leads FOR INSERT WITH CHECK (consent = true);
+CREATE POLICY "leads_auth_read" ON hlektrismos_leads FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "superuser_leads" ON hlektrismos_leads FOR ALL USING (auth.role() = 'service_role');
 
 -- 3. campaigns policies

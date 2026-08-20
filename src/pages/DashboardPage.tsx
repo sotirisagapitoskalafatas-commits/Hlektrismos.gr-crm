@@ -68,6 +68,13 @@ type Lead = {
   bill_files?: Array<{ path: string; name: string; type: string; size: number }> | null;
   assigned_to?: string | null;
   assigned_at?: string | null;
+  current_provider?: string | null;
+  program_name?: string | null;
+  unit_rate_kwh?: number | null;
+  converted_at?: string | null;
+  last_contact_at?: string | null;
+  ai_paused?: boolean | null;
+  company_name?: string | null;
 };
 
 type Agent = {
@@ -117,7 +124,7 @@ type Tariff = {
   created_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns' | 'followup';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -679,6 +686,7 @@ export default function DashboardPage() {
     users: 'Χρήστες',
     scraper: 'B2B Scraper',
     documents: 'Έγγραφα',
+    followup: '👥 Πελάτες & Follow-Up',
   };
 
   const toggleCategory = (cat: string) => {
@@ -695,6 +703,7 @@ export default function DashboardPage() {
     ]},
     { key: 'sales', label: '💼 Πωλήσεις', items: [
       { tab: 'leads' as Tab, icon: '🎯', label: 'Leads' },
+      { tab: 'followup' as Tab, icon: '👥', label: 'Πελάτες & Follow-Up' },
       { tab: 'scraper' as Tab, icon: '🏢', label: 'B2B Scraper' },
       { tab: 'sources' as Tab, icon: '📥', label: 'Πηγές Leads' },
     ]},
@@ -721,10 +730,10 @@ export default function DashboardPage() {
 
   // RBAC: Filter nav categories based on user role
   const allowedTabsByRole: Record<string, Tab[]> = {
-    admin: ['overview', 'leads', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar'],
-    management: ['overview', 'leads', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar'],
-    sales: ['overview', 'leads', 'market', 'hub', 'email', 'campaigns', 'documents', 'market-search', 'calendar'],
-    secretary: ['overview', 'leads', 'email', 'calendar'],
+    admin: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar'],
+    management: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar'],
+    sales: ['overview', 'leads', 'followup', 'market', 'hub', 'email', 'campaigns', 'documents', 'market-search', 'calendar'],
+    secretary: ['overview', 'leads', 'followup', 'email', 'calendar'],
     it: ['overview', 'settings', 'hub', 'orchestrator'],
   };
   const allowedTabs = allowedTabsByRole[userRole] || allowedTabsByRole.admin;
@@ -1459,6 +1468,9 @@ export default function DashboardPage() {
             )}
             {tab === 'documents' && (
               <DocumentGenerator toast={toast} setToast={setToast} />
+            )}
+            {tab === 'followup' && (
+              <FollowUpFolder leads={leads} crmUsers={crmUsers} toast={toast} setToast={setToast} loadData={loadData} />
             )}
           </>
         )}
@@ -3111,6 +3123,207 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOLLOW-UP & CUSTOMERS FOLDER
+   Pipeline view with customer conversion tracking
+   ═══════════════════════════════════════════════════════════════ */
+function FollowUpFolder({ leads, crmUsers, toast, setToast, loadData }: {
+  leads: Lead[];
+  crmUsers: CrmUser[];
+  toast: any;
+  setToast: (v: any) => void;
+  loadData: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'follow_up' | 'customer' | 'lost'>('all');
+  const [openLead, setOpenLead] = useState<Lead | null>(null);
+
+  // Filter: exclude deleted, focus on follow_up/customer/lost + new/contacted/qualified (pipeline)
+  const followUpLeads = leads.filter(l => {
+    if (l.deleted_at) return false;
+    if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+    return true;
+  }).filter(l => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      l.first_name?.toLowerCase().includes(q) ||
+      l.last_name?.toLowerCase().includes(q) ||
+      l.email?.toLowerCase().includes(q) ||
+      l.phone?.includes(q) ||
+      l.current_provider?.toLowerCase().includes(q) ||
+      l.program_name?.toLowerCase().includes(q) ||
+      l.region?.toLowerCase().includes(q)
+    );
+  });
+
+  // Pipeline stats
+  const stats = {
+    total: leads.filter(l => !l.deleted_at).length,
+    follow_up: leads.filter(l => !l.deleted_at && l.status === 'follow_up').length,
+    customer: leads.filter(l => !l.deleted_at && l.status === 'customer').length,
+    lost: leads.filter(l => !l.deleted_at && l.status === 'lost').length,
+    withProvider: leads.filter(l => !l.deleted_at && l.current_provider).length,
+    conversionRate: leads.filter(l => !l.deleted_at).length > 0
+      ? Math.round((leads.filter(l => !l.deleted_at && l.status === 'customer').length / leads.filter(l => !l.deleted_at).length) * 100)
+      : 0,
+  };
+
+  const PROVIDER_COLORS: Record<string, string> = {
+    'ΔΕΗ': '#1e40af', 'Protergia': '#dc2626', 'ΗΡΩΝ': '#059669', 'ZeniΘ': '#d97706',
+    'Elpedison': '#7c3aed', 'nrg': '#0891b2', 'Φυσικό Αέριο': '#be185d', 'Volton': '#4f46e5',
+    'We Energy': '#0d9488', 'Ελίν': '#b91c1c',
+  };
+
+  return (
+    <div className="dash-content">
+      <div className="dash-content-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ margin: 0 }}>Follow-Up Pipeline & Πελάτες — παρακολούθηση επαφών, μετατροπή σε πελάτη, τρέχον πρόγραμμα.</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+          {[
+            { label: 'Σύνολο', value: stats.total, color: '#64748b', icon: '📊' },
+            { label: 'Follow-Up', value: stats.follow_up, color: '#f59e0b', icon: '📞' },
+            { label: 'Πελάτες', value: stats.customer, color: '#10b981', icon: '✅' },
+            { label: 'Χαμένα', value: stats.lost, color: '#ef4444', icon: '❌' },
+            { label: 'Με Πάροχο', value: stats.withProvider, color: '#6366f1', icon: '⚡' },
+            { label: 'Μετατροπή', value: `${stats.conversionRate}%`, color: '#0ea5e9', icon: '📈' },
+          ].map((s, i) => (
+            <div key={i} className="dash-stat-card" style={{ padding: '12px 14px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                {s.icon} {s.label}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {([
+            { key: 'all', label: 'Όλα', icon: '📁', count: stats.total },
+            { key: 'follow_up', label: 'Follow-Up', icon: '📞', count: stats.follow_up },
+            { key: 'customer', label: 'Πελάτες', icon: '✅', count: stats.customer },
+            { key: 'lost', label: 'Χαμένα', icon: '❌', count: stats.lost },
+          ] as const).map(f => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              style={{
+                padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                background: statusFilter === f.key ? 'var(--text)' : 'var(--surface)',
+                color: statusFilter === f.key ? 'var(--bg)' : 'var(--text)',
+                borderColor: statusFilter === f.key ? 'var(--text)' : 'var(--border)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <span>{f.icon}</span>
+              <span>{f.label}</span>
+              <span style={{ background: statusFilter === f.key ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>{f.count}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{ position: 'relative', maxWidth: 400 }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            placeholder="Αναζήτηση με όνομα, email, πάροχο, πρόγραμμα..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text)' }}
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="dash-table-wrap">
+        <table className="dash-table">
+          <thead>
+            <tr>
+              <th>Όνομα</th>
+              <th>Email</th>
+              <th>Τηλέφωνο</th>
+              <th>Περιοχή</th>
+              <th>Status</th>
+              <th>Πάροχος</th>
+              <th>Πρόγραμμα</th>
+              <th>Τιμή/kWh</th>
+              <th>Τελ. Επαφή</th>
+              <th>Ενέργεια</th>
+            </tr>
+          </thead>
+          <tbody>
+            {followUpLeads.map(l => (
+              <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLead(l)}>
+                <td>
+                  <button className="dash-lead-name-btn" onClick={e => { e.stopPropagation(); setOpenLead(l); }}>
+                    {l.first_name} {l.last_name}
+                  </button>
+                </td>
+                <td style={{ fontSize: 12 }}>{l.email}</td>
+                <td style={{ fontSize: 12 }}>{l.phone}</td>
+                <td style={{ fontSize: 12 }}>{l.region}</td>
+                <td>
+                  <span className={`dash-status-pill ${l.status}`} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12 }}>
+                    {l.status === 'follow_up' ? '📞 Follow-Up' : l.status === 'customer' ? '✅ Πελάτης' : l.status === 'lost' ? '❌ Χαμένο' : l.status}
+                  </span>
+                </td>
+                <td>
+                  {l.current_provider ? (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
+                      padding: '2px 8px', borderRadius: 6,
+                      background: `${PROVIDER_COLORS[l.current_provider] || '#64748b'}15`,
+                      color: PROVIDER_COLORS[l.current_provider] || '#64748b',
+                    }}>
+                      ⚡ {l.current_provider}
+                    </span>
+                  ) : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>}
+                </td>
+                <td style={{ fontSize: 12, fontWeight: 500 }}>{l.program_name || '—'}</td>
+                <td style={{ fontSize: 12 }}>{l.unit_rate_kwh != null ? `€${l.unit_rate_kwh.toFixed(4)}` : '—'}</td>
+                <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {l.last_contact_at ? new Date(l.last_contact_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' }) : '—'}
+                </td>
+                <td onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => setOpenLead(l)}
+                    style={{
+                      padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    👁️ Προβολή
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {followUpLeads.length === 0 && (
+              <tr><td colSpan={10} className="dash-empty">Δεν βρέθηκαν leads σε αυτόν τον φάκελο.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Lead Detail Slideout */}
+      {openLead && (
+        <LeadDetailSlideout
+          lead={openLead}
+          onClose={() => { setOpenLead(null); loadData(); }}
+          crmUsers={crmUsers}
+        />
       )}
     </div>
   );

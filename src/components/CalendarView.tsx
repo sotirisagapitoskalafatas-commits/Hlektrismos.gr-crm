@@ -240,7 +240,6 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
                     <>
                       <div style={{
                         fontSize: 12, fontWeight: isToday ? 700 : 400,
-                        color: isToday ? '#0066cc' : '#374151',
                         marginBottom: 4,
                         width: 22, height: 22, borderRadius: 11,
                         background: isToday ? '#0066cc' : 'transparent',

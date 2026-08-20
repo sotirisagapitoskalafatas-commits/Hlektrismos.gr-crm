@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   X,
   FileText,
@@ -21,8 +21,11 @@ import {
   Zap,
   Calendar,
   UserCheck,
+  Upload,
+  CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { uploadDocument, updateLeadBillFiles, UploadedFile } from '@/lib/storage';
 
 type Lead = {
   id: string;
@@ -46,6 +49,12 @@ type Lead = {
   assigned_to?: string | null;
   assigned_at?: string | null;
   ai_paused?: boolean | null;
+  current_provider?: string | null;
+  program_name?: string | null;
+  unit_rate_kwh?: number | null;
+  converted_at?: string | null;
+  last_contact_at?: string | null;
+  company_name?: string | null;
 };
 
 type CrmUser = {
@@ -107,6 +116,20 @@ export default function LeadDetailSlideout({
   const [notesLoading, setNotesLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+
+  // Energy contract fields
+  const [currentProvider, setCurrentProvider] = useState(lead.current_provider || '');
+  const [programName, setProgramName] = useState(lead.program_name || '');
+  const [unitRate, setUnitRate] = useState(lead.unit_rate_kwh?.toString() || '');
+  const [savingEnergy, setSavingEnergy] = useState(false);
+
+  // Bill upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+
+  // Status conversion
+  const [convertingStatus, setConvertingStatus] = useState(false);
 
   // Load bill file signed URLs — tries hlektrismos_docs first, falls back to energy-bills
   useEffect(() => {
@@ -321,6 +344,99 @@ Return JSON with this exact structure:
     setAddingNote(false);
   };
 
+  // Save energy contract fields
+  const saveEnergyFields = async () => {
+    setSavingEnergy(true);
+    try {
+      const updates: any = {};
+      if (currentProvider !== (lead.current_provider || '')) updates.current_provider = currentProvider || null;
+      if (programName !== (lead.program_name || '')) updates.program_name = programName || null;
+      if (unitRate !== (lead.unit_rate_kwh?.toString() || '')) updates.unit_rate_kwh = unitRate ? parseFloat(unitRate) : null;
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('hlektrismos_leads').update(updates).eq('id', lead.id);
+        // Log as note
+        const changes = Object.entries(updates).map(([k, v]) => `${k}: ${v}`).join(', ');
+        await supabase.from('lead_notes').insert({
+          lead_id: lead.id,
+          content: `Ενημερώθηκε συμβόλαιο ενέργειας — ${changes}`,
+          author: 'CRM User',
+          note_type: 'status_change',
+        });
+      }
+    } catch (e: any) {
+      console.error('Failed to save energy fields:', e);
+    }
+    setSavingEnergy(false);
+  };
+
+  // Upload bill file
+  const handleBillUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadProgress(`Μεταφόρτωση ${files.length} αρχείων...`);
+    try {
+      const uploaded: UploadedFile[] = [];
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress(`Μεταφόρτωση ${i + 1}/${files.length}: ${files[i].name}`);
+        const { data, error } = await uploadDocument(files[i], lead.id);
+        if (error) throw new Error(error);
+        if (data) uploaded.push(data);
+      }
+      // Merge with existing bill_files
+      const existing = lead.bill_files || [];
+      const merged = [...existing, ...uploaded];
+      await updateLeadBillFiles(lead.id, merged);
+      // Log as note
+      await supabase.from('lead_notes').insert({
+        lead_id: lead.id,
+        content: `Μεταφορτώθηκαν ${uploaded.length} νέα αρχεία λογαριασμού: ${uploaded.map(u => u.name).join(', ')}`,
+        author: 'CRM User',
+        note_type: 'system',
+      });
+      setUploadProgress(`✅ ${uploaded.length} αρχεία μεταφορτώθηκαν!`);
+      setTimeout(() => { setUploading(false); setUploadProgress(''); }, 2000);
+      // Refresh bill URLs
+      const results: BillFile[] = [];
+      for (const file of merged) {
+        let signedUrl = '';
+        for (const bucket of ['hlektrismos_docs', 'energy-bills']) {
+          const { data: urlData, error: urlErr } = await supabase.storage.from(bucket).createSignedUrl(file.path, 60 * 10);
+          if (!urlErr && urlData?.signedUrl) { signedUrl = urlData.signedUrl; break; }
+        }
+        if (signedUrl) results.push({ url: signedUrl, name: file.name, type: file.type, size: file.size });
+      }
+      setBillUrls(results);
+    } catch (e: any) {
+      setUploadProgress(`❌ Σφάλμα: ${e.message}`);
+      setTimeout(() => { setUploading(false); setUploadProgress(''); }, 3000);
+    }
+  };
+
+  // Convert lead status
+  const convertStatus = async (newStatus: string) => {
+    setConvertingStatus(true);
+    try {
+      const updates: any = { status: newStatus, pipeline_status: newStatus };
+      if (newStatus === 'customer') {
+        updates.converted_at = new Date().toISOString();
+        if (currentProvider) updates.current_provider = currentProvider;
+        if (programName) updates.program_name = programName;
+        if (unitRate) updates.unit_rate_kwh = parseFloat(unitRate);
+      }
+      await supabase.from('hlektrismos_leads').update(updates).eq('id', lead.id);
+      await supabase.from('lead_notes').insert({
+        lead_id: lead.id,
+        content: `Κατάσταση αλλάξτηκε σε: ${newStatus}${newStatus === 'customer' ? ' — Μετατροπή σε πελάτη!' : ''}`,
+        author: 'CRM User',
+        note_type: 'status_change',
+      });
+      onClose();
+    } catch (e: any) {
+      console.error('Failed to convert status:', e);
+    }
+    setConvertingStatus(false);
+  };
+
   const assignedUser = crmUsers.find((u) => u.id === lead.assigned_to);
 
   return (
@@ -438,6 +554,96 @@ Return JSON with this exact structure:
                 <p style={{ margin: 0, background: 'var(--surface-2, #f5f7fa)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
                   {lead.comments}
                 </p>
+              </div>
+            )}
+          </section>
+
+          {/* Energy Contract Section */}
+          <section>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 12px' }}>
+              <Zap size={14} /> Συμβόλαιο Ενέργειας
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Πάροχος</label>
+                <select
+                  value={currentProvider}
+                  onChange={e => setCurrentProvider(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: '#fff', color: 'var(--text)' }}
+                >
+                  <option value="">Επιλέξτε...</option>
+                  {['ΔΕΗ', 'Protergia', 'ΗΡΩΝ', 'ZeniΘ', 'Elpedison', 'nrg', 'Φυσικό Αέριο', 'Volton', 'We Energy', 'Ελίν'].map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Πρόγραμμα</label>
+                <input
+                  type="text"
+                  value={programName}
+                  onChange={e => setProgramName(e.target.value)}
+                  placeholder="π.χ. Flex Home, Business Plus"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: '#fff', color: 'var(--text)' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Τιμή / kWh (€)</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={unitRate}
+                  onChange={e => setUnitRate(e.target.value)}
+                  placeholder="0.1234"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: '#fff', color: 'var(--text)' }}
+                />
+              </div>
+            </div>
+            <button
+              onClick={saveEnergyFields}
+              disabled={savingEnergy}
+              style={{
+                marginTop: 10, padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: savingEnergy ? 'not-allowed' : 'pointer',
+                background: savingEnergy ? 'var(--surface-2, #f5f7fa)' : '#00c878', color: savingEnergy ? 'var(--text-muted)' : '#fff',
+                display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+              }}
+            >
+              {savingEnergy ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 size={13} />}
+              {savingEnergy ? 'Αποθήκευση...' : 'Αποθήκευση Στοιχείων'}
+            </button>
+          </section>
+
+          {/* Status Conversion */}
+          <section>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 12px' }}>
+              <UserCheck size={14} /> Μετατροπή Κατάστασης
+            </h3>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { status: 'follow_up', label: '📞 Follow-Up', color: '#f59e0b', bg: '#fffbeb' },
+                { status: 'customer', label: '✅ Πελάτης', color: '#10b981', bg: '#ecfdf5' },
+                { status: 'lost', label: '❌ Χαμένο', color: '#ef4444', bg: '#fef2f2' },
+              ].map(s => (
+                <button
+                  key={s.status}
+                  onClick={() => convertStatus(s.status)}
+                  disabled={convertingStatus || lead.status === s.status}
+                  style={{
+                    padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: convertingStatus ? 'not-allowed' : 'pointer',
+                    border: `1px solid ${lead.status === s.status ? s.color : 'var(--border)'}`,
+                    background: lead.status === s.status ? s.bg : 'var(--surface)',
+                    color: lead.status === s.status ? s.color : 'var(--text)',
+                    opacity: convertingStatus ? 0.6 : 1,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            {lead.converted_at && (
+              <div style={{ marginTop: 8, fontSize: 11, color: '#10b981', fontWeight: 600 }}>
+                ✅ Μετατράπηκε σε πελάτη: {new Date(lead.converted_at).toLocaleDateString('el-GR')}
               </div>
             )}
           </section>
@@ -627,9 +833,43 @@ Return JSON with this exact structure:
 
           {/* Bill Files Section */}
           <section>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 12px' }}>
-              <FileText size={14} /> Bill Files
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>
+                <FileText size={14} /> Bill Files
+              </h3>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
+                  border: '1px solid #00c878', background: uploading ? '#f0fdf4' : 'rgba(0,200,120,0.06)',
+                  color: '#00c878', fontSize: 12, fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {uploading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={14} />}
+                {uploading ? 'Μεταφόρτωση...' : '📤 Μεταφόρτωση'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.csv"
+                onChange={e => handleBillUpload(e.target.files)}
+                style={{ display: 'none' }}
+              />
+            </div>
+            {uploadProgress && (
+              <div style={{
+                padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, marginBottom: 10,
+                background: uploadProgress.startsWith('❌') ? 'rgba(231,76,60,0.08)' : uploadProgress.startsWith('✅') ? 'rgba(0,200,120,0.08)' : 'rgba(0,102,204,0.06)',
+                color: uploadProgress.startsWith('❌') ? '#e74c3c' : uploadProgress.startsWith('✅') ? '#00c878' : '#0066cc',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                {uploadProgress.startsWith('❌') ? <AlertCircle size={13} /> : uploadProgress.startsWith('✅') ? <CheckCircle2 size={13} /> : <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
+                {uploadProgress}
+              </div>
+            )}
             {billLoading && (
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
                 <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading files...

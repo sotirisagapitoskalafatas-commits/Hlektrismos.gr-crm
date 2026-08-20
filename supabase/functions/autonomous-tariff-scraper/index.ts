@@ -33,7 +33,7 @@ Return ONLY the JSON array, no markdown, no explanation.`;
 // Official URLs per provider — used as fallback when scraper doesn't find them
 const OFFICIAL_URLS: Record<string, Record<string, string>> = {
   "ΔΕΗ": { B2C: "https://myhome-online.gr/el/products", B2B: "https://mybusiness-online.gr/el/products" },
-  "Protergia": { B2C: "https://www.protergia.gr/antistoixisi/spiti/", B2B: "https://www.protergia.gr/antistoixisi/epixeirisi/" },
+  "Protergia": { B2C: "https://www.protergia.gr/spiti/oikiako-reuma-proionta/", B2B: "https://www.protergia.gr/epixeirhsh/epaggelmatiko-reuma/" },
   "ΗΡΩΝ": { B2C: "https://www.heron.gr/antistoixisi/spiti/", B2B: "https://www.heron.gr/antistoixisi/epixeirisi/" },
   "nrg": { B2C: "https://www.nrg.gr/el/idiotes/revma", B2B: "https://www.nrg.gr/el/epixiriseis/revma" },
   "ZeniΘ": { B2C: "https://zenith.gr/antistoixisi/spiti/", B2B: "https://zenith.gr/antistoixisi/epixeirisi/" },

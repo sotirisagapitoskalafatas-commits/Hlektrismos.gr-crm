@@ -59,7 +59,6 @@ const PROVIDER_COLORS: Record<string, string> = {
   Protergia: '#dc2626',
   'ΗΡΩΝ': '#059669',
   'ZeniΘ': '#d97706',
-  Elpedison: '#7c3aed',
   nrg: '#0891b2',
   'Φυσικό Αέριο': '#be185d',
   Volton: '#4f46e5',

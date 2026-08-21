@@ -17,12 +17,25 @@ serve(async (req: any) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Fetch new leads that haven't been contacted yet (exclude soft-deleted)
+    // Kill switch check
+    const { data: globalSettings } = await supabaseAdmin
+      .from('crm_settings')
+      .select('setting_value')
+      .eq('setting_key', 'GLOBAL_AI_PAUSED')
+      .single();
+    if (globalSettings?.setting_value === true || globalSettings?.setting_value === 'true') {
+      return new Response(JSON.stringify({ message: "AI globally paused via kill switch." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      });
+    }
+
+    // 1. Fetch new leads that haven't been contacted yet (exclude soft-deleted, exclude ai_paused)
     const { data: leads, error: leadsError } = await supabaseAdmin
       .from('hlektrismos_leads')
       .select('*')
       .eq('status', 'new')
       .is('deleted_at', null)
+      .eq('ai_paused', false)
       .limit(10);
 
     if (leadsError) throw leadsError;

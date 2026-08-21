@@ -275,39 +275,31 @@ Deno.serve(async (req: Request) => {
       console.log(`[db] Inserted ${insertedPrices?.length || 0} energy_tariff_prices`);
     }
 
-    // 3c. Also update legacy market_tariffs for backward compatibility
-    console.log(`[db] Updating legacy market_tariffs for backward compat...`);
+    // 3c. Also update legacy market_tariffs via UPSERT (no destructive DELETE)
+    console.log(`[db] Upserting legacy market_tariffs for backward compat...`);
 
-    const { error: legacyDeleteErr } = await supabase
+    const legacyRows = tariffs.map((t) => ({
+      provider_name: t.provider_name,
+      program_name: t.program_name,
+      customer_type: t.customer_type || "B2C",
+      tariff_color: t.tariff_color || "green",
+      energy_type: t.energy_type || "electricity",
+      unit_rate_kwh: Number(t.unit_rate_kwh) || 0,
+      fixed_fee_monthly: Number(t.fixed_fee_monthly) || 0,
+      validity_month: validityMonth,
+      source_url: t.official_url || "",
+      category: t.customer_type || "B2C",
+      resource: t.energy_type === "gas" ? "gas" : "electricity",
+      last_verified: new Date().toISOString(),
+    }));
+
+    // Use upsert instead of delete+insert to avoid data loss on failure
+    const { error: legacyUpsertErr } = await supabase
       .from("market_tariffs")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .upsert(legacyRows, { onConflict: "provider_name,program_name,validity_month" });
 
-    if (legacyDeleteErr) {
-      console.warn("[db] Legacy market_tariffs delete failed:", legacyDeleteErr.message);
-    } else {
-      const legacyInserts = tariffs.map((t) => ({
-        provider_name: t.provider_name,
-        program_name: t.program_name,
-        customer_type: t.customer_type || "B2C",
-        tariff_color: t.tariff_color || "green",
-        energy_type: t.energy_type || "electricity",
-        unit_rate_kwh: Number(t.unit_rate_kwh) || 0,
-        fixed_fee_monthly: Number(t.fixed_fee_monthly) || 0,
-        validity_month: validityMonth,
-        source_url: t.official_url || "",
-        category: t.customer_type || "B2C",
-        resource: t.energy_type === "gas" ? "αέριο" : "ρεύμα",
-        last_verified: new Date().toISOString(),
-      }));
-
-      const { error: legacyInsertErr } = await supabase
-        .from("market_tariffs")
-        .insert(legacyInserts);
-
-      if (legacyInsertErr) {
-        console.warn("[db] Legacy market_tariffs insert failed:", legacyInsertErr.message);
-      }
+    if (legacyUpsertErr) {
+      console.warn("[db] Legacy market_tariffs upsert failed:", legacyUpsertErr.message);
     }
 
     // 3d. Upsert unique providers into rag_document_endpoints

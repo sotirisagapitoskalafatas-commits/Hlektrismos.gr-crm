@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Bot, Users, Radar, TrendingUp, MessageSquare,
-  Settings, BarChart3, Shield, Globe, Palette, Zap, Phone, Database, FileText, Save, RefreshCw, Mail
+  Settings, BarChart3, Shield, Globe, Palette, Zap, Phone, Database,
+  FileText, Save, RefreshCw, Mail, Building2, Search, ChevronRight,
+  PhoneCall, UserPlus, Eye, EyeOff,
 } from 'lucide-react';
 
 interface SettingEntry {
@@ -14,28 +16,253 @@ interface SettingEntry {
   updated_at: string;
 }
 
-const CATEGORIES = [
-  { key: 'general', label: 'Επισκόπηση', icon: LayoutDashboard, desc: 'Ρυθμίσεις επισκόπησης & KPIs' },
-  { key: 'agents', label: 'AI Agents', icon: Bot, desc: 'Global AI agent governance' },
-  { key: 'leads', label: 'Leads', icon: Users, desc: 'Pipeline, auto-assignment, SLA' },
-  { key: 'sources', label: 'Πηγές Leads', icon: Radar, desc: 'Lead ingestion & webhooks' },
-  { key: 'market', label: 'Market RAG', icon: TrendingUp, desc: 'Knowledge base & vectors' },
-  { key: 'hub', label: 'Agent Hub', icon: MessageSquare, desc: 'Hub capabilities & tools' },
-  { key: 'orchestrator', label: 'Orchestrator', icon: Settings, desc: 'Master AI coordinator' },
-  { key: 'business', label: 'Εταιρεία', icon: Globe, desc: 'Business profile (ΑΦΜ, ΓΕΜΗ)' },
-  { key: 'reports', label: 'Reports', icon: BarChart3, desc: 'Analytics & export' },
-  { key: 'users', label: 'Χρήστες & RBAC', icon: Shield, desc: 'Roles & access control' },
-  { key: 'scraper', label: 'B2B Scraper', icon: Database, desc: 'Apify & scraping engines' },
-  { key: 'appearance', label: 'Εμφάνιση', icon: Palette, desc: 'Theme, colors, branding' },
-  { key: 'tariffs', label: 'Τιμολόγια', icon: Zap, desc: 'Energy suppliers & formulas' },
-  { key: 'email', label: '📧 Email', icon: Mail, desc: 'SMTP, IMAP, email delivery' },
-  { key: 'campaigns', label: '📣 Campaigns', icon: Mail, desc: 'Resend, Infobip bulk sending' },
-  { key: 'voice', label: '📞 Voice AI', icon: Phone, desc: 'Vapi.ai, ElevenLabs Greek voices' },
-  { key: 'ai-assistant', label: '🤖 AI Widget', icon: Bot, desc: 'CRM AI chatbot widget' },
-  { key: 'communications', label: 'Τηλεφωνία & SMS', icon: Phone, desc: 'PBX, SMS, Viber gateways' },
-  { key: 'templates', label: '📄 Πρότυπα', icon: FileText, desc: 'Document templates (PDF offers)' },
-  { key: 'security', label: 'Ασφάλεια & GDPR', icon: Shield, desc: 'Audit logs & compliance' },
+// ─── GROUPED NAVIGATION ──────────────────────────────────────────────────────
+type GroupDef = { id: string; icon: React.ReactNode; label: string; desc: string; color: string; pages: PageDef[] };
+type PageDef = { id: string; label: string; desc?: string; render: (props: { settings: Record<string, any>; update: (k: string, v: any) => void; toast: any; setToast: (v: any) => void }) => React.ReactNode };
+
+const GROUPS: GroupDef[] = [
+  {
+    id: 'company', icon: <Building2 size={18} />, label: 'Εταιρεία & Εμφάνιση',
+    color: '#0ea5e9', desc: 'Στοιχεία, branding, χρήστες, GDPR',
+    pages: [
+      { id: 'business', label: '🏢 Εταιρικό Προφίλ', desc: 'Επωνυμία, ΑΦΜ, ΓΕΜΗ, διεύθυνση', render: (p) => <BusinessSettings settings={p.settings} update={p.update} /> },
+      { id: 'appearance', label: '🎨 Εμφάνιση & Branding', desc: 'Χρώματα, logo, θέμα', render: (p) => <AppearanceSettings settings={p.settings} update={p.update} /> },
+      { id: 'users', label: '👤 Χρήστες & RBAC', desc: 'Ρόλοι, πρόσβαση', render: (p) => <UsersSettings settings={p.settings} update={p.update} /> },
+      { id: 'security', label: '🔒 Ασφάλεια & GDPR', desc: 'Audit logs, compliance', render: (p) => <SecuritySettings settings={p.settings} update={p.update} /> },
+    ],
+  },
+  {
+    id: 'docs', icon: <FileText size={18} />, label: 'Έγγραφα & Πρότυπα',
+    color: '#06b6d4', desc: 'Πρότυπα PDF προσφορών & εγγράφων',
+    pages: [
+      { id: 'templates', label: '📄 Πρότυπα Εγγράφων', desc: 'B2C & B2B προσφορές, συμβάσεις', render: () => <DocumentTemplatesSettings /> },
+    ],
+  },
+  {
+    id: 'ai', icon: <Bot size={18} />, label: 'AI & Αυτοματισμοί',
+    color: '#059669', desc: 'Agents, Orchestrator, Hub, Scraper',
+    pages: [
+      { id: 'agents', label: '🤖 AI Agents', desc: 'Governance, κανόνες, όρια', render: (p) => <AgentsSettings settings={p.settings} update={p.update} /> },
+      { id: 'orchestrator', label: '🧠 Orchestrator', desc: 'Master AI coordinator', render: (p) => <OrchestratorSettings settings={p.settings} update={p.update} /> },
+      { id: 'hub', label: '📡 Agent Hub', desc: 'Δυνατότητες & εργαλεία', render: (p) => <HubSettings settings={p.settings} update={p.update} /> },
+      { id: 'scraper', label: '🔍 B2B Scraper', desc: 'SerpApi — κλειδί & ρυθμίσεις', render: (p) => <ScraperSettings settings={p.settings} update={p.update} /> },
+    ],
+  },
+  {
+    id: 'comms', icon: <Mail size={18} />, label: 'Leads & Επικοινωνία',
+    color: '#8b5cf6', desc: 'Pipelines, Email, SMS, Campaigns, Voice',
+    pages: [
+      { id: 'leads', label: '📋 Leads', desc: 'Pipeline, auto-assignment, SLA', render: (p) => <LeadsSettings settings={p.settings} update={p.update} /> },
+      { id: 'sources', label: '📡 Πηγές Leads', desc: 'Webhooks, ingestion', render: (p) => <SourcesSettings settings={p.settings} update={p.update} /> },
+      { id: 'market', label: '📈 Market RAG', desc: 'Knowledge base, vectors', render: (p) => <MarketSettings settings={p.settings} update={p.update} /> },
+      { id: 'email', label: '📧 Email (SMTP/IMAP)', desc: 'Ρύθμιση email delivery', render: (p) => <EmailSettings settings={p.settings} update={p.update} /> },
+      { id: 'campaigns', label: '📣 Campaigns', desc: 'Resend, Infobip bulk sending', render: (p) => <CampaignSettings settings={p.settings} update={p.update} /> },
+      { id: 'voice', label: '📞 Voice AI', desc: 'Vapi.ai, ElevenLabs Greek voices', render: (p) => <VoiceSettings settings={p.settings} update={p.update} /> },
+      { id: 'ai-assistant', label: '🤖 AI Widget', desc: 'CRM chatbot widget', render: () => <AiAssistantSettings /> },
+      { id: 'communications', label: '💬 SMS & Viber', desc: 'PBX, Viber gateways', render: (p) => <CommunicationsSettings settings={p.settings} update={p.update} /> },
+    ],
+  },
+  {
+    id: 'data', icon: <Database size={18} />, label: 'Δεδομένα & Αναφορές',
+    color: '#f59e0b', desc: 'General, Τιμολόγια, Analytics',
+    pages: [
+      { id: 'general', label: '📊 Επισκόπηση', desc: 'KPIs, ρυθμίσεις γενικές', render: (p) => <GeneralSettings settings={p.settings} update={p.update} /> },
+      { id: 'tariffs', label: '⚡ Τιμολόγια Παρόχων', desc: 'Energy tariffs & formulas', render: (p) => <TariffsSettings settings={p.settings} update={p.update} /> },
+      { id: 'reports', label: '📊 Reports & Analytics', desc: 'KPIs, export', render: (p) => <ReportsSettings settings={p.settings} update={p.update} /> },
+    ],
+  },
 ];
+
+export default function SettingsPanel({ toast, setToast }: { toast: any; setToast: (v: any) => void }) {
+  const [settings, setSettings] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Navigation state
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { loadSettings(); }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('crm_settings').select('*');
+    const map: Record<string, any> = {};
+    (data || []).forEach((e: SettingEntry) => { map[e.setting_key] = e.setting_value; });
+    setSettings(map);
+    setLoading(false);
+  };
+
+  const updateSetting = (key: string, value: any) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    setDirty(true);
+  };
+
+  const saveAll = async () => {
+    setSaving(true);
+    const updates = Object.entries(settings).map(([key, value]) =>
+      supabase.from('crm_settings').upsert({ setting_key: key, setting_value: value, category: key.split('_')[0] }, { onConflict: 'setting_key' })
+    );
+    await Promise.all(updates);
+    setSaving(false);
+    setDirty(false);
+    setToast({ msg: 'Settings saved!', type: 'success' });
+  };
+
+  // Search across all pages
+  const searchResults = search.length > 1
+    ? GROUPS.flatMap(g => g.pages.filter(p =>
+        p.label.toLowerCase().includes(search.toLowerCase()) ||
+        (p.desc || '').toLowerCase().includes(search.toLowerCase()) ||
+        g.label.toLowerCase().includes(search.toLowerCase())
+      ).map(p => ({ ...p, group: g })))
+    : [];
+
+  const currentGroup = GROUPS.find(g => g.id === activeGroup);
+  const currentPage = currentGroup?.pages.find(p => p.id === activePage);
+
+  // Render the active page content
+  const renderPage = () => {
+    if (!currentPage) return null;
+    return currentPage.render({ settings, update: updateSetting, toast, setToast });
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100%', background: 'var(--bg)' }}>
+      {/* ── SIDEBAR ─────────────────────────────────────────────────────── */}
+      <div style={{ width: 260, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column' }}>
+        {/* Search */}
+        <div style={{ padding: 14, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search settings..."
+              style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, background: 'var(--bg)', color: 'var(--text)', outline: 'none' }} />
+          </div>
+        </div>
+
+        {/* Search results or groups */}
+        {search.length > 1 ? (
+          <div style={{ padding: 8, flex: 1, overflowY: 'auto' }}>
+            {searchResults.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: 12, textAlign: 'center' }}>No results</p>
+            ) : searchResults.map(r => (
+              <button key={r.id} onClick={() => { setActiveGroup(r.group.id); setActivePage(r.id); setSearch(''); }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', padding: '10px 12px', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', marginBottom: 2 }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{r.label}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.group.label}</div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: 8, flex: 1, overflowY: 'auto' }}>
+            {GROUPS.map(g => (
+              <div key={g.id} style={{ marginBottom: 4 }}>
+                <button onClick={() => { setActiveGroup(g.id); setActivePage(null); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: activeGroup === g.id ? `${g.color}15` : 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', borderLeft: activeGroup === g.id ? `3px solid ${g.color}` : '3px solid transparent' }}>
+                  <span style={{ color: activeGroup === g.id ? g.color : 'var(--text-muted)' }}>{g.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: activeGroup === g.id ? 700 : 500, color: activeGroup === g.id ? 'var(--text)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.label}</div>
+                  </div>
+                </button>
+                {activeGroup === g.id && (
+                  <div style={{ paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
+                    {g.pages.map(p => (
+                      <button key={p.id} onClick={() => setActivePage(p.id)}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: activePage === p.id ? 'var(--bg)' : 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ fontSize: 12, fontWeight: activePage === p.id ? 600 : 400, color: activePage === p.id ? 'var(--text)' : 'var(--text-muted)' }}>{p.label}</span>
+                        {activePage === p.id && <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── CONTENT ─────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header with breadcrumb + save */}
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg)' }}>
+          <div>
+            {/* Breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+              <button onClick={() => { setActiveGroup(null); setActivePage(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, padding: 0 }}>Settings</button>
+              {activeGroup && <><ChevronRight size={10} /><button onClick={() => setActivePage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: currentPage ? 'var(--text-muted)' : 'var(--text)', fontSize: 12, padding: 0, fontWeight: currentPage ? 400 : 700 }}>{currentGroup?.label}</button></>}
+              {currentPage && <><ChevronRight size={10} /><span style={{ color: 'var(--text)', fontWeight: 700 }}>{currentPage.label}</span></>}
+            </div>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+              {currentPage?.label || currentGroup?.label || 'Settings'}
+            </h3>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={loadSettings} style={{ padding: '7px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <RefreshCw size={13} /> Reload
+            </button>
+            <button onClick={saveAll} disabled={!dirty || saving}
+              style={{ padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 11, fontWeight: 600, cursor: dirty && !saving ? 'pointer' : 'not-allowed', background: dirty ? 'var(--primary, #6366f1)' : 'var(--border)', color: dirty ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Save size={13} /> {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        {/* Page content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading settings...</div>
+          ) : !activeGroup ? (
+            /* HOME — group cards */
+            <div>
+              <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Settings</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+                {GROUPS.map(g => (
+                  <button key={g.id} onClick={() => setActiveGroup(g.id)}
+                    style={{ padding: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = g.color; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'none'; }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: `${g.color}18`, color: g.color, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>{g.icon}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 3 }}>{g.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>{g.desc}</div>
+                    <div style={{ fontSize: 10, color: g.color, fontWeight: 600 }}>{g.pages.length} settings</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : !activePage ? (
+            /* GROUP HOME — page cards */
+            <div>
+              <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: currentGroup?.color }}>{currentGroup?.icon}</span> {currentGroup?.label}
+              </h2>
+              <p style={{ margin: '0 0 20px', color: 'var(--text-muted)', fontSize: 13 }}>{currentGroup?.desc}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                {currentGroup?.pages.map(p => (
+                  <button key={p.id} onClick={() => setActivePage(p.id)}
+                    style={{ padding: 16, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = currentGroup?.color; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}>
+                    <div><div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 3 }}>{p.label}</div>{p.desc && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.desc}</div>}</div>
+                    <ChevronRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* PAGE CONTENT */
+            <div>{renderPage()}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function loadAll() {}
 
 function FieldRow({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
   return (
@@ -65,188 +292,13 @@ function NumberInput({ value, onChange, min, max }: { value: number; onChange: (
   );
 }
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-      <div onClick={() => onChange(!checked)} style={{
-        width: '40px', height: '22px', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
-        background: checked ? 'var(--primary, #0066cc)' : 'var(--border)',
-      }}>
-        <div style={{
-          width: '18px', height: '18px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px',
-          left: checked ? '20px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-        }} />
-      </div>
-      {label && <span style={{ color: 'var(--text)' }}>{label}</span>}
-    </label>
+    <button onClick={() => onChange(!checked)} style={{ position: 'relative', width: '40px', height: '22px', borderRadius: '11px', border: 'none', cursor: 'pointer', background: checked ? 'var(--primary, #6366f1)' : 'var(--border)', transition: 'background 0.2s' }}>
+      <span style={{ position: 'absolute', top: '2px', left: checked ? '20px' : '2px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+    </button>
   );
 }
-
-function ColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} style={{ width: '36px', height: '36px', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', padding: '2px' }} />
-      <TextInput value={value} onChange={onChange} placeholder="#0066cc" />
-    </div>
-  );
-}
-
-function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{
-      padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px',
-      background: 'var(--surface)', color: 'var(--text)', outline: 'none', minWidth: '180px',
-    }}>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
-}
-
-export default function SettingsPanel({ toast, setToast }: { toast: any; setToast: (v: any) => void }) {
-  const [activeCategory, setActiveCategory] = useState('general');
-  const [settings, setSettings] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => { loadSettings(); }, []);
-
-  const loadSettings = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('crm_settings').select('*');
-    if (data) {
-      const map: Record<string, any> = {};
-      data.forEach((s: SettingEntry) => { map[s.setting_key] = s.setting_value; });
-      setSettings(map);
-    }
-    setLoading(false);
-    setDirty(false);
-  };
-
-  const updateSetting = (key: string, value: any) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setDirty(true);
-  };
-
-  const saveAll = async () => {
-    setSaving(true);
-    const updates = Object.entries(settings).map(([key, value]) => ({
-      setting_key: key,
-      setting_value: value,
-      category: CATEGORIES.find(c => key.includes(c.key))?.category || 'general',
-    }));
-    const { error } = await supabase.from('crm_settings').upsert(updates, { onConflict: 'setting_key' });
-    setSaving(false);
-    if (error) {
-      setToast({ msg: 'Σφάλμα αποθήκευσης: ' + error.message, type: 'info' });
-    } else {
-      setToast({ msg: 'Οι ρυθμίσεις αποθηκεύτηκαν.', type: 'success' });
-      setDirty(false);
-    }
-  };
-
-  const renderCategory = () => {
-    switch (activeCategory) {
-      case 'general': return <GeneralSettings settings={settings} update={updateSetting} />;
-      case 'agents': return <AgentsSettings settings={settings} update={updateSetting} />;
-      case 'leads': return <LeadsSettings settings={settings} update={updateSetting} />;
-      case 'sources': return <SourcesSettings settings={settings} update={updateSetting} />;
-      case 'market': return <MarketSettings settings={settings} update={updateSetting} />;
-      case 'hub': return <HubSettings settings={settings} update={updateSetting} />;
-      case 'orchestrator': return <OrchestratorSettings settings={settings} update={updateSetting} />;
-      case 'business': return <BusinessSettings settings={settings} update={updateSetting} />;
-      case 'reports': return <ReportsSettings settings={settings} update={updateSetting} />;
-      case 'users': return <UsersSettings settings={settings} update={updateSetting} />;
-      case 'scraper': return <ScraperSettings settings={settings} update={updateSetting} />;
-      case 'appearance': return <AppearanceSettings settings={settings} update={updateSetting} />;
-      case 'tariffs': return <TariffsSettings settings={settings} update={updateSetting} />;
-      case 'email': return <EmailSettings settings={settings} update={updateSetting} />;
-      case 'campaigns': return <CampaignSettings settings={settings} update={updateSetting} />;
-      case 'voice': return <VoiceSettings settings={settings} update={updateSetting} />;
-      case 'ai-assistant': return <AiAssistantSettings />;
-      case 'communications': return <CommunicationsSettings settings={settings} update={updateSetting} />;
-      case 'templates': return <DocumentTemplatesSettings />;
-      case 'security': return <SecuritySettings settings={settings} update={updateSetting} />;
-      default: return null;
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg)' }}>
-      {/* Sidebar */}
-      <div style={{ width: '260px', borderRight: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>⚙️ Ρυθμίσεις CRM</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>16 κατηγορίες ρυθμίσεων</p>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-          {CATEGORIES.map(cat => {
-            const Icon = cat.icon;
-            return (
-              <button
-                key={cat.key}
-                onClick={() => setActiveCategory(cat.key)}
-                style={{
-                  width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: '2px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: activeCategory === cat.key ? 'rgba(0,102,204,0.1)' : 'transparent',
-                  color: activeCategory === cat.key ? 'var(--primary, #0066cc)' : 'var(--text)',
-                  display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px',
-                  fontWeight: activeCategory === cat.key ? 600 : 400,
-                  borderLeft: activeCategory === cat.key ? '3px solid var(--primary, #0066cc)' : '3px solid transparent',
-                }}
-              >
-                <Icon size={16} />
-                <div>
-                  <div>{cat.label}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 400 }}>{cat.desc}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg)' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>
-              {CATEGORIES.find(c => c.key === activeCategory)?.label}
-            </h3>
-            <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              {CATEGORIES.find(c => c.key === activeCategory)?.desc}
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={loadAll} style={{ padding: '8px 14px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--surface)', color: 'var(--text)', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <RefreshCw size={14} /> Ανανέωση
-            </button>
-            <button
-              onClick={saveAll} disabled={!dirty || saving}
-              style={{
-                padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: dirty && !saving ? 'pointer' : 'not-allowed',
-                background: dirty ? 'var(--primary, #0066cc)' : 'var(--border)', color: dirty ? '#fff' : 'var(--text-muted)',
-                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s',
-              }}
-            >
-              <Save size={14} /> {saving ? 'Αποθήκευση...' : 'Αποθήκευση'}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Φόρτωση ρυθμίσεων...</div>
-          ) : (
-            renderCategory()
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function loadAll() {} // placeholder — actual reload is in parent
 
 // ═══════════════════════════════════════════════════════════════
 // CATEGORY COMPONENTS

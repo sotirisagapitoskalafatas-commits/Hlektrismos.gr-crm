@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { uploadDocument, updateLeadBillFiles, UploadedFile } from '@/lib/storage';
+import OfferModal from './OfferModal';
 
 type Lead = {
   id: string;
@@ -135,6 +136,7 @@ export default function LeadDetailSlideout({
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [showRecs, setShowRecs] = useState(false);
   const [sendingOffer, setSendingOffer] = useState<string | null>(null);
+  const [offerModal, setOfferModal] = useState<{ tariff: any } | null>(null);
 
   // Bill upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -833,6 +835,16 @@ Return JSON with this exact structure:
                         {sendingOffer === rec.tariff_id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={11} />}
                         {sendingOffer === rec.tariff_id ? 'Αποστολή...' : 'Αποστολή Προσφοράς'}
                       </button>
+                      <button
+                        onClick={() => setOfferModal({ tariff: rec })}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, border: '1px solid #0ea5e9', fontSize: 11, fontWeight: 600,
+                          cursor: 'pointer', background: '#f0f9ff', color: '#0ea5e9',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <FileText size={11} /> Παραγωγή PDF
+                      </button>
                       {rec.official_url && (
                         <a
                           href={rec.official_url}
@@ -1278,6 +1290,13 @@ Return JSON with this exact structure:
           </section>
         </div>
       </div>
+      {offerModal && (
+        <OfferModal
+          lead={lead}
+          tariff={offerModal.tariff}
+          onClose={() => setOfferModal(null)}
+        />
+      )}
     </div>
   );
 }

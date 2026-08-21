@@ -135,13 +135,24 @@ export default function MarketRagFolders() {
 
   const syncTariffs = async () => {
     setSyncing(true);
-    try {
-      const { error } = await supabase.functions.invoke('autonomous-tariff-scraper');
-      if (error) throw error;
-      await loadTariffs();
-    } catch (e: any) {
-      alert(`Σφάλμα: ${e.message}`);
+    const providers = ['ΔΕΗ', 'Protergia', 'ΗΡΩΝ', 'nrg', 'ZeniΘ', 'Volton', 'Φυσικό Αέριο', 'Ελίν', 'Enerwave', 'Eunice Power'];
+    let synced = 0;
+    let failed = 0;
+    for (const provider of providers) {
+      try {
+        console.log(`[sync] ${provider}...`);
+        const { error } = await supabase.functions.invoke('scrape-program-details', {
+          body: { provider },
+        });
+        if (error) throw error;
+        synced++;
+      } catch (e: any) {
+        console.error(`[sync] Failed ${provider}:`, e.message);
+        failed++;
+      }
     }
+    await loadTariffs();
+    alert(`Sync ολοκληρώθηκε: ${synced} επιτυχή / ${failed} αποτυχίες`);
     setSyncing(false);
   };
 

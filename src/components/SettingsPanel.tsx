@@ -60,6 +60,7 @@ const GROUPS: GroupDef[] = [
       { id: 'voice', label: '📞 Voice AI', desc: 'Vapi.ai, ElevenLabs Greek voices', render: (p) => <VoiceSettings settings={p.settings} update={p.update} /> },
       { id: 'ai-assistant', label: '🤖 AI Widget', desc: 'CRM chatbot widget', render: () => <AiAssistantSettings /> },
       { id: 'communications', label: '💬 SMS & Viber', desc: 'PBX, Viber gateways', render: (p) => <CommunicationsSettings settings={p.settings} update={p.update} /> },
+      { id: 'excel-import', label: '📥 Excel Εισαγωγή', desc: 'Μαζική εισαγωγή leads/πελατών', render: () => <ExcelSyncSettings /> },
     ],
   },
   {
@@ -303,6 +304,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 // ═══════════════════════════════════════════════════════════════
 // CATEGORY COMPONENTS
 // ═══════════════════════════════════════════════════════════════
+
+import { ExcelSyncSettings } from './ExcelSyncSettings';
 
 function GeneralSettings({ settings, update }: { settings: Record<string, any>; update: (k: string, v: any) => void }) {
   const s = settings.business_profile || {};

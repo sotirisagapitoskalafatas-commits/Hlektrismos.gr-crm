@@ -46,6 +46,7 @@ import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 import NotificationBell from '@/components/NotificationBell';
 import CalendarView from '@/components/CalendarView';
 import MarketRAGSearch from '@/components/MarketRAGSearch';
+import LiveVoiceSupervisor from '@/components/LiveVoiceSupervisor';
 
 type Lead = {
   id: string;
@@ -127,7 +128,7 @@ type Tariff = {
   created_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns' | 'followup';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns' | 'followup' | 'voice-supervisor';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -718,6 +719,7 @@ export default function DashboardPage() {
       { tab: 'hub' as Tab, icon: '🧠', label: 'Agent Hub' },
       { tab: 'agents' as Tab, icon: '🤖', label: 'AI Agents' },
       { tab: 'orchestrator' as Tab, icon: '⚙️', label: 'Orchestrator Director' },
+      { tab: 'voice-supervisor' as Tab, icon: '📞', label: 'Voice Supervisor' },
     ]},
     { key: 'workspace', label: '✉️ Workspace', items: [
       { tab: 'email' as Tab, icon: '📧', label: 'Email' },
@@ -733,8 +735,8 @@ export default function DashboardPage() {
 
   // RBAC: Filter nav categories based on user role
   const allowedTabsByRole: Record<string, Tab[]> = {
-    admin: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar'],
-    management: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar'],
+    admin: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar', 'voice-supervisor'],
+    management: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar', 'voice-supervisor'],
     sales: ['overview', 'leads', 'followup', 'market', 'hub', 'email', 'campaigns', 'documents', 'market-search', 'calendar'],
     secretary: ['overview', 'leads', 'followup', 'email', 'calendar'],
     it: ['overview', 'settings', 'hub', 'orchestrator'],
@@ -1477,6 +1479,9 @@ export default function DashboardPage() {
                 <CustomersTab />
                 <FollowUpFolder leads={leads} crmUsers={crmUsers} toast={toast} setToast={setToast} loadData={loadData} />
               </>
+            )}
+            {tab === 'voice-supervisor' && (
+              <LiveVoiceSupervisor />
             )}
           </>
         )}

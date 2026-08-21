@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Users, Building2, User, Search, Calendar, Phone, Mail, ChevronRight } from 'lucide-react';
 import CustomerFolderSlideout from './CustomerFolderSlideout';
+import CustomerDetailModal from './CustomerDetailModal';
 
 export default function CustomersTab() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -9,6 +10,7 @@ export default function CustomersTab() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'B2C' | 'B2B'>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [detailModalId, setDetailModalId] = useState<string | null>(null);
 
   useEffect(() => { fetchCustomers(); }, []);
 
@@ -81,7 +83,7 @@ export default function CustomersTab() {
           {filtered.map(c => {
             const bc = badgeColor(c.contract_status);
             return (
-              <div key={c.id} onClick={() => setSelectedCustomerId(c.id)} style={{
+              <div key={c.id} onClick={() => setDetailModalId(c.id)} style={{
                 padding: 18, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
                 cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 10,
               }}
@@ -120,7 +122,7 @@ export default function CustomersTab() {
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Calendar size={11} /> Λήξη: {c.contract_end_date ? new Date(c.contract_end_date).toLocaleDateString('el-GR') : '—'}
                   </span>
-                  <span style={{ color: 'var(--primary, #6366f1)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <span onClick={(e) => { e.stopPropagation(); setSelectedCustomerId(c.id); }} style={{ color: 'var(--primary, #6366f1)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
                     Φάκελος <ChevronRight size={12} />
                   </span>
                 </div>
@@ -132,6 +134,9 @@ export default function CustomersTab() {
 
       {selectedCustomerId && (
         <CustomerFolderSlideout customerId={selectedCustomerId} onClose={() => setSelectedCustomerId(null)} onUpdate={fetchCustomers} />
+      )}
+      {detailModalId && (
+        <CustomerDetailModal customerId={detailModalId} onClose={() => setDetailModalId(null)} />
       )}
     </div>
   );

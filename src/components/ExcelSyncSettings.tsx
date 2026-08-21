@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supellipsae';
+import { supabase } from '../lib/supabase';
 
 export const ExcelSyncSettings: React.FC = () => {
   const [uploading, setUploading] = useState(false);

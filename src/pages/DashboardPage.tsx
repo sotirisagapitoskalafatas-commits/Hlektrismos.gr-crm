@@ -39,6 +39,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import SettingsPanel from '@/components/SettingsPanel';
 import DocumentGenerator from '@/components/DocumentGenerator';
+import CustomersTab from '@/components/CustomersTab';
 import LeadDetailSlideout from '@/components/LeadDetailSlideout';
 import MarketRagFolders from '@/components/MarketRagFolders';
 import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
@@ -1472,7 +1473,10 @@ export default function DashboardPage() {
               <DocumentGenerator toast={toast} setToast={setToast} />
             )}
             {tab === 'followup' && (
-              <FollowUpFolder leads={leads} crmUsers={crmUsers} toast={toast} setToast={setToast} loadData={loadData} />
+              <>
+                <CustomersTab />
+                <FollowUpFolder leads={leads} crmUsers={crmUsers} toast={toast} setToast={setToast} loadData={loadData} />
+              </>
             )}
           </>
         )}

@@ -33,7 +33,7 @@ const tools = [
         properties: {
           provider: {
             type: "string",
-            description: "Το όνομα του προμηθευτή (π.χ. PPC, Heron, Elpedison)",
+            description: "Το όνομα του προμηθευτή (π.χ. ΔΕΗ, Protergia, ΗΡΩΝ, ZeniΘ, nrg, Volton, Eunice Power)",
           },
           customer_type: {
             type: "string",

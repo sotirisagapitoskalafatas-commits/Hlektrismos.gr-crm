@@ -33,6 +33,7 @@ const CATEGORIES = [
   { key: 'voice', label: '📞 Voice AI', icon: Phone, desc: 'Vapi.ai, ElevenLabs Greek voices' },
   { key: 'ai-assistant', label: '🤖 AI Widget', icon: Bot, desc: 'CRM AI chatbot widget' },
   { key: 'communications', label: 'Τηλεφωνία & SMS', icon: Phone, desc: 'PBX, SMS, Viber gateways' },
+  { key: 'templates', label: '📄 Πρότυπα', icon: FileText, desc: 'Document templates (PDF offers)' },
   { key: 'security', label: 'Ασφάλεια & GDPR', icon: Shield, desc: 'Audit logs & compliance' },
 ];
 
@@ -164,6 +165,7 @@ export default function SettingsPanel({ toast, setToast }: { toast: any; setToas
       case 'voice': return <VoiceSettings settings={settings} update={updateSetting} />;
       case 'ai-assistant': return <AiAssistantSettings />;
       case 'communications': return <CommunicationsSettings settings={settings} update={updateSetting} />;
+      case 'templates': return <DocumentTemplatesSettings />;
       case 'security': return <SecuritySettings settings={settings} update={updateSetting} />;
       default: return null;
     }
@@ -1111,6 +1113,125 @@ function SecuritySettings({ settings, update }: { settings: Record<string, any>;
       <FieldRow label="IP Whitelist" desc="Αφήστε κενό για ελεύθερη πρόσβαση">
         <TextInput value={(s.ip_whitelist || []).join(', ')} onChange={(v) => update('security_config', { ...s, ip_whitelist: v.split(',').map((ip: string) => ip.trim()).filter(Boolean) })} placeholder="192.168.1.1, 10.0.0.1" />
       </FieldRow>
+    </div>
+  );
+}
+
+function DocumentTemplatesSettings() {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const loadTemplates = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('document_templates').select('*').order('created_at');
+    setTemplates(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadTemplates(); }, []);
+
+  const handleSave = async (id: string) => {
+    setSaving(true);
+    await supabase.from('document_templates').update({ html_content: editContent, updated_at: new Date().toISOString() }).eq('id', id);
+    setSaving(false);
+    setEditingId(null);
+    loadTemplates();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Διαγραφή αυτού του προτύπου;')) return;
+    await supabase.from('document_templates').delete().eq('id', id);
+    loadTemplates();
+  };
+
+  const handleDuplicate = async (tpl: any) => {
+    await supabase.from('document_templates').insert({
+      name: tpl.name + ' (αντίγραφο)',
+      template_type: tpl.template_type,
+      customer_type: tpl.customer_type,
+      html_content: tpl.html_content,
+      is_default: false,
+    });
+    loadTemplates();
+  };
+
+  const handleSetDefault = async (id: string, customerType: string) => {
+    await supabase.from('document_templates').update({ is_default: false }).eq('template_type', 'offer').eq('customer_type', customerType);
+    await supabase.from('document_templates').update({ is_default: true }).eq('id', id);
+    loadTemplates();
+  };
+
+  if (loading) return <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>Φόρτωση...</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h4 style={{ margin: 0, fontSize: 14 }}>📄 Document Templates</h4>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{templates.length} templates</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {templates.map(tpl => (
+          <div key={tpl.id} style={{
+            border: '1px solid var(--border)', borderRadius: 8, padding: 14, background: 'var(--surface)',
+            opacity: editingId && editingId !== tpl.id ? 0.5 : 1,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{tpl.name}</span>
+                <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px', background: tpl.customer_type === 'B2B' ? '#dbeafe' : '#d1fae5', borderRadius: 4, fontWeight: 600 }}>
+                  {tpl.customer_type}
+                </span>
+                {tpl.is_default && <span style={{ marginLeft: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>DEFAULT</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {!tpl.is_default && tpl.template_type === 'offer' && (
+                  <button onClick={() => handleSetDefault(tpl.id, tpl.customer_type)} style={{ padding: '4px 8px', fontSize: 10, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer' }}>
+                    Ορισμός Default
+                  </button>
+                )}
+                <button onClick={() => { setEditingId(tpl.id); setEditContent(tpl.html_content); }} style={{ padding: '4px 8px', fontSize: 10, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer' }}>
+                  ✏️ Επεξεργασία
+                </button>
+                <button onClick={() => handleDuplicate(tpl)} style={{ padding: '4px 8px', fontSize: 10, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer' }}>
+                  📋 Duplicate
+                </button>
+                <button onClick={() => handleDelete(tpl.id)} style={{ padding: '4px 8px', fontSize: 10, border: '1px solid #fecaca', borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#dc2626' }}>
+                  🗑️
+                </button>
+              </div>
+            </div>
+            {editingId === tpl.id ? (
+              <div>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  style={{ width: '100%', minHeight: 300, fontFamily: 'monospace', fontSize: 11, padding: 8, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', color: 'var(--text)' }}
+                />
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button onClick={() => handleSave(tpl.id)} disabled={saving} style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 6, background: '#0ea5e9', color: '#fff', cursor: 'pointer' }}>
+                    {saving ? 'Αποθήκευση...' : '💾 Αποθήκευση'}
+                  </button>
+                  <button onClick={() => setEditingId(null)} style={{ padding: '6px 14px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>
+                    Ακύρωση
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', maxHeight: 60, overflow: 'hidden' }}>
+                {tpl.html_content.replace(/<[^>]+>/g, '').substring(0, 150)}...
+              </div>
+            )}
+          </div>
+        ))}
+        {templates.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
+            Δεν υπάρχουν templates. Αυτόματα δημιουργήθηκαν B2C & B2B templates.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

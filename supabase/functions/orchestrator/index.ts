@@ -79,7 +79,7 @@ const GEMINI_TOOLS = [
         parameters: {
           type: 'OBJECT',
           properties: {
-            provider: { type: 'STRING', description: 'Όνομα παρόχου: ΔΕΗ, Protergia, ΗΡΩΝ, ZeniΘ, Elpedison, nrg, Φυσικό Αέριο, Volton, We Energy, Ελίν' },
+            provider: { type: 'STRING', description: 'Όνομα παρόχου: ΔΕΗ, Protergia, ΗΡΩΝ, ZeniΘ, nrg, Φυσικό Αέριο, Volton, Ελίν, Enerwave, Eunice Power' },
             category: { type: 'STRING', description: 'B2B ή B2C' },
             resource: { type: 'STRING', description: 'Πόρος: ρεύμα, φυσικό αέριο' },
           },

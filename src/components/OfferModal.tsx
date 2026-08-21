@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Download, Loader2, Eye } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface OfferModalProps {
   lead: any;
@@ -9,27 +10,7 @@ interface OfferModalProps {
 }
 
 const DEFAULT_LOGO = 'https://hlektrismos.gr/logo.png';
-
-export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModalProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [view, setView] = useState<'preview' | 'html'>('preview');
-
-  const getMonthlyKwh = () => lead?.monthly_kwh || lead?.consumption_kwh || 300;
-  const getUnitRate = () => tariff?.base_price_day || tariff?.unit_rate_kwh || 0;
-  const getFixedFee = () => tariff?.fixed_fee_monthly || 0;
-  const getDiscountedRate = () => tariff?.discounted_price_day || null;
-
-  const monthlyKwh = getMonthlyKwh();
-  const effectiveRate = getDiscountedRate() || getUnitRate();
-  const fixedFee = getFixedFee();
-  const estimatedMonthly = (monthlyKwh * effectiveRate) + fixedFee;
-  const estimatedYearly = estimatedMonthly * 12;
-  const currentCost = lead?.unit_rate_kwh ? (monthlyKwh * lead.unit_rate_kwh) : null;
-  const savingsMonthly = currentCost ? Math.max(0, currentCost - estimatedMonthly) : 0;
-  const savingsYearly = savingsMonthly * 12;
-
-  const getProcessedHtml = () => {
-    const html = `<!DOCTYPE html>
+const FALLBACK_HTML = `<!DOCTYPE html>
 <html lang="el">
 <head>
 <meta charset="UTF-8">
@@ -50,41 +31,39 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
 </head>
 <body>
   <div class="header">
-    <img src="${logoUrl || DEFAULT_LOGO}" class="logo" alt="Hlektrismos.gr" />
+    <img src="{{logo_url}}" class="logo" alt="Hlektrismos.gr" />
     <div class="company-info">
       <strong>Hlektrismos.gr</strong><br>
-      Αθηνάς 123, 10435 Αθήνα<br>
-      210 123 4567 | info@hlektrismos.gr
+      Μαύρη Πέτρα 27, 10435 Αθήνα<br>
+      210 9750816 | info@hlektrismos.gr
     </div>
   </div>
 
-  <h1>${tariff?.customer_type === 'B2B' ? 'Επαγγελματική Προσφορά' : 'Προσφορά Ηλεκτροδότησης'}</h1>
-  <p>${tariff?.customer_type === 'B2B' ? 'Αξιότιμε κύριε/κυρία,' : `Αγαπητέ/ή <strong>${lead?.first_name || ''} ${lead?.last_name || ''}</strong>,`}</p>
-  ${tariff?.customer_type === 'B2B' && lead?.company_name ? `<p>Η εταιρεία <strong>${lead.company_name}</strong> με κατανάλωση <strong>${monthlyKwh} kWh/μήνα</strong>:</p>` : ''}
-  <p>με βάση την κατανάλωσή σας (<strong>${monthlyKwh} kWh/μήνα</strong>), σας προτείνουμε:</p>
+  <h1>Προσφορά Ηλεκτροδότησης</h1>
+  <p>Αγαπητέ/ή <strong>{{customer_name}}</strong>,</p>
+  <p>με βάση την κατανάλωσή σας (<strong>{{monthly_kwh}} kWh/μήνα</strong>), σας προτείνουμε το παρακάτω πρόγραμμα:</p>
 
   <table class="tariff-table">
-    <tr><th>Πάροχος</th><td>${tariff?.provider_name || '-'}</td></tr>
-    <tr><th>Πρόγραμμα</th><td>${tariff?.program_name || '-'}</td></tr>
-    <tr><th>Τιμή / kWh (Ημέρα)</th><td>€${getUnitRate().toFixed(4)}</td></tr>
-    ${tariff?.base_price_night ? `<tr><th>Τιμή / kWh (Νύχτα)</th><td>€${tariff.base_price_night.toFixed(4)}</td></tr>` : ''}
-    <tr><th>Μηνιαίο Πάγιο</th><td>€${fixedFee.toFixed(2)}</td></tr>
-    ${tariff?.discounted_price_day ? `<tr><th>Έκπτωση</th><td>€${tariff.discounted_price_day.toFixed(4)}/kWh</td></tr>` : ''}
-    ${tariff?.discount_conditions ? `<tr><th>Συνθήκες Έκπτωσης</th><td>${tariff.discount_conditions}</td></tr>` : ''}
-    <tr><th>Εκτιμώμενο Μηνιαίο Κόστος</th><td><strong>€${estimatedMonthly.toFixed(2)}</strong></td></tr>
-    <tr><th>Εκτιμώμενο Ετήσιο Κόστος</th><td><strong>€${estimatedYearly.toFixed(2)}</strong></td></tr>
+    <tr><th>Πάροχος</th><td>{{provider_name}}</td></tr>
+    <tr><th>Πρόγραμμα</th><td>{{tariff_name}}</td></tr>
+    <tr><th>Τιμή / kWh (Ημέρα)</th><td>{{price_kwh}} €</td></tr>
+    <tr><th>Τιμή / kWh (Νύχτα)</th><td>{{price_night}} €</td></tr>
+    <tr><th>Μηνιαίο Πάγιο</th><td>{{monthly_fixed_fee}} €</td></tr>
+    <tr><th>Έκπτωση</th><td>{{discount_conditions}}</td></tr>
+    <tr><th>Εκτιμώμενο Μηνιαίο Κόστος</th><td><strong>{{monthly_estimate}} €</strong></td></tr>
+    <tr><th>Εκτιμώμενο Ετήσιο Κόστος</th><td><strong>{{yearly_estimate}} €</strong></td></tr>
   </table>
 
-  ${savingsMonthly > 0 ? `
+  {{#if savings_amount}}
   <div class="highlight">
-    <p>Το τρέχον πρόγραμμά σας (${lead?.current_provider || 'Άγνωστος'}) κοστίζει περίπου <strong>€${currentCost?.toFixed(2) || '-'}/μήνα</strong>.</p>
+    <p>Το τρέχον πρόγραμμά σας ({{current_provider}}) κοστίζει περίπου <strong>{{current_monthly_cost}} €/μήνα</strong>.</p>
     <p>Με το νέο πρόγραμμα θα εξοικονομείτε:</p>
-    <div class="savings">€${savingsMonthly.toFixed(2)} / μήνα (€${savingsYearly.toFixed(2)} / χρόνο)</div>
+    <div class="savings">€{{savings_amount}} / μήνα (€{{savings_yearly}} / χρόνο)</div>
   </div>
-  ` : ''}
+  {{/if}}
 
   <p>Θα χαρούμε να σας βοηθήσουμε να ολοκληρώσετε την αλλαγή παρόχου. Επικοινωνήστε μαζί μας:</p>
-  <p>📞 210 123 4567 | 📧 info@hlektrismos.gr</p>
+  <p>📞 210 9750816 | 📧 info@hlektrismos.gr</p>
 
   <div class="footer">
     <p>Με εκτίμηση,<br><strong>Η Ομάδα Hlektrismos.gr</strong></p>
@@ -92,8 +71,69 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
   </div>
 </body>
 </html>`;
-    return html;
+
+export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModalProps) {
+  const [template, setTemplate] = useState<string>(FALLBACK_HTML);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingTemplate, setLoadingTemplate] = useState(true);
+
+  const monthlyKwh = lead?.monthly_kwh || lead?.consumption_kwh || 300;
+  const unitRate = tariff?.base_price_day || tariff?.unit_rate_kwh || 0;
+  const fixedFee = tariff?.fixed_fee_monthly || 0;
+  const discountedRate = tariff?.discounted_price_day || null;
+  const effectiveRate = discountedRate || unitRate;
+  const estimatedMonthly = (monthlyKwh * effectiveRate) + fixedFee;
+  const estimatedYearly = estimatedMonthly * 12;
+  const currentCost = lead?.unit_rate_kwh ? (monthlyKwh * lead.unit_rate_kwh) : null;
+  const savingsMonthly = currentCost ? Math.max(0, currentCost - estimatedMonthly) : 0;
+  const savingsYearly = savingsMonthly * 12;
+
+  useEffect(() => {
+    const fetchTemplate = async () => {
+      try {
+        const customerType = tariff?.customer_type || 'B2C';
+        const { data } = await supabase
+          .from('document_templates')
+          .select('html_content')
+          .eq('template_type', 'offer')
+          .eq('customer_type', customerType)
+          .eq('is_default', true)
+          .single();
+
+        if (data?.html_content) {
+          setTemplate(data.html_content);
+        }
+      } catch (err) {
+        console.warn('Failed to load template, using fallback:', err);
+      }
+      setLoadingTemplate(false);
+    };
+    fetchTemplate();
+  }, [tariff?.customer_type]);
+
+  const replacePlaceholders = (html: string): string => {
+    return html
+      .replace(/\{\{logo_url\}\}/g, logoUrl || DEFAULT_LOGO)
+      .replace(/\{\{customer_name\}\}/g, `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim() || 'Πελάτης')
+      .replace(/\{\{company_name\}\}/g, lead?.company_name || lead?.company || '')
+      .replace(/\{\{monthly_kwh\}\}/g, monthlyKwh.toString())
+      .replace(/\{\{provider_name\}\}/g, tariff?.provider_name || '-')
+      .replace(/\{\{tariff_name\}\}/g, tariff?.program_name || tariff?.tariff_name || '-')
+      .replace(/\{\{price_kwh\}\}/g, unitRate.toFixed(4))
+      .replace(/\{\{price_night\}\}/g, tariff?.base_price_night ? tariff.base_price_night.toFixed(4) : '—')
+      .replace(/\{\{monthly_fixed_fee\}\}/g, fixedFee.toFixed(2))
+      .replace(/\{\{discount_conditions\}\}/g, tariff?.discount_conditions || '—')
+      .replace(/\{\{monthly_estimate\}\}/g, estimatedMonthly.toFixed(2))
+      .replace(/\{\{yearly_estimate\}\}/g, estimatedYearly.toFixed(2))
+      .replace(/\{\{current_provider\}\}/g, lead?.current_provider || 'Άγνωστος')
+      .replace(/\{\{current_monthly_cost\}\}/g, currentCost?.toFixed(2) || '—')
+      .replace(/\{\{savings_amount\}\}/g, savingsMonthly > 0 ? savingsMonthly.toFixed(2) : '')
+      .replace(/\{\{savings_yearly\}\}/g, savingsYearly > 0 ? savingsYearly.toFixed(2) : '')
+      .replace(/\{\{#if savings_amount\}\}/g, savingsMonthly > 0 ? '' : '<!--')
+      .replace(/\{\{\/if\}\}/g, savingsMonthly > 0 ? '' : '-->');
   };
+
+  const getProcessedHtml = () => replacePlaceholders(template);
 
   const handleDownloadPDF = () => {
     const container = document.getElementById('printable-offer');
@@ -105,19 +145,13 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
       return;
     }
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
+    printWindow.document.write(`<!DOCTYPE html>
       <html><head>
         <title>Προσφορά - ${lead?.first_name || ''} ${lead?.last_name || ''}</title>
-        <style>
-          @media print { body { margin: 0; } }
-        </style>
-      </head><body>${container.innerHTML}</body></html>
-    `);
+        <style>@media print { body { margin: 0; } }</style>
+      </head><body>${container.innerHTML}</body></html>`);
     printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    setTimeout(() => { printWindow.print(); }, 500);
   };
 
   return (
@@ -139,23 +173,14 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
             <span style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>
               Προεπισκόπηση Προσφοράς
             </span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                onClick={() => setView('preview')}
-                style={{
-                  padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, border: 'none',
-                  background: view === 'preview' ? '#0ea5e9' : '#e5e7eb', color: view === 'preview' ? '#fff' : '#6b7280',
-                  cursor: 'pointer',
-                }}
-              >
-                <Eye size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />Preview
-              </button>
-            </div>
+            <span style={{ fontSize: 11, color: '#6b7280', padding: '2px 8px', background: '#f3f4f6', borderRadius: 4 }}>
+              {tariff?.customer_type === 'B2B' ? 'B2B' : 'B2C'}
+            </span>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={handleDownloadPDF}
-              disabled={isGenerating}
+              disabled={isGenerating || loadingTemplate}
               style={{
                 padding: '6px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600,
                 background: isGenerating ? '#e5e7eb' : '#0ea5e9', color: isGenerating ? '#9ca3af' : '#fff',
@@ -180,14 +205,20 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
 
         {/* Preview */}
         <div style={{ flex: 1, overflow: 'auto', padding: 20, background: '#f3f4f6' }}>
-          <div
-            id="printable-offer"
-            style={{
-              background: '#fff', maxWidth: 700, margin: '0 auto', padding: '30px 40px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: 8,
-            }}
-            dangerouslySetInnerHTML={{ __html: getProcessedHtml() }}
-          />
+          {loadingTemplate ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+              <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#0ea5e9' }} />
+            </div>
+          ) : (
+            <div
+              id="printable-offer"
+              style={{
+                background: '#fff', maxWidth: 700, margin: '0 auto', padding: '30px 40px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: 8,
+              }}
+              dangerouslySetInnerHTML={{ __html: getProcessedHtml() }}
+            />
+          )}
         </div>
       </div>
     </div>

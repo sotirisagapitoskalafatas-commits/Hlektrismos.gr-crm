@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/satellite';
+import { supabase } from '../lib/supabase';
 import { Phone, PhoneOff, MessageSquare, Volume2 } from 'lucide-react';
 
 export default function LiveVoiceSupervisor() {

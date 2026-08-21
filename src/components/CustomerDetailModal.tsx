@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/satellite';
+import { supabase } from '../lib/supabase';
 import { X, Phone, Mail, MapPin, Building2, FileText, User, GitBranch, Plus, HardDrive } from 'lucide-react';
 
 interface CustomerDetailModalProps {

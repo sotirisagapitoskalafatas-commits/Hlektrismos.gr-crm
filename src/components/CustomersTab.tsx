@@ -39,6 +39,7 @@ export default function CustomersTab() {
       full_name: l.full_name || `${l.first_name || ''} ${l.last_name || ''}`.trim(),
       active_provider: l.current_provider,
       active_program: l.program_name,
+      pipeline_stage: l.status,
       contract_status: 'active',
     }));
     // Deduplicate by id
@@ -62,16 +63,24 @@ export default function CustomersTab() {
 
   const badgeColor = (s: string) => {
     if (s === 'active') return { bg: '#d1fae5', color: '#065f46' };
-    if (s === 'expiring_soon') return { bg: '#fef3c7', color: '#92400e' };
-    return { bg: '#fee2e2', color: '#991b1b' };
+    if (s === 'intro') return { bg: '#dbeafe', color: '#1e40af' };
+    if (s === 'awaiting_offer' || s === 'awaiting_signature') return { bg: '#fef3c7', color: '#92400e' };
+    if (s === 'accepted' || s === 'sent_to_provider') return { bg: '#e0e7ff', color: '#3730a3' };
+    if (s === 'rejected') return { bg: '#fee2e2', color: '#991b1b' };
+    return { bg: '#f3f4f6', color: '#6b7280' };
   };
 
   const statusLabel = (s: string) => {
-    if (s === 'active') return 'Ενεργό';
-    if (s === 'expiring_soon') return 'Λήγει Σύντομα';
-    if (s === 'expired') return 'Έληξε';
-    if (s === 'pending_switch') return 'Μεταφορά';
-    return s || '—';
+    const labels: Record<string, string> = {
+      intro: 'Εισαγωγή',
+      awaiting_offer: 'Αναμονή Προσφοράς',
+      awaiting_signature: 'Αναμονή Υπογραφής',
+      accepted: 'Αποδεκτή',
+      sent_to_provider: 'Απεσταλμένη στον Πάροχο',
+      active: 'Ενεργή',
+      rejected: 'Απορρίφθηκε',
+    };
+    return labels[s] || s || '—';
   };
 
   const handleAddCustomer = async () => {
@@ -155,13 +164,13 @@ export default function CustomersTab() {
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 11, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer' }}>
           <option value="all">Κατάσταση: Όλες</option>
-          <option value="active">Ενεργό</option>
-          <option value="expiring_soon">Λήγει Σύντομα</option>
-          <option value="expired">Έληξε</option>
           <option value="intro">Εισαγωγή</option>
-          <option value="proposal">Προσφορά</option>
-          <option value="won">Κερδισμένο</option>
-          <option value="lost">Χαμένο</option>
+          <option value="awaiting_offer">Αναμονή Προσφοράς</option>
+          <option value="awaiting_signature">Αναμονή Υπογραφής</option>
+          <option value="accepted">Αποδεκτή</option>
+          <option value="sent_to_provider">Απεσταλμένη στον Πάροχο</option>
+          <option value="active">Ενεργή</option>
+          <option value="rejected">Απορρίφθηκε</option>
         </select>
         {(filterServiceType !== 'all' || filterProvider !== 'all' || filterSource !== 'all' || filterStatus !== 'all') && (
           <button onClick={() => { setFilterServiceType('all'); setFilterProvider('all'); setFilterSource('all'); setFilterStatus('all'); }}
@@ -218,7 +227,7 @@ export default function CustomersTab() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
           {filtered.map(c => {
-            const bc = badgeColor(c.contract_status);
+            const bc = badgeColor(c.pipeline_stage || c.contract_status);
             return (
               <div key={c.id} onClick={() => { setSelectedCustomer(c.id); setSelectedSourceTable(c._source_table || 'customers'); }} style={{
                 padding: 18, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
@@ -232,7 +241,7 @@ export default function CustomersTab() {
                     {c.customer_type === 'B2B' ? <Building2 size={10} /> : <User size={10} />} {c.customer_type}
                   </span>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: bc.bg, color: bc.color }}>
-                    {statusLabel(c.contract_status)}
+                    {statusLabel(c.pipeline_stage || c.contract_status)}
                   </span>
                 </div>
                 <div>

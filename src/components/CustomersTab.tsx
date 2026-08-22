@@ -29,7 +29,7 @@ export default function CustomersTab() {
     setLoading(true);
     const [custRes, leadsRes] = await Promise.all([
       supabase.from('hlektrismos_customers').select('*').order('created_at', { ascending: false }),
-      supabase.from('hlektrismos_leads').select('*').eq('status', 'customer').is('deleted_at', null).order('created_at', { ascending: false }),
+      supabase.from('hlektrismos_leads').select('*').or('status.eq.customer,converted_at.not.is.null').is('deleted_at', null).order('created_at', { ascending: false }),
     ]);
     const custs = custRes.data || [];
     // Merge leads with status='customer' as customer entries

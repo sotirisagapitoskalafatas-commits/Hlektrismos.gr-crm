@@ -432,7 +432,7 @@ export default function DashboardPage() {
     }
 
     // RBAC: Sales users only see their own assigned leads
-    let leadsQuery = supabase.from('hlektrismos_leads').select('*').is('deleted_at', null).neq('status', 'customer').order('created_at', { ascending: false });
+    let leadsQuery = supabase.from('hlektrismos_leads').select('*').is('deleted_at', null).and('status.neq.customer,converted_at.is.null').order('created_at', { ascending: false });
     if (currentRole === 'sales' && user?.id) {
       leadsQuery = leadsQuery.eq('assigned_to', user.id);
     }

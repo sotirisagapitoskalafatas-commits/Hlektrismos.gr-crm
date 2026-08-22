@@ -140,7 +140,11 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
       }
       if (payload.active_provider !== undefined) { payload.current_provider = payload.active_provider; delete payload.active_provider; }
       if (payload.active_program !== undefined) { payload.program_name = payload.active_program; delete payload.active_program; }
-      if (payload.pipeline_stage !== undefined) { payload.status = payload.pipeline_stage; delete payload.pipeline_stage; }
+      // Keep status='customer' for converted leads, don't overwrite with pipeline_stage
+      // Store pipeline_stage in comments suffix if needed
+      delete payload.pipeline_stage;
+      if (!entity?.converted_at) { payload.converted_at = new Date().toISOString(); }
+      if (entity?.status !== 'customer') { payload.status = 'customer'; }
       if (payload.notes !== undefined) { payload.comments = payload.notes; delete payload.notes; }
       delete payload.afm;
       delete payload.city;

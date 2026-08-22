@@ -92,9 +92,15 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     ]);
     if (entityRes.data) {
       const e = entityRes.data;
-      // If lead used as customer, normalize name fields
-      if (entityType === 'customer' && !e.full_name && (e.first_name || e.last_name)) {
-        e.full_name = `${e.first_name || ''} ${e.last_name || ''}`.trim();
+      // If lead used as customer, normalize field names for customer form
+      if (entityType === 'customer' && sourceTable === 'leads') {
+        if (!e.full_name && (e.first_name || e.last_name)) {
+          e.full_name = `${e.first_name || ''} ${e.last_name || ''}`.trim();
+        }
+        e.active_provider = e.current_provider || '';
+        e.active_program = e.program_name || '';
+        e.pipeline_stage = e.status || '';
+        e.notes = e.comments || '';
       }
       setEntity(e); setEditForm(e);
     }
@@ -118,24 +124,27 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
   const saveGeneral = async () => {
     setSaving(true);
     const useLeadFields = (sourceTable === 'leads' && entityType === 'customer') || entityType === 'lead';
-    const allowed = entityType === 'customer' && !useLeadFields
+    // When saving a lead-as-customer, use customer form field names (they're in editForm), then map to lead columns
+    const allowed = entityType === 'customer'
       ? ['full_name', 'company_name', 'phone', 'email', 'afm', 'address', 'city', 'active_provider', 'active_program', 'supply_number', 'pipeline_stage', 'notes', 'service_type', 'source', 'government_id']
       : ['first_name', 'last_name', 'phone', 'email', 'region', 'status', 'company_name', 'address', 'comments', 'customer_type', 'service_type', 'source', 'assigned_to', 'current_provider', 'program_name', 'government_id'];
     const payload: Record<string, any> = {};
     for (const k of allowed) { if (k in editForm) payload[k] = editForm[k]; }
-    // For leads used as customers, map full_name back to first/last
-    if (useLeadFields && payload.full_name) {
-      const parts = payload.full_name.split(' ');
-      payload.first_name = parts[0] || '';
-      payload.last_name = parts.slice(1).join(' ');
-      delete payload.full_name;
-    }
-    // Map customer field names to lead field names
-    if (useLeadFields) {
+    // For leads used as customers, map customer form field names → lead column names
+    if (useLeadFields && entityType === 'customer') {
+      if (payload.full_name) {
+        const parts = payload.full_name.split(' ');
+        payload.first_name = parts[0] || '';
+        payload.last_name = parts.slice(1).join(' ');
+        delete payload.full_name;
+      }
       if (payload.active_provider !== undefined) { payload.current_provider = payload.active_provider; delete payload.active_provider; }
       if (payload.active_program !== undefined) { payload.program_name = payload.active_program; delete payload.active_program; }
       if (payload.pipeline_stage !== undefined) delete payload.pipeline_stage;
       if (payload.notes !== undefined) { payload.comments = payload.notes; delete payload.notes; }
+      delete payload.afm;
+      delete payload.city;
+      delete payload.supply_number;
     }
     const { error } = await supabase.from(table).update(payload).eq('id', entityId);
     setSaving(false);

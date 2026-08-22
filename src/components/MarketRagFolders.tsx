@@ -99,22 +99,26 @@ export default function MarketRagFolders() {
     const { data, error } = await supabase.rpc('get_active_tariff_prices');
     if (error) {
       console.error('[MarketRagFolders] RPC error, falling back to direct query:', error);
-      const { data: fallback } = await supabase.rpc('get_active_tariff_prices');
+      const { data: fallback } = await supabase
+        .from('energy_tariffs')
+        .select('id, provider_name, program_name, customer_type, tariff_color, energy_type, official_url, requires_dual_zone_meter, is_active')
+        .eq('is_active', true)
+        .order('provider_name');
       if (fallback) {
         setTariffs(
           fallback.map((t: any) => ({
             tariff_id: t.id,
             provider_name: t.provider_name,
             program_name: t.program_name,
-            customer_type: t.customer_type,
-            tariff_color: t.tariff_color,
+            customer_type: typeof t.customer_type === 'string' ? t.customer_type : String(t.customer_type || 'B2C'),
+            tariff_color: typeof t.tariff_color === 'string' ? t.tariff_color : String(t.tariff_color || 'green'),
             energy_type: t.energy_type || 'electricity',
-            official_url: t.source_url,
-            requires_dual_zone_meter: false,
-            base_price_day: t.unit_rate_kwh,
+            official_url: t.official_url,
+            requires_dual_zone_meter: t.requires_dual_zone_meter || false,
+            base_price_day: null,
             base_price_night: null,
-            unit_rate_kwh: t.unit_rate_kwh,
-            fixed_fee_monthly: t.fixed_fee_monthly,
+            unit_rate_kwh: null,
+            fixed_fee_monthly: null,
             discounted_price_day: null,
             discounted_price_night: null,
             discount_conditions: null,

@@ -128,7 +128,7 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     const useLeadFields = (sourceTable === 'leads' && entityType === 'customer') || entityType === 'lead';
     // When saving a lead-as-customer, use customer form field names (they're in editForm), then map to lead columns
     const allowed = entityType === 'customer'
-      ? ['full_name', 'company_name', 'phone', 'email', 'afm', 'address', 'city', 'active_provider', 'active_program', 'supply_number', 'pipeline_stage', 'notes', 'service_type', 'source', 'government_id']
+      ? ['full_name', 'company_name', 'phone', 'email', 'afm', 'address', 'city', 'active_provider', 'active_program', 'supply_number', 'pipeline_stage', 'notes', 'service_type', 'source', 'government_id', 'customer_type']
       : ['first_name', 'last_name', 'phone', 'email', 'region', 'status', 'company_name', 'address', 'comments', 'customer_type', 'service_type', 'source', 'assigned_to', 'current_provider', 'program_name', 'government_id'];
     const payload: Record<string, any> = {};
     for (const k of allowed) { if (k in editForm) payload[k] = editForm[k]; }
@@ -279,6 +279,10 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
             { value: 'sent_to_provider', label: 'Απεσταλμένη στον Πάροχο' },
             { value: 'active', label: 'Ενεργή' },
             { value: 'rejected', label: 'Απορρίφθηκε' },
+          ])}
+          {getSelect('Τύπος', 'customer_type', [
+            { value: 'B2C', label: 'B2C (Ιδιώτης)' },
+            { value: 'B2B', label: 'B2B (Επιχείρηση)' },
           ])}
           {getTextarea('Σημειώσεις', 'notes')}
         </div>

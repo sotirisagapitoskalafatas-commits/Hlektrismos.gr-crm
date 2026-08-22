@@ -60,10 +60,10 @@ export default function SalesAgentsTab() {
     };
     if (editingId) {
       const { error } = await supabase.from('sales_agents').update(payload).eq('id', editingId);
-      if (error) { setToast({ msg: \`Σφάλμα: ${error.message}\`, type: 'error' }); return; }
+      if (error) { setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' }); return; }
     } else {
       const { error } = await supabase.from('sales_agents').insert({ ...payload, active: true });
-      if (error) { setToast({ msg: \`Σφάλμα: ${error.message}\`, type: 'error' }); return; }
+      if (error) { setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' }); return; }
     }
     setToast({ msg: 'Αποθηκεύτηκε.', type: 'success' });
     setShowAdd(false); setEditingId(null);

@@ -155,7 +155,6 @@ export default function CustomersTab() {
             Καθαρισμός
           </button>
         )}
-        </div>
       </div>
 
       {/* Add Customer Form */}

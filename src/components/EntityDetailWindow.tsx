@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Save, Plus, Trash2, Upload, Download, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Save, Plus, Trash2, Upload, Download, Maximize2, Minimize2, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SERVICES_LIST, PROVIDER_LIST, LEAD_SOURCES, getProgramsForProvider } from '../constants/energyData';
 
@@ -74,6 +74,8 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [showAddSupply, setShowAddSupply] = useState(false);
+  const [editingSupply, setEditingSupply] = useState<string | null>(null);
+  const [editSupply, setEditSupply] = useState<Record<string, any>>({});
   const [newSupply, setNewSupply] = useState({
     supply_number: '', provider_name: '', program_name: '',
     sales_agent_id: '', estimated_commission: '0', monthly_cost: '',
@@ -178,6 +180,34 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     if (!confirm('Διαγραφή παροχής;')) return;
     const { error } = await supabase.from('supply_points').delete().eq('id', id);
     if (!error) { setToast({ msg: 'Διαγράφηκε.', type: 'success' }); loadEntity(); }
+  };
+
+  const startEditSupply = (sp: SupplyPoint) => {
+    setEditingSupply(sp.id);
+    setEditSupply({
+      supply_number: sp.supply_number || '',
+      provider_name: sp.provider_name || '',
+      program_name: sp.program_name || '',
+      sales_agent_id: sp.sales_agent_id || '',
+      estimated_commission: sp.estimated_commission?.toString() || '0',
+      monthly_cost: sp.monthly_cost?.toString() || '',
+      status: sp.status || 'active',
+    });
+  };
+
+  const saveEditSupply = async () => {
+    if (!editingSupply) return;
+    const { error } = await supabase.from('supply_points').update({
+      supply_number: editSupply.supply_number,
+      provider_name: editSupply.provider_name || null,
+      program_name: editSupply.program_name || null,
+      sales_agent_id: editSupply.sales_agent_id || null,
+      estimated_commission: parseFloat(editSupply.estimated_commission) || 0,
+      monthly_cost: editSupply.monthly_cost ? parseFloat(editSupply.monthly_cost) : null,
+      status: editSupply.status || 'active',
+    }).eq('id', editingSupply);
+    if (error) setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' });
+    else { setToast({ msg: 'Ενημερώθηκε.', type: 'success' }); setEditingSupply(null); loadEntity(); }
   };
 
   const handleDocUpload = async (docType: string, file: File) => {
@@ -358,8 +388,49 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
             <tbody>
               {supplyPoints.map(sp => {
                 const agentName = agents.find(a => a.id === sp.sales_agent_id)?.full_name || '-';
+                const isEditing = editingSupply === sp.id;
+                if (isEditing) {
+                  return (
+                    <tr key={sp.id} style={{ borderBottom: '1px solid var(--border)', background: '#f0fdf4' }}>
+                      <td style={tdS}><input value={editSupply.supply_number} onChange={e => setEditSupply(p => ({ ...p, supply_number: e.target.value }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px' }} /></td>
+                      <td style={tdS}>
+                        <select value={editSupply.provider_name} onChange={e => setEditSupply(p => ({ ...p, provider_name: e.target.value, program_name: '' }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px' }}>
+                          <option value="">--</option>
+                          {PROVIDER_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </td>
+                      <td style={tdS}>
+                        <select value={editSupply.program_name} onChange={e => setEditSupply(p => ({ ...p, program_name: e.target.value }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px' }}>
+                          <option value="">--</option>
+                          {getProgramsForProvider(editSupply.provider_name).map((p, i) => (
+                            <option key={i} value={p.program}>{p.program}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={tdS}>
+                        <select value={editSupply.sales_agent_id} onChange={e => setEditSupply(p => ({ ...p, sales_agent_id: e.target.value }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px' }}>
+                          <option value="">--</option>
+                          {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                        </select>
+                      </td>
+                      <td style={tdS}>
+                        <select value={editSupply.status} onChange={e => setEditSupply(p => ({ ...p, status: e.target.value }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px' }}>
+                          <option value="active">active</option>
+                          <option value="pending">pending</option>
+                          <option value="inactive">inactive</option>
+                        </select>
+                      </td>
+                      <td style={tdS}><input type="number" value={editSupply.estimated_commission} onChange={e => setEditSupply(p => ({ ...p, estimated_commission: e.target.value }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px', width: 70 }} /></td>
+                      <td style={tdS}><input type="number" value={editSupply.monthly_cost} onChange={e => setEditSupply(p => ({ ...p, monthly_cost: e.target.value }))} style={{ ...inputS, fontSize: 12, padding: '4px 6px', width: 70 }} /></td>
+                      <td style={{ ...tdS, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button onClick={saveEditSupply} style={{ ...btnP, fontSize: 10, padding: '3px 6px', marginRight: 4 }}>Αποθ.</button>
+                        <button onClick={() => setEditingSupply(null)} style={{ padding: '3px 6px', borderRadius: 4, border: 'none', background: '#e5e7eb', color: '#374151', fontSize: 10, cursor: 'pointer' }}>Ακύρ.</button>
+                      </td>
+                    </tr>
+                  );
+                }
                 return (
-                  <tr key={sp.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr key={sp.id} style={{ borderBottom: '1px solid var(--border)' }} onDoubleClick={() => startEditSupply(sp)}>
                     <td style={tdS}><strong>{sp.supply_number}</strong></td>
                     <td style={tdS}>{sp.provider_name || '-'}</td>
                     <td style={tdS}>{sp.program_name || '-'}</td>
@@ -373,7 +444,8 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
                     </td>
                     <td style={{ ...tdS, fontVariantNumeric: 'tabular-nums' }}>{sp.estimated_commission > 0 ? `€${sp.estimated_commission.toFixed(2)}` : '-'}</td>
                     <td style={{ ...tdS, fontVariantNumeric: 'tabular-nums' }}>{sp.monthly_cost ? `€${sp.monthly_cost.toFixed(2)}` : '-'}</td>
-                    <td style={{ ...tdS, textAlign: 'center' }}>
+                    <td style={{ ...tdS, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => startEditSupply(sp)} style={{ ...btnP, fontSize: 10, padding: '3px 6px', marginRight: 4 }}><Pencil size={10} /></button>
                       <button onClick={() => deleteSupplyPoint(sp.id)} style={btnD}><Trash2 size={12} /></button>
                     </td>
                   </tr>

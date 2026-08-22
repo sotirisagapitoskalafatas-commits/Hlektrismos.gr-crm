@@ -140,7 +140,7 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
       }
       if (payload.active_provider !== undefined) { payload.current_provider = payload.active_provider; delete payload.active_provider; }
       if (payload.active_program !== undefined) { payload.program_name = payload.active_program; delete payload.active_program; }
-      if (payload.pipeline_stage !== undefined) delete payload.pipeline_stage;
+      if (payload.pipeline_stage !== undefined) { payload.status = payload.pipeline_stage; delete payload.pipeline_stage; }
       if (payload.notes !== undefined) { payload.comments = payload.notes; delete payload.notes; }
       delete payload.afm;
       delete payload.city;

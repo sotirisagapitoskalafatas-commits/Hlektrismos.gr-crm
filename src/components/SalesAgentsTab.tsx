@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserPlus, Trash2, Edit2, Save, X, TrendingUp, DollarSign, Award } from 'lucide-react';
+import { UserPlus, Trash2, Edit2, Save, X, TrendingUp, DollarSign, Award, Building2, Briefcase } from 'lucide-react';
 import { PROVIDER_LIST } from '../constants/energyData';
 
 interface SalesAgent {
   id: string; full_name: string; email: string | null; phone: string | null;
-  role: string; active: boolean; target_providers: string[] | null;
+  role: string; active: boolean; agent_type: string; target_providers: string[] | null;
   commission_rate_pct: number | null; notes: string | null; created_at: string;
+}
+
+interface AgentProviderCommission {
+  id?: string; agent_id: string; provider_name: string;
+  fixed_rate: number; per_kwh_rate: number;
 }
 
 const inputS: React.CSSProperties = {
@@ -14,6 +19,12 @@ const inputS: React.CSSProperties = {
   fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box',
 };
 const labelS: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 3 };
+const thS: React.CSSProperties = { padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap' };
+const tdS: React.CSSProperties = { padding: '5px 10px', fontSize: 11, borderBottom: '1px solid var(--border)' };
+const miniInput: React.CSSProperties = {
+  width: 80, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4,
+  fontSize: 11, background: 'var(--surface)', color: 'var(--text)', outline: 'none', textAlign: 'right',
+};
 
 export default function SalesAgentsTab() {
   const [agents, setAgents] = useState<SalesAgent[]>([]);
@@ -22,9 +33,10 @@ export default function SalesAgentsTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [form, setForm] = useState<Record<string, any>>({
-    full_name: '', email: '', phone: '', role: 'sales',
-    commission_rate_pct: '10', target_providers: [], notes: '',
+    full_name: '', email: '', phone: '', role: 'sales', agent_type: 'employee',
+    target_providers: [], notes: '',
   });
+  const [providerCommissions, setProviderCommissions] = useState<Record<string, { fixed_rate: string; per_kwh_rate: string }>>({});
   const [stats, setStats] = useState<Record<string, { total_commission: number; supply_count: number }>>({});
 
   useEffect(() => { loadAgents(); }, []);
@@ -50,25 +62,57 @@ export default function SalesAgentsTab() {
     setLoading(false);
   };
 
+  const loadProviderCommissions = async (agentId: string) => {
+    const { data } = await supabase.from('agent_provider_commissions').select('*').eq('agent_id', agentId);
+    if (data) {
+      const map: Record<string, { fixed_rate: string; per_kwh_rate: string }> = {};
+      for (const c of data as AgentProviderCommission[]) {
+        map[c.provider_name] = { fixed_rate: String(c.fixed_rate ?? 0), per_kwh_rate: String(c.per_kwh_rate ?? 0) };
+      }
+      setProviderCommissions(map);
+    }
+  };
+
+  const saveProviderCommissions = async (agentId: string) => {
+    await supabase.from('agent_provider_commissions').delete().eq('agent_id', agentId);
+    const rows: Omit<AgentProviderCommission, 'id'>[] = Object.entries(providerCommissions)
+      .filter(([_, v]) => parseFloat(v.fixed_rate) > 0 || parseFloat(v.per_kwh_rate) > 0)
+      .map(([provider, v]) => ({
+        agent_id: agentId, provider_name: provider,
+        fixed_rate: parseFloat(v.fixed_rate) || 0,
+        per_kwh_rate: parseFloat(v.per_kwh_rate) || 0,
+      }));
+    if (rows.length > 0) {
+      await supabase.from('agent_provider_commissions').insert(rows);
+    }
+  };
+
   const handleSave = async () => {
     if (!form.full_name.trim()) return;
     const payload = {
       full_name: form.full_name.trim(), email: form.email || null, phone: form.phone || null,
-      role: form.role, commission_rate_pct: parseFloat(form.commission_rate_pct) || 10,
+      role: form.role, agent_type: form.agent_type,
       target_providers: form.target_providers?.length ? form.target_providers : null,
       notes: form.notes || null,
     };
     if (editingId) {
       const { error } = await supabase.from('sales_agents').update(payload).eq('id', editingId);
-      if (error) { setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' }); return; }
+      if (error) { setToast({ msg: String(error.message), type: 'error' }); return; }
+      await saveProviderCommissions(editingId);
     } else {
-      const { error } = await supabase.from('sales_agents').insert({ ...payload, active: true });
-      if (error) { setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' }); return; }
+      const { data, error } = await supabase.from('sales_agents').insert({ ...payload, active: true }).select('id').single();
+      if (error) { setToast({ msg: String(error.message), type: 'error' }); return; }
+      if (data?.id) await saveProviderCommissions(data.id);
     }
     setToast({ msg: 'Αποθηκεύτηκε.', type: 'success' });
     setShowAdd(false); setEditingId(null);
-    setForm({ full_name: '', email: '', phone: '', role: 'sales', commission_rate_pct: '10', target_providers: [], notes: '' });
+    resetForm();
     loadAgents();
+  };
+
+  const resetForm = () => {
+    setForm({ full_name: '', email: '', phone: '', role: 'sales', agent_type: 'employee', target_providers: [], notes: '' });
+    setProviderCommissions({});
   };
 
   const handleDelete = async (id: string) => {
@@ -77,21 +121,34 @@ export default function SalesAgentsTab() {
     if (!error) { setToast({ msg: 'Απενεργοποιήθηκε.', type: 'success' }); loadAgents(); }
   };
 
-  const startEdit = (agent: SalesAgent) => {
+  const startEdit = async (agent: SalesAgent) => {
     setEditingId(agent.id);
     setForm({
       full_name: agent.full_name, email: agent.email || '', phone: agent.phone || '',
-      role: agent.role, commission_rate_pct: String(agent.commission_rate_pct || 10),
+      role: agent.role, agent_type: agent.agent_type || 'employee',
       target_providers: agent.target_providers || [], notes: agent.notes || '',
     });
+    await loadProviderCommissions(agent.id);
     setShowAdd(true);
   };
 
   const toggleProvider = (p: string) => {
     setForm(f => {
       const curr = f.target_providers || [];
-      return { ...f, target_providers: curr.includes(p) ? curr.filter((x: string) => x !== p) : [...curr, p] };
+      const next = curr.includes(p) ? curr.filter((x: string) => x !== p) : [...curr, p];
+      return { ...f, target_providers: next };
     });
+    setProviderCommissions(pc => {
+      if (pc[p]) { const copy = { ...pc }; delete copy[p]; return copy; }
+      return pc;
+    });
+  };
+
+  const updateProviderCommission = (provider: string, field: 'fixed_rate' | 'per_kwh_rate', value: string) => {
+    setProviderCommissions(pc => ({
+      ...pc,
+      [provider]: { ...(pc[provider] || { fixed_rate: '0', per_kwh_rate: '0' }), [field]: value },
+    }));
   };
 
   const totalCommission = agents.reduce((sum, a) => sum + (stats[a.id]?.total_commission || 0), 0);
@@ -108,12 +165,13 @@ export default function SalesAgentsTab() {
           {toast.msg}
         </div>
       )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Award size={18} style={{ color: '#f59e0b' }} /> Πωλητές & Προμήθειες
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>Διαχείριση πωλητών, αποτελέσματα, προμήθειες</p>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>Διαχείριση πωλητών, αποτελέσματα, προμήθειες ανά πάροχο</p>
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 20, fontSize: 12 }}>
@@ -121,7 +179,7 @@ export default function SalesAgentsTab() {
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#10b981' }}><DollarSign size={14} /> €{totalCommission.toFixed(2)}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#3b82f6' }}><TrendingUp size={14} /> {totalSupplies} παροχές</span>
           </div>
-          <button onClick={() => { setShowAdd(!showAdd); setEditingId(null); setForm({ full_name: '', email: '', phone: '', role: 'sales', commission_rate_pct: '10', target_providers: [], notes: '' }); }}
+          <button onClick={() => { setShowAdd(!showAdd); setEditingId(null); resetForm(); }}
             style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
             <UserPlus size={13} /> Νέος Πωλητής
           </button>
@@ -134,6 +192,7 @@ export default function SalesAgentsTab() {
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0369a1' }}>{editingId ? 'Επεξεργασία' : 'Προσθήκη'} Πωλητή</h3>
             <button onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#0369a1' }}><X size={16} /></button>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             <div><label style={labelS}>Ονοματεπώνυμο *</label><input value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} style={inputS} /></div>
             <div><label style={labelS}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inputS} /></div>
@@ -141,11 +200,18 @@ export default function SalesAgentsTab() {
             <div><label style={labelS}>Ρόλος</label><select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={inputS}>
               <option value="sales">Πωλητής</option><option value="admin">Admin</option><option value="management">Διοίκηση</option>
             </select></div>
-            <div><label style={labelS}>Ποσοστό Προμήθειας (%)</label><input type="number" value={form.commission_rate_pct} onChange={e => setForm(f => ({ ...f, commission_rate_pct: e.target.value }))} style={inputS} /></div>
+            <div>
+              <label style={labelS}>Τύπος Υπαλλήλου</label>
+              <select value={form.agent_type} onChange={e => setForm(f => ({ ...f, agent_type: e.target.value }))} style={inputS}>
+                <option value="employee"><Briefcase size={10} /> Εργαζόμενος</option>
+                <option value="contractor"><Building2 size={10} /> Εξωτερικός Συνεργάτης</option>
+              </select>
+            </div>
             <div style={{ gridColumn: 'span 3' }}><label style={labelS}>Σημειώσεις</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inputS, resize: 'vertical' }} /></div>
           </div>
+
           <div style={{ marginTop: 10 }}>
-            <label style={labelS}>Τομείς Ενδιαφέροντος (Πάροχοι)</label>
+            <label style={labelS}>Τομείς Ενδιαφέροντος (Πάροχοι) — κλικ για ενεργοποίηση προμήθειας</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
               {PROVIDER_LIST.map(p => (
                 <button key={p} onClick={() => toggleProvider(p)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 11, cursor: 'pointer',
@@ -157,6 +223,49 @@ export default function SalesAgentsTab() {
               ))}
             </div>
           </div>
+
+          {form.target_providers && form.target_providers.length > 0 && (
+            <div style={{ marginTop: 12, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '8px 12px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
+                Προμήθειες ανά Πάροχο
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thS}>Πάροχος</th>
+                    <th style={{ ...thS, textAlign: 'center' }}>B2C Σταθερή (€/πελάτη)</th>
+                    <th style={{ ...thS, textAlign: 'center' }}>B2B Μεταβλητή (€/kWh)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.target_providers.map((p: string) => (
+                    <tr key={p}>
+                      <td style={tdS}>
+                        <span style={{ fontWeight: 600 }}>{p}</span>
+                      </td>
+                      <td style={{ ...tdS, textAlign: 'center' }}>
+                        <input
+                          type="number" step="0.01" min="0"
+                          value={providerCommissions[p]?.fixed_rate || '0'}
+                          onChange={e => updateProviderCommission(p, 'fixed_rate', e.target.value)}
+                          style={miniInput}
+                        />
+                      </td>
+                      <td style={{ ...tdS, textAlign: 'center' }}>
+                        <input
+                          type="number" step="0.001" min="0"
+                          value={providerCommissions[p]?.per_kwh_rate || '0'}
+                          onChange={e => updateProviderCommission(p, 'per_kwh_rate', e.target.value)}
+                          style={miniInput}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={handleSave} disabled={!form.full_name.trim()} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: form.full_name.trim() ? 'var(--primary)' : '#94a3b8', color: '#fff', fontSize: 12, fontWeight: 600, cursor: form.full_name.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Save size={13} /> {editingId ? 'Ενημέρωση' : 'Αποθήκευση'}
@@ -177,7 +286,14 @@ export default function SalesAgentsTab() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{a.full_name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.role}</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+                      background: a.agent_type === 'contractor' ? '#fef3c7' : '#dbeafe',
+                      color: a.agent_type === 'contractor' ? '#92400e' : '#1e40af' }}>
+                      {a.agent_type === 'contractor' ? 'Εξωτερικός' : 'Εργαζόμενος'}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{a.role}</span>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button onClick={() => startEdit(a)} style={{ padding: 4, borderRadius: 4, border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer' }}><Edit2 size={12} /></button>
@@ -196,10 +312,6 @@ export default function SalesAgentsTab() {
                 <div style={{ textAlign: 'center', flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 16, color: '#10b981' }}>€{(stats[a.id]?.total_commission || 0).toFixed(2)}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Προμήθεια</div>
-                </div>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{a.commission_rate_pct || 10}%</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Rate</div>
                 </div>
               </div>
               {a.target_providers && a.target_providers.length > 0 && (

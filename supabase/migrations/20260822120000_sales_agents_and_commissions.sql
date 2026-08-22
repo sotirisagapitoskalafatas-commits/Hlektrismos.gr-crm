@@ -49,12 +49,18 @@ CREATE POLICY "Allow all on agent_provider_commissions" ON agent_provider_commis
 CREATE TABLE IF NOT EXISTS customer_agent_attribution (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL,
+  agent_id uuid REFERENCES sales_agents(id) ON DELETE SET NULL,
   customer_type text NOT NULL DEFAULT 'customer', -- 'lead' or 'customer'
-  agent_id uuid REFERENCES sales_agents(id) ON DELETE CASCADE,
-  attribution_percent numeric(5,2) DEFAULT 100.00,
-  commission_amount numeric(10,2) DEFAULT 0,
+  attribution_type text DEFAULT 'primary', -- 'primary', 'secondary', 'referral'
+  commission_pct numeric(5,2) DEFAULT 100.00,
+  notes text,
   created_at timestamptz DEFAULT now()
 );
+-- Add customer_type column if it doesn't exist (table may have been created by earlier migration)
+DO $$ BEGIN
+  ALTER TABLE customer_agent_attribution ADD COLUMN customer_type text NOT NULL DEFAULT 'customer';
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
 ALTER TABLE customer_agent_attribution ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all on customer_agent_attribution" ON customer_agent_attribution FOR ALL USING (true);
 
@@ -71,6 +77,10 @@ CREATE TABLE IF NOT EXISTS customer_commissions_ledger (
   notes text,
   created_at timestamptz DEFAULT now()
 );
+-- Add missing columns if table was created by earlier migration
+DO $$ BEGIN ALTER TABLE customer_commissions_ledger ADD COLUMN status text DEFAULT 'pending'; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE customer_commissions_ledger ADD COLUMN approved_at timestamptz; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE customer_commissions_ledger ADD COLUMN paid_at timestamptz; EXCEPTION WHEN duplicate_column THEN null; END $$;
 ALTER TABLE customer_commissions_ledger ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all on customer_commissions_ledger" ON customer_commissions_ledger FOR ALL USING (true);
 
@@ -86,17 +96,21 @@ CREATE TABLE IF NOT EXISTS customer_documents (
   uploaded_by text,
   created_at timestamptz DEFAULT now()
 );
+DO $$ BEGIN
+  ALTER TABLE customer_documents ADD COLUMN customer_type text NOT NULL DEFAULT 'customer';
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
 ALTER TABLE customer_documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all on customer_documents" ON customer_documents FOR ALL USING (true);
 
--- 8. Create indexes
-CREATE INDEX IF NOT EXISTS idx_sales_agents_active ON sales_agents(active);
-CREATE INDEX IF NOT EXISTS idx_agent_commissions_agent ON agent_provider_commissions(agent_id);
-CREATE INDEX IF NOT EXISTS idx_customer_attribution_customer ON customer_agent_attribution(customer_id, customer_type);
-CREATE INDEX IF NOT EXISTS idx_commissions_ledger_status ON customer_commissions_ledger(status);
-CREATE INDEX IF NOT EXISTS idx_customer_documents_customer ON customer_documents(customer_id, customer_type);
-CREATE INDEX IF NOT EXISTS idx_hlektrismos_leads_service_type ON hlektrismos_leads(service_type);
-CREATE INDEX IF NOT EXISTS idx_hlektrismos_leads_source ON hlektrismos_leads(source);
+-- 8. Create indexes (safe - wrap in exception handlers for existing tables)
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_sales_agents_active ON sales_agents(active); EXCEPTION WHEN undefined_column THEN null; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_agent_commissions_agent ON agent_provider_commissions(agent_id); EXCEPTION WHEN undefined_column THEN null; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_customer_attribution_customer ON customer_agent_attribution(customer_id, customer_type); EXCEPTION WHEN undefined_column THEN null; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_commissions_ledger_status ON customer_commissions_ledger(status); EXCEPTION WHEN undefined_column THEN null; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_customer_documents_customer ON customer_documents(customer_id, customer_type); EXCEPTION WHEN undefined_column THEN null; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_hlektrismos_leads_service_type ON hlektrismos_leads(service_type); EXCEPTION WHEN undefined_column THEN null; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_hlektrismos_leads_source ON hlektrismos_leads(source); EXCEPTION WHEN undefined_column THEN null; END $$;
 
 -- 9. Create calculate_commission_for_customer function
 CREATE OR REPLACE FUNCTION calculate_commission_for_customer(

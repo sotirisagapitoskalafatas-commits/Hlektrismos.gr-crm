@@ -21,6 +21,7 @@ interface Agent { id: string; full_name: string; }
 interface EntityDetailWindowProps {
   entityId: string;
   entityType: 'lead' | 'customer';
+  sourceTable?: 'leads' | 'customers';
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -61,7 +62,7 @@ const tdS: React.CSSProperties = {
   padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text)',
 };
 
-export default function EntityDetailWindow({ entityId, entityType, onClose, onSaved }: EntityDetailWindowProps) {
+export default function EntityDetailWindow({ entityId, entityType, sourceTable, onClose, onSaved }: EntityDetailWindowProps) {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [entity, setEntity] = useState<any>(null);
@@ -79,7 +80,7 @@ export default function EntityDetailWindow({ entityId, entityType, onClose, onSa
   });
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
 
-  const table = entityType === 'customer' ? 'hlektrismos_customers' : 'hlektrismos_leads';
+  const table = sourceTable === 'leads' ? 'hlektrismos_leads' : entityType === 'customer' ? 'hlektrismos_customers' : 'hlektrismos_leads';
 
   const loadEntity = useCallback(async () => {
     setLoading(true);
@@ -89,7 +90,14 @@ export default function EntityDetailWindow({ entityId, entityType, onClose, onSa
       supabase.from('entity_documents').select('*').eq('entity_id', entityId).eq('entity_type', entityType).order('created_at', { ascending: false }),
       supabase.from('sales_agents').select('id, full_name').eq('active', true),
     ]);
-    if (entityRes.data) { setEntity(entityRes.data); setEditForm(entityRes.data); }
+    if (entityRes.data) {
+      const e = entityRes.data;
+      // If lead used as customer, normalize name fields
+      if (entityType === 'customer' && !e.full_name && (e.first_name || e.last_name)) {
+        e.full_name = `${e.first_name || ''} ${e.last_name || ''}`.trim();
+      }
+      setEntity(e); setEditForm(e);
+    }
     if (supplyRes.data) setSupplyPoints(supplyRes.data as SupplyPoint[]);
     if (docsRes.data) setDocuments(docsRes.data as EntityDocument[]);
     if (agentsRes.data) setAgents(agentsRes.data as Agent[]);
@@ -100,7 +108,7 @@ export default function EntityDetailWindow({ entityId, entityType, onClose, onSa
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); } }, [toast]);
 
   const entityName = entityType === 'customer'
-    ? (entity?.full_name || 'Πελάτης')
+    ? (entity?.full_name || `${entity?.first_name || ''} ${entity?.last_name || ''}`.trim() || 'Πελάτης')
     : `${entity?.first_name || ''} ${entity?.last_name || ''}`.trim() || 'Lead';
 
   const currentProvider = editForm.current_provider || editForm.active_provider || '';
@@ -109,11 +117,26 @@ export default function EntityDetailWindow({ entityId, entityType, onClose, onSa
 
   const saveGeneral = async () => {
     setSaving(true);
-    const allowed = entityType === 'customer'
+    const useLeadFields = (sourceTable === 'leads' && entityType === 'customer') || entityType === 'lead';
+    const allowed = entityType === 'customer' && !useLeadFields
       ? ['full_name', 'company_name', 'phone', 'email', 'afm', 'address', 'city', 'active_provider', 'active_program', 'supply_number', 'pipeline_stage', 'notes', 'service_type', 'source', 'government_id']
       : ['first_name', 'last_name', 'phone', 'email', 'region', 'status', 'company_name', 'address', 'comments', 'customer_type', 'service_type', 'source', 'assigned_to', 'current_provider', 'program_name', 'government_id'];
     const payload: Record<string, any> = {};
     for (const k of allowed) { if (k in editForm) payload[k] = editForm[k]; }
+    // For leads used as customers, map full_name back to first/last
+    if (useLeadFields && payload.full_name) {
+      const parts = payload.full_name.split(' ');
+      payload.first_name = parts[0] || '';
+      payload.last_name = parts.slice(1).join(' ');
+      delete payload.full_name;
+    }
+    // Map customer field names to lead field names
+    if (useLeadFields) {
+      if (payload.active_provider !== undefined) { payload.current_provider = payload.active_provider; delete payload.active_provider; }
+      if (payload.active_program !== undefined) { payload.program_name = payload.active_program; delete payload.active_program; }
+      if (payload.pipeline_stage !== undefined) delete payload.pipeline_stage;
+      if (payload.notes !== undefined) { payload.comments = payload.notes; delete payload.notes; }
+    }
     const { error } = await supabase.from(table).update(payload).eq('id', entityId);
     setSaving(false);
     if (error) setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' });

@@ -12,7 +12,9 @@ export default function CustomersTab() {
   const [filterServiceType, setFilterServiceType] = useState('all');
   const [filterProvider, setFilterProvider] = useState('all');
   const [filterSource, setFilterSource] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  const [selectedSourceTable, setSelectedSourceTable] = useState<'leads' | 'customers'>('customers');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCustomer, setNewCustomer] = useState<Record<string, string>>({
     full_name: '', company_name: '', afm: '', phone: '', email: '',
@@ -54,7 +56,8 @@ export default function CustomersTab() {
     const matchServiceType = filterServiceType === 'all' || c.service_type === filterServiceType;
     const matchProvider = filterProvider === 'all' || c.active_provider === filterProvider;
     const matchSource = filterSource === 'all' || c.source === filterSource;
-    return matchSearch && matchType && matchServiceType && matchProvider && matchSource;
+    const matchStatus = filterStatus === 'all' || c.pipeline_stage === filterStatus || c.contract_status === filterStatus;
+    return matchSearch && matchType && matchServiceType && matchProvider && matchSource && matchStatus;
   });
 
   const badgeColor = (s: string) => {
@@ -149,8 +152,19 @@ export default function CustomersTab() {
           <option value="all">Πηγή: Όλες</option>
           {LEAD_SOURCES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
-        {(filterServiceType !== 'all' || filterProvider !== 'all' || filterSource !== 'all') && (
-          <button onClick={() => { setFilterServiceType('all'); setFilterProvider('all'); setFilterSource('all'); }}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 11, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer' }}>
+          <option value="all">Κατάσταση: Όλες</option>
+          <option value="active">Ενεργό</option>
+          <option value="expiring_soon">Λήγει Σύντομα</option>
+          <option value="expired">Έληξε</option>
+          <option value="intro">Εισαγωγή</option>
+          <option value="proposal">Προσφορά</option>
+          <option value="won">Κερδισμένο</option>
+          <option value="lost">Χαμένο</option>
+        </select>
+        {(filterServiceType !== 'all' || filterProvider !== 'all' || filterSource !== 'all' || filterStatus !== 'all') && (
+          <button onClick={() => { setFilterServiceType('all'); setFilterProvider('all'); setFilterSource('all'); setFilterStatus('all'); }}
             style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: 'var(--primary, #6366f1)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
             Καθαρισμός
           </button>
@@ -206,7 +220,7 @@ export default function CustomersTab() {
           {filtered.map(c => {
             const bc = badgeColor(c.contract_status);
             return (
-              <div key={c.id} onClick={() => setSelectedCustomer(c.id)} style={{
+              <div key={c.id} onClick={() => { setSelectedCustomer(c.id); setSelectedSourceTable(c._source_table || 'customers'); }} style={{
                 padding: 18, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
                 cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 10,
               }}
@@ -266,7 +280,7 @@ export default function CustomersTab() {
       )}
 
       {selectedCustomer && (
-        <EntityDetailWindow entityId={selectedCustomer} entityType="customer" onClose={() => setSelectedCustomer(null)} onSaved={fetchCustomers} />
+        <EntityDetailWindow entityId={selectedCustomer} entityType="customer" sourceTable={selectedSourceTable} onClose={() => setSelectedCustomer(null)} onSaved={fetchCustomers} />
       )}
     </div>
   );

@@ -40,7 +40,6 @@ import { useAuth } from '@/hooks/useAuth';
 import SettingsPanel from '@/components/SettingsPanel';
 import DocumentGenerator from '@/components/DocumentGenerator';
 import CustomersTab from '@/components/CustomersTab';
-import LeadDetailSlideout from '@/components/LeadDetailSlideout';
 import MarketRagFolders from '@/components/MarketRagFolders';
 import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 import NotificationBell from '@/components/NotificationBell';
@@ -239,13 +238,9 @@ export default function DashboardPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [confirmDeleteAgentId, setConfirmDeleteAgentId] = useState<string | null>(null);
-  const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [openLeadFolder, setOpenLeadFolder] = useState<string | null>(null);
   const [showAddLead, setShowAddLead] = useState(false);
   const [newLead, setNewLead] = useState<Record<string, string>>({ first_name: '', last_name: '', email: '', phone: '', region: '', customer_type: 'B2C' });
-  const [billUrls, setBillUrls] = useState<Array<{ url: string; name: string; type: string; size: number }>>([]);
-  const [billLoading, setBillLoading] = useState(false);
-  const [billError, setBillError] = useState<string | null>(null);
 
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -311,49 +306,6 @@ export default function DashboardPage() {
     };
     loadTheme();
   }, []);
-
-  // Fetch a signed URL for the uploaded bill whenever a lead detail is opened.
-  useEffect(() => {
-    if (!openLead) {
-      setBillUrls([]);
-      setBillError(null);
-      setBillLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setBillLoading(true);
-    setBillError(null);
-    setBillUrls([]);
-
-    const filesToLoad = openLead.bill_files && openLead.bill_files.length > 0
-      ? openLead.bill_files
-      : openLead.bill_file_path
-        ? [{ path: openLead.bill_file_path, name: openLead.bill_file_name || 'Λογαριασμός', type: 'application/pdf', size: 0 }]
-        : [];
-
-    if (filesToLoad.length === 0) {
-      setBillLoading(false);
-      return;
-    }
-
-    (async () => {
-      const results: Array<{ url: string; name: string; type: string; size: number }> = [];
-      for (const file of filesToLoad) {
-        const { data, error } = await supabase.storage
-          .from('energy-bills')
-          .createSignedUrl(file.path, 60 * 10);
-        if (cancelled) return;
-        if (!error && data?.signedUrl) {
-          results.push({ url: data.signedUrl, name: file.name, type: file.type, size: file.size });
-        }
-      }
-      if (!cancelled) {
-        setBillUrls(results);
-        setBillLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [openLead]);
 
   // Conversation management functions
   const createNewConversation = () => {
@@ -1284,7 +1236,7 @@ export default function DashboardPage() {
                         {filteredLeads.map((l) => {
                           const aiOk = canActivateAI(l);
                           return (
-                            <tr key={l.id} className="dash-row-clickable" style={selectedLeads.has(l.id) ? { background: 'rgba(0,102,204,0.06)' } : undefined} onClick={() => setOpenLead(l)}>
+                            <tr key={l.id} className="dash-row-clickable" style={selectedLeads.has(l.id) ? { background: 'rgba(0,102,204,0.06)' } : undefined} onClick={() => setOpenLeadFolder(l.id)}>
                               <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                                 <input
                                   type="checkbox"
@@ -1294,7 +1246,7 @@ export default function DashboardPage() {
                                 />
                               </td>
                               <td>
-                                <button className="dash-lead-name-btn" onClick={(e) => { e.stopPropagation(); setOpenLead(l); }}>
+                                <button className="dash-lead-name-btn" onClick={(e) => { e.stopPropagation(); setOpenLeadFolder(l.id); }}>
                                   {l.first_name} {l.last_name}
                                 </button>
                               </td>
@@ -1628,14 +1580,6 @@ export default function DashboardPage() {
 
       {configAgent && (
         <AgentConfigDrawer agent={configAgent} onClose={() => setConfigAgent(null)} onSave={saveAgentConfig} />
-      )}
-
-      {openLead && (
-        <LeadDetailSlideout
-          lead={openLead}
-          onClose={() => setOpenLead(null)}
-          crmUsers={crmUsers}
-        />
       )}
 
       {openLeadFolder && (
@@ -3300,7 +3244,7 @@ function FollowUpFolder({ leads, crmUsers, toast, setToast, loadData }: {
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'follow_up' | 'customer' | 'lost'>('all');
-  const [openLead, setOpenLead] = useState<Lead | null>(null);
+  const [openLeadFolder, setOpenLeadFolder] = useState<string | null>(null);
 
   // Filter: exclude deleted, focus on follow_up/customer/lost + new/contacted/qualified (pipeline)
   const followUpLeads = leads.filter(l => {
@@ -3424,9 +3368,9 @@ function FollowUpFolder({ leads, crmUsers, toast, setToast, loadData }: {
           </thead>
           <tbody>
             {followUpLeads.map(l => (
-              <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLead(l)}>
+              <tr key={l.id} className="dash-row-clickable" onClick={() => setOpenLeadFolder(l.id)}>
                 <td>
-                  <button className="dash-lead-name-btn" onClick={e => { e.stopPropagation(); setOpenLead(l); }}>
+                  <button className="dash-lead-name-btn" onClick={e => { e.stopPropagation(); setOpenLeadFolder(l.id); }}>
                     {l.first_name} {l.last_name}
                   </button>
                 </td>
@@ -3457,7 +3401,7 @@ function FollowUpFolder({ leads, crmUsers, toast, setToast, loadData }: {
                 </td>
                 <td onClick={e => e.stopPropagation()}>
                   <button
-                    onClick={() => setOpenLead(l)}
+                    onClick={() => setOpenLeadFolder(l.id)}
                     style={{
                       padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                       border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)',
@@ -3476,12 +3420,13 @@ function FollowUpFolder({ leads, crmUsers, toast, setToast, loadData }: {
         </table>
       </div>
 
-      {/* Lead Detail Slideout */}
-      {openLead && (
-        <LeadDetailSlideout
-          lead={openLead}
-          onClose={() => { setOpenLead(null); loadData(); }}
-          crmUsers={crmUsers}
+      {/* Lead Detail Folder */}
+      {openLeadFolder && (
+        <EntityDetailWindow
+          entityId={openLeadFolder}
+          entityType="lead"
+          onClose={() => { setOpenLeadFolder(null); loadData(); }}
+          onSaved={loadData}
         />
       )}
     </div>

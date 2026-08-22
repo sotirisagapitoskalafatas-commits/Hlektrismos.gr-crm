@@ -47,6 +47,10 @@ import NotificationBell from '@/components/NotificationBell';
 import CalendarView from '@/components/CalendarView';
 import MarketRAGSearch from '@/components/MarketRAGSearch';
 import LiveVoiceSupervisor from '@/components/LiveVoiceSupervisor';
+import EntityDetailWindow from '@/components/EntityDetailWindow';
+import { SERVICES_LIST, PROVIDER_LIST, LEAD_SOURCES } from '@/constants/energyData';
+import SalesAgentsTab from '@/components/SalesAgentsTab';
+import ProvidersCommissionsTab from '@/components/ProvidersCommissionsTab';
 
 type Lead = {
   id: string;
@@ -79,6 +83,9 @@ type Lead = {
   company_name?: string | null;
   monthly_kwh?: number | null;
   consumption_kwh?: number | null;
+  service_type?: string | null;
+  source?: string | null;
+  government_id?: string | null;
 };
 
 type Agent = {
@@ -128,7 +135,7 @@ type Tariff = {
   created_at: string;
 };
 
-type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns' | 'followup' | 'voice-supervisor';
+type Tab = 'overview' | 'agents' | 'leads' | 'sources' | 'market' | 'hub' | 'reports' | 'users' | 'scraper' | 'orchestrator' | 'settings' | 'email' | 'documents' | 'calendar' | 'market-search' | 'campaigns' | 'followup' | 'voice-supervisor' | 'providers-commissions' | 'sales-agents';
 
 const greekRegions = [
   'Όλη η Ελλάδα',
@@ -220,6 +227,9 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [filterServiceType, setFilterServiceType] = useState('all');
+  const [filterProvider, setFilterProvider] = useState('all');
+  const [filterSource, setFilterSource] = useState('all');
   const [configAgent, setConfigAgent] = useState<Agent | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -230,6 +240,9 @@ export default function DashboardPage() {
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [confirmDeleteAgentId, setConfirmDeleteAgentId] = useState<string | null>(null);
   const [openLead, setOpenLead] = useState<Lead | null>(null);
+  const [openLeadFolder, setOpenLeadFolder] = useState<string | null>(null);
+  const [showAddLead, setShowAddLead] = useState(false);
+  const [newLead, setNewLead] = useState<Record<string, string>>({ first_name: '', last_name: '', email: '', phone: '', region: '', customer_type: 'B2C' });
   const [billUrls, setBillUrls] = useState<Array<{ url: string; name: string; type: string; size: number }>>([]);
   const [billLoading, setBillLoading] = useState(false);
   const [billError, setBillError] = useState<string | null>(null);
@@ -428,7 +441,7 @@ export default function DashboardPage() {
       leadsQuery,
       supabase.from('ai_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_sources').select('*').order('created_at', { ascending: false }),
-      supabase.from('market_tariffs').select('*').order('provider_name', { ascending: true }),
+      supabase.rpc('get_active_tariff_prices'),
       supabase.from('crm_users').select('*').order('created_at', { ascending: false }),
       supabase.from('lead_notes').select('*').order('created_at', { ascending: false }),
     ]);
@@ -524,6 +537,26 @@ export default function DashboardPage() {
     loadData();
   };
 
+  const handleAddLead = async () => {
+    if (!newLead.first_name && !newLead.last_name) return;
+    const { error } = await supabase.from('hlektrismos_leads').insert({
+      first_name: newLead.first_name,
+      last_name: newLead.last_name,
+      email: newLead.email || null,
+      phone: newLead.phone || null,
+      region: newLead.region || null,
+      customer_type: newLead.customer_type,
+      status: 'new',
+      source: 'manual_entry',
+    });
+    if (!error) {
+      setShowAddLead(false);
+      setNewLead({ first_name: '', last_name: '', email: '', phone: '', region: '', customer_type: 'B2C' });
+      setToast({ msg: 'Lead δημιουργήθηκε!', type: 'success' });
+      loadData();
+    }
+  };
+
   const toggleLeadSelection = (id: string) => {
     setSelectedLeads(prev => {
       const next = new Set(prev);
@@ -577,7 +610,25 @@ export default function DashboardPage() {
   const updateTariffPrice = async (t: Tariff) => {
     const newPrice = prompt(`Εισάγετε νέα τιμή/kWh για ${t.provider_name} - ${t.program_name}:`, t.unit_rate_kwh.toString());
     if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
-      await supabase.from('market_tariffs').update({ unit_rate_kwh: parseFloat(newPrice) }).eq('id', t.id);
+      // Find the latest price record for this tariff
+      const { data: priceRecord } = await supabase
+        .from('energy_tariff_prices')
+        .select('id')
+        .eq('tariff_id', t.tariff_id || t.id)
+        .order('validity_from', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (priceRecord) {
+        await supabase.from('energy_tariff_prices').update({ unit_rate_kwh: parseFloat(newPrice), base_price_day: parseFloat(newPrice) }).eq('id', priceRecord.id);
+      } else {
+        // Create a new price record
+        await supabase.from('energy_tariff_prices').insert({
+          tariff_id: t.tariff_id || t.id,
+          unit_rate_kwh: parseFloat(newPrice),
+          base_price_day: parseFloat(newPrice),
+          validity_from: new Date().toISOString().split('T')[0],
+        });
+      }
       loadData();
       setToast({ msg: 'Η τιμή ενημερώθηκε.', type: 'success' });
     }
@@ -623,7 +674,14 @@ export default function DashboardPage() {
       }
     }
 
-    return matchesSearch && matchesDate;
+    // Service type filter
+    const matchesServiceType = filterServiceType === 'all' || l.service_type === filterServiceType;
+    // Provider filter
+    const matchesProvider = filterProvider === 'all' || l.current_provider === filterProvider;
+    // Source filter
+    const matchesSource = filterSource === 'all' || l.source === filterSource;
+
+    return matchesSearch && matchesDate && matchesServiceType && matchesProvider && matchesSource;
   });
 
   const deletedLeads = leads.filter((l) => {
@@ -691,6 +749,8 @@ export default function DashboardPage() {
     scraper: 'B2B Scraper',
     documents: 'Έγγραφα',
     followup: '👥 Πελάτες & Follow-Up',
+    'providers-commissions': '📊 Πάροχοι & Προμήθειες',
+    'sales-agents': '🏆 Πωλητές',
   };
 
   const toggleCategory = (cat: string) => {
@@ -708,6 +768,8 @@ export default function DashboardPage() {
     { key: 'sales', label: '💼 Πωλήσεις', items: [
       { tab: 'leads' as Tab, icon: '🎯', label: 'Leads' },
       { tab: 'followup' as Tab, icon: '👥', label: 'Πελάτες & Follow-Up' },
+      { tab: 'sales-agents' as Tab, icon: '🏆', label: 'Πωλητές' },
+      { tab: 'providers-commissions' as Tab, icon: '📊', label: 'Πάροχοι & Προμήθειες' },
       { tab: 'scraper' as Tab, icon: '🏢', label: 'B2B Scraper' },
       { tab: 'sources' as Tab, icon: '📥', label: 'Πηγές Leads' },
     ]},
@@ -735,9 +797,9 @@ export default function DashboardPage() {
 
   // RBAC: Filter nav categories based on user role
   const allowedTabsByRole: Record<string, Tab[]> = {
-    admin: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar', 'voice-supervisor'],
-    management: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar', 'voice-supervisor'],
-    sales: ['overview', 'leads', 'followup', 'market', 'hub', 'email', 'campaigns', 'documents', 'market-search', 'calendar'],
+    admin: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'users', 'settings', 'scraper', 'market-search', 'calendar', 'voice-supervisor', 'providers-commissions', 'sales-agents'],
+    management: ['overview', 'leads', 'followup', 'agents', 'sources', 'market', 'hub', 'orchestrator', 'email', 'campaigns', 'documents', 'reports', 'scraper', 'market-search', 'calendar', 'voice-supervisor', 'providers-commissions', 'sales-agents'],
+    sales: ['overview', 'leads', 'followup', 'market', 'hub', 'email', 'campaigns', 'documents', 'market-search', 'calendar', 'providers-commissions', 'sales-agents'],
     secretary: ['overview', 'leads', 'followup', 'email', 'calendar'],
     it: ['overview', 'settings', 'hub', 'orchestrator'],
   };
@@ -1044,6 +1106,11 @@ export default function DashboardPage() {
                 <div className="dash-content-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ margin: 0 }}>Διαχείριση Leads — αναζήτηση, φίλτρα, ανάθεση σε AI agents.</p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setShowAddLead(!showAddLead)} style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Plus size={14} /> Νέο Lead
+                      </button>
+                    </div>
                     {selectedLeads.size > 0 ? (
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
@@ -1073,6 +1140,22 @@ export default function DashboardPage() {
                       </button>
                     )}
                   </div>
+
+                  {/* Add Lead Form */}
+                  {showAddLead && (
+                    <div style={{ padding: 16, background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+                      <div><label style={{ fontSize: 10, fontWeight: 600, color: '#166534', display: 'block', marginBottom: 2 }}>Όνομα *</label><input value={newLead.first_name} onChange={e => setNewLead(c => ({ ...c, first_name: e.target.value }))} placeholder="Γιώργος" style={{ width: '100%', padding: '6px 8px', border: '1px solid #86efac', borderRadius: 6, fontSize: 11, background: '#fff', outline: 'none' }} /></div>
+                      <div><label style={{ fontSize: 10, fontWeight: 600, color: '#166534', display: 'block', marginBottom: 2 }}>Επώνυμο</label><input value={newLead.last_name} onChange={e => setNewLead(c => ({ ...c, last_name: e.target.value }))} placeholder="Παπαδόπουλος" style={{ width: '100%', padding: '6px 8px', border: '1px solid #86efac', borderRadius: 6, fontSize: 11, background: '#fff', outline: 'none' }} /></div>
+                      <div><label style={{ fontSize: 10, fontWeight: 600, color: '#166534', display: 'block', marginBottom: 2 }}>Email</label><input value={newLead.email} onChange={e => setNewLead(c => ({ ...c, email: e.target.value }))} placeholder="email@gr" style={{ width: '100%', padding: '6px 8px', border: '1px solid #86efac', borderRadius: 6, fontSize: 11, background: '#fff', outline: 'none' }} /></div>
+                      <div><label style={{ fontSize: 10, fontWeight: 600, color: '#166534', display: 'block', marginBottom: 2 }}>Τηλέφωνο</label><input value={newLead.phone} onChange={e => setNewLead(c => ({ ...c, phone: e.target.value }))} placeholder="69..." style={{ width: '100%', padding: '6px 8px', border: '1px solid #86efac', borderRadius: 6, fontSize: 11, background: '#fff', outline: 'none' }} /></div>
+                      <div><label style={{ fontSize: 10, fontWeight: 600, color: '#166534', display: 'block', marginBottom: 2 }}>Περιοχή</label><input value={newLead.region} onChange={e => setNewLead(c => ({ ...c, region: e.target.value }))} placeholder="Αθήνα" style={{ width: '100%', padding: '6px 8px', border: '1px solid #86efac', borderRadius: 6, fontSize: 11, background: '#fff', outline: 'none' }} /></div>
+                      <div><label style={{ fontSize: 10, fontWeight: 600, color: '#166534', display: 'block', marginBottom: 2 }}>Τύπος</label><select value={newLead.customer_type} onChange={e => setNewLead(c => ({ ...c, customer_type: e.target.value }))} style={{ width: '100%', padding: '6px 8px', border: '1px solid #86efac', borderRadius: 6, fontSize: 11, background: '#fff', outline: 'none' }}><option value="B2C">B2C</option><option value="B2B">B2B</option></select></div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={handleAddLead} disabled={!newLead.first_name} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: newLead.first_name ? '#10b981' : '#94a3b8', color: '#fff', fontSize: 11, fontWeight: 600, cursor: newLead.first_name ? 'pointer' : 'not-allowed' }}>Αποθήκευση</button>
+                        <button onClick={() => setShowAddLead(false)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 11, cursor: 'pointer', color: '#64748b' }}>X</button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Sub-tabs (folders) */}
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -1148,6 +1231,36 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
+
+                  {/* Service/Provider/Source Filters */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={filterServiceType} onChange={e => setFilterServiceType(e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+                      <option value="all">Υπηρεσία: Όλες</option>
+                      {SERVICES_LIST.map(s => <option key={s.key} value={s.key}>{s.icon} {s.label}</option>)}
+                    </select>
+                    <select value={filterProvider} onChange={e => setFilterProvider(e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+                      <option value="all">Πάροχος: Όλοι</option>
+                      {PROVIDER_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+                      <option value="all">Πηγή: Όλες</option>
+                      {LEAD_SOURCES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                    </select>
+                    {(filterServiceType !== 'all' || filterProvider !== 'all' || filterSource !== 'all') && (
+                      <button onClick={() => { setFilterServiceType('all'); setFilterProvider('all'); setFilterSource('all'); }}
+                        style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: 'var(--primary)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        Καθαρισμός Φίλτρων
+                      </button>
+                    )}
+                    {(filterServiceType !== 'all' || filterProvider !== 'all' || filterSource !== 'all') && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {filteredLeads.length} αποτελέσματα
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Active leads table */}
@@ -1164,7 +1277,7 @@ export default function DashboardPage() {
                               style={{ accentColor: '#0066cc', cursor: 'pointer' }}
                             />
                           </th>
-                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Κατηγορία</th><th>GDPR</th><th>Status</th><th>AI Agent</th><th>Ενέργεια</th>
+                          <th>Όνομα</th><th>Email</th><th>Τηλέφωνο</th><th>Περιοχή</th><th>Τύπος</th><th>Υπηρεσία</th><th>Πάροχος</th><th>Πηγή</th><th>Status</th><th>Ενέργεια</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1197,14 +1310,25 @@ export default function DashboardPage() {
                                 </select>
                               </td>
                               <td>
-                                <div className="gdpr-badge-wrap">
-                                  <select className="dash-status-select" value={l.lawful_basis || ''} onChange={(e) => updateLeadGdpr(l, 'lawful_basis', e.target.value)} onClick={(e) => e.stopPropagation()}>
-                                    <option value="" disabled>—</option>
-                                    <option value="Consent">Consent</option>
-                                    <option value="Legitimate_Interest">Leg. Interest</option>
-                                  </select>
-                                  <span className={`gdpr-badge ${aiOk ? 'ok' : 'blocked'}`}>{aiOk ? 'OK' : 'Missing'}</span>
-                                </div>
+                                {l.service_type ? (
+                                  <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fef3c7', color: '#92400e', whiteSpace: 'nowrap' }}>
+                                    {SERVICES_LIST.find(s => s.key === l.service_type)?.icon} {l.service_type}
+                                  </span>
+                                ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                              </td>
+                              <td>
+                                {l.current_provider ? (
+                                  <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#dbeafe', color: '#1e40af', whiteSpace: 'nowrap' }}>
+                                    {l.current_provider}
+                                  </span>
+                                ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                              </td>
+                              <td>
+                                {l.source ? (
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                    {LEAD_SOURCES.find(s => s.key === l.source)?.label || l.source}
+                                  </span>
+                                ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
                               </td>
                               <td>
                                 <select className="dash-status-select" value={l.status || 'new'} onChange={(e) => updateLeadGdpr(l, 'status', e.target.value)} onClick={(e) => e.stopPropagation()}>
@@ -1216,12 +1340,21 @@ export default function DashboardPage() {
                                 </select>
                               </td>
                               <td>
-                                <span className={`dash-status-pill ${l.assigned_to ? 'assigned' : 'unassigned'}`}>
-                                  {l.assigned_to ? l.assigned_to.substring(0, 8) : 'Unassigned'}
-                                </span>
-                              </td>
-                              <td>
                                 <div className="dash-lead-actions" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => setOpenLeadFolder(l.id)}
+                                    title="Άνοιγμα Φακέλου"
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                      padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(99,102,241,0.3)',
+                                      background: 'rgba(99,102,241,0.06)', color: '#6366f1', cursor: 'pointer',
+                                      fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.15s',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#6366f1'; e.currentTarget.style.color = '#fff'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)'; e.currentTarget.style.color = '#6366f1'; }}
+                                  >
+                                    <FolderOpen size={13} /> Φάκελος
+                                  </button>
                                   <button
                                     onClick={() => softDeleteLead(l.id)}
                                     title="Μεταφορά στα Διεγραμμένα"
@@ -1483,6 +1616,12 @@ export default function DashboardPage() {
             {tab === 'voice-supervisor' && (
               <LiveVoiceSupervisor />
             )}
+            {tab === 'providers-commissions' && (
+              <ProvidersCommissionsTab />
+            )}
+            {tab === 'sales-agents' && (
+              <SalesAgentsTab />
+            )}
           </>
         )}
       </div>
@@ -1496,6 +1635,15 @@ export default function DashboardPage() {
           lead={openLead}
           onClose={() => setOpenLead(null)}
           crmUsers={crmUsers}
+        />
+      )}
+
+      {openLeadFolder && (
+        <EntityDetailWindow
+          entityId={openLeadFolder}
+          entityType="lead"
+          onClose={() => setOpenLeadFolder(null)}
+          onSaved={loadData}
         />
       )}
     </div>

@@ -20,11 +20,8 @@ serve(async (req: any) => {
     )
 
     // Fetch tariffs for RAG context
-    const { data: tariffs } = await supabaseClient
-      .from('market_tariffs')
-      .select('*')
-    
-    const tariffLines = tariffs?.map((t: any) => `- ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n') || '';
+    const { data: tariffs } = await supabaseClient.rpc('get_active_tariff_prices');
+    const tariffLines = tariffs?.map((t: any) => `- ${t.provider_name}: ${t.program_name} @ €${t.unit_rate_kwh}/kWh (€${t.fixed_fee_monthly}/mo)`).join('\n') || '';
 
     // Handle callback request — store as lead
     if (callbackRequest) {

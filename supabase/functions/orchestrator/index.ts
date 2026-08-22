@@ -256,15 +256,14 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'get_market_tariffs': {
-        let query = supabaseAdmin.from('market_tariffs').select('*')
-        if (args.provider) query = query.eq('provider_name', args.provider)
-        if (args.category) query = query.eq('category', args.category)
-        if (args.resource) query = query.eq('resource', args.resource)
-        const { data, error } = await query
+        const { data, error } = await supabaseAdmin.rpc('get_active_tariff_prices');
         if (error) throw error
         if (!data || data.length === 0) return 'Δεν βρέθηκαν ταρίφα.'
-        return data.map((t: any) =>
-          `${t.provider_name} | ${t.tariff_name} | ${t.category} | €${t.price_eur}/kWh | €${t.fixed_fee_monthly || 0}/μήνα`
+        let filtered = data;
+        if (args.provider) filtered = filtered.filter((t: any) => t.provider_name?.includes(args.provider));
+        if (args.category) filtered = filtered.filter((t: any) => t.customer_type === args.category);
+        return filtered.slice(0, 20).map((t: any) =>
+          `${t.provider_name} | ${t.program_name} | ${t.customer_type} | €${t.unit_rate_kwh}/kWh | €${t.fixed_fee_monthly}/mo`
         ).join('\n')
       }
 
@@ -520,11 +519,8 @@ serve(async (req: any) => {
     if (agentsError) throw agentsError
 
     // Fetch live tariffs for RAG context
-    const { data: tariffs } = await supabaseAdmin
-      .from('market_tariffs')
-      .select('*')
-
-    const tariffLines = tariffs?.map((t: any) => `- ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n') || ''
+    const { data: tariffs } = await supabaseAdmin.rpc('get_active_tariff_prices');
+    const tariffLines = tariffs?.map((t: any) => `- ${t.provider_name}: ${t.program_name} @ €${t.unit_rate_kwh}/kWh`).join('\n') || ''
 
     // Fetch recent agent conversations for inter-agent context (handle missing table gracefully)
     let conversationContext = 'No recent inter-agent conversations.'

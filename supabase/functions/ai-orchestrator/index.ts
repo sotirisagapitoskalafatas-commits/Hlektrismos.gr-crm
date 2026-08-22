@@ -97,25 +97,17 @@ async function executeTool(
           customer_type?: string;
         };
 
-        let query = supabase
-          .from("market_tariffs")
-          .select("*")
-          .eq("is_active", true);
-
-        if (provider) {
-          query = query.ilike("provider", `%${provider}%`);
-        }
-        if (customer_type) {
-          query = query.ilike("customer_type", `%${customer_type}%`);
-        }
-
-        const { data, error } = await query.limit(20);
+        const { data, error } = await supabase.rpc('get_active_tariff_prices').limit(20);
 
         if (error) throw error;
 
+        let filtered = data ?? [];
+        if (provider) filtered = filtered.filter((t: any) => t.provider_name?.toLowerCase().includes(provider.toLowerCase()));
+        if (customer_type) filtered = filtered.filter((t: any) => t.customer_type === customer_type);
+
         return {
           name,
-          content: JSON.stringify({ tariffs: data ?? [], count: data?.length ?? 0 }),
+          content: JSON.stringify({ tariffs: filtered, count: filtered.length }),
         };
       }
 

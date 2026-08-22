@@ -36,14 +36,10 @@ serve(async (req) => {
       }
 
       // Fetch all tariffs as context
-      const { data: tariffs } = await supabase
-        .from("market_tariffs")
-        .select("provider_name, program_name, tariff_color, unit_rate_kwh, fixed_fee_monthly, validity_month")
-        .order("validity_month", { ascending: false })
-        .limit(50);
+      const { data: tariffs } = await supabase.rpc('get_active_tariff_prices');
 
       const tariffContext = tariffs?.map((t: any) =>
-        `- ${t.provider_name} | ${t.program_name} | ${t.tariff_color?.toUpperCase() || 'B2B'} | ${t.unit_rate_kwh} €/kWh | €${t.fixed_fee_monthly}/mo | ${t.validity_month}`
+        `- ${t.provider_name} | ${t.program_name} | ${t.tariff_color?.toUpperCase() || 'B2B'} | ${t.unit_rate_kwh} €/kWh | €${t.fixed_fee_monthly}/mo | ${t.validity_from}`
       ).join("\n") || "Δεν υπάρχουν τρέχοντα ταρίφα.";
 
       // Call Gemini for synthesis

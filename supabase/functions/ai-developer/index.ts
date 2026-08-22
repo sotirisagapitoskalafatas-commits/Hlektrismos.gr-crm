@@ -44,7 +44,7 @@ const DEVELOPER_SYSTEM_PROMPT = `You are a senior software engineer and IT speci
 - Database: PostgreSQL with RLS policies
 - Edge Functions: Deno runtime
 - Auth: Supabase Auth with email/password
-- Current tables: hlektrismos_leads, ai_agents, lead_sources, market_tariffs, agent_memory, agent_conversations, agent_reports, crm_users
+- Current tables: hlektrismos_leads, hlektrismos_customers, ai_agents, lead_sources, energy_tariffs, energy_tariff_prices, agent_memory, agent_conversations, agent_reports, crm_users
 
 When asked to fix bugs or implement features, provide:
 1. Root cause analysis

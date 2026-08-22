@@ -64,11 +64,8 @@ serve(async (req: any) => {
     if (!geminiApiKey) throw new Error("No GEMINI_API_KEY available.");
 
     // 3. Fetch tariffs for RAG
-    const { data: tariffs } = await supabaseAdmin
-      .from('market_tariffs')
-      .select('*')
-
-    const tariffLines = tariffs?.map((t: any) => `- ${t.resource}: ${t.tariff_name} @ ${t.price_eur} ${t.unit}`).join('\n') || ''
+    const { data: tariffs } = await supabaseAdmin.rpc('get_active_tariff_prices');
+    const tariffLines = tariffs?.map((t: any) => `- ${t.provider_name}: ${t.program_name} @ €${t.unit_rate_kwh}/kWh (fixed: €${t.fixed_fee_monthly}/mo)`).join('\n') || ''
 
     const results = [];
 

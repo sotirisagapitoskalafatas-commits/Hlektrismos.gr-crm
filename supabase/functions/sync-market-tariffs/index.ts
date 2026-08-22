@@ -118,19 +118,28 @@ Deno.serve(async (req) => {
       let synced = 0;
       for (const provider of PROVIDERS) {
         for (const prog of provider.programs) {
-          const { error } = await supabase.from('market_tariffs').upsert({
-            resource: 'Electricity',
-            tariff_name: `${provider.name} ${prog.name}`,
-            price_eur: prog.price,
-            unit: '€/kWh',
+          const { data: et } = await supabase.from('energy_tariffs').upsert({
             provider_name: provider.name,
-            category: prog.category,
-            b2c_url: provider.b2c_url,
-            b2b_url: provider.b2b_url,
-            fixed_fee_monthly: prog.fee,
-            last_verified: new Date().toISOString(),
-          }, { onConflict: 'tariff_name' });
-          if (!error) synced++;
+            program_name: prog.name,
+            customer_type: (prog.category || 'B2C') as any,
+            tariff_color: 'green' as any,
+            energy_type: 'electricity' as any,
+            official_url: prog.category === 'B2C' ? provider.b2c_url : provider.b2b_url,
+            is_active: true,
+          }, { onConflict: 'provider_name,program_name' }).select('id').single();
+
+          if (et) {
+            const vm = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`;
+            await supabase.from('energy_tariff_prices').upsert({
+              tariff_id: et.id,
+              unit_rate_kwh: prog.price,
+              base_price_day: prog.price,
+              fixed_fee_monthly: prog.fee,
+              validity_from: vm,
+              verification_status: 'verified' as any,
+            }, { onConflict: 'tariff_id,validity_from' });
+            synced++;
+          }
         }
       }
 
@@ -165,10 +174,7 @@ Deno.serve(async (req) => {
     }
 
     // Default: list current tariffs
-    const { data: tariffs, error } = await supabase
-      .from('market_tariffs')
-      .select('*')
-      .order('provider_name', { ascending: true });
+    const { data: tariffs, error } = await supabase.rpc('get_active_tariff_prices');
 
     if (error) throw error;
 

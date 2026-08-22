@@ -23,7 +23,31 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
 
   try {
+    // ─── JWT Auth Verification ──────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Use service role for DB writes
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
@@ -49,7 +73,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 1. Fetch tariffs
-    let query = supabase
+    let query = supabaseAdmin
       .from("energy_tariffs")
       .select("id, provider_name, program_name, official_url, customer_type")
       .not("official_url", "is", null)
@@ -223,7 +247,7 @@ ${cleanText}`
 
         // 5. Upsert to energy_tariff_prices
         const today = new Date().toISOString().split("T")[0];
-        const { data: existing } = await supabase
+        const { data: existing } = await supabaseAdmin
           .from("energy_tariff_prices")
           .select("id")
           .eq("tariff_id", tariff.id)
@@ -244,9 +268,9 @@ ${cleanText}`
         };
 
         if (existing) {
-          await supabase.from("energy_tariff_prices").update(priceData).eq("id", existing.id);
+          await supabaseAdmin.from("energy_tariff_prices").update(priceData).eq("id", existing.id);
         } else {
-          await supabase.from("energy_tariff_prices").insert({
+          await supabaseAdmin.from("energy_tariff_prices").insert({
             tariff_id: tariff.id,
             ...priceData,
             unit_rate_kwh: parsed.base_price_day,
@@ -266,7 +290,7 @@ ${cleanText}`
     // Log to scraper_logs
     const durationMs = Date.now() - startTime;
     try {
-      await supabase.from("scraper_logs").insert({
+      await supabaseAdmin.from("scraper_logs").insert({
         provider_name: providerFilter || "all",
         status: failedCount > 0 && updatedCount === 0 ? "error" : "success",
         records_synced: updatedCount,
@@ -292,11 +316,11 @@ ${cleanText}`
     console.error(`[scrape-program-details] Fatal: ${err.message}`);
 
     try {
-      const supabase = createClient(
+      const supabaseAdmin = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
-      await supabase.from("scraper_logs").insert({
+      await supabaseAdmin.from("scraper_logs").insert({
         provider_name: "scrape-program-details",
         status: "error",
         error_message: err.message,

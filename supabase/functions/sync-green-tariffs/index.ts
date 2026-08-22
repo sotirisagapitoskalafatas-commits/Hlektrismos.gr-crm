@@ -126,16 +126,12 @@ serve(async (req) => {
           results.push({
             provider_name: endpoint.provider_name,
             program_name: endpoint.endpoint_label,
-            customer_type: endpoint.customer_type,
+            customer_type: endpoint.customer_type || 'B2C',
             tariff_color: endpoint.tariff_color || 'green',
             unit_rate_kwh: extracted.unit_rate_kwh,
             fixed_fee_monthly: extracted.fixed_fee_monthly,
             validity_month: validityMonth,
             source_url: endpoint.endpoint_url,
-            category: endpoint.customer_type,
-            resource: 'ρεύμα',
-            last_verified: new Date().toISOString(),
-            embedding: embedding,
           });
 
           // Update endpoint last_synced_at
@@ -152,18 +148,35 @@ serve(async (req) => {
       }
     }
 
-    // Upsert results into market_tariffs
+    // Upsert results into energy_tariffs + energy_tariff_prices
     if (results.length > 0) {
-      const { error: upsertError } = await supabase
-        .from("market_tariffs")
-        .upsert(results, {
-          onConflict: "provider_name, program_name, validity_month",
-          ignoreDuplicates: false,
-        });
+      for (const result of results) {
+        const { data: tariff } = await supabase
+          .from("energy_tariffs")
+          .upsert({
+            provider_name: result.provider_name,
+            program_name: result.program_name,
+            customer_type: (result.customer_type || 'B2C') as any,
+            tariff_color: (result.tariff_color || 'green') as any,
+            energy_type: 'electricity' as any,
+            official_url: result.source_url || null,
+            is_active: true,
+          }, { onConflict: "provider_name,program_name" })
+          .select("id")
+          .single();
 
-      if (upsertError) {
-        console.error("Upsert error:", upsertError);
-        errors.push(`DB upsert: ${upsertError.message}`);
+        if (tariff) {
+          const validityFrom = `${result.validity_month}-01`;
+          await supabase.from("energy_tariff_prices").upsert({
+            tariff_id: tariff.id,
+            base_price_day: result.unit_rate_kwh,
+            unit_rate_kwh: result.unit_rate_kwh,
+            fixed_fee_monthly: result.fixed_fee_monthly || 0,
+            validity_from: validityFrom,
+            verification_status: "needs_review" as any,
+            source_url: result.source_url || null,
+          }, { onConflict: "tariff_id,validity_from" });
+        }
       }
     }
 

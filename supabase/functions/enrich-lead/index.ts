@@ -62,6 +62,29 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // ─── JWT Auth Verification ──────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { lead_id, website } = await req.json();
     if (!lead_id || !website) {
       return new Response(JSON.stringify({ error: "Missing lead_id or website" }), {
@@ -102,7 +125,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
@@ -121,7 +144,7 @@ Deno.serve(async (req: Request) => {
       updatePayload.enrichment_status = "failed";
     }
 
-    await supabase
+    await supabaseAdmin
       .from("hlektrismos_leads")
       .update(updatePayload)
       .eq("id", lead_id);

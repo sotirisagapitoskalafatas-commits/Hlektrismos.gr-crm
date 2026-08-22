@@ -52,7 +52,31 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
 
   try {
+    // ─── JWT Auth Verification ──────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Use service role for DB writes
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
@@ -222,7 +246,7 @@ Deno.serve(async (req: Request) => {
       is_active: true,
     }));
 
-    const { data: insertedCatalog, error: catalogError } = await supabase
+    const { data: insertedCatalog, error: catalogError } = await supabaseAdmin
       .from("energy_tariffs")
       .upsert(tariffCatalogInserts, { onConflict: "provider_name,program_name" })
       .select("id, provider_name, program_name");
@@ -262,8 +286,7 @@ Deno.serve(async (req: Request) => {
         source_url: t.official_url || null,
       }));
 
-    const { data: insertedPrices, error: priceError } = await supabase
-      .from("energy_tariff_prices")
+    const { data: insertedPrices, error: priceError } =       await supabaseAdmin.from("energy_tariff_prices")
       .upsert(priceInserts, { onConflict: "tariff_id,validity_from" })
       .select("id");
 
@@ -275,34 +298,7 @@ Deno.serve(async (req: Request) => {
       console.log(`[db] Inserted ${insertedPrices?.length || 0} energy_tariff_prices`);
     }
 
-    // 3c. Also update legacy market_tariffs via UPSERT (no destructive DELETE)
-    console.log(`[db] Upserting legacy market_tariffs for backward compat...`);
-
-    const legacyRows = tariffs.map((t) => ({
-      provider_name: t.provider_name,
-      program_name: t.program_name,
-      customer_type: t.customer_type || "B2C",
-      tariff_color: t.tariff_color || "green",
-      energy_type: t.energy_type || "electricity",
-      unit_rate_kwh: Number(t.unit_rate_kwh) || 0,
-      fixed_fee_monthly: Number(t.fixed_fee_monthly) || 0,
-      validity_month: validityMonth,
-      source_url: t.official_url || "",
-      category: t.customer_type || "B2C",
-      resource: t.energy_type === "gas" ? "gas" : "electricity",
-      last_verified: new Date().toISOString(),
-    }));
-
-    // Use upsert instead of delete+insert to avoid data loss on failure
-    const { error: legacyUpsertErr } = await supabase
-      .from("market_tariffs")
-      .upsert(legacyRows, { onConflict: "provider_name,program_name,validity_month" });
-
-    if (legacyUpsertErr) {
-      console.warn("[db] Legacy market_tariffs upsert failed:", legacyUpsertErr.message);
-    }
-
-    // 3d. Upsert unique providers into rag_document_endpoints
+    // 3c. Upsert unique providers into rag_document_endpoints
     const uniqueProviders = [...new Set(tariffs.map((t) => t.provider_name))];
     console.log(`[db] Upserting ${uniqueProviders.length} providers into rag_document_endpoints...`);
 
@@ -335,7 +331,7 @@ Deno.serve(async (req: Request) => {
     // Log to scraper_logs
     const durationMs = Date.now() - startTime;
     try {
-      await supabase.from("scraper_logs").insert({
+      await supabaseAdmin.from("scraper_logs").insert({
         provider_name: "autonomous-scraper",
         status: "success",
         records_synced: tariffs.length,
@@ -367,11 +363,11 @@ Deno.serve(async (req: Request) => {
     console.error(`[autonomous-tariff-scraper] Fatal error: ${err.message}`, err);
 
     try {
-      const supabase = createClient(
+      const supabaseAdmin = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
-      await supabase.from("scraper_logs").insert({
+      await supabaseAdmin.from("scraper_logs").insert({
         provider_name: "autonomous-scraper",
         status: "error",
         error_message: err.message,

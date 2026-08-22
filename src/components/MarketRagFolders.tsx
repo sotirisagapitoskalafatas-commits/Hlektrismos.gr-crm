@@ -99,10 +99,7 @@ export default function MarketRagFolders() {
     const { data, error } = await supabase.rpc('get_active_tariff_prices');
     if (error) {
       console.error('[MarketRagFolders] RPC error, falling back to direct query:', error);
-      const { data: fallback } = await supabase
-        .from('market_tariffs')
-        .select('*')
-        .order('provider_name');
+      const { data: fallback } = await supabase.rpc('get_active_tariff_prices');
       if (fallback) {
         setTariffs(
           fallback.map((t: any) => ({

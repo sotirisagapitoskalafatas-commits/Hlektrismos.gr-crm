@@ -15,6 +15,8 @@
   --text-dim: #8ba0bc;
   --accent: #0066cc;
   --accent-2: #0099d4;
+  --primary: #6366f1;
+  --primary-10: rgba(99, 102, 241, 0.1);
   --accent-glow: rgba(0, 102, 204, 0.25);
   --accent-2-glow: rgba(0, 153, 212, 0.22);
   --greek-blue: #004c98;
@@ -52,6 +54,8 @@
   --text-dim: #64748b;
   --accent: #00c878;
   --accent-2: #0066cc;
+  --primary: #818cf8;
+  --primary-10: rgba(129, 140, 248, 0.1);
   --accent-glow: rgba(0, 200, 120, 0.25);
   --accent-2-glow: rgba(0, 102, 204, 0.22);
   --section-bg: rgba(6, 10, 18, 0.88);

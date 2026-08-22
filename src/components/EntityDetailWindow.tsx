@@ -47,7 +47,7 @@ const inputS: React.CSSProperties = {
 };
 const labelS: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 };
 const btnP: React.CSSProperties = {
-  padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff',
+  padding: '8px 16px', borderRadius: 8, border: 'none', background: '#6366f1', color: '#fff',
   fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
 };
 const btnD: React.CSSProperties = {

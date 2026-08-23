@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+const fs = require('fs');
+const path = require('path');
+
+const content = `import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserPlus, Trash2, Edit2, Save, X, TrendingUp, DollarSign, Award, ChevronDown, ChevronRight, Users, Zap } from 'lucide-react';
 import { PROVIDER_LIST, PROVIDERS_AND_PROGRAMS } from '../constants/energyData';
@@ -15,7 +18,7 @@ interface AgentProviderCommission {
 }
 
 // key = provider::program (or provider::_default)
-const ckey = (provider: string, program?: string | null) => `${provider}::${program || '_default'}`;
+const ckey = (provider: string, program?: string | null) => \`\${provider}::\${program || '_default'}\`;
 type CommMap = Record<string, { fixed_rate: string; per_kwh_rate: string }>;
 
 const inputS: React.CSSProperties = {
@@ -145,7 +148,7 @@ export default function SalesAgentsTab() {
       setShowAdd(false); setEditingId(null); resetForm();
       loadAgents();
     } catch (err: any) {
-      setToast({ msg: `Σφάλμα: ${err.message}`, type: 'error' });
+      setToast({ msg: \`Σφάλμα: \${err.message}\`, type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -191,7 +194,7 @@ export default function SalesAgentsTab() {
   const programsFor = (p: string) => PROVIDERS_AND_PROGRAMS.filter(pp => pp.provider === p);
 
   const hasAnyCommissionFor = (p: string) =>
-    Object.entries(comms).some(([k, v]) => k.startsWith(`${p}::`) && (parseFloat(v.fixed_rate) > 0 || parseFloat(v.per_kwh_rate) > 0));
+    Object.entries(comms).some(([k, v]) => k.startsWith(\`\${p}::\`) && (parseFloat(v.fixed_rate) > 0 || parseFloat(v.per_kwh_rate) > 0));
 
   const totalCommission = agents.reduce((sum, a) => sum + (stats[a.id]?.total_commission || 0), 0);
   const totalSupplies = agents.reduce((sum, a) => sum + (stats[a.id]?.supply_count || 0), 0);
@@ -267,7 +270,7 @@ export default function SalesAgentsTab() {
                 const active = hasAnyCommissionFor(p);
                 const progs = programsFor(p);
                 return (
-                  <div key={p} style={{ background: 'var(--surface)', borderRadius: 8, border: `1px solid ${active ? '#10b981' : 'var(--border)'}`, overflow: 'hidden' }}>
+                  <div key={p} style={{ background: 'var(--surface)', borderRadius: 8, border: \`1px solid \${active ? '#10b981' : 'var(--border)'}\`, overflow: 'hidden' }}>
                     <button onClick={() => toggleProviderExpanded(p)} style={{
                       width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       padding: '8px 12px', background: active ? '#f0fdf4' : 'transparent', border: 'none', cursor: 'pointer',
@@ -459,3 +462,7 @@ function AgentCommissionSummary({ agentId }: { agentId: string }) {
     </div>
   );
 }
+`;
+
+fs.writeFileSync(path.join(__dirname, '..', 'src', 'components', 'SalesAgentsTab.tsx'), content, 'utf8');
+console.log('SalesAgentsTab.tsx written:', content.length, 'bytes');

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/LoginPage';
@@ -89,6 +90,7 @@ export default function App() {
           (authenticated route). Never place it here — it must not render on
           public routes or leak CRM capabilities to anonymous visitors. */}
       <Router />
+      <SpeedInsights />
     </AuthProvider>
   );
 }

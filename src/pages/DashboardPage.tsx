@@ -1650,6 +1650,11 @@ export default function DashboardPage() {
           onSaved={loadData}
         />
       )}
+
+      {/* Floating AI Assistant — mounted at dashboard root so it renders on
+          every tab. Portals itself to <body>; do NOT mount it globally in
+          App.tsx (public-route leak) or inside individual tabs (double FAB). */}
+      <CrmAiAssistantWidget leads={leads} tariffs={tariffs} />
     </div>
   );
 }
@@ -4992,9 +4997,6 @@ function OrchestratorDirectorTab({ agents, leads, tariffs, crmUsers, toast, setT
       {selectedView === 'developer' && (
         <DeveloperAgentChat />
       )}
-
-      {/* Floating AI Assistant Widget */}
-      <CrmAiAssistantWidget leads={leads} tariffs={tariffs} />
     </div>
   );
 }

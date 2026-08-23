@@ -435,7 +435,7 @@ img { display: block; max-width: 100%; }
 .login-glow-1 { position: absolute; width: 600px; height: 600px; top: -200px; right: -100px; border-radius: 50%; background: radial-gradient(circle, var(--accent-glow), transparent 65%); filter: blur(40px); }
 .login-glow-2 { position: absolute; width: 500px; height: 500px; bottom: -200px; left: -100px; border-radius: 50%; background: radial-gradient(circle, var(--accent-2-glow), transparent 65%); filter: blur(40px); }
 .login-grid-bg { position: absolute; inset: 0; background-image: linear-gradient(rgba(0,102,204,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,102,204,0.04) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
-.login-card-wrap { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.login-card-wrap { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 24px; }
 .login-brand { display: flex; align-items: center; gap: 10px; font: 700 22px var(--font-display); }
 .login-card { width: min(440px, calc(100% - 32px)); padding: 40px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border-bright); box-shadow: 0 12px 48px rgba(0,71,160,0.1); backdrop-filter: blur(12px); }
 .login-card h1 { margin: 0 0 8px; font: 700 26px var(--font-display); }
@@ -1788,4 +1788,60 @@ img { display: block; max-width: 100%; }
   .stats-strip { grid-template-columns: 1fr; }
   .dash-stats-grid { grid-template-columns: 1fr; }
   .dash-stat-card strong { font-size: 20px; }
+}
+
+/* ── Global Orb (EarthBackground) ─────────────────────────────────────────── */
+.earth-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, #12233c 0%, #0b1626 55%, #070e1a 100%);
+}
+.earth-canvas.is-panel { position: absolute; }
+.earth-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
+.earth-canvas.earth-fallback {
+  background: radial-gradient(circle at 50% 45%, #16304f 0%, #0b1626 60%, #070e1a 100%);
+}
+.earth-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(72, 217, 201, 0.3);
+  background: rgba(7, 14, 26, 0.75);
+  color: #9fd9cf;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+.earth-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(6, 11, 20, 0.82) 0%,
+    rgba(6, 11, 20, 0.35) 55%,
+    rgba(6, 11, 20, 0.6) 100%
+  );
+}
+.earth-scrim--soft {
+  background: linear-gradient(
+    90deg,
+    rgba(6, 11, 20, 0.78) 0%,
+    rgba(6, 11, 20, 0.3) 62%,
+    transparent 100%
+  );
+}
+/* Center-weighted scrim for the login route — keeps the orb visible behind the card. */
+.earth-scrim--login {
+  background: radial-gradient(
+    circle at 50% 45%,
+    transparent 28%,
+    rgba(6, 11, 20, 0.45) 72%,
+    rgba(6, 11, 20, 0.78) 100%
+  );
 }

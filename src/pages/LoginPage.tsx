@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { ArrowRight, Lock, Mail } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import EarthBackground from '@/components/EarthBackground';
 
 export default function LoginPage() {
   const { signIn, signUp } = useAuth();
@@ -49,6 +50,8 @@ export default function LoginPage() {
         <div className="login-glow-2" />
         <div className="login-grid-bg" />
       </div>
+      <EarthBackground mode="ambient" />
+      <div className="earth-scrim earth-scrim--login" />
       <div className="login-card-wrap">
         <a href="#/" className="login-brand">
           <svg viewBox="0 0 100 100" style={{ width: 72, height: 72 }} xmlns="http://www.w3.org/2000/svg">

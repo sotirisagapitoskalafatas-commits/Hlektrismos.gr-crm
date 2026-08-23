@@ -88,6 +88,7 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     sales_agent_id: '', estimated_commission: '0', monthly_cost: '',
   });
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
   const [attributions, setAttributions] = useState<AgentAttribution[]>([]);
   const [newAttr, setNewAttr] = useState({ agent_id: '', attribution_type: 'primary', commission_pct: '100' });
 
@@ -489,11 +490,25 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
               </div>
             </div>
             {doc ? (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" style={{ ...btnP, textDecoration: 'none', fontSize: 12, padding: '6px 12px' }}>
-                  <Download size={12} /> Λήψη
-                </a>
-                <button onClick={() => deleteDocument(doc.id)} style={btnD}>Διαγραφή</button>
+              <div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setPreviewDocId(previewDocId === doc.id ? null : doc.id)} style={{ ...btnP, fontSize: 12, padding: '6px 12px' }}>
+                    {previewDocId === doc.id ? 'Απόκρυψη' : 'Προβολή'}
+                  </button>
+                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer" style={{ ...btnP, textDecoration: 'none', fontSize: 12, padding: '6px 12px' }}>
+                    <Download size={12} /> Λήψη
+                  </a>
+                  <button onClick={() => deleteDocument(doc.id)} style={btnD}>Διαγραφή</button>
+                </div>
+                {previewDocId === doc.id && (
+                  <div style={{ marginTop: 10, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                    {doc.file_name?.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                      <img src={doc.file_url} alt={doc.document_type} style={{ width: '100%', maxHeight: 360, objectFit: 'contain', display: 'block' }} />
+                    ) : (
+                      <iframe src={doc.file_url} title={doc.document_type} style={{ width: '100%', height: 360, border: 'none' }} />
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <label style={{ ...btnP, cursor: 'pointer', opacity: isUploading ? 0.5 : 1, fontSize: 12, padding: '6px 12px' }}>
@@ -526,17 +541,31 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {offers.map(offer => (
-              <div key={offer.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)' }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{offer.file_name || 'Offer'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(offer.created_at).toLocaleDateString('el-GR')}</div>
+              <div key={offer.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: `1px solid ${previewDocId === offer.id ? '#0066cc' : 'var(--border)'}`, borderRadius: 8, background: 'var(--surface)' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{offer.file_name || 'Offer'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(offer.created_at).toLocaleDateString('el-GR')}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setPreviewDocId(previewDocId === offer.id ? null : offer.id)} style={{ ...btnP, fontSize: 12, padding: '6px 12px' }}>
+                      Προβολή
+                    </button>
+                    <a href={offer.file_url} target="_blank" rel="noopener noreferrer" style={{ ...btnP, textDecoration: 'none', fontSize: 12, padding: '6px 12px' }}>
+                      <Download size={12} />
+                    </a>
+                    <button onClick={() => deleteDocument(offer.id)} style={btnD}><Trash2 size={12} /></button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <a href={offer.file_url} target="_blank" rel="noopener noreferrer" style={{ ...btnP, textDecoration: 'none', fontSize: 12, padding: '6px 12px' }}>
-                    <Download size={12} />
-                  </a>
-                  <button onClick={() => deleteDocument(offer.id)} style={btnD}><Trash2 size={12} /></button>
-                </div>
+                {previewDocId === offer.id && (
+                  <div style={{ margin: '0 12px', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden', background: '#fff' }}>
+                    {offer.file_name?.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                      <img src={offer.file_url} alt={offer.file_name} style={{ width: '100%', maxHeight: 360, objectFit: 'contain', display: 'block' }} />
+                    ) : (
+                      <iframe src={offer.file_url} title={offer.file_name || 'Offer'} style={{ width: '100%', height: 360, border: 'none' }} />
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

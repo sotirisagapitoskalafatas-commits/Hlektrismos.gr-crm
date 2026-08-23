@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   RefreshCw,
   TrendingDown,
+  Eye,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { uploadDocument, updateLeadBillFiles, UploadedFile } from '@/lib/storage';
@@ -108,6 +109,7 @@ export default function LeadDetailSlideout({
   const hubApiKey = localStorage.getItem('hub_api_key') || '';
   const hubModel = localStorage.getItem('hub_model') || 'gemini-3.6-flash';
   const [billUrls, setBillUrls] = useState<BillFile[]>([]);
+  const [previewFile, setPreviewFile] = useState<BillFile | null>(null);
   const [billLoading, setBillLoading] = useState(false);
   const [billError, setBillError] = useState<string | null>(null);
 
@@ -1141,52 +1143,84 @@ Return JSON with this exact structure:
             )}
             {billUrls.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {billUrls.map((file, i) => (
-                  <div key={i} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '12px 14px',
-                    background: 'var(--surface-2, #f5f7fa)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 10,
-                  }}>
-                    {file.type === 'application/pdf' ? (
-                      <FileText size={22} style={{ color: '#e74c3c', flexShrink: 0 }} />
-                    ) : (
-                      <ImageIcon size={22} style={{ color: '#00c878', flexShrink: 0 }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {file.type === 'application/pdf' ? 'PDF' : file.type === 'image/jpeg' ? 'JPEG' : 'PNG'}
-                        {file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}
+                {billUrls.map((file, i) => {
+                  const isImage = file.type.startsWith('image/');
+                  const isPdf = file.type === 'application/pdf';
+                  const isPreviewed = previewFile === file;
+                  return (
+                    <div key={i}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '12px 14px',
+                        background: 'var(--surface-2, #f5f7fa)',
+                        border: `1px solid ${isPreviewed ? '#0066cc' : 'var(--border)'}`,
+                        borderRadius: 10,
+                      }}>
+                        {isImage ? (
+                          <img
+                            src={file.url}
+                            alt={file.name}
+                            onClick={() => setPreviewFile(isPreviewed ? null : file)}
+                            style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in', flexShrink: 0 }}
+                          />
+                        ) : isPdf ? (
+                          <FileText size={22} style={{ color: '#e74c3c', flexShrink: 0 }} />
+                        ) : (
+                          <ImageIcon size={22} style={{ color: '#00c878', flexShrink: 0 }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {isPdf ? 'PDF' : isImage ? (file.type === 'image/jpeg' ? 'JPEG' : file.type === 'image/png' ? 'PNG' : 'WEBP') : 'CSV/XLS'}
+                            {file.size > 0 ? ` · ${(file.size / 1024 / 1024).toFixed(1)}MB` : ''}
+                          </div>
+                        </div>
+                        {(isImage || isPdf) && (
+                          <button
+                            onClick={() => setPreviewFile(isPreviewed ? null : file)}
+                            title="Inline προεπισκόπηση"
+                            style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${isPreviewed ? '#0066cc' : 'var(--border)'}`, background: isPreviewed ? 'rgba(0,102,204,0.08)' : '#fff', color: isPreviewed ? '#0066cc' : 'var(--text)', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                          >
+                            <Eye size={12} /> {isPreviewed ? 'Απόκρυψη' : 'Προεπισκόπηση'}
+                          </button>
+                        )}
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', textDecoration: 'none', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                          <ExternalLink size={12} /> View
+                        </a>
+                        <a href={file.url} download={file.name} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', textDecoration: 'none', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                          <Download size={12} /> Download
+                        </a>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { data, error } = await supabase.functions.invoke('billing-ocr', {
+                                body: { lead_id: lead.id, file_url: file.url, file_type: file.type },
+                              });
+                              if (error) throw error;
+                              alert(`📄 OCR Extracted:\nProvider: ${data.data?.provider || 'N/A'}\nRate: €${data.data?.unit_rate_kwh || 'N/A'}/kWh\nMonthly: €${data.data?.monthly_cost_total || 'N/A'}\nConsumption: ${data.data?.consumption_kwh || 'N/A'} kWh`);
+                            } catch (e: any) {
+                              alert(`❌ OCR Error: ${e.message}`);
+                            }
+                          }}
+                          style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #7c3aed', background: '#faf5ff', color: '#7c3aed', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                        >
+                          <Zap size={12} /> Extract Bill Data
+                        </button>
                       </div>
+                      {isPreviewed && (
+                        <div style={{ marginTop: -6, margin: '0 12px', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', overflow: 'hidden', background: '#fff' }}>
+                          {isImage ? (
+                            <img src={file.url} alt={file.name} style={{ width: '100%', maxHeight: 420, objectFit: 'contain', display: 'block' }} />
+                          ) : (
+                            <iframe src={`${file.url}#toolbar=0`} title={file.name} style={{ width: '100%', height: 420, border: 'none' }} />
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <a href={file.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', textDecoration: 'none', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <ExternalLink size={12} /> View
-                    </a>
-                    <a href={file.url} download={file.name} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', textDecoration: 'none', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <Download size={12} /> Download
-                    </a>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke('billing-ocr', {
-                            body: { lead_id: lead.id, file_url: file.url, file_type: file.type },
-                          });
-                          if (error) throw error;
-                          alert(`📄 OCR Extracted:\nProvider: ${data.data?.provider || 'N/A'}\nRate: €${data.data?.unit_rate_kwh || 'N/A'}/kWh\nMonthly: €${data.data?.monthly_cost_total || 'N/A'}\nConsumption: ${data.data?.consumption_kwh || 'N/A'} kWh`);
-                        } catch (e: any) {
-                          alert(`❌ OCR Error: ${e.message}`);
-                        }
-                      }}
-                      style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #7c3aed', background: '#faf5ff', color: '#7c3aed', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
-                    >
-                      <Zap size={12} /> Extract Bill Data
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

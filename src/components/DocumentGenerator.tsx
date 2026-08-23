@@ -1,21 +1,43 @@
-import { useState } from 'react';
-import { FileText, Download, Eye, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { FileText, Download, Eye, Plus, Trash2, Pencil, FileDown, Save, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type DocTemplate = {
   id: string;
   name: string;
   type: 'proposal' | 'contract' | 'authorization' | 'offer' | 'letter' | 'custom';
+  customer_type: 'b2c' | 'b2b' | 'both';
   subject: string;
   body: string;
   footer: string;
   created_at: string;
 };
 
+type SavedDocument = {
+  id: string;
+  title: string;
+  subject: string;
+  body: string;
+  footer: string;
+  created_at: string;
+};
+
+type EditorState = {
+  mode: 'template' | 'document';
+  id: string | null;
+  name: string;
+  type: DocTemplate['type'];
+  customer_type: DocTemplate['customer_type'];
+  subject: string;
+  body: string;
+  footer: string;
+};
+
 const defaultTemplates: Omit<DocTemplate, 'id' | 'created_at'>[] = [
   {
     name: 'Προσφορά Ηλεκτροσίστησης',
     type: 'proposal',
+    customer_type: 'b2c',
     subject: 'Προσφορά Ηλεκτροσίστησης — Hlektrismos.gr',
     body: `<div class="doc-header">
   <div class="doc-logo">⚡ Hlektrismos.gr</div>
@@ -70,6 +92,7 @@ const defaultTemplates: Omit<DocTemplate, 'id' | 'created_at'>[] = [
   {
     name: 'Σύμβαση Εξυπηρέτησης',
     type: 'contract',
+    customer_type: 'both',
     subject: 'Σύμβαση Εξυπηρέτησης — Hlektrismos.gr',
     body: `<div class="doc-header">
   <div class="doc-logo">⚡ Hlektrismos.gr</div>
@@ -140,6 +163,7 @@ const defaultTemplates: Omit<DocTemplate, 'id' | 'created_at'>[] = [
   {
     name: 'Εξουσιοδότηση Μεταγραφής',
     type: 'authorization',
+    customer_type: 'both',
     subject: 'Εξουσιοδότηση Μεταγραφής — Hlektrismos.gr',
     body: `<div class="doc-header">
   <div class="doc-logo">⚡ Hlektrismos.gr</div>
@@ -209,6 +233,12 @@ const typeColors: Record<string, string> = {
   custom: '#1f2937',
 };
 
+const customerTypeLabels: Record<string, string> = {
+  b2c: 'B2C Ιδιώτες',
+  b2b: 'B2B Επιχειρήσεις',
+  both: 'Κοινό',
+};
+
 const docStyles = `
   @page { size: A4; margin: 20mm 18mm 25mm 18mm; }
   .doc-header { text-align: center; border-bottom: 3px solid #0066cc; padding-bottom: 16px; margin-bottom: 24px; }
@@ -235,18 +265,63 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
   toast?: { msg: string; type: 'success' | 'info' } | null;
   setToast?: (v: { msg: string; type: 'success' | 'info' } | null) => void;
 } = {}) {
-  const [templates, setTemplates] = useState<DocTemplate[]>(() =>
-    defaultTemplates.map((t, i) => ({
-      ...t,
-      id: `default-${i}`,
-      created_at: new Date().toISOString(),
-    }))
-  );
-  const [selectedTemplate, setSelectedTemplate] = useState<DocTemplate | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [templates, setTemplates] = useState<DocTemplate[]>([]);
+  const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
+  const [typeFilter, setTypeFilter] = useState<'all' | 'b2c' | 'b2b'>('all');
+  const [editor, setEditor] = useState<EditorState | null>(null);
 
-  const fillTemplate = (template: DocTemplate): string => {
+  const blankEditor: EditorState = {
+    mode: 'template',
+    id: null,
+    name: '',
+    type: 'custom',
+    customer_type: 'both',
+    subject: '',
+    body: `<div class="doc-header">
+  <div class="doc-logo">⚡ Hlektrismos.gr</div>
+  <div class="doc-title">ΤΙΤΛΟΣ ΕΓΓΡΑΦΟΥ</div>
+  <div class="doc-date">{{current_date}}</div>
+</div>
+
+<div class="doc-section">
+  <h3>Πελάτης</h3>
+  <table class="doc-table">
+    <tr><td><strong>Ονοματεπώνυμο:</strong></td><td>{{lead.first_name}} {{lead.last_name}}</td></tr>
+    <tr><td><strong>Τηλέφωνο:</strong></td><td>{{lead.phone}}</td></tr>
+    <tr><td><strong>Email:</strong></td><td>{{lead.email}}</td></tr>
+  </table>
+</div>
+
+<div class="doc-section">
+  <p>Κείμενο εγγράφου...</p>
+</div>`,
+    footer: 'Hlektrismos.gr — Ηλεκτροενέργεια για όλους | ΑΦΜ: 000000000 | ΓΕΜΗ: 00000000000',
+  };
+
+  // Load templates from DB; seed defaults on first run
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('doc_templates').select('*').order('created_at', { ascending: true });
+      if (!data || data.length === 0) {
+        const { data: seeded } = await supabase.from('doc_templates').insert(defaultTemplates).select('*');
+        setTemplates(seeded || []);
+        return;
+      }
+      setTemplates(data as DocTemplate[]);
+    })();
+  }, []);
+
+  // Load saved documents
+  const loadDocuments = async () => {
+    const { data } = await supabase.from('crm_documents').select('*').order('updated_at', { ascending: false });
+    setDocuments(data || []);
+  };
+  useEffect(() => { loadDocuments(); }, []);
+
+  const fillTemplate = (template: DocTemplate): string => fillTemplateRaw(template.body);
+
+  const fillTemplateRaw = (rawBody: string): string => {
     const now = new Date();
     const validityDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const replacements: Record<string, string> = {
@@ -273,43 +348,11 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
       '{{customer_afm}}': customFields['customer_afm'] || '',
     };
 
-    let result = template.body;
+    let result = rawBody;
     for (const [key, value] of Object.entries(replacements)) {
       result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
     }
     return result;
-  };
-
-  const handlePrint = (template: DocTemplate) => {
-    const filledBody = fillTemplate(template);
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      setToast?.({ msg: 'Αποκλείστηκε το popup. Επιτρέψτε popups.', type: 'info' });
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="el">
-      <head>
-        <meta charset="UTF-8">
-        <title>${template.subject}</title>
-        <style>
-          body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 20mm 18mm 25mm 18mm; color: #1f2937; font-size: 12px; line-height: 1.5; }
-          ${docStyles}
-        </style>
-      </head>
-      <body>
-        ${filledBody}
-        <div class="doc-footer">${template.footer}</div>
-        <script>
-          window.onload = function() { window.print(); }
-        <\/script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    setToast?.({ msg: `Αρχείο ${template.name} δημιουργήθηκε!`, type: 'success' });
   };
 
   const handleDownloadPdf = (template: DocTemplate) => {
@@ -339,10 +382,132 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
     setToast?.({ msg: `HTML αρχείο κατέβηκε. Χρησιμοποιήστε Ctrl+P → Save as PDF.`, type: 'success' });
   };
 
+  const buildWordHtml = (subject: string, filledBody: string, footer: string) => `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+  <meta charset='utf-8'>
+  <title>${subject}</title>
+  <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+  <style>
+    @page { size: A4; margin: 2cm 1.8cm; }
+    body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; font-size: 12pt; line-height: 1.5; color: #1f2937; }
+    ${docStyles}
+  </style>
+</head>
+<body>
+${filledBody}
+<div class="doc-footer">${footer}</div>
+</body>
+</html>`;
+
+  const handleDownloadWord = (name: string, subject: string, rawBody: string, footer: string) => {
+    const html = buildWordHtml(subject, fillTemplateRaw(rawBody), footer);
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${name.replace(/[\\/:*?"<>|]/g, '_')}.doc`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setToast?.({ msg: `Το Word αρχείο "${name}.doc" κατέβηκε!`, type: 'success' });
+  };
+
+  const saveEditor = async () => {
+    if (!editor || !editor.name.trim()) {
+      setToast?.({ msg: 'Συμπλήρωσε όνομα.', type: 'info' });
+      return;
+    }
+    if (editor.mode === 'template') {
+      const payload = {
+        name: editor.name,
+        type: editor.type,
+        customer_type: editor.customer_type,
+        subject: editor.subject,
+        body: editor.body,
+        footer: editor.footer,
+      };
+      const { data, error } = editor.id
+        ? await supabase.from('doc_templates').update(payload).eq('id', editor.id).select('*')
+        : await supabase.from('doc_templates').insert(payload).select('*');
+      if (error) {
+        setToast?.({ msg: 'Σφάλμα αποθήκευσης template.', type: 'info' });
+        return;
+      }
+      setTemplates(prev => editor.id
+        ? prev.map(t => t.id === editor.id ? (data?.[0] as DocTemplate) : t)
+        : [...prev, ...(data || []) as DocTemplate[]]);
+      setToast?.({ msg: `Template "${editor.name}" αποθηκεύτηκε!`, type: 'success' });
+    } else {
+      const payload = {
+        title: editor.name,
+        subject: editor.subject,
+        body: editor.body,
+        footer: editor.footer,
+        lead_id: lead?.id || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = editor.id
+        ? await supabase.from('crm_documents').update(payload).eq('id', editor.id).select('*')
+        : await supabase.from('crm_documents').insert(payload).select('*');
+      if (error) {
+        setToast?.({ msg: 'Σφάλμα αποθήκευσης εγγράφου.', type: 'info' });
+        return;
+      }
+      await loadDocuments();
+      setToast?.({ msg: `Έγγραφο "${editor.name}" αποθηκεύτηκε!`, type: 'success' });
+    }
+    setEditor(null);
+  };
+
+  const deleteTemplate = async (id: string, name: string) => {
+    if (!window.confirm(`Διαγραφή template "${name}";`)) return;
+    await supabase.from('doc_templates').delete().eq('id', id);
+    setTemplates(prev => prev.filter(t => t.id !== id));
+    setToast?.({ msg: 'Το template διαγράφηκε.', type: 'info' });
+  };
+
+  const deleteDocument = async (id: string, title: string) => {
+    if (!window.confirm(`Διαγραφή εγγράφου "${title}";`)) return;
+    await supabase.from('crm_documents').delete().eq('id', id);
+    setDocuments(prev => prev.filter(d => d.id !== id));
+    setToast?.({ msg: 'Το έγγραφο διαγράφηκε.', type: 'info' });
+  };
+
+  const openEditor = (mode: EditorState['mode'], source?: Partial<EditorState>) =>
+    setEditor({ ...blankEditor, mode, ...source });
+
+  const handlePrintRaw = (subject: string, rawBody: string, footer: string) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setToast?.({ msg: 'Αποκλείστηκε το popup. Επιτρέψτε popups.', type: 'info' });
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="el">
+      <head>
+        <meta charset="UTF-8">
+        <title>${subject}</title>
+        <style>
+          body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 20mm 18mm 25mm 18mm; color: #1f2937; font-size: 12px; line-height: 1.5; }
+          ${docStyles}
+        </style>
+      </head>
+      <body>
+        ${fillTemplateRaw(rawBody)}
+        <div class="doc-footer">${footer}</div>
+        <script>
+          window.onload = function() { window.print(); }
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="dash-content">
       <div className="dash-content-header">
-        <p>Δημιουργία εγγράφων: προσφορές, συμβάσεις, εξουσιοδοτήσεις — με αυτόματη συμπλήρωση στοιχείων πελάτη.</p>
+        <p>Δημιουργία εγγράφων: προσφορές, συμβάσεις, εξουσιοδοτήσεις — με αυτόματη συμπλήρωση στοιχείων πελάτη. Εξαγωγή σε Word (.doc), PDF ή εκτύπωση.</p>
       </div>
 
       {lead && (
@@ -351,22 +516,30 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
         </div>
       )}
 
-      {Object.keys(customFields).length > 0 && (
-        <div className="scraper-config" style={{ marginBottom: '20px' }}>
-          <h3>Προσαρμοσμένα Πεδία</h3>
-          <div className="scraper-config-grid">
-            {Object.entries(customFields).map(([key, val]) => (
-              <div className="drawer-field" key={key}>
-                <label>{key.replace(/_/g, ' ')}</label>
-                <input type="text" value={val} onChange={(e) => setCustomFields({ ...customFields, [key]: e.target.value })} />
-              </div>
-            ))}
-          </div>
+      {/* ═══ TEMPLATES ═══ */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <h3 style={{ fontSize: '15px', margin: 0 }}>📋 Templates Εγγράφων</h3>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {(['all', 'b2c', 'b2b'] as const).map(f => (
+            <button key={f} onClick={() => setTypeFilter(f)} style={{
+              padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              border: '1px solid var(--border)',
+              background: typeFilter === f ? 'var(--text)' : 'var(--surface)',
+              color: typeFilter === f ? 'var(--bg)' : 'var(--text-muted)',
+            }}>
+              {f === 'all' ? 'Όλα' : f === 'b2c' ? 'B2C' : 'B2B'}
+            </button>
+          ))}
+          <button className="btn btn-primary" style={{ fontSize: '12px' }} onClick={() => openEditor('template')}>
+            <Plus size={14} /> Νέο Template
+          </button>
         </div>
-      )}
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-        {templates.map((template) => (
+        {templates
+          .filter(t => typeFilter === 'all' || t.customer_type === typeFilter || t.customer_type === 'both')
+          .map((template) => (
           <div key={template.id} style={{
             background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px',
             padding: '20px', transition: 'all 0.2s',
@@ -379,26 +552,66 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
               }}>
                 <FileText size={18} />
               </div>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <strong style={{ fontSize: '14px', color: 'var(--text)' }}>{template.name}</strong>
-                <div style={{ fontSize: '11px', color: typeColors[template.type], fontWeight: 600 }}>{typeLabels[template.type]}</div>
+                <div style={{ fontSize: '11px', fontWeight: 600, display: 'flex', gap: '8px' }}>
+                  <span style={{ color: typeColors[template.type] }}>{typeLabels[template.type]}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>· {customerTypeLabels[template.customer_type]}</span>
+                </div>
               </div>
+              <button title="Επεξεργασία" onClick={() => openEditor('template', { id: template.id, name: template.name, type: template.type, customer_type: template.customer_type, subject: template.subject, body: template.body, footer: template.footer })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}><Pencil size={14} /></button>
+              <button title="Διαγραφή" onClick={() => deleteTemplate(template.id, template.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 size={14} /></button>
             </div>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
               {template.subject}
             </p>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" style={{ flex: 1, fontSize: '12px' }} onClick={() => handleDownloadWord(template.name + (lead ? `_${lead.first_name}` : ''), template.subject, template.body, template.footer)}>
+                <FileDown size={14} /> Word
+              </button>
               <button className="btn btn-secondary" style={{ flex: 1, fontSize: '12px' }} onClick={() => handleDownloadPdf(template)}>
                 <Download size={14} /> PDF
               </button>
-              <button className="btn btn-primary" style={{ flex: 1, fontSize: '12px' }} onClick={() => handlePrint(template)}>
+              <button className="btn btn-secondary" style={{ flex: 1, fontSize: '12px' }} onClick={() => handlePrintRaw(template.subject, template.body, template.footer)}>
                 <Eye size={14} /> Εκτύπωση
+              </button>
+              <button title="Νέο έγγραφο από αυτό το template" onClick={() => openEditor('document', { name: `${template.name} — ${new Date().toLocaleDateString('el-GR')}`, subject: template.subject, body: fillTemplate(template), footer: template.footer })} style={{ padding: '6px 10px', borderRadius: '8px', fontSize: '12px', border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <Plus size={14} />
               </button>
             </div>
           </div>
         ))}
       </div>
 
+      {/* ═══ SAVED DOCUMENTS ═══ */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '28px 0 14px', flexWrap: 'wrap', gap: '10px' }}>
+        <h3 style={{ fontSize: '15px', margin: 0 }}>📄 Αποθηκευμένα Έγγραφα ({documents.length})</h3>
+        <button className="btn btn-primary" style={{ fontSize: '12px' }} onClick={() => openEditor('document')}>
+          <Plus size={14} /> Νέο Έγγραφο
+        </button>
+      </div>
+      {documents.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(0,0,0,0.03)', borderRadius: '12px', color: 'var(--text-muted)', fontSize: '13px' }}>
+          Δεν υπάρχουν αποθηκευμένα έγγραφα. Δημιούργησε νέο ή ξεκίνα από ένα template.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {documents.map((doc) => (
+            <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px' }}>
+              <FileText size={18} style={{ color: '#0066cc', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.title}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Ενημερώθηκε: {new Date(doc.created_at).toLocaleDateString('el-GR')}</div>
+              </div>
+              <button title="Word" onClick={() => handleDownloadWord(doc.title, doc.subject, doc.body, doc.footer)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0066cc', padding: '4px' }}><FileDown size={16} /></button>
+              <button title="Επεξεργασία" onClick={() => openEditor('document', { mode: 'document', id: doc.id, name: doc.title, subject: doc.subject, body: doc.body, footer: doc.footer })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}><Pencil size={15} /></button>
+              <button title="Διαγραφή" onClick={() => deleteDocument(doc.id, doc.title)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 size={15} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ═══ CUSTOM FIELDS ═══ */}
       <div style={{ marginTop: '24px' }}>
         <h3 style={{ fontSize: '14px', marginBottom: '10px' }}>Προσαρμογή Πεδίων</h3>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
@@ -420,6 +633,67 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
           ))}
         </div>
       </div>
+
+      {/* ═══ EDITOR MODAL ═══ */}
+      {editor && (
+        <div onClick={() => setEditor(null)} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(900px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg)', borderRadius: '16px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', margin: 0 }}>
+                {editor.mode === 'template' ? (editor.id ? 'Επεξεργασία Template' : 'Νέο Template') : (editor.id ? 'Επεξεργασία Εγγράφου' : 'Νέο Έγγραφο')}
+              </h3>
+              <button onClick={() => setEditor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: editor.mode === 'template' ? '2fr 1fr 1fr' : '2fr', gap: '12px', marginBottom: '12px' }}>
+              <div className="drawer-field">
+                <label>{editor.mode === 'template' ? 'Όνομα Template' : 'Τίτλος Εγγράφου'} *</label>
+                <input type="text" value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} />
+              </div>
+              {editor.mode === 'template' && (
+                <>
+                  <div className="drawer-field">
+                    <label>Τύπος</label>
+                    <select value={editor.type} onChange={(e) => setEditor({ ...editor, type: e.target.value as EditorState['type'] })}>
+                      {Object.entries(typeLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div className="drawer-field">
+                    <label>Κατηγορία Πελάτη</label>
+                    <select value={editor.customer_type} onChange={(e) => setEditor({ ...editor, customer_type: e.target.value as EditorState['customer_type'] })}>
+                      <option value="b2c">B2C Ιδιώτες</option>
+                      <option value="b2b">B2B Επιχειρήσεις</option>
+                      <option value="both">Κοινό</option>
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="drawer-field" style={{ marginBottom: '12px' }}>
+              <label>Θέμα / Υπότιτλος</label>
+              <input type="text" value={editor.subject} onChange={(e) => setEditor({ ...editor, subject: e.target.value })} />
+            </div>
+            <div className="drawer-field" style={{ marginBottom: '12px' }}>
+              <label>Κείμενο Εγγράφου (HTML — υποστηρίζει placeholders π.χ. {'{{lead.first_name}}'})</label>
+              <textarea value={editor.body} onChange={(e) => setEditor({ ...editor, body: e.target.value })} rows={16} style={{ fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.6 }} />
+            </div>
+            <div className="drawer-field" style={{ marginBottom: '16px' }}>
+              <label>Υποσέλιδο</label>
+              <input type="text" value={editor.footer} onChange={(e) => setEditor({ ...editor, footer: e.target.value })} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => handlePrintRaw(editor.subject || editor.name, editor.body, editor.footer)}>
+                <Eye size={14} /> Προεπισκόπηση
+              </button>
+              <button className="btn btn-secondary" onClick={() => setEditor(null)}>Άκυρο</button>
+              <button className="btn btn-primary" onClick={saveEditor}>
+                <Save size={14} /> Αποθήκευση
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

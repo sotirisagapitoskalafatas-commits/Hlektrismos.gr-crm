@@ -309,11 +309,58 @@ export default function DashboardPage() {
   }, []);
 
   // Conversation management functions
-  const createNewConversation = () => {
+  useEffect(() => {
+    (async () => {
+      const { data: threads } = await supabase
+        .from('chat_threads')
+        .select('id, title, context_id, selected_agents, created_at, updated_at')
+        .eq('source', 'agent_hub')
+        .order('updated_at', { ascending: false })
+        .limit(50);
+      if (!threads?.length) return;
+      const { data: msgs } = await supabase
+        .from('chat_messages')
+        .select('thread_id, role, content')
+        .in('thread_id', threads.map(t => t.id))
+        .order('created_at', { ascending: true });
+      const convs = threads.map(t => ({
+        id: t.id as string,
+        title: t.title || 'Νέα Συνομιλία',
+        messages: (msgs || []).filter(m => m.thread_id === t.id).map(m => ({ role: m.role as 'user' | 'assistant', text: m.content })),
+        selectedAgents: (t.selected_agents as string[]) || [],
+        contextId: t.context_id,
+        createdAt: new Date(t.created_at),
+        updatedAt: new Date(t.updated_at),
+      })).filter(c => c.messages.length > 0);
+      if (!activeConversationId && convs.length > 0) {
+        setActiveConversationId(convs[0].id);
+        setHubSelectedAgents(convs[0].selectedAgents);
+      }
+      setHubConversations(prev => {
+        const localOnly = prev.filter(p => !convs.some(c => c.id === p.id));
+        return [...convs, ...localOnly];
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const createNewConversation = async () => {
+    const welcome = 'Γεια σου! Είμαι ο Master Orchestrator της Hlektrismos.gr. Πώς μπορώ να σε βοηθήσω με τα AI agents;';
+    const { data: thread, error } = await supabase
+      .from('chat_threads')
+      .insert({
+        title: `Νέα Συνομιλία ${hubConversations.length + 1}`,
+        source: 'agent_hub',
+        selected_agents: [],
+      })
+      .select('id')
+      .single();
+    if (error) return;
+    await supabase.from('chat_messages').insert({ thread_id: thread.id, role: 'assistant', content: welcome });
     const newConv = {
-      id: crypto.randomUUID(),
+      id: thread.id,
       title: `Νέα Συνομιλία ${hubConversations.length + 1}`,
-      messages: [{ role: 'assistant' as const, text: 'Γεια σου! Είμαι ο Master Orchestrator της Hlektrismos.gr. Πώς μπορώ να σε βοηθήσω με τα AI agents;' }],
+      messages: [{ role: 'assistant' as const, text: welcome }],
       selectedAgents: [],
       contextId: null,
       createdAt: new Date(),
@@ -324,15 +371,20 @@ export default function DashboardPage() {
     setHubSelectedAgents([]);
   };
 
-  const deleteConversation = (convId: string) => {
+  const deleteConversation = async (convId: string) => {
+    if (!window.confirm('Διαγραφή συνομιλίας; Η ενέργεια είναι μη αναστρέψιμη.')) return;
     setHubConversations(prev => prev.filter(c => c.id !== convId));
+    supabase.from('chat_messages').delete().eq('thread_id', convId).then(() => {});
+    await supabase.from('chat_threads').delete().eq('id', convId);
     if (activeConversationId === convId) {
-      setActiveConversationId(hubConversations.length > 1 ? hubConversations.find(c => c.id !== convId)?.id || null : null);
+      const remaining = hubConversations.filter(c => c.id !== convId);
+      setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
     }
   };
 
   const updateConversationTitle = (convId: string, title: string) => {
     setHubConversations(prev => prev.map(c => c.id === convId ? { ...c, title } : c));
+    supabase.from('chat_threads').update({ title }).eq('id', convId).then(() => {});
   };
 
   const toggleAgentInConversation = (agentId: string) => {
@@ -2011,7 +2063,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
   createNewConversation: () => void;
-  deleteConversation: (id: string) => void;
+  deleteConversation: (id: string) => void | Promise<void>;
   updateConversationTitle: (id: string, title: string) => void;
   toggleAgentInConversation: (agentId: string) => void;
 }) {
@@ -2050,12 +2102,15 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
       }
       return c;
     }));
-    
+
+    supabase.from('chat_messages').insert({ thread_id: activeConversationId, role: 'user', content: userMsg }).then(() => {});
+
     setHubLoading(true);
 
     try {
       const activeConv = conversations.find(c => c.id === activeConversationId);
       const contextId = activeConv?.contextId || crypto.randomUUID();
+      const isFirstUserMsg = (activeConv?.messages.filter(m => m.role === 'user').length || 0) === 0;
       const { data, error } = await supabase.functions.invoke('orchestrator', {
         body: {
           message: userMsg,
@@ -2070,18 +2125,27 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
       });
 
       if (error) throw error;
-      
+
       setHubConversations(prev => prev.map(c => {
         if (c.id === activeConversationId) {
           return {
             ...c,
             messages: [...c.messages, { role: 'assistant', text: data.reply }],
             contextId: data.context_id || c.contextId,
+            title: isFirstUserMsg ? userMsg.slice(0, 50) : c.title,
             updatedAt: new Date(),
           };
         }
         return c;
       }));
+      supabase.from('chat_messages').insert({ thread_id: activeConversationId, role: 'assistant', content: data.reply }).then(() => {});
+      const threadUpdate: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+        context_id: data.context_id || contextId,
+        selected_agents: hubSelectedAgents,
+      };
+      if (isFirstUserMsg) threadUpdate.title = userMsg.slice(0, 50);
+      supabase.from('chat_threads').update(threadUpdate).eq('id', activeConversationId).then(() => {});
     } catch (e: any) {
       setHubConversations(prev => prev.map(c => {
         if (c.id === activeConversationId) {
@@ -2128,7 +2192,7 @@ function AgentHubTab({ agents, conversations, activeConversationId, setActiveCon
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{conv.messages.length} μηνύματα · {conv.updatedAt.toLocaleDateString('el-GR')}</div>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '12px', opacity: 0.6 }}>🗑️</button>
+              <button title="Διαγραφή συνομιλίας" onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px', fontSize: '13px', borderRadius: '6px', flexShrink: 0 }}>🗑</button>
             </div>
           ))}
           {conversations.length === 0 && (

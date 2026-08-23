@@ -1915,3 +1915,83 @@ img { display: block; max-width: 100%; }
 }
 .advantage-card { border-color: rgba(52, 211, 153, 0.26); }
 .advantage-card:hover { border-color: rgba(52, 211, 153, 0.55); }
+
+/* ── Gallery: 3D containers with scroll depth ──────────────────────────────
+   Layer stack per card:
+   .gallery-item  → GSAP scroll entrance (inline transforms)
+   .gallery-float → idle bobbing keyframes (CSS animation)
+   .gallery-tilt  → cursor-driven rotateX/rotateY via --rx/--ry custom props
+   .gallery-media → GSAP scrubbed parallax (photo drifts slower than card)
+   .gallery-glare → cursor-tracked light sheen (--gx/--gy)
+   .gallery-3d-card → overlay content lifted via translateZ                     */
+.gallery-item { overflow: visible; }
+.gallery-float {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+}
+@keyframes gallery-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+.gallery-item:nth-child(odd) .gallery-float { animation: gallery-float 7s ease-in-out infinite; }
+.gallery-item:nth-child(even) .gallery-float { animation: gallery-float 8.5s ease-in-out 1.4s infinite; }
+
+.gallery-tilt {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.3s cubic-bezier(0.22, 0.68, 0.32, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+  will-change: transform;
+  box-shadow: 0 18px 44px rgba(3, 7, 18, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.22);
+}
+.gallery-item:hover .gallery-tilt {
+  border-color: rgba(52, 211, 153, 0.6);
+  box-shadow:
+    0 30px 70px rgba(3, 7, 18, 0.55),
+    0 0 36px rgba(16, 185, 129, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.gallery-media {
+  position: absolute;
+  inset: -9% 0;
+  transform: translateZ(0);
+  will-change: transform;
+}
+.gallery-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.gallery-item:hover .gallery-media img { transform: scale(1.08); }
+
+.gallery-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.16), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.gallery-item:hover .gallery-glare { opacity: 1; }
+
+.gallery-3d-card {
+  transform: translateZ(46px) translateY(20px);
+}
+.gallery-item:hover .gallery-3d-card {
+  transform: translateZ(46px) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-item .gallery-float { animation: none !important; }
+  .gallery-tilt,
+  .gallery-media img,
+  .gallery-3d-card { transition: none !important; }
+}

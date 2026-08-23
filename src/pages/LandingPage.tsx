@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
@@ -239,6 +239,63 @@ export default function LandingPage() {
     io.observe(el);
     return () => io.disconnect();
   }, [journeyMapLive]);
+
+  // Gallery: cursor-following 3D tilt + glare, scroll-scrubbed depth entrance
+  // and photo/card parallax. Entirely skipped under prefers-reduced-motion.
+  const galleryReducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const handleGalleryTilt = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (galleryReducedMotion) return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.setProperty('--ry', `${(px * 10).toFixed(2)}deg`);
+    el.style.setProperty('--rx', `${(-py * 8).toFixed(2)}deg`);
+    el.style.setProperty('--gx', `${((px + 0.5) * 100).toFixed(1)}%`);
+    el.style.setProperty('--gy', `${((py + 0.5) * 100).toFixed(1)}%`);
+  };
+
+  const resetGalleryTilt = (e: ReactMouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.setProperty('--rx', '0deg');
+    e.currentTarget.style.setProperty('--ry', '0deg');
+  };
+
+  useEffect(() => {
+    if (galleryReducedMotion) return;
+    const ctx = gsap.context(() => {
+      gsap.utils.toArray<HTMLElement>('.gallery-item').forEach((item) => {
+        gsap.fromTo(
+          item,
+          { y: 90, opacity: 0, rotateX: 12, scale: 0.94, transformPerspective: 1100 },
+          {
+            y: 0,
+            opacity: 1,
+            rotateX: 0,
+            scale: 1,
+            duration: 1.05,
+            ease: 'power3.out',
+            scrollTrigger: { trigger: item, start: 'top 88%', once: true },
+          },
+        );
+        const media = item.querySelector('.gallery-media');
+        if (media) {
+          gsap.fromTo(
+            media,
+            { yPercent: -5 },
+            {
+              yPercent: 5,
+              ease: 'none',
+              scrollTrigger: { trigger: item, start: 'top bottom', end: 'bottom top', scrub: true },
+            },
+          );
+        }
+      });
+    });
+    return () => ctx.revert();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Force light mode on the public landing page (CRM dashboard keeps its dark theme).
   useEffect(() => {
@@ -581,16 +638,27 @@ export default function LandingPage() {
               {galleryItems.map((item, i) => (
                 <div
                   key={item.title}
-                  className={`gallery-item ${item.wide ? 'gallery-item-wide' : ''} ${i % 2 === 0 ? 'reveal-left' : 'reveal-right'} stagger-${i + 1}`}
+                  className={`gallery-item ${item.wide ? 'gallery-item-wide' : ''}`}
                   onClick={() => setGalleryModal(i)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <img src={item.image} alt={item.title} loading="lazy" />
-                  <div className="gallery-3d-card">
-                    <div className="gallery-card-inner">
-                      <h3>{item.title}</h3>
-                      <p>{item.subtitle}</p>
-                      <span className="gallery-card-cta">Μάθε περισσότερα →</span>
+                  <div className="gallery-float">
+                    <div
+                      className="gallery-tilt"
+                      onMouseMove={handleGalleryTilt}
+                      onMouseLeave={resetGalleryTilt}
+                    >
+                      <div className="gallery-media">
+                        <img src={item.image} alt={item.title} loading="lazy" />
+                      </div>
+                      <div className="gallery-glare" aria-hidden="true" />
+                      <div className="gallery-3d-card">
+                        <div className="gallery-card-inner">
+                          <h3>{item.title}</h3>
+                          <p>{item.subtitle}</p>
+                          <span className="gallery-card-cta">Μάθε περισσότερα →</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -66,13 +66,19 @@ function GreeceMapboxMap({ activeRegion, progressRef, className }: GreeceMap3DPr
         })
         mapRef.current = map
 
-        const fail = () => {
-          if (!cancelled) setStatus('failed')
+        const fail = (reason: string) => {
+          if (cancelled) return
+          console.warn(`[GreeceMap3D] Mapbox unavailable: ${reason} — falling back to stylised terrain.`)
+          setStatus('failed')
         }
-        failTimer = window.setTimeout(fail, 10000)
+        // Hard deadline: if the style hasn't loaded in 10s, give up.
+        failTimer = window.setTimeout(() => fail('style load timeout (10s)'), 10000)
+
+        // ANY error before 'load' means the map can't be trusted → fall back fast.
         map.on('error', (e) => {
           const err = e as unknown as { error?: { status?: number; message?: string } }
-          if (err?.error?.status === 401 || /unauthorized|token/i.test(err?.error?.message ?? '')) fail()
+          const msg = err?.error?.message ?? String((e as unknown as { message?: string })?.message ?? 'unknown error')
+          if (!cancelled && !map.loaded()) fail(msg)
         })
 
         map.on('load', () => {
@@ -95,7 +101,8 @@ function GreeceMapboxMap({ activeRegion, progressRef, className }: GreeceMap3DPr
           })
           setStatus('ready')
         })
-      } catch {
+      } catch (e) {
+        console.warn('[GreeceMap3D] Mapbox failed to initialise:', e)
         setStatus('failed')
       }
     }
@@ -127,8 +134,19 @@ function GreeceMapboxMap({ activeRegion, progressRef, className }: GreeceMap3DPr
   }
 
   return (
-    <div className={className} style={{ position: 'relative', background: '#04101f' }}>
-      <div ref={containerRef} className="absolute inset-0" />
+    <div
+      className={className}
+      style={{ position: 'relative', width: '100%', height: '100%', minHeight: '320px', background: '#04101f' }}
+    >
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      {status === 'loading' && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-emerald-500/30 bg-slate-950/80 px-5 py-2.5 backdrop-blur-md">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-400/30 border-t-emerald-400" />
+            <span className="text-xs font-semibold tracking-wide text-slate-300">Φόρτωση δορυφορικού χάρτη…</span>
+          </div>
+        </div>
+      )}
       {status === 'ready' && (
         <div className="pointer-events-none absolute left-4 top-4 z-10">
           <div className="rounded-2xl border border-emerald-500/50 bg-slate-950/85 px-4 py-2.5 shadow-2xl backdrop-blur-xl transition-all duration-500">

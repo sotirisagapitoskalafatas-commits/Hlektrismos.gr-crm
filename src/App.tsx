@@ -11,7 +11,6 @@ import ContactPage from '@/pages/ContactPage';
 import TermsOfUse from '@/pages/TermsOfUse';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Cookies from '@/pages/Cookies';
-import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 import { scrollToTarget } from '@/hooks/useLenis';
 
 function ScrollToTop() {
@@ -70,7 +69,6 @@ function Router() {
     }
     return <DashboardPage />;
   }
-
   if (route === 'about') return <AboutPage />;
   if (route === 'services') return <ServicesPage />;
   if (route === 'energy') return <EnergyPage />;
@@ -87,8 +85,10 @@ export default function App() {
   return (
     <AuthProvider>
       <ScrollToTop />
+      {/* Security: the CRM AI assistant is mounted ONLY inside DashboardPage
+          (authenticated route). Never place it here — it must not render on
+          public routes or leak CRM capabilities to anonymous visitors. */}
       <Router />
-      <CrmAiAssistantWidget />
     </AuthProvider>
   );
 }

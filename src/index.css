@@ -1845,3 +1845,73 @@ img { display: block; max-width: 100%; }
     rgba(6, 11, 20, 0.78) 100%
   );
 }
+
+/* ── Login contrast over the dark orb background ─────────────────────────── */
+.login-card {
+  background: linear-gradient(160deg, rgba(13, 22, 38, 0.94), rgba(7, 12, 22, 0.88));
+}
+.login-page .login-card h1 {
+  color: #ffffff;
+  text-shadow: 0 2px 14px rgba(120, 220, 255, 0.35), 0 4px 26px rgba(0, 0, 0, 0.65);
+}
+.login-page .login-sub { color: rgba(226, 240, 248, 0.85); }
+.login-page .login-field label { color: rgba(226, 240, 248, 0.88); }
+.login-page .login-demo-hint { color: rgba(200, 222, 236, 0.7); }
+.login-page .login-demo-message { color: #7fe8c0; }
+.login-page .login-toggle,
+.login-page .login-back { color: #7fe8c0; }
+.login-page .form-error { color: #ffb4a8; }
+
+/* ── 3D floating-glass panels ────────────────────────────────────────────── */
+.journey-region-card,
+.journey-stop,
+.login-card {
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  box-shadow:
+    0 25px 60px rgba(3, 7, 18, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+.journey-region-card:hover,
+.journey-stop:hover,
+.login-card:hover {
+  border-color: rgba(52, 211, 153, 0.65);
+  box-shadow:
+    0 30px 70px rgba(3, 7, 18, 0.95),
+    0 0 42px rgba(16, 185, 129, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.journey-region-card {
+  background: linear-gradient(165deg, rgba(10, 18, 32, 0.9), rgba(5, 9, 18, 0.84));
+  transform: perspective(1200px) rotateX(1.5deg);
+}
+.journey-stop {
+  background: linear-gradient(165deg, rgba(10, 18, 32, 0.86), rgba(5, 9, 18, 0.8));
+  border-radius: 18px;
+}
+.journey-stop.active {
+  border-color: rgba(52, 211, 153, 0.8);
+  box-shadow:
+    0 30px 70px rgba(3, 7, 18, 0.95),
+    0 0 46px rgba(16, 185, 129, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transform: perspective(1200px) rotateX(1.5deg) translateY(-4px);
+}
+.journey-stop h3 { color: #f4f8fc; }
+.journey-stop p { color: rgba(226, 240, 248, 0.78); }
+.journey-stop strong { color: rgba(240, 248, 252, 0.92); }
+.journey-stop-number { color: #48d9c9; }
+.journey-stop:not(.visible) { opacity: 0.35; transform: translateY(24px); }
+
+.advantage-card,
+.form-card,
+.pillar-card,
+.price-card {
+  box-shadow:
+    0 22px 55px rgba(3, 7, 18, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.advantage-card { border-color: rgba(52, 211, 153, 0.26); }
+.advantage-card:hover { border-color: rgba(52, 211, 153, 0.55); }

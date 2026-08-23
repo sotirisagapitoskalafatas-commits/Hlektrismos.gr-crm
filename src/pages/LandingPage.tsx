@@ -219,6 +219,26 @@ export default function LandingPage() {
   const journeySectionRef = useRef<HTMLElement>(null);
   const journeyFillRef = useRef<HTMLSpanElement>(null);
   const journeyProgressRef = useRef(0);
+  const journeyMapWrapRef = useRef<HTMLDivElement>(null);
+  // The 3D map (Mapbox chunk + tiles) is heavy — mount it only when the
+  // journey section approaches the viewport instead of on page load.
+  const [journeyMapLive, setJourneyMapLive] = useState(false);
+
+  useEffect(() => {
+    const el = journeyMapWrapRef.current;
+    if (!el || journeyMapLive) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setJourneyMapLive(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '800px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [journeyMapLive]);
 
   // Force light mode on the public landing page (CRM dashboard keeps its dark theme).
   useEffect(() => {
@@ -493,8 +513,10 @@ export default function LandingPage() {
         <section className="greece-journey" id="journey" ref={journeySectionRef}>
           {/* Sticky viewport: the 3D map stays pinned while info cards scroll past */}
           <div className="journey-sticky">
-            <div className="journey-map-wrap" aria-hidden="true">
-              <GreeceMap3D activeRegion={journeyIndex} progressRef={journeyProgressRef} className="journey-canvas" />
+            <div className="journey-map-wrap" aria-hidden="true" ref={journeyMapWrapRef}>
+              {journeyMapLive && (
+                <GreeceMap3D activeRegion={journeyIndex} progressRef={journeyProgressRef} className="journey-canvas" />
+              )}
             </div>
             <div className="journey-map-vignette" />
 
@@ -522,7 +544,10 @@ export default function LandingPage() {
           <div className="container">
             <div className="journey-stops">
               {greekJourney.map((stop, index) => (
-                <article className={index === journeyIndex ? 'journey-stop active reveal visible' : 'journey-stop reveal'} key={stop.city}>
+                <article
+                  className={`journey-stop reveal visible${index === journeyIndex ? ' active' : ''}`}
+                  key={stop.city}
+                >
                   <span className="journey-stop-number">0{index + 1}</span>
                   <div><span className="journey-stop-region">{stop.region}</span><h3>{stop.title}</h3><p>{stop.text}</p><strong>{stop.city}</strong></div>
                 </article>

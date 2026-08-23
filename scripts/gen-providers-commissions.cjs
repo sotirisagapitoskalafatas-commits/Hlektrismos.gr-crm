@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+const fs = require('fs');
+const path = require('path');
+
+const content = `import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { TrendingUp, DollarSign, Zap, Users, BarChart3, ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
 import { PROVIDERS_AND_PROGRAMS, PROVIDER_COLORS } from '../constants/energyData';
@@ -152,7 +155,7 @@ export default function ProvidersCommissionsTab() {
           {sorted.map(g => {
             const color = PROVIDER_COLORS[g.provider] || '#6b7280';
             return (
-              <div key={g.provider} style={{ padding: 20, background: 'var(--surface)', border: `1px solid ${color}30`, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div key={g.provider} style={{ padding: 20, background: 'var(--surface)', border: \`1px solid \${color}30\`, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 4, height: 32, borderRadius: 2, background: color, flexShrink: 0 }} />
                   <div>
@@ -169,7 +172,7 @@ export default function ProvidersCommissionsTab() {
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Προγράμματα (κλικ για προβολή πελατών):</div>
                   {Object.entries(g.programs).map(([prog, data]) => {
-                    const key = `${g.provider}::${prog}`;
+                    const key = \`\${g.provider}::\${prog}\`;
                     const expanded = expandedPrograms.has(key);
                     const colorMap: Record<string, { bg: string; text: string }> = {
                       green: { bg: '#dcfce7', text: '#166534' }, blue: { bg: '#dbeafe', text: '#1e40af' },
@@ -179,7 +182,7 @@ export default function ProvidersCommissionsTab() {
                     const progColor = progInfo?.color || 'blue';
                     const colors = colorMap[progColor] || colorMap.blue;
                     return (
-                      <div key={prog} style={{ border: `1px solid ${expanded ? color + '50' : 'var(--border)'}`, borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                      <div key={prog} style={{ border: \`1px solid \${expanded ? color + '50' : 'var(--border)'}\`, borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
                         <button onClick={() => toggleProgram(key)} style={{
                           width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           padding: '7px 10px', background: expanded ? 'var(--bg)' : 'transparent',
@@ -222,7 +225,7 @@ export default function ProvidersCommissionsTab() {
                                   {/* Inline status edit */}
                                   <select value={sp.status} onChange={e => updateSupplyField(sp.id, 'status', e.target.value)}
                                     title="Αλλαγή κατάστασης"
-                                    style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, border: `1px solid ${st.color}40`, background: `${st.color}10`, color: st.color, cursor: 'pointer', fontWeight: 600 }}>
+                                    style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, border: \`1px solid \${st.color}40\`, background: \`\${st.color}10\`, color: st.color, cursor: 'pointer', fontWeight: 600 }}>
                                     {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                   </select>
 
@@ -277,3 +280,7 @@ export default function ProvidersCommissionsTab() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync(path.join(__dirname, '..', 'src', 'components', 'ProvidersCommissionsTab.tsx'), content, 'utf8');
+console.log('ProvidersCommissionsTab.tsx written:', content.length, 'bytes');

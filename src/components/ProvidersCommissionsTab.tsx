@@ -15,6 +15,7 @@ interface Agent { id: string; full_name: string; }
 interface ProviderGroup {
   provider: string; supplyCount: number; totalCommission: number;
   programs: Record<string, { count: number; commission: number; monthlyCost: number }>;
+  agents: Record<string, { name: string; count: number; commission: number }>;
 }
 
 export default function ProvidersCommissionsTab() {
@@ -40,7 +41,7 @@ export default function ProvidersCommissionsTab() {
   const groups: Record<string, ProviderGroup> = {};
   for (const sp of supplyPoints) {
     const pname = sp.provider_name || 'Άγνωστος';
-    if (!groups[pname]) groups[pname] = { provider: pname, supplyCount: 0, totalCommission: 0, programs: {} };
+    if (!groups[pname]) groups[pname] = { provider: pname, supplyCount: 0, totalCommission: 0, programs: {}, agents: {} };
     groups[pname].supplyCount += 1;
     groups[pname].totalCommission += sp.estimated_commission || 0;
     const prog = sp.program_name || 'Άγνωστο';
@@ -48,6 +49,12 @@ export default function ProvidersCommissionsTab() {
     groups[pname].programs[prog].count += 1;
     groups[pname].programs[prog].commission += sp.estimated_commission || 0;
     groups[pname].programs[prog].monthlyCost += sp.monthly_cost || 0;
+    if (sp.sales_agent_id) {
+      const aname = agentName(sp.sales_agent_id);
+      if (!groups[pname].agents[sp.sales_agent_id]) groups[pname].agents[sp.sales_agent_id] = { name: aname, count: 0, commission: 0 };
+      groups[pname].agents[sp.sales_agent_id].count += 1;
+      groups[pname].agents[sp.sales_agent_id].commission += sp.estimated_commission || 0;
+    }
   }
 
   const sorted = Object.values(groups).sort((a, b) => b.supplyCount - a.supplyCount);
@@ -117,6 +124,21 @@ export default function ProvidersCommissionsTab() {
                     );
                   })}
                 </div>
+
+                {Object.keys(g.agents).length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Πωλητές:</div>
+                    {Object.values(g.agents).sort((a, b) => b.commission - a.commission).map(ag => (
+                      <div key={ag.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 10px', marginBottom: 3 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text)' }}>👤 {ag.name}</span>
+                        <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
+                          <span style={{ color: '#3b82f6', fontWeight: 600 }}>{ag.count} παροχές</span>
+                          <span style={{ color: '#10b981', fontWeight: 600 }}>€{ag.commission.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

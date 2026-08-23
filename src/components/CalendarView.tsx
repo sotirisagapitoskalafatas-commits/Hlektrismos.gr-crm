@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Plus, User, MapPin, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Loader2 } from 'lucide-react';
+import { Calendar, Clock, Plus, User, MapPin, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Loader2, Pencil } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type CalendarEvent = {
@@ -64,6 +64,7 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
     notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const year = selectedDate.getFullYear();
   const month = selectedDate.getMonth();
@@ -107,28 +108,67 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
     setLoading(false);
   };
 
-  const createEvent = async () => {
+  const saveEvent = async () => {
     if (!form.title.trim()) return;
     setSaving(true);
     const start = new Date(`${form.start_date}T${form.start_time}`);
     const end = new Date(`${form.start_date}T${form.end_time}`);
-    const { error } = await supabase.from('calendar_events').insert({
+    const payload = {
       title: form.title,
       description: form.description || null,
       event_type: form.event_type,
       lead_id: form.lead_id || null,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      status: 'scheduled',
       location: form.location || null,
       notes: form.notes || null,
-    });
+    };
+    let error;
+    if (editingId) {
+      ({ error } = await supabase.from('calendar_events').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editingId));
+    } else {
+      ({ error } = await supabase.from('calendar_events').insert({ ...payload, status: 'scheduled' }));
+    }
     if (!error) {
       setShowForm(false);
+      setEditingId(null);
       setForm({ title: '', description: '', event_type: 'meeting', lead_id: '', start_date: new Date().toISOString().slice(0, 10), start_time: '09:00', end_time: '10:00', location: '', notes: '' });
       loadEvents();
     }
     setSaving(false);
+  };
+
+  const openEdit = (ev: CalendarEvent) => {
+    setEditingId(ev.id);
+    const startDate = ev.start_time.slice(0, 10);
+    const startTime = ev.start_time.slice(11, 16);
+    let endDate = startDate;
+    let endTime = '10:00';
+    if (ev.end_time) {
+      endTime = ev.end_time.slice(11, 16);
+    }
+    setForm({
+      title: ev.title,
+      description: ev.description || '',
+      event_type: ev.event_type,
+      lead_id: ev.lead_id || '',
+      start_date: startDate,
+      start_time: startTime || '09:00',
+      end_time: endTime,
+      location: ev.location || '',
+      notes: ev.notes || '',
+    });
+    // If event is on a different month than currently viewed, jump to it
+    const d = new Date(ev.start_time);
+    if (d.getFullYear() !== selectedDate.getFullYear() || d.getMonth() !== selectedDate.getMonth()) {
+      setSelectedDate(d);
+    }
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -176,7 +216,7 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
           </p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => { setEditingId(null); setShowForm(true); }}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
         >
           <Plus size={16} /> Νέο Event
@@ -256,6 +296,7 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
                   }}
                   onClick={() => {
                     if (day) {
+                      setEditingId(null);
                       setForm(prev => ({ ...prev, start_date: dateStr }));
                       setShowForm(true);
                     }
@@ -276,7 +317,7 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
                       {dayEvents.slice(0, 3).map(ev => {
                         const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
                         return (
-                          <div key={ev.id} onClick={(e) => e.stopPropagation()} style={{
+                          <div key={ev.id} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${ev.title} — κλικ για επεξεργασία`} style={{
                             fontSize: 10, padding: '2px 4px', borderRadius: 4,
                             background: colors.bg, color: colors.fg,
                             marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -314,10 +355,11 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
                   {dayEvents.map(ev => {
                     const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
                     return (
-                      <div key={ev.id} style={{
+                      <div key={ev.id} onClick={() => openEdit(ev)} style={{
                         fontSize: 10, padding: 6, borderRadius: 6,
                         background: colors.bg, color: colors.fg,
                         marginBottom: 4, border: `1px solid ${colors.fg}22`,
+                        cursor: 'pointer',
                       }}>
                         <div style={{ fontWeight: 600 }}>{ev.title}</div>
                         <div style={{ fontSize: 9, opacity: 0.7 }}>{new Date(ev.start_time).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })}</div>
@@ -359,9 +401,17 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => openEdit(ev)} title="Επεξεργασία / Μετακίνηση" style={{ background: '#0066cc15', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#0066cc' }}>
+                      <Pencil size={14} />
+                    </button>
                     {ev.status === 'scheduled' && (
                       <button onClick={() => updateStatus(ev.id, 'completed')} title="Ολοκληρώθηκε" style={{ background: '#00c87815', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#00c878' }}>
                         <CheckCircle size={14} />
+                      </button>
+                    )}
+                    {ev.status === 'completed' && (
+                      <button onClick={() => updateStatus(ev.id, 'scheduled')} title="Επαναφορά σε Προγραμματισμένο" style={{ background: '#f59e0b15', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#f59e0b' }}>
+                        <Clock size={14} />
                       </button>
                     )}
                     <button onClick={() => deleteEvent(ev.id)} title="Διαγραφή" style={{ background: '#ef444415', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#ef4444' }}>
@@ -385,7 +435,7 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
             const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
             const lead = leads.find(l => l.id === ev.lead_id);
             return (
-              <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid #f3f4f6' }}>
+              <div key={ev.id} onClick={() => openEdit(ev)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: colors.bg, color: colors.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Calendar size={14} />
                 </div>
@@ -401,6 +451,7 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
                 <span style={{ padding: '2px 8px', borderRadius: 6, background: colors.bg, color: colors.fg, fontSize: 10, fontWeight: 600 }}>
                   {STATUS_LABELS[ev.status] || ev.status}
                 </span>
+                <Pencil size={12} style={{ color: '#9ca3af' }} />
               </div>
             );
           })}
@@ -410,13 +461,15 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
         </div>
       </div>
 
-      {/* New Event Modal */}
+      {/* New/Edit Event Modal */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: 480, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Plus size={18} /> Νέο Event</h3>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><XCircle size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {editingId ? <><Pencil size={18} /> Επεξεργασία Event</> : <><Plus size={18} /> Νέο Event</>}
+              </h3>
+              <button onClick={closeForm} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><XCircle size={20} /></button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -469,12 +522,19 @@ export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>Ακύρωση</button>
-              <button onClick={createEvent} disabled={!form.title.trim() || saving} style={{ padding: '8px 16px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
-                {saving ? 'Αποθήκευση...' : 'Δημιουργία'}
-              </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'space-between' }}>
+              {editingId && (
+                <button onClick={() => { deleteEvent(editingId); closeForm(); }} style={{ padding: '8px 16px', background: '#ef444415', color: '#ef4444', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Trash2 size={14} /> Διαγραφή
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                <button onClick={closeForm} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>Ακύρωση</button>
+                <button onClick={saveEvent} disabled={!form.title.trim() || saving} style={{ padding: '8px 16px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : editingId ? <CheckCircle size={14} /> : <Plus size={14} />}
+                  {saving ? 'Αποθήκευση...' : editingId ? 'Ενημέρωση' : 'Δημιουργία'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -44,6 +44,7 @@ import MarketRagFolders from '@/components/MarketRagFolders';
 import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 import NotificationBell from '@/components/NotificationBell';
 import CalendarView from '@/components/CalendarView';
+import OverviewSalesTracker from '@/components/OverviewSalesTracker';
 import MarketRAGSearch from '@/components/MarketRAGSearch';
 import LiveVoiceSupervisor from '@/components/LiveVoiceSupervisor';
 import EntityDetailWindow from '@/components/EntityDetailWindow';
@@ -952,6 +953,8 @@ export default function DashboardPage() {
                     {agents.filter(a => !a.deleted_at).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Δεν υπάρχουν agents.</p>}
                   </div>
                 </div>
+
+                <OverviewSalesTracker />
 
                 {/* Quick Actions */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', marginTop: '24px' }}>

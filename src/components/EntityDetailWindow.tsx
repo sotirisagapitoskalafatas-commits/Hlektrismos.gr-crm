@@ -18,6 +18,12 @@ interface EntityDocument {
 
 interface Agent { id: string; full_name: string; }
 
+interface AgentAttribution {
+  id: string; customer_id: string; agent_id: string | null;
+  customer_type: string; attribution_type: string;
+  commission_pct: number | null; notes: string | null; created_at: string;
+}
+
 interface EntityDetailWindowProps {
   entityId: string;
   entityType: 'lead' | 'customer';
@@ -38,6 +44,7 @@ const DOC_TYPES = [
 const TABS = [
   { key: 'general', label: 'Γενικά' },
   { key: 'supplies', label: 'Παροχές' },
+  { key: 'agents', label: 'Συνεργάτες' },
   { key: 'documents', label: 'Έγγραφα' },
   { key: 'offers', label: 'Προσφορές' },
 ];
@@ -81,16 +88,19 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     sales_agent_id: '', estimated_commission: '0', monthly_cost: '',
   });
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [attributions, setAttributions] = useState<AgentAttribution[]>([]);
+  const [newAttr, setNewAttr] = useState({ agent_id: '', attribution_type: 'primary', commission_pct: '100' });
 
   const table = sourceTable === 'leads' ? 'hlektrismos_leads' : entityType === 'customer' ? 'hlektrismos_customers' : 'hlektrismos_leads';
 
   const loadEntity = useCallback(async () => {
     setLoading(true);
-    const [entityRes, supplyRes, docsRes, agentsRes] = await Promise.all([
+    const [entityRes, supplyRes, docsRes, agentsRes, attrRes] = await Promise.all([
       supabase.from(table).select('*').eq('id', entityId).single(),
       supabase.from('supply_points').select('*').eq('entity_id', entityId).eq('entity_type', entityType).order('created_at', { ascending: false }),
       supabase.from('entity_documents').select('*').eq('entity_id', entityId).eq('entity_type', entityType).order('created_at', { ascending: false }),
       supabase.from('sales_agents').select('id, full_name').eq('active', true),
+      supabase.from('customer_agent_attribution').select('*').eq('customer_id', entityId).order('created_at', { ascending: true }),
     ]);
     if (entityRes.data) {
       const e = entityRes.data;
@@ -109,6 +119,7 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     if (supplyRes.data) setSupplyPoints(supplyRes.data as SupplyPoint[]);
     if (docsRes.data) setDocuments(docsRes.data as EntityDocument[]);
     if (agentsRes.data) setAgents(agentsRes.data as Agent[]);
+    if (attrRes.data) setAttributions(attrRes.data as AgentAttribution[]);
     setLoading(false);
   }, [entityId, entityType, table]);
 
@@ -534,6 +545,122 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
     );
   };
 
+  const addAttribution = async () => {
+    if (!newAttr.agent_id) return;
+    const { error } = await supabase.from('customer_agent_attribution').insert({
+      customer_id: entityId,
+      agent_id: newAttr.agent_id,
+      customer_type: entityType === 'customer' ? 'customer' : 'lead',
+      attribution_type: newAttr.attribution_type,
+      commission_pct: parseFloat(newAttr.commission_pct) || 100,
+    });
+    if (error) { setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' }); return; }
+    setNewAttr({ agent_id: '', attribution_type: 'primary', commission_pct: '100' });
+    setToast({ msg: 'Ο πωλητής συνδέθηκε.', type: 'success' });
+    loadEntity();
+    onSaved?.();
+  };
+
+  const removeAttribution = async (id: string) => {
+    if (!confirm('Αφαίρεση σύνδεσης πωλητή;')) return;
+    const { error } = await supabase.from('customer_agent_attribution').delete().eq('id', id);
+    if (error) { setToast({ msg: `Σφάλμα: ${error.message}`, type: 'error' }); return; }
+    setToast({ msg: 'Αφαιρέθηκε.', type: 'success' });
+    loadEntity();
+    onSaved?.();
+  };
+
+  const updateAttributionPct = async (id: string, pct: string) => {
+    await supabase.from('customer_agent_attribution').update({ commission_pct: parseFloat(pct) || 0 }).eq('id', id);
+    loadEntity();
+  };
+
+  const ATTR_TYPE_LABELS: Record<string, { label: string; bg: string; fg: string }> = {
+    primary: { label: 'Κύριος', bg: '#dbeafe', fg: '#1e40af' },
+    secondary: { label: 'Δευτερεύων', bg: '#f3e8ff', fg: '#7e22ce' },
+    referral: { label: 'Συστάσεις', bg: '#fef9c3', fg: '#854d0e' },
+  };
+
+  const renderAgents = () => {
+    const usedAgentIds = attributions.map(a => a.agent_id);
+    const availableAgents = agents.filter(a => !usedAgentIds.includes(a.id));
+    return (
+      <div>
+        <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+          Συνεργάτες Πώλησης ({attributions.length})
+        </h3>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
+          Ένας πελάτης μπορεί να έχει συμβόλαιο με πολλούς πωλητές. Η κατανομή προμήθειας καθορίζεται από το ποσοστό.
+        </p>
+
+        {/* Add attribution form */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '2 1 180px' }}>
+            <label style={labelS}>Πωλητής</label>
+            <select value={newAttr.agent_id} onChange={e => setNewAttr(a => ({ ...a, agent_id: e.target.value }))} style={inputS}>
+              <option value="">-- Επιλέξτε --</option>
+              {availableAgents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: '1 1 130px' }}>
+            <label style={labelS}>Τύπος Σύνδεσης</label>
+            <select value={newAttr.attribution_type} onChange={e => setNewAttr(a => ({ ...a, attribution_type: e.target.value }))} style={inputS}>
+              <option value="primary">Κύριος</option>
+              <option value="secondary">Δευτερεύων</option>
+              <option value="referral">Συστάσεις</option>
+            </select>
+          </div>
+          <div style={{ width: 90 }}>
+            <label style={labelS}>Ποσοστό %</label>
+            <input type="number" min="0" max="100" value={newAttr.commission_pct} onChange={e => setNewAttr(a => ({ ...a, commission_pct: e.target.value }))} style={inputS} />
+          </div>
+          <button onClick={addAttribution} disabled={!newAttr.agent_id} style={{ ...btnP, opacity: newAttr.agent_id ? 1 : 0.5 }}>
+            <Plus size={14} /> Προσθήκη
+          </button>
+        </div>
+
+        {/* Attribution list */}
+        {attributions.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Δεν έχουν συνδεθεί πωλητές ακόμα.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {attributions.map(attr => {
+              const agent = agents.find(a => a.id === attr.agent_id);
+              const t = ATTR_TYPE_LABELS[attr.attribution_type] || ATTR_TYPE_LABELS.primary;
+              return (
+                <div key={attr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 16, background: '#eff6ff', display: 'grid', placeItems: 'center', fontSize: 14 }}>👤</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{agent?.full_name || 'Άγνωστος'}</div>
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 8px', borderRadius: 4, background: t.bg, color: t.fg }}>{t.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <input
+                      type="number" min="0" max="100"
+                      defaultValue={attr.commission_pct ?? 100}
+                      onBlur={e => updateAttributionPct(attr.id, e.target.value)}
+                      style={{ ...inputS, width: 70, textAlign: 'right', fontSize: 12 }}
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>% προμήθεια</span>
+                  </div>
+                  <button onClick={() => removeAttribution(attr.id)} style={btnD}><Trash2 size={13} /></button>
+                </div>
+              );
+            })}
+            {(() => {
+              const total = attributions.reduce((s, a) => s + (a.commission_pct || 0), 0);
+              return (
+                <div style={{ fontSize: 11, fontWeight: 700, color: total === 100 ? '#166534' : '#b45309', textAlign: 'right' }}>
+                  Σύνολο: {total}% {total !== 100 && '(πρέπει να είναι 100%)'}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'flex-end' }}>
@@ -611,6 +738,7 @@ export default function EntityDetailWindow({ entityId, entityType, sourceTable, 
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
           {activeTab === 'general' && renderGeneral()}
           {activeTab === 'supplies' && renderSupplies()}
+          {activeTab === 'agents' && renderAgents()}
           {activeTab === 'documents' && renderDocuments()}
           {activeTab === 'offers' && renderOffers()}
         </div>

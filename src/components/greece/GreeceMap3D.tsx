@@ -1,45 +1,161 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { GreeceTerrainR3F } from './GreeceTerrainR3F'
 
-/* ── Activation gate ───────────────────────────────────────────────────────
- * VITE_GOOGLE_MAPS_API_KEY must be a real Google Maps Platform key (AIza…)
- * with "Maps JavaScript API" + "Map Tiles API" enabled and billing active.
- * Anything else (missing key, Gemini/AI Studio keys, typos) silently keeps
- * the self-contained R3F terrain so production never breaks.
+/* ── Activation gates ──────────────────────────────────────────────────────
+ * Tier 1: Mapbox GL satellite + 3D terrain  (VITE_MAPBOX_TOKEN = pk.…)
+ * Tier 2: Google Earth photorealistic 3D    (VITE_GOOGLE_MAPS_API_KEY = AIza…)
+ * Tier 3: self-contained R3F stylised terrain (always available fallback)
+ * Invalid/missing keys silently fall down the chain — production never breaks.
  * ──────────────────────────────────────────────────────────────────────── */
-const MAPS_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() ?? ''
-const EARTH_ENABLED = /^AIza/.test(MAPS_KEY)
+const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN as string | undefined)?.trim() ?? ''
+const GOOGLE_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() ?? ''
 
-interface FlightStop {
-  id: string
+const REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+interface RegionStop {
   name: string
-  /** "lat,lng" */
-  center: string
-  range: number
-  tilt: number
+  subtitle: string
+  center: [number, number]
+  zoom: number
+  pitch: number
+  bearing: number
 }
 
-const FLIGHT_PLAN: FlightStop[] = [
-  { id: 'attiki',    name: 'Αττική',         center: '37.9838,23.7275', range: 45000,  tilt: 50 },
-  { id: 'sterea',    name: 'Στερεά Ελλάδα',  center: '38.6500,22.4000', range: 75000,  tilt: 55 },
-  { id: 'makedonia', name: 'Βόρεια Ελλάδα',  center: '40.6401,22.9444', range: 85000,  tilt: 50 },
-  { id: 'ionio',     name: 'Ιόνια Νησιά',    center: '38.6000,20.7000', range: 95000,  tilt: 55 },
-  { id: 'aigaio',    name: 'Αιγαίο',         center: '37.4467,25.3289', range: 110000, tilt: 50 },
-  { id: 'kriti',     name: 'Κρήτη',          center: '35.2401,24.8093', range: 60000,  tilt: 50 },
+const REGIONS: RegionStop[] = [
+  { name: 'Attica',          center: [23.7275, 37.9838], zoom: 11,   pitch: 65, bearing: -20, subtitle: 'Αθήνα — Κέντρο Ενέργειας' },
+  { name: 'Central Greece',  center: [22.4, 38.65],      zoom: 9,    pitch: 60, bearing: 10,  subtitle: 'Στερεά Ελλάδα — Δίκτυο' },
+  { name: 'Northern Greece', center: [22.9444, 40.6401], zoom: 10,   pitch: 65, bearing: 15,  subtitle: 'Θεσσαλονίκη — Βόρειος Κόμβος' },
+  { name: 'Ionian Islands',  center: [20.7, 38.6],       zoom: 9.5,  pitch: 70, bearing: -30, subtitle: 'Ιόνιο — Νησιωτική Διαχείριση' },
+  { name: 'Aegean Islands',  center: [25.3289, 37.4467], zoom: 9,    pitch: 65, bearing: 45,  subtitle: 'Αιγαίο — Ανανεώσιμες Πηγές' },
+  { name: 'Crete',           center: [24.8093, 35.2401], zoom: 9.5,  pitch: 65, bearing: 0,   subtitle: 'Κρήτη — Πράσινη Μετάβαση' },
 ]
+
+/* ── Tier 1 · Mapbox GL ──────────────────────────────────────────────────── */
+
+type MapStatus = 'loading' | 'ready' | 'failed'
+
+function GreeceMapboxMap({ activeRegion, progressRef, className }: GreeceMap3DProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<import('mapbox-gl').Map | null>(null)
+  const [status, setStatus] = useState<MapStatus>('loading')
+  const stop = REGIONS[activeRegion] ?? REGIONS[0]
+
+  useEffect(() => {
+    let cancelled = false
+    let failTimer = 0
+
+    async function init() {
+      try {
+        // Lazy-load: keeps ~800 kB of mapbox-gl out of the main bundle.
+        const mapboxgl = (await import('mapbox-gl')).default
+        await import('mapbox-gl/dist/mapbox-gl.css')
+        if (cancelled || !containerRef.current) return
+
+        mapboxgl.accessToken = MAPBOX_TOKEN
+        const map = new mapboxgl.Map({
+          container: containerRef.current,
+          style: 'mapbox://styles/mapbox/satellite-streets-v12',
+          center: REGIONS[0].center,
+          zoom: REGIONS[0].zoom,
+          pitch: REGIONS[0].pitch,
+          bearing: REGIONS[0].bearing,
+          projection: 'globe',
+          interactive: false,
+          attributionControl: true,
+        })
+        mapRef.current = map
+
+        const fail = () => {
+          if (!cancelled) setStatus('failed')
+        }
+        failTimer = window.setTimeout(fail, 10000)
+        map.on('error', (e) => {
+          const err = e as unknown as { error?: { status?: number; message?: string } }
+          if (err?.error?.status === 401 || /unauthorized|token/i.test(err?.error?.message ?? '')) fail()
+        })
+
+        map.on('load', () => {
+          if (cancelled) return
+          window.clearTimeout(failTimer)
+          map.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512,
+            maxzoom: 14,
+          })
+          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.6 })
+          map.setFog({
+            range: [0.5, 10],
+            color: '#030712',
+            'horizon-blend': 0.1,
+            'high-color': '#0f172a',
+            'space-color': '#020617',
+            'star-intensity': 0.5,
+          })
+          setStatus('ready')
+        })
+      } catch {
+        setStatus('failed')
+      }
+    }
+    void init()
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(failTimer)
+      mapRef.current?.remove()
+      mapRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (status !== 'ready' || !map) return
+    map.flyTo({
+      center: stop.center,
+      zoom: stop.zoom,
+      pitch: stop.pitch,
+      bearing: stop.bearing,
+      duration: REDUCED_MOTION ? 0 : 2600,
+      essential: true,
+    })
+  }, [activeRegion, status]) // eslint-disable-line react-hooks/exhaustive-deps -- `stop` derives from activeRegion
+
+  if (status === 'failed') {
+    return <GreeceTerrainR3F activeRegion={activeRegion} progressRef={progressRef} className={className} />
+  }
+
+  return (
+    <div className={className} style={{ position: 'relative', background: '#04101f' }}>
+      <div ref={containerRef} className="absolute inset-0" />
+      {status === 'ready' && (
+        <div className="pointer-events-none absolute left-4 top-4 z-10">
+          <div className="rounded-2xl border border-emerald-500/50 bg-slate-950/85 px-4 py-2.5 shadow-2xl backdrop-blur-xl transition-all duration-500">
+            <div className="flex items-center gap-2.5">
+              <span className="h-3 w-3 animate-ping rounded-full bg-emerald-400 shadow-[0_0_12px_#34d9b4]" />
+              <div>
+                <h4 className="text-sm font-extrabold tracking-wide text-white">{stop.name}</h4>
+                <p className="text-[11px] font-medium text-emerald-300">{stop.subtitle}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Tier 2 · Google Earth 3D web component ─────────────────────────────── */
 
 type MapsStatus = 'loading' | 'ready' | 'failed'
 
-/** Injects the Maps JS API (maps3d library) once, then waits for <gmp-map-3d>. */
 function useGoogleMaps3d(enabled: boolean): MapsStatus {
   const [status, setStatus] = useState<MapsStatus>('loading')
 
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-
-    // If the element still isn't defined after 10s (bad key, blocked network),
-    // give up and let the caller fall back to the R3F terrain.
     const failTimer = window.setTimeout(() => {
       if (!cancelled && !customElements.get('gmp-map-3d')) setStatus('failed')
     }, 10000)
@@ -48,7 +164,7 @@ function useGoogleMaps3d(enabled: boolean): MapsStatus {
       try {
         if (!document.querySelector('script[data-gmaps-3d="true"]')) {
           const s = document.createElement('script')
-          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&v=weekly&libraries=maps3d`
+          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&v=weekly&libraries=maps3d`
           s.async = true
           s.dataset.gmaps3d = 'true'
           document.head.appendChild(s)
@@ -73,6 +189,16 @@ function useGoogleMaps3d(enabled: boolean): MapsStatus {
   return status
 }
 
+/** "lat,lng" flight plan for gmp-map-3d flyCameraTo. */
+const GOOGLE_FLIGHT_PLAN = [
+  { id: 'attiki',    name: 'Αττική',        center: '37.9838,23.7275', range: 45000,  tilt: 50 },
+  { id: 'sterea',    name: 'Στερεά Ελλάδα', center: '38.65,22.4',      range: 75000,  tilt: 55 },
+  { id: 'makedonia', name: 'Βόρεια Ελλάδα', center: '40.6401,22.9444', range: 85000,  tilt: 50 },
+  { id: 'ionio',     name: 'Ιόνια Νησιά',   center: '38.6,20.7',       range: 95000,  tilt: 55 },
+  { id: 'aigaio',    name: 'Αιγαίο',        center: '37.4467,25.3289', range: 110000, tilt: 50 },
+  { id: 'kriti',     name: 'Κρήτη',         center: '35.2401,24.8093', range: 60000,  tilt: 50 },
+]
+
 function GoogleEarthMap({ activeRegion, progressRef, className }: GreeceMap3DProps) {
   const mapRef = useRef<HTMLElement | null>(null)
   const status = useGoogleMaps3d(true)
@@ -80,11 +206,12 @@ function GoogleEarthMap({ activeRegion, progressRef, className }: GreeceMap3DPro
   useEffect(() => {
     const el = mapRef.current as { flyCameraTo?: (o: unknown) => void } | null
     if (status !== 'ready' || !el || typeof el.flyCameraTo !== 'function') return
-    const stop = FLIGHT_PLAN[activeRegion] ?? FLIGHT_PLAN[0]
+    const idx = Math.min(Math.max(activeRegion, 0), GOOGLE_FLIGHT_PLAN.length - 1)
+    const stopG = GOOGLE_FLIGHT_PLAN[idx]
     el.flyCameraTo({
-      center: stop.center,
-      range: stop.range,
-      tilt: stop.tilt,
+      center: stopG.center,
+      range: stopG.range,
+      tilt: stopG.tilt,
       heading: 0,
       duration: 2000,
     })
@@ -103,8 +230,8 @@ function GoogleEarthMap({ activeRegion, progressRef, className }: GreeceMap3DPro
         tilt="45"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
-        {FLIGHT_PLAN.map((stop, idx) => (
-          <gmp-marker-3d key={stop.id} position={stop.center} altitude-mode="relative-to-ground">
+        {GOOGLE_FLIGHT_PLAN.map((stopG, idx) => (
+          <gmp-marker-3d key={stopG.id} position={stopG.center} altitude-mode="relative-to-ground">
             <div
               slot="content"
               className={`pointer-events-none rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-2xl transition-all duration-300 ${
@@ -113,7 +240,7 @@ function GoogleEarthMap({ activeRegion, progressRef, className }: GreeceMap3DPro
                   : 'border border-gray-700 bg-gray-900/90 backdrop-blur-md'
               }`}
             >
-              ⚡ {stop.name}
+              ⚡ {stopG.name}
             </div>
           </gmp-marker-3d>
         ))}
@@ -122,12 +249,14 @@ function GoogleEarthMap({ activeRegion, progressRef, className }: GreeceMap3DPro
   )
 }
 
+/* ── Public contract ─────────────────────────────────────────────────────── */
+
 export interface GreeceMap3DProps {
   /** Active city/region index — drives marker glow, HUD card & camera flight. */
   activeRegion: number
   /**
    * Continuous 0..1 scroll progress ref (consumed by the R3F fallback's camera
-   * rig; kept for contract stability across both implementations).
+   * rig; kept for contract stability across all implementations).
    */
   progressRef: MutableRefObject<number>
   className?: string
@@ -135,12 +264,15 @@ export interface GreeceMap3DProps {
 
 /**
  * Region map used inside the landing journey.
- * - Real Google Earth photorealistic 3D when VITE_GOOGLE_MAPS_API_KEY is set.
- * - Otherwise the self-contained stylised R3F terrain (no external calls).
+ * Mapbox satellite terrain when VITE_MAPBOX_TOKEN is set; Google Earth 3D when
+ * VITE_GOOGLE_MAPS_API_KEY is set; otherwise the self-contained R3F terrain.
  */
 export function GreeceMap3D({ activeRegion, progressRef, className }: GreeceMap3DProps) {
-  if (!EARTH_ENABLED) {
-    return <GreeceTerrainR3F activeRegion={activeRegion} progressRef={progressRef} className={className} />
+  if (/^pk\./.test(MAPBOX_TOKEN)) {
+    return <GreeceMapboxMap activeRegion={activeRegion} progressRef={progressRef} className={className} />
   }
-  return <GoogleEarthMap activeRegion={activeRegion} progressRef={progressRef} className={className} />
+  if (/^AIza/.test(GOOGLE_KEY)) {
+    return <GoogleEarthMap activeRegion={activeRegion} progressRef={progressRef} className={className} />
+  }
+  return <GreeceTerrainR3F activeRegion={activeRegion} progressRef={progressRef} className={className} />
 }

@@ -98,24 +98,36 @@ ${visitorContext}
 
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('CRM_AI_AGENT') || Deno.env.get('CRM_AI_AGENT_2') || '';
 
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`, {
+    // Thinking models spend output tokens on hidden reasoning — with a low
+    // maxOutputTokens the visible reply gets cut off mid-sentence. Raise the
+    // cap and disable thinking; fall back gracefully if the model rejects
+    // thinkingConfig.
+    const buildRequestBody = (disableThinking: boolean) => ({
+      system_instruction: {
+        parts: [{ text: systemPrompt }]
+      },
+      contents: geminiMessages,
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 2048,
+        ...(disableThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      }
+    });
+
+    const callGemini = (body: any) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-goog-api-key': geminiApiKey,
       },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        contents: geminiMessages,
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 300,
-        }
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(30000),
     })
+
+    let geminiResponse = await callGemini(buildRequestBody(true));
+    if (!geminiResponse.ok) {
+      geminiResponse = await callGemini(buildRequestBody(false));
+    }
 
     const aiData = await geminiResponse.json()
     

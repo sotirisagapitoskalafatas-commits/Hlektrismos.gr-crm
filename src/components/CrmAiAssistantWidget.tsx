@@ -70,20 +70,17 @@ export default function CrmAiAssistantWidget({ leads = [], tariffs = [] }: { lea
       const contextId = localStorage.getItem('crm_ai_widget_session') || crypto.randomUUID();
       localStorage.setItem('crm_ai_widget_session', contextId);
 
-      const res = await fetch('https://bkzkefiqpoqbihdcxixj.supabase.co/functions/v1/orchestrator', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
+      const { data, error: fnError } = await supabase.functions.invoke('orchestrator', {
+        body: {
           message: msg,
           mode: 'chat',
           context_id: contextId,
           api_key: apiKey,
           model,
-        }),
+        },
       });
 
-      const data = await res.json();
-      const reply = data.reply || data.error || 'Σφάλμα κλήσης AI.';
+      const reply = data?.reply || data?.error || (fnError ? `Σφάλμα: ${fnError.message}` : 'Σφάλμα κλήσης AI.');
       setMessages(prev => [...prev, { role: 'assistant', text: reply, ts: Date.now() }]);
     } catch (err: any) {
       setMessages(prev => [...prev, { role: 'assistant', text: `❌ Σφάλμα: ${err.message}`, ts: Date.now() }]);

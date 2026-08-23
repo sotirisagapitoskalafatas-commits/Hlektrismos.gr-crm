@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bot, Send, X, Minimize2, Maximize2, Settings, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -95,9 +96,10 @@ export default function CrmAiAssistantWidget({ leads = [], tariffs = [] }: { lea
 
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
 
-  // Floating button
+  // Floating button — portal to <body> so ancestor transforms/backdrop-filters
+  // can't hijack position:fixed and clip the widget inside dashboard panels.
   if (!open) {
-    return (
+    return createPortal(
       <div
         onClick={() => setOpen(true)}
         style={{
@@ -112,12 +114,13 @@ export default function CrmAiAssistantWidget({ leads = [], tariffs = [] }: { lea
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       >
         <Bot size={28} color="#fff" />
-      </div>
+      </div>,
+      document.body,
     );
   }
 
   // Chat window
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
@@ -280,6 +283,7 @@ export default function CrmAiAssistantWidget({ leads = [], tariffs = [] }: { lea
           </div>
         </>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

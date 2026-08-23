@@ -1,543 +1,436 @@
-import { useEffect, useState } from 'react';
-import { Calendar, Clock, Plus, User, MapPin, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Loader2, Pencil } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Plus, ChevronLeft, ChevronRight, Settings, Search, Calendar as CalendarIcon,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import {
+  CalendarEvent, CRMContact, CalendarSettings, DEFAULT_CALENDAR_SETTINGS,
+} from '@/types/calendar';
+import {
+  CATEGORIES, CategoryKey, categoryOf, blankEvent, fetchContacts, dbToEvent, eventToDb,
+  fmtTime, sameDay, MONTHS_GR,
+} from './calendar/shared';
+import QuickCreatePopover from './calendar/QuickCreatePopover';
+import EventEditorModal from './calendar/EventEditorModal';
+import CalendarSettingsModal from './calendar/CalendarSettingsModal';
+import TimeGridView from './calendar/TimeGridView';
 
-type CalendarEvent = {
-  id: string;
-  lead_id: string | null;
-  agent_id: string | null;
-  title: string;
-  description: string | null;
-  event_type: string;
-  start_time: string;
-  end_time: string | null;
-  status: string;
-  location: string | null;
-  notes: string | null;
-  created_at: string;
-};
+type Lead = { id: string; first_name: string; last_name: string };
+type ViewMode = 'day' | 'week' | 'month' | 'year' | '4days';
 
-type Lead = { id: string; first_name: string; last_name: string; email: string; phone: string; company_name?: string };
+const SETTINGS_KEY = 'gcal_settings_v1';
 
-const EVENT_COLORS: Record<string, { bg: string; fg: string }> = {
-  meeting: { bg: '#0066cc15', fg: '#0066cc' },
-  call: { bg: '#00c87815', fg: '#00c878' },
-  follow_up: { bg: '#fffbeb', fg: '#f59e0b' },
-  deadline: { bg: '#ef444415', fg: '#ef4444' },
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  scheduled: 'Προγραμματισμένο',
-  completed: 'Ολοκληρώθηκε',
-  cancelled: 'Ακυρώθηκε',
-  no_show: 'Δεν εμφανίστηκε',
-};
-
-const WEEKDAYS = ['Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ', 'Κυρ'];
-
-function getMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const offset = firstDay === 0 ? 6 : firstDay - 1; // Monday start
-  const days: (number | null)[] = [];
-  for (let i = 0; i < offset; i++) days.push(null);
-  for (let d = 1; d <= daysInMonth; d++) days.push(d);
-  return days;
-}
-
-export default function CalendarView({ leads = [] }: { leads?: Lead[] }) {
+export default function CalendarView({ leads = [], initialDraft = null, onDraftConsumed }: {
+  leads?: Lead[];
+  initialDraft?: Partial<CalendarEvent> | null;
+  onDraftConsumed?: () => void;
+}) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [contacts, setContacts] = useState<CRMContact[]>([]);
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [quickSlot, setQuickSlot] = useState<Date | null>(null);
+  const [quickSeed, setQuickSeed] = useState<Partial<CalendarEvent> | undefined>();
+  const [fullEdit, setFullEdit] = useState<{ ev: CalendarEvent; isNew: boolean } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [filters, setFilters] = useState<Set<CategoryKey>>(new Set(Object.keys(CATEGORIES) as CategoryKey[]));
+  const [miniNav, setMiniNav] = useState({ y: new Date().getFullYear(), m: new Date().getMonth() });
 
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    event_type: 'meeting',
-    lead_id: '',
-    start_date: new Date().toISOString().slice(0, 10),
-    start_time: '09:00',
-    end_time: '10:00',
-    location: '',
-    notes: '',
+  const [settings, setSettings] = useState<CalendarSettings>(() => {
+    try { return { ...DEFAULT_CALENDAR_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; }
+    catch { return DEFAULT_CALENDAR_SETTINGS; }
   });
-  const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  const year = selectedDate.getFullYear();
-  const month = selectedDate.getMonth();
+  useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }, [settings]);
 
   useEffect(() => {
-    loadEvents();
+    (async () => {
+      setLoading(true);
+      const [{ data }, contactsList] = await Promise.all([
+        supabase.from('calendar_events').select('*').order('start_time', { ascending: true }),
+        fetchContacts(),
+      ]);
+      if (data) setEvents(data.map((r: any) => dbToEvent(r, settings.primaryTimeZone)));
+      setContacts(contactsList);
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-create follow-up reminder when a lead's status changes to 'follow_up'
+  // Email→Calendar bridge: consume prefill draft
   useEffect(() => {
-    const createFollowUpReminder = async (lead: any) => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(10, 0, 0, 0);
-      const nextWeek = new Date(tomorrow);
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      nextWeek.setHours(10, 0, 0, 0);
-      
-      await supabase.from('calendar_events').insert({
-        title: `📞 Follow-Up: ${lead.first_name} ${lead.last_name}`,
-        description: `Αυτόματο reminder για follow-up με ${lead.first_name} ${lead.last_name}. Email: ${lead.email || 'N/A'}, Τηλ: ${lead.phone || 'N/A'}`,
-        event_type: 'follow_up',
-        start_time: tomorrow.toISOString(),
-        end_time: nextWeek.toISOString(),
-        status: 'scheduled',
-        lead_id: lead.id,
-        notes: 'Αυτόματο reminder — lead μετατράπηκε σε follow_up status',
-      });
-    };
-    // This effect runs when leads prop changes - check for follow_up status
-    // (In practice this is triggered by parent component reloading data)
-  }, [leads]);
+    if (initialDraft) {
+      setFullEdit({ ev: blankEvent(settings, null, initialDraft as Partial<CalendarEvent>), isNew: true });
+      onDraftConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraft]);
 
-  const loadEvents = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('calendar_events')
-      .select('*')
-      .order('start_time', { ascending: true });
-    if (data) setEvents(data);
-    setLoading(false);
+  const visibleEvents = useMemo(() => events.filter(ev => {
+    if (!filters.has(categoryOf(ev))) return false;
+    if (!settings.showDeclinedEvents && ev.status === 'cancelled') return false;
+    if (!settings.showCompletedTasks && ev.status === 'completed') return false;
+    return true;
+  }), [events, filters, settings.showDeclinedEvents, settings.showCompletedTasks]);
+
+  /* ═══ NAVIGATION ═══ */
+  const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+  const weekStartOf = (d: Date): Date => {
+    const x = new Date(d); x.setHours(0, 0, 0, 0);
+    const startDow = settings.startWeekOn === 'Monday' ? 1 : 0;
+    const diff = (x.getDay() - startDow + 7) % 7;
+    return addDays(x, -diff);
   };
 
-  const saveEvent = async () => {
-    if (!form.title.trim()) return;
-    setSaving(true);
-    const start = new Date(`${form.start_date}T${form.start_time}`);
-    const end = new Date(`${form.start_date}T${form.end_time}`);
-    const payload = {
-      title: form.title,
-      description: form.description || null,
-      event_type: form.event_type,
-      lead_id: form.lead_id || null,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      location: form.location || null,
-      notes: form.notes || null,
-    };
-    let error;
-    if (editingId) {
-      ({ error } = await supabase.from('calendar_events').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editingId));
+  const navigate = (dir: number) => {
+    if (viewMode === 'month') setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + dir, 1));
+    else if (viewMode === 'year') setCurrentDate(new Date(currentDate.getFullYear() + dir, currentDate.getMonth(), 1));
+    else if (viewMode === 'week') setCurrentDate(addDays(currentDate, 7 * dir));
+    else setCurrentDate(addDays(currentDate, (viewMode === '4days' ? 4 : 1) * dir));
+  };
+
+  const rangeDays = (): Date[] => {
+    if (viewMode === 'day') return [new Date(currentDate)];
+    if (viewMode === '4days') return Array.from({ length: 4 }, (_, i) => addDays(currentDate, i));
+    const ws = weekStartOf(currentDate);
+    const count = settings.showWeekends ? 7 : 5;
+    return Array.from({ length: count }, (_, i) => addDays(ws, settings.startWeekOn === 'Monday' ? i : i)).slice(0, settings.startWeekOn === 'Monday' ? count : count);
+  };
+
+  const headerLabel = () => {
+    if (viewMode === 'year') return `${currentDate.getFullYear()}`;
+    if (viewMode === 'month') return `${MONTHS_GR[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+    if (viewMode === 'week' || viewMode === '4days') {
+      const days = rangeDays();
+      const a = days[0], b = days[days.length - 1];
+      if (a.getMonth() === b.getMonth()) return `${a.getDate()} – ${b.getDate()} ${MONTHS_GR[a.getMonth()].slice(0, 3)} ${a.getFullYear()}`;
+      return `${a.getDate()} ${MONTHS_GR[a.getMonth()].slice(0, 3)} – ${b.getDate()} ${MONTHS_GR[b.getMonth()].slice(0, 3)} ${b.getFullYear()}`;
+    }
+    return currentDate.toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  /* ═══ CRUD ═══ */
+  const persist = async (ev: CalendarEvent) => {
+    const db = eventToDb(ev);
+    if (ev.id) {
+      await supabase.from('calendar_events').update(db).eq('id', ev.id);
+      setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, ...ev } : e));
     } else {
-      ({ error } = await supabase.from('calendar_events').insert({ ...payload, status: 'scheduled' }));
+      const { data } = await supabase.from('calendar_events').insert(db).select().single();
+      if (data) setEvents(prev => [...prev, dbToEvent(data, settings.primaryTimeZone)].sort((a, b) => a.start_time.localeCompare(b.start_time)));
     }
-    if (!error) {
-      setShowForm(false);
-      setEditingId(null);
-      setForm({ title: '', description: '', event_type: 'meeting', lead_id: '', start_date: new Date().toISOString().slice(0, 10), start_time: '09:00', end_time: '10:00', location: '', notes: '' });
-      loadEvents();
-    }
-    setSaving(false);
+    setFullEdit(null); setQuickSlot(null);
   };
 
-  const openEdit = (ev: CalendarEvent) => {
-    setEditingId(ev.id);
-    const startDate = ev.start_time.slice(0, 10);
-    const startTime = ev.start_time.slice(11, 16);
-    let endDate = startDate;
-    let endTime = '10:00';
-    if (ev.end_time) {
-      endTime = ev.end_time.slice(11, 16);
-    }
-    setForm({
-      title: ev.title,
-      description: ev.description || '',
-      event_type: ev.event_type,
-      lead_id: ev.lead_id || '',
-      start_date: startDate,
-      start_time: startTime || '09:00',
-      end_time: endTime,
-      location: ev.location || '',
-      notes: ev.notes || '',
-    });
-    // If event is on a different month than currently viewed, jump to it
-    const d = new Date(ev.start_time);
-    if (d.getFullYear() !== selectedDate.getFullYear() || d.getMonth() !== selectedDate.getMonth()) {
-      setSelectedDate(d);
-    }
-    setShowForm(true);
-  };
-
-  const closeForm = () => {
-    setShowForm(false);
-    setEditingId(null);
-  };
-
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from('calendar_events').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
-    loadEvents();
-  };
-
-  const deleteEvent = async (id: string) => {
+  const removeEvent = async (id: string) => {
     await supabase.from('calendar_events').delete().eq('id', id);
-    loadEvents();
+    setEvents(prev => prev.filter(e => e.id !== id));
+    setFullEdit(null);
   };
 
-  const navigateMonth = (dir: number) => {
-    const d = new Date(year, month + dir, 1);
-    setSelectedDate(d);
+  /* ═══ MONTH GRID ═══ */
+  const monthGrid = useMemo(() => {
+    const y = currentDate.getFullYear(); const m = currentDate.getMonth();
+    const first = new Date(y, m, 1);
+    const startOffset = settings.startWeekOn === 'Monday'
+      ? (first.getDay() === 0 ? 6 : first.getDay() - 1)
+      : first.getDay();
+    const cells: Date[] = [];
+    for (let i = 0; i < 42; i++) cells.push(addDays(new Date(y, m, 1 - startOffset), i));
+    return cells;
+  }, [currentDate, settings.startWeekOn]);
+
+  const eventsForDay = (d: Date) => visibleEvents.filter(ev => {
+    const s = new Date(ev.start_time);
+    if (sameDay(s, d)) return true;
+    if (ev.end_time) {
+      const e = new Date(ev.end_time);
+      return d >= new Date(s.getFullYear(), s.getMonth(), s.getDate()) && d <= new Date(e.getFullYear(), e.getMonth(), e.getDate()) && (ev.is_all_day || true);
+    }
+    return false;
+  });
+
+  const peopleResults = peopleSearch.trim() === '' ? [] : contacts.filter(c =>
+    c.name.toLowerCase().includes(peopleSearch.toLowerCase())
+  ).slice(0, 6);
+
+  const openQuickWithGuest = (c: CRMContact) => {
+    const slot = new Date(); slot.setHours(slot.getHours() + 1, 0, 0, 0);
+    setQuickSeed({ guests: [c], color: '#039be5' });
+    setQuickSlot(slot);
+    setPeopleSearch('');
   };
 
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-
-  const getEventsForDate = (dateStr: string) =>
-    events.filter(e => e.start_time.slice(0, 10) === dateStr);
-
-  const days = getMonthDays(year, month);
-  const monthLabel = selectedDate.toLocaleDateString('el-GR', { month: 'long', year: 'numeric' });
-
-  // Stats
-  const upcomingCount = events.filter(e => e.status === 'scheduled' && new Date(e.start_time) >= today).length;
-  const completedCount = events.filter(e => e.status === 'completed').length;
-  const thisMonthEvents = events.filter(e => {
-    const d = new Date(e.start_time);
-    return d.getMonth() === month && d.getFullYear() === year;
-  }).length;
 
   return (
-    <div style={{ padding: 20, maxWidth: 1100, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Calendar size={22} /> Ημερολόγιο
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
-            Διαχείριση συναντήσεων, κλήσεων και follow-ups
-          </p>
-        </div>
+    <div className="flex h-[calc(100vh-130px)] bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm text-gray-800">
+      {/* ═══ LEFT SIDEBAR ═══ */}
+      <aside className="w-60 border-r border-gray-200 p-4 flex flex-col gap-5 shrink-0 overflow-y-auto select-none">
         <button
-          onClick={() => { setEditingId(null); setShowForm(true); }}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+          onClick={() => { setQuickSeed(undefined); setQuickSlot(new Date(today.setMinutes(0, 0, 0))); }}
+          className="flex items-center gap-3 px-5 py-3 rounded-full shadow-md border border-gray-200 hover:shadow-lg transition-all bg-white font-medium text-gray-700 w-fit"
         >
-          <Plus size={16} /> Νέο Event
+          <Plus className="w-6 h-6 text-blue-600" />
+          <span className="text-sm">Δημιουργία</span>
         </button>
-      </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          { label: 'Επερχόμενα', value: upcomingCount, color: '#0066cc' },
-          { label: 'Αυτόν τον μήνα', value: thisMonthEvents, color: '#00c878' },
-          { label: 'Ολοκληρωμένα', value: completedCount, color: '#f59e0b' },
-          { label: 'Σύνολο', value: events.length, color: '#6b7280' },
-        ].map((s, i) => (
-          <div key={i} style={{ padding: '12px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: `${s.color}10`, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Calendar size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>{s.label}</div>
+        {/* Mini calendar */}
+        <div className="border-b border-gray-100 pb-4">
+          <div className="flex items-center justify-between text-xs font-semibold mb-2">
+            <span>{MONTHS_GR[miniNav.m].slice(0, 3)} {miniNav.y}</span>
+            <div className="flex gap-0.5">
+              <button onClick={() => setMiniNav(miniNav.m === 0 ? { y: miniNav.y - 1, m: 11 } : { ...miniNav, m: miniNav.m - 1 })}><ChevronLeft className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setMiniNav(miniNav.m === 11 ? { y: miniNav.y + 1, m: 0 } : { ...miniNav, m: miniNav.m + 1 })}><ChevronRight className="w-3.5 h-3.5" /></button>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* View controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={() => navigateMonth(-1)} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: 6, cursor: 'pointer' }}><ChevronLeft size={16} /></button>
-          <span style={{ fontWeight: 700, fontSize: 16, minWidth: 160, textAlign: 'center' }}>{monthLabel}</span>
-          <button onClick={() => navigateMonth(1)} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: 6, cursor: 'pointer' }}><ChevronRight size={16} /></button>
-          <button onClick={() => setSelectedDate(new Date())} style={{ marginLeft: 8, padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Σήμερα</button>
+          <div className="grid grid-cols-7 text-center text-[10px] text-gray-400 font-medium mb-1">
+            {(settings.startWeekOn === 'Monday' ? ['Δ', 'Τ', 'Τ', 'Π', 'Π', 'Σ', 'Κ'] : ['Κ', 'Δ', 'Τ', 'Τ', 'Π', 'Π', 'Σ']).map((d, i) => <span key={i}>{d}</span>)}
+          </div>
+          <div className="grid grid-cols-7 text-center text-[10px] gap-y-0.5">
+            {(() => {
+              const first = new Date(miniNav.y, miniNav.m, 1);
+              const off = settings.startWeekOn === 'Monday' ? (first.getDay() === 0 ? 6 : first.getDay() - 1) : first.getDay();
+              const total = new Date(miniNav.y, miniNav.m + 1, 0).getDate();
+              return [
+                ...Array.from({ length: off }, () => null),
+                ...Array.from({ length: total }, (_, i) => i + 1),
+              ].map((day, i) => {
+                if (!day) return <span key={i} />;
+                const d = new Date(miniNav.y, miniNav.m, day);
+                const isToday = sameDay(d, today);
+                const isSelected = sameDay(d, currentDate);
+                return (
+                  <button key={i}
+                    onClick={() => { setCurrentDate(d); setViewMode(v => v === 'year' ? 'month' : v); }}
+                    className={`py-0.5 rounded-full hover:bg-gray-100 ${isToday ? 'bg-blue-600 text-white font-bold' : isSelected ? 'bg-blue-100 font-bold' : ''}`}
+                  >{day}</button>
+                );
+              });
+            })()}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['month', 'week', 'day'] as const).map(v => (
-            <button key={v} onClick={() => setViewMode(v)} style={{
-              padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600,
-              background: viewMode === v ? '#0066cc' : '#f3f4f6',
-              color: viewMode === v ? '#fff' : '#374151',
-              border: 'none',
-            }}>
-              {v === 'month' ? 'Μήνας' : v === 'week' ? 'Εβδομάδα' : 'Ημέρα'}
-            </button>
+
+        {/* Search people */}
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Αναζήτηση ατόμων"
+            value={peopleSearch}
+            onChange={e => setPeopleSearch(e.target.value)}
+            className="w-full pl-8 pr-2 py-1.5 bg-gray-100 text-xs rounded-md focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+          />
+          {peopleResults.length > 0 && (
+            <div className="absolute left-0 right-0 top-9 bg-white border border-gray-200 rounded-md shadow-lg z-20 max-h-48 overflow-y-auto">
+              {peopleResults.map(c => (
+                <div key={c.id} onClick={() => openQuickWithGuest(c)} className="p-2 hover:bg-blue-50 cursor-pointer text-xs flex justify-between items-center border-b border-gray-50 last:border-0">
+                  <div>
+                    <div className="font-semibold">{c.name}</div>
+                    <div className="text-[10px] text-gray-400">{c.email || '—'}</div>
+                  </div>
+                  <span className={`text-[9px] uppercase font-bold px-1 rounded ${c.role === 'lead' ? 'text-amber-700' : c.role === 'customer' ? 'text-emerald-700' : 'text-purple-700'}`}>{c.role}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* My calendars */}
+        <div className="space-y-1.5 text-xs">
+          <span className="font-semibold text-gray-600">Το ημερολόγιό μου</span>
+          {(Object.keys(CATEGORIES) as CategoryKey[]).map(key => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.has(key)}
+                onChange={() => setFilters(prev => {
+                  const n = new Set(prev);
+                  if (n.has(key)) n.delete(key); else n.add(key);
+                  return n;
+                })}
+                style={{ accentColor: CATEGORIES[key].color }}
+              />
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: CATEGORIES[key].color }} />
+              <span className={filters.has(key) ? 'text-gray-800' : 'text-gray-400'}>{CATEGORIES[key].label}</span>
+            </label>
           ))}
         </div>
-      </div>
 
-      {/* Calendar Grid (Month View) */}
-      {viewMode === 'month' && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          {/* Weekday headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e5e7eb' }}>
-            {WEEKDAYS.map(d => (
-              <div key={d} style={{ padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#6b7280', background: '#f9fafb' }}>{d}</div>
-            ))}
-          </div>
-
-          {/* Day cells */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-            {days.map((day, i) => {
-              const dateStr = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
-              const dayEvents = day ? getEventsForDate(dateStr) : [];
-              const isToday = dateStr === todayStr;
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    minHeight: 90,
-                    padding: 6,
-                    borderRight: (i + 1) % 7 === 0 ? 'none' : '1px solid #f3f4f6',
-                    borderBottom: i < days.length - 7 ? '1px solid #f3f4f6' : 'none',
-                    background: isToday ? '#f0f7ff' : '#fff',
-                    cursor: day ? 'pointer' : 'default',
-                    position: 'relative',
-                  }}
-                  onClick={() => {
-                    if (day) {
-                      setEditingId(null);
-                      setForm(prev => ({ ...prev, start_date: dateStr }));
-                      setShowForm(true);
-                    }
-                  }}
-                >
-                  {day && (
-                    <>
-                      <div style={{
-                        fontSize: 12, fontWeight: isToday ? 700 : 400,
-                        marginBottom: 4,
-                        width: 22, height: 22, borderRadius: 11,
-                        background: isToday ? '#0066cc' : 'transparent',
-                        color: isToday ? '#fff' : '#374151',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {day}
-                      </div>
-                      {dayEvents.slice(0, 3).map(ev => {
-                        const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
-                        return (
-                          <div key={ev.id} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${ev.title} — κλικ για επεξεργασία`} style={{
-                            fontSize: 10, padding: '2px 4px', borderRadius: 4,
-                            background: colors.bg, color: colors.fg,
-                            marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            cursor: 'pointer',
-                          }}>
-                            {ev.title}
-                          </div>
-                        );
-                      })}
-                      {dayEvents.length > 3 && <div style={{ fontSize: 9, color: '#6b7280' }}>+{dayEvents.length - 3} ακόμα</div>}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {/* Other calendars */}
+        <div className="space-y-1.5 text-xs">
+          <span className="font-semibold text-gray-600">Άλλα ημερολόγια</span>
+          <label className="flex items-center gap-2 cursor-pointer text-gray-500">
+            <input type="checkbox" defaultChecked style={{ accentColor: '#0b8043' }} />
+            🇬🇷 Αργίες Ελλάδας
+          </label>
         </div>
-      )}
+      </aside>
 
-      {/* Week View */}
-      {viewMode === 'week' && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
-            {Array.from({ length: 7 }, (_, i) => {
-              const d = new Date(selectedDate);
-              d.setDate(d.getDate() - d.getDay() + 1 + i);
-              const dateStr = d.toISOString().slice(0, 10);
-              const dayEvents = getEventsForDate(dateStr);
-              const isToday = dateStr === todayStr;
-              return (
-                <div key={i} style={{ minHeight: 200 }}>
-                  <div style={{ textAlign: 'center', padding: '4px 0', fontSize: 11, fontWeight: 700, color: isToday ? '#0066cc' : '#6b7280', marginBottom: 8 }}>
-                    {WEEKDAYS[i]} {d.getDate()}
-                  </div>
-                  {dayEvents.map(ev => {
-                    const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
-                    return (
-                      <div key={ev.id} onClick={() => openEdit(ev)} style={{
-                        fontSize: 10, padding: 6, borderRadius: 6,
-                        background: colors.bg, color: colors.fg,
-                        marginBottom: 4, border: `1px solid ${colors.fg}22`,
-                        cursor: 'pointer',
-                      }}>
-                        <div style={{ fontWeight: 600 }}>{ev.title}</div>
-                        <div style={{ fontSize: 9, opacity: 0.7 }}>{new Date(ev.start_time).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+      {/* ═══ MAIN AREA ═══ */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="h-14 border-b border-gray-200 px-5 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <CalendarIcon className="w-5 h-5 text-blue-600" />
+            <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 border border-gray-300 rounded-md text-xs font-medium hover:bg-gray-50">
+              Σήμερα
+            </button>
+            <div className="flex items-center gap-0.5">
+              <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-4 h-4" /></button>
+              <button onClick={() => navigate(1)} className="p-1.5 hover:bg-gray-100 rounded-full"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+            <h1 className="text-lg font-medium text-gray-800 capitalize">{headerLabel()}</h1>
+            {settings.showWorldClock && settings.secondaryTimeZone && (
+              <span className="text-[10px] text-gray-400 ml-2">🌐 {settings.secondaryTimeZone}</span>
+            )}
           </div>
-        </div>
-      )}
 
-      {/* Day View */}
-      {viewMode === 'day' && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-            {selectedDate.toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          <div className="flex items-center gap-2">
+            {loading && <span className="text-[10px] text-gray-400 animate-pulse">φόρτωση…</span>}
+            <select
+              value={viewMode}
+              onChange={(e: any) => setViewMode(e.target.value)}
+              className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 focus:outline-none cursor-pointer"
+            >
+              <option value="day">Ημέρα</option>
+              <option value="week">Εβδομάδα</option>
+              <option value="month">Μήνας</option>
+              <option value="year">Χρόνος</option>
+              <option value="4days">4 ημέρες</option>
+            </select>
+            <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-100 rounded-full" title="Ρυθμίσεις">
+              <Settings className="w-4.5 h-4.5 text-gray-600" />
+            </button>
           </div>
-          {getEventsForDate(todayStr).length === 0 && events.filter(e => e.start_time.slice(0, 10) === selectedDate.toISOString().slice(0, 10)).length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Δεν υπάρχουν events</div>
-          ) : (
-            getEventsForDate(selectedDate.toISOString().slice(0, 10)).map(ev => {
-              const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
-              return (
-                <div key={ev.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 14px', borderRadius: 8,
-                  background: colors.bg, border: `1px solid ${colors.fg}22`,
-                  marginBottom: 8,
-                }}>
-                  <div style={{ width: 4, height: 36, borderRadius: 2, background: colors.fg }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: colors.fg }}>{ev.title}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>
-                      <Clock size={10} /> {new Date(ev.start_time).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })}
-                      {ev.end_time && ` — ${new Date(ev.end_time).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })}`}
-                      {ev.location && <><MapPin size={10} /> {ev.location}</>}
+        </header>
+
+        {/* ═══ VIEWS ═══ */}
+        {(viewMode === 'day' || viewMode === 'week' || viewMode === '4days') && (
+          <TimeGridView
+            days={rangeDays()}
+            events={visibleEvents}
+            settings={settings}
+            onSlotClick={(slot) => { setQuickSeed(undefined); setQuickSlot(slot); }}
+            onEventClick={(ev) => setFullEdit({ ev, isNew: false })}
+          />
+        )}
+
+        {/* Month view */}
+        {viewMode === 'month' && (
+          <div className="flex-1 overflow-auto flex flex-col">
+            <div className="grid grid-cols-7 border-b border-gray-200 shrink-0">
+              {(settings.startWeekOn === 'Monday'
+                ? ['Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ', 'Κυρ']
+                : ['Κυρ', 'Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ']
+              ).map(d => (
+                <div key={d} className="p-2 text-center text-[11px] font-semibold text-gray-500">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 grid-rows-6 flex-1">
+              {monthGrid.map((day, i) => {
+                const inMonth = day.getMonth() === currentDate.getMonth();
+                const isToday = sameDay(day, today);
+                const dayEvents = eventsForDay(day);
+                return (
+                  <div key={i}
+                    onClick={() => { const s = new Date(day); s.setHours(9, 0, 0, 0); setQuickSeed(undefined); setQuickSlot(s); }}
+                    className={`border-r border-b border-gray-100 p-1 min-h-[90px] cursor-pointer hover:bg-blue-50/30 transition-colors ${inMonth ? 'bg-white' : 'bg-gray-50/60'} ${isToday ? 'ring-2 ring-inset ring-blue-500/60' : ''}`}
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mb-0.5 mx-auto md:mx-0 ${isToday ? 'bg-blue-600 text-white font-bold' : inMonth ? 'text-gray-700' : 'text-gray-300'}`}>
+                      {day.getDate()}
                     </div>
+                    {dayEvents.slice(0, 3).map(ev => (
+                      <div key={ev.id}
+                        onClick={(e) => { e.stopPropagation(); setFullEdit({ ev, isNew: false }); }}
+                        title={`${ev.title} · ${fmtTime(new Date(ev.start_time), settings.timeFormat)}`}
+                        className="text-[10px] px-1 py-0.5 rounded mb-0.5 text-white truncate hover:brightness-95 cursor-pointer shadow-sm"
+                        style={{
+                          background: ev.color,
+                          textDecoration: ev.status === 'cancelled' ? 'line-through' : 'none',
+                          opacity: ev.status === 'completed' ? 0.7 : 1,
+                        }}
+                      >
+                        {!ev.is_all_day && <span className="opacity-80 mr-0.5">{fmtTime(new Date(ev.start_time), settings.timeFormat).replace(':00', '')}</span>}
+                        {ev.title || '(Χωρίς τίτλο)'}
+                      </div>
+                    ))}
+                    {dayEvents.length > 3 && <div className="text-[9px] text-gray-400 pl-1">+{dayEvents.length - 3} ακόμα</div>}
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => openEdit(ev)} title="Επεξεργασία / Μετακίνηση" style={{ background: '#0066cc15', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#0066cc' }}>
-                      <Pencil size={14} />
-                    </button>
-                    {ev.status === 'scheduled' && (
-                      <button onClick={() => updateStatus(ev.id, 'completed')} title="Ολοκληρώθηκε" style={{ background: '#00c87815', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#00c878' }}>
-                        <CheckCircle size={14} />
-                      </button>
-                    )}
-                    {ev.status === 'completed' && (
-                      <button onClick={() => updateStatus(ev.id, 'scheduled')} title="Επαναφορά σε Προγραμματισμένο" style={{ background: '#f59e0b15', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#f59e0b' }}>
-                        <Clock size={14} />
-                      </button>
-                    )}
-                    <button onClick={() => deleteEvent(ev.id)} title="Διαγραφή" style={{ background: '#ef444415', border: 'none', borderRadius: 4, padding: 4, cursor: 'pointer', color: '#ef4444' }}>
-                      <Trash2 size={14} />
-                    </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Year view */}
+        {viewMode === 'year' && (
+          <div className="flex-1 overflow-y-auto p-4 grid grid-cols-4 gap-4 content-start">
+            {Array.from({ length: 12 }, (_, m) => {
+              const first = new Date(currentDate.getFullYear(), m, 1);
+              const off = settings.startWeekOn === 'Monday' ? (first.getDay() === 0 ? 6 : first.getDay() - 1) : first.getDay();
+              const total = new Date(currentDate.getFullYear(), m + 1, 0).getDate();
+              return (
+                <div key={m} className="border border-gray-100 rounded-lg p-2 hover:shadow-sm transition-shadow">
+                  <div className="text-xs font-semibold text-center mb-1 cursor-pointer hover:text-blue-600"
+                    onClick={() => { setCurrentDate(new Date(currentDate.getFullYear(), m, 1)); setViewMode('month'); }}>
+                    {MONTHS_GR[m]}
+                  </div>
+                  <div className="grid grid-cols-7 gap-y-0.5 text-center">
+                    {(settings.startWeekOn === 'Monday' ? ['Δ','Τ','Τ','Π','Π','Σ','Κ'] : ['Κ','Δ','Τ','Τ','Π','Π','Σ']).map((d, i) => (
+                      <span key={`h${i}`} className="text-[8px] text-gray-400">{d}</span>
+                    ))}
+                    {[...Array(off).fill(null), ...Array.from({ length: total }, (_, i) => i + 1)].map((day, i) => {
+                      if (!day) return <span key={i} />;
+                      const d = new Date(currentDate.getFullYear(), m, day);
+                      const hasEvents = eventsForDay(d).length > 0;
+                      const isToday = sameDay(d, today);
+                      return (
+                        <button key={i}
+                          onClick={() => { setCurrentDate(d); setViewMode('day'); }}
+                          className={`text-[8.5px] leading-none py-0.5 rounded-full relative hover:bg-blue-100 ${isToday ? 'bg-blue-600 text-white font-bold' : ''}`}
+                        >
+                          {day}
+                          {hasEvents && !isToday && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-green-500" />}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
-      )}
-
-      {/* Upcoming Events List */}
-      <div style={{ marginTop: 20 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Clock size={18} /> Επερχόμενα Events
-        </h3>
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          {events.filter(e => e.status === 'scheduled' && new Date(e.start_time) >= today).slice(0, 10).map(ev => {
-            const colors = EVENT_COLORS[ev.event_type] || EVENT_COLORS.meeting;
-            const lead = leads.find(l => l.id === ev.lead_id);
-            return (
-              <div key={ev.id} onClick={() => openEdit(ev)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: colors.bg, color: colors.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Calendar size={14} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{ev.title}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>
-                    {new Date(ev.start_time).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    {' • '}
-                    {new Date(ev.start_time).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })}
-                    {lead && <> • <User size={10} /> {lead.first_name} {lead.last_name}</>}
-                  </div>
-                </div>
-                <span style={{ padding: '2px 8px', borderRadius: 6, background: colors.bg, color: colors.fg, fontSize: 10, fontWeight: 600 }}>
-                  {STATUS_LABELS[ev.status] || ev.status}
-                </span>
-                <Pencil size={12} style={{ color: '#9ca3af' }} />
-              </div>
-            );
-          })}
-          {events.filter(e => e.status === 'scheduled' && new Date(e.start_time) >= today).length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Δεν υπάρχουν επερχόμενα events</div>
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
-      {/* New/Edit Event Modal */}
-      {showForm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: 480, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                {editingId ? <><Pencil size={18} /> Επεξεργασία Event</> : <><Plus size={18} /> Νέο Event</>}
-              </h3>
-              <button onClick={closeForm} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><XCircle size={20} /></button>
-            </div>
+      {/* ═══ MODALS ═══ */}
+      {quickSlot !== null && (
+        <QuickCreatePopover
+          event={blankEvent(settings, quickSlot, quickSeed)}
+          contacts={contacts}
+          settings={settings}
+          onClose={() => { setQuickSlot(null); setQuickSeed(undefined); }}
+          onSave={(ev) => persist({ ...ev, event_type: ev.event_kind === 'event' ? 'meeting' : ev.event_kind === 'task' ? 'follow_up' : 'meeting' })}
+          onMoreOptions={(ev) => { setQuickSlot(null); setFullEdit({ ev, isNew: true }); }}
+        />
+      )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Τίτλος *</label>
-                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="π.χ. Συνάντηση με ΔΕΗ" style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }} />
-              </div>
+      {fullEdit && (
+        <EventEditorModal
+          event={fullEdit.ev}
+          isNew={fullEdit.isNew}
+          contacts={contacts}
+          settings={settings}
+          onClose={() => setFullEdit(null)}
+          onSave={(ev) => persist(ev)}
+          onDelete={(id) => removeEvent(id)}
+        />
+      )}
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Τύπος</label>
-                <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, background: '#fff' }}>
-                  <option value="meeting">📅 Συνάντηση</option>
-                  <option value="call">📞 Κλήση</option>
-                  <option value="follow_up">🔄 Follow-up</option>
-                  <option value="deadline">⏰ Deadline</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Lead</label>
-                <select value={form.lead_id} onChange={e => setForm({ ...form, lead_id: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, background: '#fff' }}>
-                  <option value="">— Χωρίς lead —</option>
-                  {leads.map(l => <option key={l.id} value={l.id}>{l.first_name} {l.last_name}{l.company_name ? ` (${l.company_name})` : ''}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Ημερομηνία</label>
-                <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Ώρα έναρξης</label>
-                <input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Ώρα λήξης</label>
-                <input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Τοποθεσία</label>
-                <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="π.χ. Zoom, γραφείο" style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }} />
-              </div>
-
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Σημειώσεις</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, resize: 'vertical' }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'space-between' }}>
-              {editingId && (
-                <button onClick={() => { deleteEvent(editingId); closeForm(); }} style={{ padding: '8px 16px', background: '#ef444415', color: '#ef4444', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Trash2 size={14} /> Διαγραφή
-                </button>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-                <button onClick={closeForm} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>Ακύρωση</button>
-                <button onClick={saveEvent} disabled={!form.title.trim() || saving} style={{ padding: '8px 16px', background: '#0066cc', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : editingId ? <CheckCircle size={14} /> : <Plus size={14} />}
-                  {saving ? 'Αποθήκευση...' : editingId ? 'Ενημέρωση' : 'Δημιουργία'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {showSettings && (
+        <CalendarSettingsModal settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

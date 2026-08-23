@@ -44,6 +44,8 @@ import MarketRagFolders from '@/components/MarketRagFolders';
 import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
 import NotificationBell from '@/components/NotificationBell';
 import CalendarView from '@/components/CalendarView';
+import { createEventFromEmail } from '@/utils/calendarBridge';
+import type { CalendarEvent } from '@/types/calendar';
 import OverviewSalesTracker from '@/components/OverviewSalesTracker';
 import MarketRAGSearch from '@/components/MarketRAGSearch';
 import LiveVoiceSupervisor from '@/components/LiveVoiceSupervisor';
@@ -212,6 +214,7 @@ function canActivateAI(lead: Lead): boolean {
 export default function DashboardPage() {
   const { user, signOut } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
+  const [calendarDraft, setCalendarDraft] = useState<Partial<CalendarEvent> | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
@@ -1598,10 +1601,10 @@ export default function DashboardPage() {
               <SettingsPanel toast={toast} setToast={setToast} />
             )}
             {tab === 'email' && (
-              <EmailTab toast={toast} setToast={setToast} />
+              <EmailTab toast={toast} setToast={setToast} onCreateEvent={(email) => { setCalendarDraft(createEventFromEmail(email)); setTab('calendar'); }} />
             )}
             {tab === 'calendar' && (
-              <CalendarView leads={leads.filter(l => !l.deleted_at)} />
+              <CalendarView leads={leads.filter(l => !l.deleted_at)} initialDraft={calendarDraft} onDraftConsumed={() => setCalendarDraft(null)} />
             )}
             {tab === 'market-search' && (
               <div style={{ padding: 20, height: 'calc(100vh - 120px)' }}>
@@ -3630,9 +3633,10 @@ function DeveloperAgentChat() {
   );
 }
 
-function EmailTab({ toast, setToast }: {
+function EmailTab({ toast, setToast, onCreateEvent }: {
   toast: { msg: string; type: 'success' | 'info' } | null;
   setToast: (v: { msg: string; type: 'success' | 'info' } | null) => void;
+  onCreateEvent?: (email: any) => void;
 }) {
   const [emails, setEmails] = useState<Array<{
     id: string; from_email: string; to_email: string; subject: string;
@@ -4103,6 +4107,9 @@ function EmailTab({ toast, setToast }: {
                     setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- Πρωτότυπο μήνυμα ---\nΑπό: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
                     setShowCompose(true);
                   }}>↪️ Προώθηση</button>
+                  {onCreateEvent && (
+                    <button className="btn btn-ghost" onClick={() => onCreateEvent(selectedEmailData)}>📅 Δημιουργία Event</button>
+                  )}
                 </div>
               </div>
             )}

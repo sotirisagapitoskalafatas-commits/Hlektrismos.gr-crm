@@ -12,13 +12,15 @@ import TermsOfUse from '@/pages/TermsOfUse';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Cookies from '@/pages/Cookies';
 import CrmAiAssistantWidget from '@/components/CrmAiAssistantWidget';
+import { scrollToTarget } from '@/hooks/useLenis';
 
 function ScrollToTop() {
   const [route, setRoute] = useState(window.location.hash);
   useEffect(() => {
     const onHashChange = () => {
       setRoute(window.location.hash);
-      window.scrollTo(0, 0);
+      // Route swaps must jump instantly — Lenis if mounted, native otherwise.
+      scrollToTarget(0, true);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);

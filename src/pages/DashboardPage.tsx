@@ -125,6 +125,7 @@ type CrmUser = {
 
 type Tariff = {
   id: string;
+  tariff_id?: string;
   provider_name: string;
   program_name: string;
   customer_type: string;
@@ -511,7 +512,7 @@ export default function DashboardPage() {
     loadData();
   };
 
-  const updateLeadGdpr = async (lead: Lead, field: 'lawful_basis' | 'customer_category', value: string) => {
+  const updateLeadGdpr = async (lead: Lead, field: 'lawful_basis' | 'customer_category' | 'status', value: string) => {
     await supabase.from('hlektrismos_leads').update({ [field]: value }).eq('id', lead.id);
     loadData();
   };
@@ -759,6 +760,7 @@ export default function DashboardPage() {
     followup: '👥 Πελάτες & Follow-Up',
     'providers-commissions': '📊 Πάροχοι & Προμήθειες',
     'sales-agents': '🏆 Πωλητές',
+    'voice-supervisor': '🎙️ Voice Supervisor',
   };
 
   const toggleCategory = (cat: string) => {
@@ -3147,7 +3149,7 @@ function CampaignsTab({ leads, preSelectedLeadIds, toast, setToast, onClearSelec
         : `Καμπάνια ολοκληρώθηκε: ${result?.sent || 0} απεσταλμένα, ${result?.failed || 0} αποτυχίες`;
       setToast({ msg, type: newCampaign.require_approval ? 'info' : 'success' });
       setShowCreate(false);
-      setNewCampaign({ name: '', channel: 'email', subject: '', body: '', audience_filter: {} });
+      setNewCampaign({ name: '', channel: 'email', subject: '', body: '', audience_filter: {}, require_approval: true });
       loadCampaigns();
     } catch (e: any) {
       setToast({ msg: `Σφάλμα: ${e.message}`, type: 'info' });
@@ -4100,11 +4102,11 @@ function EmailTab({ toast, setToast, onCreateEvent }: {
                 </div>
                 <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
                   <button className="btn btn-primary" onClick={() => {
-                    setComposeData({ to: selectedEmailData.from_email, cc: '', bcc: '', subject: `RE: ${selectedEmailData.subject}`, body: '', replyTo: selectedEmailData.id });
+                    setComposeData({ to: selectedEmailData.from_email, cc: '', bcc: '', subject: `RE: ${selectedEmailData.subject}`, body: '', replyTo: selectedEmailData.id, showCcBcc: false });
                     setShowCompose(true);
                   }}>↩️ Απάντηση</button>
                   <button className="btn btn-ghost" onClick={() => {
-                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- Πρωτότυπο μήνυμα ---\nΑπό: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '' });
+                    setComposeData({ to: '', cc: '', bcc: '', subject: `FWD: ${selectedEmailData.subject}`, body: `\n\n--- Πρωτότυπο μήνυμα ---\nΑπό: ${selectedEmailData.from_email}\n${selectedEmailData.body}`, replyTo: '', showCcBcc: false });
                     setShowCompose(true);
                   }}>↪️ Προώθηση</button>
                   {onCreateEvent && (

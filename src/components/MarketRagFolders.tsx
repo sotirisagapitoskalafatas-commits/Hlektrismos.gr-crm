@@ -216,7 +216,7 @@ export default function MarketRagFolders() {
             program_name: selectedTariff.program_name,
             customer_type: selectedTariff.customer_type,
             tariff_color: selectedTariff.tariff_color,
-            energy_type: selectedTariff.energy_type,
+            energy_type: selectedTariff.energy_type ?? 'electricity',
             official_url: selectedTariff.official_url,
             terms_pdf_url: null,
             requires_dual_zone_meter: selectedTariff.requires_dual_zone_meter,

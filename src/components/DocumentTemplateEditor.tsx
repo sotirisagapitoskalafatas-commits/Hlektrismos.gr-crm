@@ -39,7 +39,7 @@ export default function DocumentTemplateEditor({ template, onSave, onClose }: Pr
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
 
   const insertTag = (tag: string) => {
-    setHtmlContent(prev => prev + ` ${tag} `);
+    setHtmlContent((prev: string) => prev + ` ${tag} `);
     setCopiedTag(tag);
     setTimeout(() => setCopiedTag(null), 1200);
   };

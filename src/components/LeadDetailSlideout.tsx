@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { uploadDocument, updateLeadBillFiles, UploadedFile } from '@/lib/storage';
+import { useAuth } from '@/hooks/useAuth';
 import OfferModal from './OfferModal';
 
 type Lead = {
@@ -106,6 +107,7 @@ export default function LeadDetailSlideout({
   onClose,
   crmUsers,
 }: LeadDetailSlideoutProps) {
+  const { user } = useAuth();
   const hubApiKey = localStorage.getItem('hub_api_key') || '';
   const hubModel = localStorage.getItem('hub_model') || 'gemini-3.6-flash';
   const [billUrls, setBillUrls] = useState<BillFile[]>([]);

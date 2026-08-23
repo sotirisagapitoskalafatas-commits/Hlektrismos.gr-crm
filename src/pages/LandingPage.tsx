@@ -1,4 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
   ArrowRight,
   Bot,
@@ -22,7 +24,12 @@ import {
   FileText,
 } from 'lucide-react';
 import ChatBot from '@/components/ChatBot';
+import { GreeceMap3D } from '@/components/greece/GreeceMap3D';
+import HeroParticles from '@/components/three/HeroParticles';
+import { useLenis } from '@/hooks/useLenis';
 import { supabase } from '@/lib/supabase';
+
+gsap.registerPlugin(ScrollTrigger);
 
 type LeadForm = {
   firstName: string;
@@ -195,15 +202,23 @@ export default function LandingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [scrollPct, setScrollPct] = useState(0);
-  const [scrollY, setScrollY] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [galleryModal, setGalleryModal] = useState<number | null>(null);
-  const journeySectionRef = useRef<HTMLElement>(null);
-  const [bgTransform, setBgTransform] = useState('');
-  const journeyIndex = Math.min(greekJourney.length - 1, Math.floor((scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)) * greekJourney.length));
+  const [journeyIndex, setJourneyIndex] = useState(0);
   const activeJourney = greekJourney[journeyIndex];
+
+  // Refs driven imperatively by GSAP ScrollTrigger — no per-frame React re-renders.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
+  const heroBgRef = useRef<HTMLDivElement>(null);
+  const heroContentRef = useRef<HTMLDivElement>(null);
+  const heroVisualRef = useRef<HTMLDivElement>(null);
+  const particlesRef = useRef<HTMLDivElement>(null);
+  const pageProgressRef = useRef<HTMLDivElement>(null);
+  const journeySectionRef = useRef<HTMLElement>(null);
+  const journeyFillRef = useRef<HTMLSpanElement>(null);
+  const journeyProgressRef = useRef(0);
 
   // Force light mode on the public landing page (CRM dashboard keeps its dark theme).
   useEffect(() => {
@@ -212,30 +227,84 @@ export default function LandingPage() {
   }, []);
 
   useScrollReveal();
+  useLenis();
 
+  // All scroll-driven visuals run through GSAP ScrollTrigger, writing straight
+  // to DOM nodes via quickSetters — the component only re-renders when the
+  // discrete journeyIndex actually changes.
   useEffect(() => {
-    const onScroll = () => {
-      const y = window.scrollY;
-      setScrollY(y);
-      setScrolled(y > 40);
-      const h = document.documentElement.scrollHeight - window.innerHeight;
-      setScrollPct(h > 0 ? (y / h) * 100 : 0);
-
-      const el = journeySectionRef.current;
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        const viewportH = window.innerHeight;
-        const sectionH = rect.height;
-        const progress = Math.max(0, Math.min(1, -rect.top / Math.max(1, sectionH - viewportH)));
-        const panY = -progress * 30;
-        const scale = 1.15 + progress * 0.25;
-        const tilt = 8 + progress * 12;
-        setBgTransform(`translate3d(0, ${panY}%, 0) scale(${scale}) rotateX(${tilt}deg)`);
+    const ctx = gsap.context(() => {
+      // ── Header state (class toggle, no re-render) ──
+      const header = headerRef.current;
+      if (header) {
+        const headerTrigger = ScrollTrigger.create({
+          start: 40,
+          end: 'max',
+          onToggle: (self) => header.classList.toggle('scrolled', self.isActive),
+        });
+        header.classList.toggle('scrolled', headerTrigger.isActive);
       }
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
+
+      // ── Page scroll-progress bar ──
+      const pageFill = pageProgressRef.current;
+      if (pageFill && rootRef.current) {
+        const setPageProgress = gsap.quickSetter(pageFill, 'width', '%');
+        const pageTrigger = ScrollTrigger.create({
+          trigger: rootRef.current,
+          start: 'top top',
+          end: 'bottom bottom',
+          onUpdate: (self) => setPageProgress(self.progress * 100),
+        });
+        setPageProgress(pageTrigger.progress * 100);
+      }
+
+      // ── Hero micro-parallax + fade-out ──
+      const hero = heroRef.current;
+      if (hero) {
+        const bgTarget = heroBgRef.current;
+        const setBgY = bgTarget ? gsap.quickSetter(bgTarget, 'y', 'px') : null;
+        const setBgScale = bgTarget ? gsap.quickSetter(bgTarget, 'scale') : null;
+        const setContentY = heroContentRef.current ? gsap.quickSetter(heroContentRef.current, 'y', 'px') : null;
+        const fadeTargets = [heroBgRef.current, heroContentRef.current, heroVisualRef.current, particlesRef.current]
+          .filter((el): el is HTMLDivElement => Boolean(el));
+        const setFade = fadeTargets.length > 0 ? gsap.quickSetter(fadeTargets, 'opacity') : null;
+
+        const applyHero = (progress: number) => {
+          const y = progress * hero.offsetHeight;
+          setBgY?.(y * 0.4);
+          setBgScale?.(1 + y * 0.0003);
+          setContentY?.(y * 0.12);
+          setFade?.(Math.max(0, 1 - y / 600));
+        };
+        const heroTrigger = ScrollTrigger.create({
+          trigger: hero,
+          start: 'top top',
+          end: () => `+=${hero.offsetHeight}`,
+          onUpdate: (self) => applyHero(self.progress),
+        });
+        applyHero(heroTrigger.progress);
+      }
+
+      // ── Greece journey — sticky 3D map progress ──
+      const journey = journeySectionRef.current;
+      if (journey) {
+        const setJourneyFill = journeyFillRef.current ? gsap.quickSetter(journeyFillRef.current, 'width', '%') : null;
+        const applyJourney = (progress: number) => {
+          journeyProgressRef.current = progress; // consumed inside GreeceMap3D's camera rig
+          setJourneyFill?.(progress * 100);
+          const next = Math.min(greekJourney.length - 1, Math.floor(progress * greekJourney.length));
+          setJourneyIndex((current) => (current === next ? current : next));
+        };
+        const journeyTrigger = ScrollTrigger.create({
+          trigger: journey,
+          start: 'top top',
+          end: 'bottom bottom',
+          onUpdate: (self) => applyJourney(self.progress),
+        });
+        applyJourney(journeyTrigger.progress);
+      }
+    }, rootRef);
+    return () => ctx.revert();
   }, []);
 
   const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((current) => ({ ...current, [field]: value }));
@@ -341,15 +410,11 @@ export default function LandingPage() {
     setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
   };
 
-  const heroBgTransform = `translate3d(0, ${scrollY * 0.4}px, 0) scale(${1 + scrollY * 0.0003})`;
-  const heroContentTransform = `translate3d(0, ${scrollY * 0.12}px, 0)`;
-  const heroOpacity = Math.max(0, 1 - scrollY / 600);
-
   return (
-    <div className="app-shell">
-      <div className="scroll-progress"><div className="scroll-progress-fill" style={{ width: `${scrollPct}%` }} /></div>
+    <div className="app-shell" ref={rootRef}>
+      <div className="scroll-progress"><div className="scroll-progress-fill" ref={pageProgressRef} /></div>
 
-      <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
+      <header className="site-header" ref={headerRef}>
         <div className="container nav-wrap">
           <a href="#top" className="brand">
             <svg viewBox="0 0 100 100" style={{ width: 34, height: 34 }} xmlns="http://www.w3.org/2000/svg">
@@ -382,16 +447,19 @@ export default function LandingPage() {
       </header>
 
       <main id="top">
-        <section className="hero">
+        <section className="hero" ref={heroRef}>
           <div className="hero-bg">
-            <div className="hero-bg-image" style={{ transform: heroBgTransform, opacity: heroOpacity }} />
+            <div className="hero-bg-image" ref={heroBgRef} />
             <div className="hero-bg-overlay" />
             <div className="hero-grid-bg" />
             <div className="hero-glow-1" />
             <div className="hero-glow-2" />
+            <div className="hero-particles" ref={particlesRef} aria-hidden="true">
+              <HeroParticles />
+            </div>
           </div>
           <div className="container hero-grid">
-            <div className="hero-content" style={{ transform: heroContentTransform, opacity: heroOpacity }}>
+            <div className="hero-content" ref={heroContentRef}>
               <div className="eyebrow"><span className="eyebrow-dot" /> Εξειδικευμένοι Σύμβουλοι Ενέργειας</div>
               <h1>Ο προσωπικός σου <span className="gradient">σύμβουλος ενέργειας</span></h1>
               <p className="hero-intro">Δίπλα σου με όλες τις ενεργειακές λύσεις για το σπίτι και την επιχείρησή σου! Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο — δωρεάν.</p>
@@ -400,7 +468,7 @@ export default function LandingPage() {
                 <a href="tel:+302102255000" className="btn btn-ghost"><Phone size={16} /> +30 210 22 55 000</a>
               </div>
             </div>
-            <div className="hero-visual" style={{ opacity: heroOpacity }}>
+            <div className="hero-visual" ref={heroVisualRef}>
               <div className="orbit-stage">
                 <div className="orbit-ring orbit-ring-1" />
                 <div className="orbit-ring orbit-ring-2" />
@@ -423,48 +491,42 @@ export default function LandingPage() {
         </section>
 
         <section className="greece-journey" id="journey" ref={journeySectionRef}>
-          <div className="journey-bg-layer">
-            <div className="journey-bg-inner" style={{ transform: bgTransform }}>
-              <div className="journey-bg-img" />
-              <div className="journey-bg-overlay" />
-              <div className="journey-bg-route">
-                <svg viewBox="0 0 420 600" preserveAspectRatio="xMidYMid slice">
-                  <path d="M235 80 C200 160 260 220 245 280 S180 380 230 440 S260 520 250 560" fill="none" stroke="rgba(0,102,204,0.4)" strokeWidth="2" strokeDasharray="6 4" />
-                </svg>
-              </div>
-              {greekJourney.map((stop, index) => (
-                <div key={stop.city} className={index === journeyIndex ? 'journey-bg-pin active' : 'journey-bg-pin'} style={{ left: `${stop.x}%`, top: `${stop.y}%` }}>
-                  <div className="journey-bg-pin-ring" />
-                  <div className="journey-bg-pin-dot" />
-                  <div className="journey-bg-pin-label">{stop.city}</div>
-                </div>
-              ))}
+          {/* Sticky viewport: the 3D map stays pinned while info cards scroll past */}
+          <div className="journey-sticky">
+            <div className="journey-map-wrap" aria-hidden="true">
+              <GreeceMap3D activeRegion={journeyIndex} progressRef={journeyProgressRef} className="journey-canvas" />
             </div>
-          </div>
+            <div className="journey-map-vignette" />
 
-          <div className="journey-content">
-            <div className="container journey-intro">
+            <div className="journey-intro-overlay">
               <div className="eyebrow" style={{ margin: '0 auto' }}><span className="eyebrow-dot" /> Παντού στην Ελλάδα</div>
-              <h2>Η ενέργεια <span className="gradient-text">ταξιδεύει μαζί σου.</span></h2>
+              <h2>Η ενέργεια <span style={{ color: '#7fe8c0' }}>ταξιδεύει μαζί σου.</span></h2>
               <p>Καθώς κατεβαίνεις, γνωρίζεις τις λύσεις μας σε κάθε γωνιά της Ελλάδας — από την Αθήνα μέχρι την Κρήτη.</p>
             </div>
 
-            <div className="container">
-              <div className="journey-progress-bar">
-                <div className="track"><span className="fill" style={{ width: `${((journeyIndex + 1) / greekJourney.length) * 100}%` }} /></div>
-                <div className="journey-current-label">{activeJourney.region} — {activeJourney.city}</div>
-              </div>
-            </div>
+            <article key={activeJourney.city} className="journey-region-card">
+              <span className="journey-stop-region">{activeJourney.region}</span>
+              <h3>{activeJourney.title}</h3>
+              <p>{activeJourney.text}</p>
+              <strong>{activeJourney.city}</strong>
+            </article>
 
-            <div className="container">
-              <div className="journey-stops">
-                {greekJourney.map((stop, index) => (
-                  <article className={index === journeyIndex ? 'journey-stop active reveal visible' : 'journey-stop reveal'} key={stop.city}>
-                    <span className="journey-stop-number">0{index + 1}</span>
-                    <div><span className="journey-stop-region">{stop.region}</span><h3>{stop.title}</h3><p>{stop.text}</p><strong>{stop.city}</strong></div>
-                  </article>
-                ))}
+            <div className="journey-hud">
+              <div className="journey-progress-bar">
+                <div className="track"><span className="fill" ref={journeyFillRef} /></div>
               </div>
+              <div className="journey-current-label">{activeJourney.region} — {activeJourney.city}</div>
+            </div>
+          </div>
+
+          <div className="container">
+            <div className="journey-stops">
+              {greekJourney.map((stop, index) => (
+                <article className={index === journeyIndex ? 'journey-stop active reveal visible' : 'journey-stop reveal'} key={stop.city}>
+                  <span className="journey-stop-number">0{index + 1}</span>
+                  <div><span className="journey-stop-region">{stop.region}</span><h3>{stop.title}</h3><p>{stop.text}</p><strong>{stop.city}</strong></div>
+                </article>
+              ))}
             </div>
           </div>
         </section>

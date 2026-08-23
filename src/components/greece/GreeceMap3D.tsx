@@ -1,4 +1,4 @@
-import { useRef, useMemo, Suspense } from 'react'
+import { useRef, useMemo, Suspense, type MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Line } from '@react-three/drei'
 import * as THREE from 'three'
@@ -138,14 +138,18 @@ function OceanFloor() {
   )
 }
 
-function CameraRig({ active,progress }: { active:number;progress:number }) {
+function CameraRig({ active, progressRef }: { active:number;progressRef:MutableRefObject<number> }) {
   const { camera } = useThree()
   const posRef  = useRef(new THREE.Vector3(0,-0.2,4.8))
   const lookRef = useRef(new THREE.Vector3(0,0,0))
+  const tmpPos  = useRef(new THREE.Vector3())
+  const tmpLook = useRef(new THREE.Vector3())
   useFrame(() => {
     const r = GREECE_REGIONS[active]
-    posRef.current .lerp(new THREE.Vector3(r.x*0.55, r.y*0.55, 4.5-progress*0.7), 0.03)
-    lookRef.current.lerp(new THREE.Vector3(r.x*0.45, r.y*0.45, 0),              0.03)
+    tmpPos.current.set(r.x*0.55, r.y*0.55, 4.5-progressRef.current*0.7)
+    tmpLook.current.set(r.x*0.45, r.y*0.45, 0)
+    posRef.current .lerp(tmpPos.current, 0.03)
+    lookRef.current.lerp(tmpLook.current, 0.03)
     camera.position.copy(posRef.current)
     camera.lookAt(lookRef.current)
   })
@@ -153,7 +157,7 @@ function CameraRig({ active,progress }: { active:number;progress:number }) {
 }
 
 /* ── Scene ───────────────────────────────────────────────────────────────── */
-function Scene({ activeRegion, scrollProgress }: { activeRegion:number; scrollProgress:number }) {
+function Scene({ activeRegion, progressRef }: { activeRegion:number; progressRef:MutableRefObject<number> }) {
   return (
     <>
       <ambientLight intensity={0.12} />
@@ -181,24 +185,29 @@ function Scene({ activeRegion, scrollProgress }: { activeRegion:number; scrollPr
         <RegionMarker key={r.id} x={r.x} y={r.y} active={i===activeRegion} idx={i} />
       ))}
 
-      <CameraRig active={activeRegion} progress={scrollProgress} />
+      <CameraRig active={activeRegion} progressRef={progressRef} />
     </>
   )
 }
 
 /* ── Export ──────────────────────────────────────────────────────────────── */
 export interface GreeceMap3DProps {
+  /** Active city/region index — drives the camera target & marker glow. */
   activeRegion: number
-  scrollProgress: number
+  /**
+   * Continuous 0..1 scroll progress, updated imperatively by GSAP ScrollTrigger
+   * (kept in a ref so the scene never re-renders per frame).
+   */
+  progressRef: MutableRefObject<number>
   className?: string
 }
 
-export function GreeceMap3D({ activeRegion, scrollProgress, className }: GreeceMap3DProps) {
+export function GreeceMap3D({ activeRegion, progressRef, className }: GreeceMap3DProps) {
   return (
     <Canvas camera={{ position:[0,-0.2,4.8], fov:38 }} dpr={[1,2]}
       gl={{ antialias:true }} className={className} style={{ background:'#020c1a' }}>
       <Suspense fallback={null}>
-        <Scene activeRegion={activeRegion} scrollProgress={scrollProgress} />
+        <Scene activeRegion={activeRegion} progressRef={progressRef} />
       </Suspense>
     </Canvas>
   )

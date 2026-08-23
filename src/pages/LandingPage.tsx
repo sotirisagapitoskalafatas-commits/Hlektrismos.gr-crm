@@ -251,8 +251,8 @@ export default function LandingPage() {
     const r = el.getBoundingClientRect();
     const px = (e.clientX - r.left) / r.width - 0.5;
     const py = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty('--ry', `${(px * 10).toFixed(2)}deg`);
-    el.style.setProperty('--rx', `${(-py * 8).toFixed(2)}deg`);
+    el.style.setProperty('--ry', `${(px * 7).toFixed(2)}deg`);
+    el.style.setProperty('--rx', `${(-py * 5.5).toFixed(2)}deg`);
     el.style.setProperty('--gx', `${((px + 0.5) * 100).toFixed(1)}%`);
     el.style.setProperty('--gy', `${((py + 0.5) * 100).toFixed(1)}%`);
   };
@@ -268,7 +268,7 @@ export default function LandingPage() {
       gsap.utils.toArray<HTMLElement>('.gallery-item').forEach((item) => {
         gsap.fromTo(
           item,
-          { y: 90, opacity: 0, rotateX: 12, scale: 0.94, transformPerspective: 1100 },
+          { y: 64, opacity: 0, rotateX: 10, scale: 0.95, transformPerspective: 1100 },
           {
             y: 0,
             opacity: 1,

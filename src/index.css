@@ -1995,3 +1995,13 @@ img { display: block; max-width: 100%; }
   .gallery-media img,
   .gallery-3d-card { transition: none !important; }
 }
+
+/* Gallery fit: tilted cards must never spill past the viewport. Clip the
+   whole section, cap grid width so cards stay compact and centered, and let
+   the container's side padding absorb the remaining tilt overhang. */
+.gallery-section { overflow: hidden; }
+.gallery-grid {
+  max-width: min(1060px, 100%);
+  margin-inline: auto;
+  gap: 22px;
+}

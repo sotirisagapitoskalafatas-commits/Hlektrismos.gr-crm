@@ -770,6 +770,14 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section className="energy-showcase" aria-label="Ενεργειακές εγκαταστάσεις Hlektrismos">
+          <div className="container">
+            <figure className="energy-showcase-frame reveal">
+              <img src="/images/energy8.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" />
+            </figure>
+          </div>
+        </section>
+
         <section className="contact-section section-bg-contact" id="contact">
           <div className="contact-glow" />
           <div className="container">

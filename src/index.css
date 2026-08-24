@@ -2034,3 +2034,21 @@ img { display: block; max-width: 100%; }
   background: rgba(255, 255, 255, 0.6);
   border-color: rgba(0, 200, 120, 0.28);
 }
+
+/* Energy showcase — framed full-width photo between FAQ and contact form */
+.energy-showcase { padding: 56px 0 24px; overflow: hidden; }
+.energy-showcase-frame {
+  margin: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  aspect-ratio: 21 / 9;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  box-shadow:
+    0 30px 70px rgba(3, 7, 18, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.energy-showcase-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (max-width: 768px) {
+  .energy-showcase { padding: 36px 0 12px; }
+  .energy-showcase-frame { aspect-ratio: 4 / 3; border-radius: 16px; }
+}

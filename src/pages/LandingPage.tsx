@@ -262,6 +262,24 @@ export default function LandingPage() {
     e.currentTarget.style.setProperty('--ry', '0deg');
   };
 
+  // Showcase banner gets a hero-grade tilt range — it's one big image, not a grid card.
+  const handleShowcaseTilt = (e: ReactMouseEvent<HTMLElement>) => {
+    if (galleryReducedMotion) return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.setProperty('--ry', `${(px * 10).toFixed(2)}deg`);
+    el.style.setProperty('--rx', `${(-py * 8).toFixed(2)}deg`);
+    el.style.setProperty('--gx', `${((px + 0.5) * 100).toFixed(1)}%`);
+    el.style.setProperty('--gy', `${((py + 0.5) * 100).toFixed(1)}%`);
+  };
+
+  const resetShowcaseTilt = (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.setProperty('--rx', '0deg');
+    e.currentTarget.style.setProperty('--ry', '0deg');
+  };
+
   useEffect(() => {
     if (galleryReducedMotion) return;
     const ctx = gsap.context(() => {
@@ -288,6 +306,36 @@ export default function LandingPage() {
               yPercent: 5,
               ease: 'none',
               scrollTrigger: { trigger: item, start: 'top bottom', end: 'bottom top', scrub: true },
+            },
+          );
+        }
+      });
+
+      // Showcase banner: 3D entrance + scroll-scrubbed parallax (replaces the
+      // .reveal class fade so the two systems don't fight over the element).
+      gsap.utils.toArray<HTMLElement>('.energy-showcase-frame').forEach((frame) => {
+        gsap.fromTo(
+          frame,
+          { y: 90, opacity: 0, rotateX: 14, scale: 0.94, transformPerspective: 1200 },
+          {
+            y: 0,
+            opacity: 1,
+            rotateX: 0,
+            scale: 1,
+            duration: 1.15,
+            ease: 'power3.out',
+            scrollTrigger: { trigger: frame, start: 'top 88%', once: true },
+          },
+        );
+        const showcaseMedia = frame.querySelector('.energy-showcase-media');
+        if (showcaseMedia) {
+          gsap.fromTo(
+            showcaseMedia,
+            { yPercent: -7 },
+            {
+              yPercent: 7,
+              ease: 'none',
+              scrollTrigger: { trigger: frame, start: 'top bottom', end: 'bottom top', scrub: true },
             },
           );
         }
@@ -780,8 +828,17 @@ export default function LandingPage() {
 
         <section className="energy-showcase" aria-label="Ενεργειακές εγκαταστάσεις Hlektrismos">
           <div className="container">
-            <figure className="energy-showcase-frame reveal">
-              <img src="/images/energy8.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" />
+            <figure
+              className="energy-showcase-frame"
+              onMouseMove={handleShowcaseTilt}
+              onMouseLeave={resetShowcaseTilt}
+            >
+              <div className="energy-showcase-tilt">
+                <div className="energy-showcase-media">
+                  <img src="/images/energy8.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" />
+                </div>
+                <span className="energy-showcase-glare" aria-hidden="true" />
+              </div>
             </figure>
           </div>
         </section>

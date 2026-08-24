@@ -2038,19 +2038,64 @@ img { display: block; max-width: 100%; }
 /* Energy showcase — framed full-width photo between FAQ and contact form */
 .energy-showcase { padding: 56px 0 24px; overflow: hidden; }
 .energy-showcase-frame {
+  --showcase-radius: 24px;
   margin: 0;
-  border-radius: 24px;
-  overflow: hidden;
+  position: relative;
   aspect-ratio: 21 / 9;
+  border-radius: var(--showcase-radius);
   border: 1px solid rgba(52, 211, 153, 0.28);
   box-shadow:
     0 30px 70px rgba(3, 7, 18, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  perspective: 1100px;
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
 }
-.energy-showcase-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.energy-showcase-frame:hover {
+  border-color: rgba(52, 211, 153, 0.55);
+  box-shadow:
+    0 44px 96px rgba(3, 7, 18, 0.62),
+    0 0 42px rgba(52, 211, 153, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.energy-showcase-tilt {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--showcase-radius) - 1px);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.35s cubic-bezier(0.22, 0.68, 0.32, 1);
+  will-change: transform;
+}
+.energy-showcase-media {
+  position: absolute;
+  inset: -9% 0;
+  will-change: transform;
+}
+.energy-showcase-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* Slight overscale so the parallax bleed + tilt rotation never expose edges */
+  transform: scale(1.07);
+}
+.energy-showcase-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(520px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.18), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.energy-showcase-frame:hover .energy-showcase-glare { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .energy-showcase-tilt { transition: none; transform: none; }
+  .energy-showcase-frame:hover { box-shadow: 0 30px 70px rgba(3, 7, 18, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14); }
+}
 @media (max-width: 768px) {
   .energy-showcase { padding: 36px 0 12px; }
-  .energy-showcase-frame { aspect-ratio: 4 / 3; border-radius: 16px; }
+  .energy-showcase-frame { --showcase-radius: 16px; aspect-ratio: 4 / 3; }
 }
 
 /* Journey scroll hint — bouncing mouse icon so users know to scroll.

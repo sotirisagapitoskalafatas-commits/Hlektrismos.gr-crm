@@ -280,10 +280,10 @@ img { display: block; max-width: 100%; }
 .footer-bottom { display: flex; justify-content: space-between; gap: 16px; padding-top: 24px; border-top: 1px solid var(--card-border); color: var(--footer-text); font-size: 12px; }
 
 /* ===== Greece journey — sticky 3D map (GSAP ScrollTrigger + R3F) ===== */
-.greece-journey { position: relative; min-height: 320vh; }
+.greece-journey { position: relative; min-height: 180vh; }
 .journey-sticky {
   position: sticky; top: 0;
-  height: 100vh; overflow: hidden;
+  height: 100vh; height: 100dvh; overflow: hidden;
 }
 .journey-map-wrap { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .journey-canvas { display: block; width: 100%; height: 100%; }
@@ -329,7 +329,7 @@ img { display: block; max-width: 100%; }
 .journey-region-card p { margin: 0 0 14px; color: rgba(240,244,248,0.65); line-height: 1.6; font-size: 15px; }
 .journey-region-card strong { color: rgba(240,244,248,0.85); font-size: 13px; }
 
-.journey-stops { position: relative; z-index: 2; display: grid; gap: 60vh; padding: 120vh 0 80vh; }
+.journey-stops { position: relative; z-index: 2; display: grid; gap: 30vh; padding: 56vh 0 40vh; }
 .journey-stop {
   display: grid; grid-template-columns: 58px 1fr; gap: 22px;
   padding: 28px; border-radius: var(--radius);
@@ -661,7 +661,7 @@ img { display: block; max-width: 100%; }
   .contact-grid { grid-template-columns: 1fr; gap: 40px; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
   .footer-brand { grid-column: 1 / -1; }
-  .journey-stops { gap: 50vh; padding: 100vh 0 70vh; }
+  .journey-stops { gap: 25vh; padding: 48vh 0 34vh; }
   .journey-stop { max-width: 100%; margin-left: 0 !important; }
   .provider-grid { grid-template-columns: 1fr 1fr; }
 }
@@ -1705,7 +1705,7 @@ img { display: block; max-width: 100%; }
   .stat-item span { font-size: 12px; }
 
   /* Journey */
-  .journey-stops { gap: 45vh; padding: 90vh 0 60vh; }
+  .journey-stops { gap: 22vh; padding: 42vh 0 30vh; }
   .journey-stop { max-width: 100%; padding: 16px; }
   .journey-stop h3 { font-size: 18px; }
   .journey-stop p { font-size: 14px; }
@@ -2051,4 +2051,44 @@ img { display: block; max-width: 100%; }
 @media (max-width: 768px) {
   .energy-showcase { padding: 36px 0 12px; }
   .energy-showcase-frame { aspect-ratio: 4 / 3; border-radius: 16px; }
+}
+
+/* Journey scroll hint — bouncing mouse icon so users know to scroll.
+   Fades out as soon as the camera leaves the first region. */
+.journey-scroll-hint {
+  position: absolute; left: 50%; bottom: clamp(88px, 14vh, 130px); transform: translateX(-50%);
+  z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 9px;
+  color: rgba(240, 248, 252, 0.88); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+  pointer-events: none;
+}
+.journey-scroll-hint-hidden { opacity: 0; visibility: hidden; }
+.journey-mouse {
+  width: 24px; height: 38px; border: 2px solid rgba(255, 255, 255, 0.78);
+  border-radius: 13px; display: flex; justify-content: center; padding-top: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+.journey-mouse i {
+  width: 3px; height: 7px; border-radius: 2px; background: #48d9c9;
+  animation: journey-wheel 1.6s ease-in-out infinite;
+}
+@keyframes journey-wheel {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  55% { transform: translateY(9px); opacity: 0.15; }
+  70% { opacity: 0; }
+  85% { transform: translateY(0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .journey-scroll-hint { display: none; }
+}
+/* On phones the info card hugs the left/bottom — park the hint in the
+   bottom-right corner, clear of the card and the iOS home indicator. */
+@media (max-width: 768px) {
+  .journey-scroll-hint {
+    left: auto; right: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    transform: none;
+  }
 }

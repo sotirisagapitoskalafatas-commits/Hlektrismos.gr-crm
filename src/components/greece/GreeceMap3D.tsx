@@ -84,20 +84,26 @@ function GreeceMapboxMap({ activeRegion, progressRef, className }: GreeceMap3DPr
         map.on('load', () => {
           if (cancelled) return
           window.clearTimeout(failTimer)
-          map.addSource('mapbox-dem', {
-            type: 'raster-dem',
-            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-            tileSize: 512,
-            maxzoom: 14,
-          })
-          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.6 })
+          // DEM raster tiles are the heaviest part of the scene — skip 3D
+          // terrain on phones/tablets to keep the journey smooth on mobile
+          // GPUs and networks. Fog is shader-side, so it stays everywhere.
+          const isSmallScreen = window.matchMedia('(max-width: 768px)').matches
+          if (!isSmallScreen) {
+            map.addSource('mapbox-dem', {
+              type: 'raster-dem',
+              url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+              tileSize: 512,
+              maxzoom: 14,
+            })
+            map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.6 })
+          }
           map.setFog({
             range: [0.5, 10],
             color: '#030712',
             'horizon-blend': 0.1,
             'high-color': '#0f172a',
             'space-color': '#020617',
-            'star-intensity': 0.5,
+            'star-intensity': isSmallScreen ? 0.25 : 0.5,
           })
           setStatus('ready')
         })

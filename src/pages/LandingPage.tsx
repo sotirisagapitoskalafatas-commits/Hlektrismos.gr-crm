@@ -577,6 +577,14 @@ export default function LandingPage() {
             </div>
             <div className="journey-map-vignette" />
 
+            <div
+              className={`journey-scroll-hint${journeyIndex > 0 ? ' journey-scroll-hint-hidden' : ''}`}
+              aria-hidden="true"
+            >
+              <span className="journey-mouse"><i /></span>
+              <span>Κύλιση</span>
+            </div>
+
             <div className="journey-intro-overlay">
               <div className="eyebrow" style={{ margin: '0 auto' }}><span className="eyebrow-dot" /> Παντού στην Ελλάδα</div>
               <h2>Η ενέργεια <span style={{ color: '#7fe8c0' }}>ταξιδεύει μαζί σου.</span></h2>

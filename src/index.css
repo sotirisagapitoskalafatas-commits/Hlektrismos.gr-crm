@@ -2137,3 +2137,252 @@ img { display: block; max-width: 100%; }
     transform: none;
   }
 }
+
+/* ===== CRM OS shell (added) ===== */
+
+/* ---------- Command Center design utilities ---------- */
+
+/* Uppercase mono micro-label, e.g. "COMMAND CENTER" / "CRITICAL" */
+@layer components {
+  .micro {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  /* Warm paper card */
+  .card {
+    background: #fff;
+    border: 1px solid rgba(23, 24, 26, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(23, 24, 26, 0.05), 0 14px 34px -28px rgba(23, 24, 26, 0.35);
+  }
+
+  .field {
+    @apply w-full px-3 py-2 rounded-lg bg-white border border-line focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 text-sm text-ink placeholder:text-ink/35 transition-all;
+  }
+  .field-dark {
+    @apply w-full px-3 py-2 rounded-lg bg-ink/[0.05] border border-line focus:border-brand-500 focus:outline-none text-sm;
+  }
+  select.field, select.field-dark {
+    appearance: none;
+  }
+
+  /* Severity colored left spine, like the attention queue rows */
+  .spine {
+    position: relative;
+  }
+  .spine::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+  }
+  .spine-critical::before { background: #b3392e; }
+  .spine-high::before { background: #d99b28; }
+  .spine-medium::before { background: #d6d1ca; }
+  .spine-ok::before { background: #1c6f52; }
+  .spine-info::before { background: #2f5fd8; }
+
+  /* Dotted module-maturity indicator */
+  .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .dot-live { background: #1c6f52; }
+  .dot-beta { background: #2f5fd8; }
+  .dot-planned { background: transparent; border: 1px solid #c9c4bd; }
+  .dot-blocked { background: #b3392e; }
+
+  /* pills */
+  .pill {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+}
+
+/* ---------- Liquid glass sidebar / CRM OS shell ---------- */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.62);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  backdrop-filter: blur(22px) saturate(1.45);
+  border-right: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 1px 0 0 rgba(255, 255, 255, 0.35),
+    0 10px 34px -26px rgba(23, 24, 26, 0.5),
+    0 0 0 1px rgba(23, 24, 26, 0.045);
+}
+.glass-drawer {
+  background: rgba(250, 249, 247, 0.92);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    24px 0 60px -40px rgba(23, 24, 26, 0.55);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-nav, .glass-drawer { background: #fbfaf8; }
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 520px at -8% -12%, rgba(47, 95, 216, 0.09), transparent 60%),
+    radial-gradient(760px 420px at 108% 8%, rgba(221, 155, 40, 0.07), transparent 55%),
+    radial-gradient(680px 480px at 60% 118%, rgba(28, 111, 82, 0.06), transparent 60%);
+}
+
+/* Navigation leaf (rendered on top of the glass) */
+.nav-leaf {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(23, 24, 26, 0.72);
+  border: 1px solid transparent;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.nav-leaf:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: #17181a;
+  box-shadow: inset 0 0 0 1px rgba(23, 24, 26, 0.06), 0 3px 10px -6px rgba(23, 24, 26, 0.2);
+}
+.nav-leaf:active { transform: translateY(0.5px); }
+.nav-active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.82));
+  color: #17181a;
+  font-weight: 600;
+  border-color: rgba(23, 24, 26, 0.12);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 6px 16px -10px rgba(23, 24, 26, 0.35);
+}
+.nav-active .nav-dot { opacity: 1; }
+
+/* Atlas / AI accent — the one deliberate visual exception */
+.nav-atlas { color: #3d3a86; }
+.nav-atlas:hover {
+  background: linear-gradient(180deg, rgba(238, 241, 255, 0.95), rgba(231, 234, 255, 0.85));
+  box-shadow: inset 0 0 0 1px rgba(109, 97, 255, 0.22), 0 4px 14px -8px rgba(109, 97, 255, 0.45);
+}
+.nav-atlas-active {
+  background: linear-gradient(180deg, #f4f4ff, #e7e9ff);
+  color: #312e81;
+  font-weight: 600;
+  border-color: rgba(109, 97, 255, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 0 1px rgba(109, 97, 255, 0.35), 0 8px 22px -10px rgba(109, 97, 255, 0.55);
+}
+.nav-atlas-pulse { animation: atlas-glow 3.2s ease-in-out infinite; }
+@keyframes atlas-glow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75), 0 0 0 1px rgba(109, 97, 255, 0.18); }
+  50% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 0 1px rgba(109, 97, 255, 0.45), 0 6px 20px -8px rgba(109, 97, 255, 0.5); }
+}
+
+/* Count badge on a nav leaf */
+.nav-badge {
+  flex: none;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 24, 26, 0.88);
+  color: #fff;
+}
+
+/* Small active indicator dot (not color-only) */
+.nav-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #17181a;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.nav-cat-icon { color: rgba(23, 24, 26, 0.45); }
+.nav-cat-accent { color: #6d61ff; }
+
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid #2f5fd8;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-leaf, .nav-leaf:hover, .nav-active, .nav-atlas, .nav-atlas-active { transition: none; }
+  .nav-atlas-pulse, .pulse-online, .animate-fadein { animation: none; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadein { animation: fadeIn 0.25s ease-out both; }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(28,111,82,.35); }
+  100% { box-shadow: 0 0 0 8px rgba(28,111,82,0); }
+}
+.pulse-online { animation: pulse-ring 2s ease-out infinite; }
+
+/* Leaflet — keep light theme */
+.leaflet-container {
+  background: #f4f2ef !important;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+}
+.leaflet-control-attribution {
+  background: rgba(255,255,255,.65) !important;
+  font-size: 9px !important;
+  color: #94a3b8 !important;
+}
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1) !important;
+}
+.leaflet-control-zoom a {
+  background: rgba(255,255,255,.9) !important;
+  color: #17181a !important;
+  border: 1px solid #e8e5e1 !important;
+}
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(23,24,26,.18); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(23,24,26,.3); }
+.glass-card {
+  background: #fff;
+  border: 1px solid rgba(23, 24, 26, 0.08);
+  box-shadow: 0 1px 2px rgba(23, 24, 26, 0.05), 0 14px 34px -28px rgba(23, 24, 26, 0.35);
+}

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { AuthProvider, useAuth } from '@/lib/auth';
+import { useRoute } from '@/lib/router';
+import { NavProvider } from '@/lib/nav';
 import LandingPage from '@/pages/LandingPage';
-import LoginPage from '@/pages/LoginPage';
-import DashboardPage from '@/pages/DashboardPage';
+import LoginPage from '@/components/LoginPage';
+import AppShell from '@/components/app/AppShell';
 import AboutPage from '@/pages/AboutPage';
 import ServicesPage from '@/pages/ServicesPage';
 import EnergyPage from '@/pages/EnergyPage';
@@ -12,84 +13,63 @@ import ContactPage from '@/pages/ContactPage';
 import TermsOfUse from '@/pages/TermsOfUse';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Cookies from '@/pages/Cookies';
-import { scrollToTarget } from '@/hooks/useLenis';
 
-function ScrollToTop() {
-  const [route, setRoute] = useState(window.location.hash);
-  useEffect(() => {
-    const onHashChange = () => {
-      setRoute(window.location.hash);
-      // Route swaps must jump instantly — Lenis if mounted, native otherwise.
-      scrollToTarget(0, true);
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-  return null;
-}
-
-type Route = 'landing' | 'login' | 'dashboard' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies';
-
-function getRouteFromHash(): Route {
-  const hash = window.location.hash.replace('#', '');
-  if (hash === '/login') return 'login';
-  if (hash === '/dashboard') return 'dashboard';
-  if (hash === '/about') return 'about';
-  if (hash === '/services') return 'services';
-  if (hash === '/energy') return 'energy';
-  if (hash === '/faq') return 'faq';
-  if (hash === '/contact') return 'contact';
-  if (hash === '/terms') return 'terms';
-  if (hash === '/privacy') return 'privacy';
-  if (hash === '/cookies') return 'cookies';
-  return 'landing';
-}
-
-function Router() {
+function AppContent() {
+  const [route, navigate] = useRoute();
   const { session, loading } = useAuth();
-  const [route, setRoute] = useState<Route>(getRouteFromHash());
-
-  useEffect(() => {
-    const onHashChange = () => setRoute(getRouteFromHash());
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#5a7090' }}>Φόρτωση...</div>;
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#5a7090' }}>
+        Φόρτωση...
+      </div>
+    );
   }
 
-  if (route === 'login') {
-    return <LoginPage />;
+  // Protect the CRM OS shell — redirect to login if not signed in.
+  if (route === 'app' && !session) {
+    navigate('login');
+    return null;
   }
 
-  if (route === 'dashboard') {
-    if (!session) {
-      window.location.hash = '/login';
+  // If already signed in and on login page, go straight to the shell.
+  if (route === 'login' && session) {
+    navigate('app');
+    return null;
+  }
+
+  switch (route) {
+    case 'login':
       return <LoginPage />;
-    }
-    return <DashboardPage />;
+    case 'app':
+      return <AppShell />;
+    case 'about':
+      return <AboutPage />;
+    case 'services':
+      return <ServicesPage />;
+    case 'energy':
+      return <EnergyPage />;
+    case 'faq':
+      return <FaqPage />;
+    case 'contact':
+      return <ContactPage />;
+    case 'terms':
+      return <TermsOfUse />;
+    case 'privacy':
+      return <PrivacyPolicy />;
+    case 'cookies':
+      return <Cookies />;
+    default:
+      return <LandingPage />;
   }
-  if (route === 'about') return <AboutPage />;
-  if (route === 'services') return <ServicesPage />;
-  if (route === 'energy') return <EnergyPage />;
-  if (route === 'faq') return <FaqPage />;
-  if (route === 'contact') return <ContactPage />;
-  if (route === 'terms') return <TermsOfUse />;
-  if (route === 'privacy') return <PrivacyPolicy />;
-  if (route === 'cookies') return <Cookies />;
-
-  return <LandingPage />;
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <ScrollToTop />
-      {/* Security: the CRM AI assistant is mounted ONLY inside DashboardPage
-          (authenticated route). Never place it here — it must not render on
-          public routes or leak CRM capabilities to anonymous visitors. */}
-      <Router />
+      <NavProvider>
+        <AppContent />
+      </NavProvider>
       <SpeedInsights />
     </AuthProvider>
   );

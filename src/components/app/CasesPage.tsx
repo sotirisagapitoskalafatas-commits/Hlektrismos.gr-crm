@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { ACTIVE_STAGES, SERVICES, stageLabel } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
-import { Case, createCase, fetchCases } from '@/lib/api';
+import { Case, createCase, fetchAllCaseStats, fetchCases } from '@/lib/api';
 import { Btn, Card, EmptyState, Field, Micro, Modal, Pill, Spinner, StagePill, fmtDate, fmtMoney } from '@/lib/ui';
 import { Briefcase, Plus, Search } from 'lucide-react';
 
@@ -99,11 +99,15 @@ function CreateCaseModal({ open, onClose, onCreated }: {
 }
 
 export default function CasesPage() {
-  const { openCase } = useNav();
+  const { openCase, view } = useNav();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<'all' | Stage>('all');
+  const [status, setStatus] = useState<'all' | 'active' | 'done' | 'lost' | 'docs' | 'sig'>('all');
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [docPending, setDocPending] = useState<Set<string>>(new Set());
+  const [sigPending, setSigPending] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
@@ -115,15 +119,52 @@ export default function CasesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const f = view.filters;
+    if (!f) return;
+    const validStage: Stage[] = ['new', 'contacted', 'offer', 'application', 'signed', 'document_check', 'submitted', 'activation', 'completed', 'lost', 'cancelled'];
+    if (f.stage && (validStage as string[]).includes(f.stage)) setStage(f.stage as Stage);
+    if (f.status === 'active' || f.status === 'done' || f.status === 'lost' || f.status === 'docs' || f.status === 'sig') setStatus(f.status);
+    if (f.status === 'active') setStage('all');
+    if (f.owner) setOwnerId(f.owner);
+  }, [view.filters]);
+
+  const loadPendingFlags = useCallback(async () => {
+    if (cases.length === 0) return;
+    const stats = await fetchAllCaseStats(cases.map(c => c.id));
+    const dp = new Set<string>();
+    const sp = new Set<string>();
+    stats.forEach((s, id) => {
+      const c = cases.find(x => x.id === id);
+      if (s.documents.some(d => d.status === 'required' || d.status === 'received' || d.status === 'missing')) dp.add(id);
+      const awaiting = ['signed', 'document_check', 'submitted', 'activation'];
+      const hasPendingSig = s.signatures.some(sg => sg.status !== 'verified' && sg.status !== 'accepted' && sg.status !== 'approved');
+      if (hasPendingSig || (s.signatures.length === 0 && c && awaiting.includes(c.current_stage))) sp.add(id);
+    });
+    setDocPending(dp);
+    setSigPending(sp);
+  }, [cases]);
+
+  useEffect(() => {
+    if (status === 'docs' || status === 'sig') loadPendingFlags();
+  }, [status, loadPendingFlags]);
+
   const search = q.trim().toLowerCase();
   const filtered = cases.filter(c => {
-    const okStage = stage === 'all' || c.current_stage === stage;
+    let okStage: boolean;
+    if (status === 'active') okStage = ACTIVE_STAGES.includes(c.current_stage);
+    else if (status === 'done') okStage = c.current_stage === 'completed';
+    else if (status === 'lost') okStage = c.current_stage === 'lost' || c.current_stage === 'cancelled';
+    else if (status === 'docs') okStage = docPending.has(c.id);
+    else if (status === 'sig') okStage = sigPending.has(c.id);
+    else okStage = stage === 'all' || c.current_stage === stage;
+    const okOwner = !ownerId || c.owner_id === ownerId || c.inside_sales_owner === ownerId || c.field_sales_owner === ownerId || c.back_office_owner === ownerId;
     const okQ = !search ||
       (c.case_no ?? '').toLowerCase().includes(search) ||
       (c.customer?.full_name ?? '').toLowerCase().includes(search) ||
       (c.customer?.phone ?? '').includes(search) ||
       c.title.toLowerCase().includes(search);
-    return okStage && okQ;
+    return okStage && okOwner && okQ;
   });
 
   return (
@@ -144,12 +185,23 @@ export default function CasesPage() {
       </div>
 
       <div className="flex gap-1.5 flex-wrap">
-        <button onClick={() => setStage('all')}
-          className={`pill px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${stage === 'all' ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+        {((
+          [['all', 'Όλα (ενεργά)'], ['active', 'Ενεργά'], ['done', 'Ολοκληρωμένα'], ['lost', 'Χάθηκαν'], ['docs', 'Εκκρεμή έγγραφα'], ['sig', 'Προς υπογραφή']] as const
+        )).map(([id, label]) => (
+          <button key={id} onClick={() => { setStatus(id); setStage('all'); setOwnerId(null); setQ(''); }}
+            className={`pill px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${status === id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-1.5 flex-wrap">
+        <button onClick={() => { setStage('all'); setStatus('all'); setOwnerId(null); }}
+          className={`pill px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${stage === 'all' && status === 'all' ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
           Όλα
         </button>
         {ACTIVE_STAGES.map(s => (
-          <button key={s} onClick={() => setStage(stage === s ? 'all' : s)}
+          <button key={s} onClick={() => { setStage(stage === s ? 'all' : s); setStatus('all'); setOwnerId(null); }}
             className={`pill px-3 py-1.5 text-[11px] rounded-lg border transition-colors ${stage === s ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
             {stageLabel(s)}
           </button>

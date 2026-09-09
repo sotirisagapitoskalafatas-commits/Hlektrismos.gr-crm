@@ -168,7 +168,6 @@ export type Lead = {
 };
 
 function logError(method: string, err: unknown) {
-  // eslint-disable-next-line no-console
   console.error(`[atlas.api] ${method}:`, err);
 }
 
@@ -650,46 +649,54 @@ export async function createVisit(caseId: string, input: { purpose?: string; sch
   } catch (e) { logError('createVisit', e); return null; }
 }
 
-export async function checkInVisit(id: string, coords?: { lat: number; lng: number }): Promise<void> {
-  if (!supabase) return;
+export type CheckInCoords = { lat: number; lng: number; accuracy?: number };
+
+export async function checkInVisit(id: string, coords?: CheckInCoords): Promise<boolean> {
+  if (!supabase) return false;
   const profile = await ensureProfile();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('case_visits')
-    .update({ status: 'in_progress', started_at: new Date().toISOString(), check_in: { at: new Date().toISOString(), ...(coords ?? {}) } })
+    .update({ status: 'in_progress', started_at: new Date().toISOString(), check_in: { at: new Date().toISOString(), ...(coords ?? {}), accuracy: coords?.accuracy ?? null } })
     .eq('id', id)
     .select('case_id')
     .single();
+  if (error) { logError('checkInVisit', error); return false; }
   if (data?.case_id) {
+    const accLine = coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : '';
     await addActivity(data.case_id as string, {
       role: (profile?.role ?? 'field_sales') as Role,
       activity_type: 'check_in',
       title: 'Check In',
-      description: 'Ο πωλητής έφτασε στον πελάτη.',
-      location: coords ? { ...coords } : null,
-      metadata: { visit_id: id },
+      description: `Ο πωλητής έφτασε στον πελάτη${accLine}.`,
+      location: coords ? { lat: coords.lat, lng: coords.lng } : null,
+      metadata: { visit_id: id, accuracy: coords?.accuracy ?? null },
     });
   }
+  return !!data;
 }
 
-export async function checkOutVisit(id: string, coords?: { lat: number; lng: number }, notes?: string): Promise<void> {
-  if (!supabase) return;
+export async function checkOutVisit(id: string, coords?: CheckInCoords, notes?: string): Promise<boolean> {
+  if (!supabase) return false;
   const profile = await ensureProfile();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('case_visits')
-    .update({ status: 'completed', ended_at: new Date().toISOString(), check_out: { at: new Date().toISOString(), ...(coords ?? {}) }, notes: notes ?? '' })
+    .update({ status: 'completed', ended_at: new Date().toISOString(), check_out: { at: new Date().toISOString(), ...(coords ?? {}), accuracy: coords?.accuracy ?? null }, notes: notes ?? '' })
     .eq('id', id)
     .select('case_id')
     .single();
+  if (error) { logError('checkOutVisit', error); return false; }
   if (data?.case_id) {
+    const accLine = coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : '';
     await addActivity(data.case_id as string, {
       role: (profile?.role ?? 'field_sales') as Role,
       activity_type: 'check_out',
       title: 'Check Out',
-      description: notes || 'Η επίσκεψη ολοκληρώθηκε.',
-      location: coords ? { ...coords } : null,
-      metadata: { visit_id: id },
+      description: `${notes ? notes + ' — ' : ''}Η επίσκεψη ολοκληρώθηκε${accLine}.`,
+      location: coords ? { lat: coords.lat, lng: coords.lng } : null,
+      metadata: { visit_id: id, accuracy: coords?.accuracy ?? null },
     });
   }
+  return !!data;
 }
 
 export async function updateVisitNotes(id: string, notes: string, result: string): Promise<void> {
@@ -796,6 +803,37 @@ export async function markOfferSent(id: string, caseId: string): Promise<void> {
     title: 'Προσφορά στάλθηκε',
     description: 'Η προσφορά εστάλη στον πελάτη.',
   });
+}
+
+export type CaseStats = {
+  timeline: TimelineEvent[];
+  documents: CaseDocument[];
+  signatures: CaseSignature[];
+  offers: CaseOffer[];
+};
+
+export async function fetchCaseStats(caseId: string): Promise<CaseStats> {
+  const [timeline, documents, signatures, offers] = await Promise.all([
+    fetchTimeline(caseId),
+    fetchDocuments(caseId),
+    fetchSignatures(caseId),
+    fetchOffers(caseId),
+  ]);
+  return { timeline, documents, signatures, offers };
+}
+
+export async function fetchAllCaseStats(caseIds: string[]): Promise<Map<string, CaseStats>> {
+  const empty: CaseStats = { timeline: [], documents: [], signatures: [], offers: [] };
+  const entries = await Promise.all(
+    caseIds.map(async id => {
+      try {
+        return [id, await fetchCaseStats(id)] as [string, CaseStats];
+      } catch {
+        return [id, empty] as [string, CaseStats];
+      }
+    }),
+  );
+  return new Map<string, CaseStats>(entries);
 }
 
 /* ---------------- Notifications ---------------- */

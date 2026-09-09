@@ -1,0 +1,16 @@
+{
+  "name": "ATLAS CRM — PowerFor",
+  "short_name": "ATLAS CRM",
+  "description": "Σύστημα πωλήσεων & CRM για την Ηlektrismos.gr.",
+  "lang": "el",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f6",
+  "theme_color": "#0a0f14",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/app-icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -54,7 +54,7 @@ export default function PreferencesPage() {
       <Card>
         <CardHeader micro="Επίδειξη" title="Προσομοίωση ρόλου" className="mb-3" />
         <div className="flex items-center gap-2 mb-3">
-          <Pill tone={sim ? 'warn' : 'ok'}>{sim ? 'sim' : 'πραγματικός'}</Pill>
+          <Pill tone={sim ? 'amber' : 'green'}>{sim ? 'sim' : 'πραγματικός'}</Pill>
           <span className="text-[13px] text-ink/70">
             Τρέχων ρόλος: <strong className="text-ink">{roleLabel(role)}</strong>
             {sim && realRole ? <span className="text-ink/45 font-normal"> (φυσικός: {roleLabel(realRole)})</span> : null}

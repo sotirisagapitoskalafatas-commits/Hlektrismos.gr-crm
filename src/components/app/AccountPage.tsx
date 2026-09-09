@@ -48,7 +48,7 @@ export default function AccountPage() {
             <div className="text-xs text-ink/50 truncate">{user?.email ?? '—'}</div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
-            <Pill tone={sim ? 'warn' : 'ok'}>{sim ? `sim · ${roleLabel(role)}` : roleLabel(role)}</Pill>
+            <Pill tone={sim ? 'amber' : 'green'}>{sim ? `sim · ${roleLabel(role)}` : roleLabel(role)}</Pill>
             <span className="micro text-ink/40">{ROLES.find(r => r.id === role)?.hint}</span>
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function AccountPage() {
                 <div className="text-[13px] font-medium text-ink">{r.label} <span className="micro text-ink/40">{r.short}</span></div>
                 <div className="text-[11px] text-ink/45 truncate">{r.hint}</div>
               </div>
-              {r.id === role && <Pill tone="brand">τρέχων</Pill>}
+              {r.id === role && <Pill tone="blue">τρέχων</Pill>}
             </div>
           ))}
         </div>

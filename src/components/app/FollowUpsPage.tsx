@@ -16,13 +16,18 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 export default function FollowUpsPage() {
   const { role } = useAuth();
-  const { openCase } = useNav();
+  const { openCase, view } = useNav();
   const [items, setItems] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('today');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ case_id: '', due_at: '', channel: 'phone', reason: '', priority: 'normal' });
   const [cases, setCases] = useState<{ id: string; case_no: string; label: string }[]>([]);
+
+  useEffect(() => {
+    const s = view.filters?.status;
+    if (s === 'overdue' || s === 'today' || s === 'upcoming' || s === 'all') setFilter(s);
+  }, [view.filters]);
 
   const load = useCallback(async () => {
     const list = await fetchFollowUps({ status: 'all' });

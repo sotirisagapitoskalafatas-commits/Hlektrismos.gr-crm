@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState, type SVGProps } from 'react';
+import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, Suspense, lazy, useEffect, useRef, useState, type SVGProps } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
@@ -24,10 +24,11 @@ import {
   FileText,
 } from 'lucide-react';
 import ChatBot from '@/components/ChatBot';
-import { GreeceMap3D } from '@/components/greece/GreeceMap3D';
-import HeroParticles from '@/components/three/HeroParticles';
 import { useLenis } from '@/hooks/useLenis';
 import { supabase } from '@/lib/supabase';
+
+const GreeceMap3D = lazy(() => import('@/components/greece/GreeceMap3D').then(m => ({ default: m.GreeceMap3D })));
+const HeroParticles = lazy(() => import('@/components/three/HeroParticles'));
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -573,7 +574,9 @@ export default function LandingPage() {
             <div className="hero-glow-1" />
             <div className="hero-glow-2" />
             <div className="hero-particles" ref={particlesRef} aria-hidden="true">
-              <HeroParticles />
+              <Suspense fallback={null}>
+                <HeroParticles />
+              </Suspense>
             </div>
           </div>
           <div className="container hero-grid">
@@ -612,9 +615,11 @@ export default function LandingPage() {
           {/* Sticky viewport: the 3D map stays pinned while info cards scroll past */}
           <div className="journey-sticky">
             <div className="journey-map-wrap" aria-hidden="true" ref={journeyMapWrapRef}>
-              {journeyMapLive && (
-                <GreeceMap3D activeRegion={journeyIndex} progressRef={journeyProgressRef} className="journey-canvas" />
-              )}
+              <Suspense fallback={<div className="journey-canvas" />}>
+                {journeyMapLive && (
+                  <GreeceMap3D activeRegion={journeyIndex} progressRef={journeyProgressRef} className="journey-canvas" />
+                )}
+              </Suspense>
             </div>
             <div className="journey-map-vignette" />
 

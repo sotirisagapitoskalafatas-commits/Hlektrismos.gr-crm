@@ -18,6 +18,7 @@ interface AuthContextValue {
   loading: boolean;
   role: Role;
   setRoleOverride: (r: Role) => void;
+  clearRoleOverride: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -87,6 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoleOverrideState(r);
   };
 
+  const clearRoleOverride = () => {
+    localStorage.removeItem(ROLE_KEY);
+    setRoleOverrideState(null);
+  };
+
   // Effective role = simulator override (if any) else profile role.
   const role: Role = roleOverride ?? profile?.role ?? DEFAULT_ROLE;
 
@@ -99,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         role,
         setRoleOverride,
+        clearRoleOverride,
         signIn,
         signUp,
         signOut,

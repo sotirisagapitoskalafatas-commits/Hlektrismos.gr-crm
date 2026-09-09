@@ -4,8 +4,8 @@ import {
   ClipboardCheck, FileCheck, Upload, Power, CheckCircle2, Sparkles,
   LayoutDashboard, Building2, Bot, Map as MapIcon, Compass, Briefcase,
   CalendarDays, Gauge, Settings, Home, ChevronRight, Bell, Plus, Search,
-  UserPlus, ChartNoAxesColumn, Sun, Route as RouteIcon, MonitorCog, Files,
-  Cog, BarChart3, Filter, Stethoscope, ShieldCheck, UsersRound, ShoppingBag, Navigation,
+  UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
+  UserCircle, SlidersHorizontal,
 } from 'lucide-react';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
@@ -133,7 +133,8 @@ export const SERVICES: Record<string, string> = {
 export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
   | 'home' | 'leads' | 'cases' | 'followups' | 'customers'
-  | 'map' | 'myday' | 'backoffice' | 'providers' | 'reports' | 'admin';
+  | 'map' | 'myday' | 'backoffice' | 'reports' | 'admin'
+  | 'account' | 'preferences';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice';
 
@@ -174,9 +175,7 @@ export const NAV_SECTIONS: NavSection[] = [
     children: [
       { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live', badge: 'leads' },
       { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live' },
-      { key: 'pipeline', label: 'My Pipeline', icon: ChartNoAxesColumn, page: 'cases', roles: ['admin', 'manager', 'inside_sales'], maturity: 'planned' },
       { key: 'followups', label: 'Follow Ups', icon: CalendarClock, page: 'followups', roles: ALL, maturity: 'live', badge: 'followups' },
-      { key: 'calendar', label: 'Calendar', icon: CalendarDays, page: 'followups', roles: ['admin', 'manager', 'inside_sales'], maturity: 'planned' },
     ],
   },
   {
@@ -185,9 +184,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Navigation,
     children: [
       { key: 'myday', label: 'Ημέρα μου', icon: Sun, page: 'myday', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
-      { key: 'visits', label: 'Επισκέψεις', icon: MapPin, page: 'myday', roles: ['admin', 'manager', 'field_sales'], maturity: 'planned' },
       { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
-      { key: 'route', label: 'Route', icon: RouteIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'planned' },
     ],
   },
   {
@@ -196,8 +193,6 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Cog,
     children: [
       { key: 'backoffice', label: 'Back Office', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
-      { key: 'documents', label: 'Documents', icon: Files, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'planned' },
-      { key: 'signatures', label: 'Signatures', icon: PenLine, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'planned' },
     ],
   },
   {
@@ -205,7 +200,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Customers',
     icon: Users,
     children: [
-      { key: 'customers', label: 'Customers', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'planned' },
+      { key: 'customers', label: 'Customers', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
     ],
   },
   {
@@ -213,18 +208,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Analytics',
     icon: BarChart3,
     children: [
-      { key: 'reports', label: 'Reports', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'planned' },
-      { key: 'pipeline', label: 'Pipeline', icon: Filter, page: 'cases', roles: ['admin', 'manager'], maturity: 'planned' },
-    ],
-  },
-  {
-    id: 'ai',
-    label: 'AI',
-    icon: Sparkles,
-    accent: true,
-    children: [
-      { key: 'atlas', label: 'Atlas AI', icon: Sparkles, page: 'admin', roles: ALL, maturity: 'planned', accent: true },
-      { key: 'diagnostic', label: 'Sales Diagnostic', icon: Stethoscope, page: 'admin', roles: ['admin', 'manager', 'inside_sales'], maturity: 'planned', accent: true },
+      { key: 'reports', label: 'Reports', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
   {
@@ -232,9 +216,9 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'System',
     icon: Settings,
     children: [
-      { key: 'settings', label: 'Settings', icon: Settings, page: 'admin', roles: ['admin', 'manager'], maturity: 'planned' },
-      { key: 'users', label: 'Users', icon: UsersRound, page: 'admin', roles: ['admin'], maturity: 'planned' },
-      { key: 'rlp', label: 'Roles & Permissions', icon: ShieldCheck, page: 'admin', roles: ['admin'], maturity: 'planned' },
+      { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
+      { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
+      { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
 ];
@@ -267,9 +251,10 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   myday: 'Ημέρα μου',
   map: 'Χάρτης',
   backoffice: 'Operations',
-  providers: 'Πάροχοι',
   reports: 'Reports',
   admin: 'Διαχείριση',
+  account: 'Λογαριασμός',
+  preferences: 'Προτιμήσεις',
 };
 
 export const MATURITY_LABEL: Record<ModuleMaturity, { label: string; dot: string }> = {
@@ -288,7 +273,7 @@ export type CaseAction =
   | 'capture_signature' | 'create_application' | 'submit_provider' | 'change_stage'
   | 'assign' | 'delete';
 
-const PERMS: Record<Role, CaseAction[]> = {
+export const PERMS: Record<Role, CaseAction[]> = {
   admin: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'verify_document', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature', 'create_application', 'submit_provider', 'change_stage', 'assign', 'delete'],
   manager: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'verify_document', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature', 'create_application', 'submit_provider', 'change_stage', 'assign'],
   inside_sales: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'change_stage', 'assign'],

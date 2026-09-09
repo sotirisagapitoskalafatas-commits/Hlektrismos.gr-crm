@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import {
   BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLES, can,
   findNav, flattenNav, navForRole, roleLabel,
 } from '@/lib/roles';
-import type { NavLeaf, PageKey, Role } from '@/lib/roles';
-import { Btn, IconBtn, Logo, Micro, Modal } from '@/lib/ui';
+import type { NavLeaf, Role } from '@/lib/roles';
+import { Btn, IconBtn, Logo, Micro, Modal, Spinner } from '@/lib/ui';
 import {
   AppNotification, Case, fetchCases, fetchFollowUps, fetchLeads,
   fetchNotifications, markNotificationsRead,
@@ -21,10 +21,15 @@ import CasesPage from './CasesPage';
 import CaseDetailPage from './CaseDetailPage';
 import FollowUpsPage from './FollowUpsPage';
 import LeadsPage from './LeadsPage';
-import PlaceholderPage from './PlaceholderPage';
-import MyDayPage from './MyDayPage';
-import MapPage from './MapPage';
-import BackOfficePage from './BackOfficePage';
+
+const CustomersPage = lazy(() => import('./CustomersPage'));
+const ReportsPage = lazy(() => import('./ReportsPage'));
+const AccountPage = lazy(() => import('./AccountPage'));
+const PreferencesPage = lazy(() => import('./PreferencesPage'));
+const SettingsPage = lazy(() => import('./SettingsPage'));
+const MyDayPage = lazy(() => import('./MyDayPage'));
+const MapPage = lazy(() => import('./MapPage'));
+const BackOfficePage = lazy(() => import('./BackOfficePage'));
 
 /* ---------------- Shell-wide counts (nav badges) ---------------- */
 type ShellCounts = { leads: number; followups: number; backoffice: number };
@@ -253,7 +258,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
   onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void;
 }) {
   const { role, profile, user, setRoleOverride } = useAuth();
-  const { view, openCase } = useNav();
+  const { view, openCase, go } = useNav();
   const { notifs, unread, load } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
@@ -359,13 +364,16 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
                 <span className={`pill ${sim ? 'bg-warn-100 text-warn-600' : 'bg-ok-100 text-ok-600'}`}>{sim ? 'sim' : 'πραγματικός'}</span>
               </div>
 
-              <button disabled title="Σύντομα διαθέσιμο" className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink/70 hover:bg-ink/5 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => { go('account'); setAcctOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink/70 hover:bg-ink/5">
                 <UserCircle className="w-4 h-4 text-ink/40" /> Λογαριασμός
               </button>
-              <button disabled title="Σύντομα διαθέσιμο" className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink/70 hover:bg-ink/5 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => { go('preferences'); setAcctOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink/70 hover:bg-ink/5">
                 <SlidersHorizontal className="w-4 h-4 text-ink/40" /> Προτιμήσεις
               </button>
-              <button disabled title="Σύντομα διαθέσιμο" className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink/70 hover:bg-ink/5 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => { setAcctOpen(false); window.location.hash = '/faq'; }}
+                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink/70 hover:bg-ink/5">
                 <CircleHelp className="w-4 h-4 text-ink/40" /> Κέντρο βοήθειας
               </button>
 
@@ -463,12 +471,6 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 /* ---------------- Shell ---------------- */
-const PLACEHOLDERS: Record<string, { page: PageKey; kind: string }> = {
-  customers: { page: 'customers', kind: 'customers' },
-  providers: { page: 'providers', kind: 'providers' },
-  reports: { page: 'reports', kind: 'reports' },
-  admin: { page: 'admin', kind: 'admin' },
-};
 
 export default function AppShell() {
   const { signOut } = useAuth();
@@ -477,6 +479,12 @@ export default function AppShell() {
   const [drawer, setDrawer] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const counts = useShellCounts();
+
+  useEffect(() => {
+    const onPrefs = () => setCollapsed(localStorage.getItem('atlas.nav.collapsed') === '1');
+    window.addEventListener('atlas:prefs', onPrefs);
+    return () => window.removeEventListener('atlas:prefs', onPrefs);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -513,10 +521,12 @@ export default function AppShell() {
       case 'myday': return <MyDayPage />;
       case 'map': return <MapPage />;
       case 'backoffice': return <BackOfficePage />;
-      default: {
-        const ph = PLACEHOLDERS[view.page];
-        return ph ? <PlaceholderPage kind={ph.kind} /> : <HomePage />;
-      }
+      case 'customers': return <CustomersPage />;
+      case 'reports': return <ReportsPage />;
+      case 'account': return <AccountPage />;
+      case 'preferences': return <PreferencesPage />;
+      case 'admin': return <SettingsPage />;
+      default: return <HomePage />;
     }
   })();
 
@@ -528,7 +538,9 @@ export default function AppShell() {
         <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} />
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
-            {body}
+            <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>
+              {body}
+            </Suspense>
           </div>
         </main>
       </div>

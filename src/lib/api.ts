@@ -173,6 +173,15 @@ function logError(method: string, err: unknown) {
 }
 
 /* ---------------- Profiles ---------------- */
+export type StaffProfile = {
+  id: string;
+  full_name: string;
+  role: Role;
+  phone: string | null;
+  avatar_url: string | null;
+  created_at: string | null;
+};
+
 export async function ensureProfile(): Promise<{ id: string; full_name: string; role: Role } | null> {
   if (!supabase || !supabase.auth.getUser()) return null;
   const { data: { user } } = await supabase.auth.getUser();
@@ -184,6 +193,27 @@ export async function ensureProfile(): Promise<{ id: string; full_name: string; 
     .maybeSingle();
   if (error) { logError('ensureProfile', error); return null; }
   return data ?? null;
+}
+
+export async function updateProfile(id: string, patch: { full_name?: string; phone?: string | null }): Promise<boolean> {
+  if (!supabase) return false;
+  const upd: Record<string, unknown> = {};
+  if (patch.full_name !== undefined) upd.full_name = patch.full_name;
+  if (patch.phone !== undefined) upd.phone = patch.phone;
+  if (Object.keys(upd).length === 0) return true;
+  const { error } = await supabase.from('profiles').update(upd).eq('id', id);
+  if (error) { logError('updateProfile', error); return false; }
+  return true;
+}
+
+export async function fetchStaff(): Promise<StaffProfile[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, phone, avatar_url, created_at')
+    .order('created_at', { ascending: true });
+  if (error) { logError('fetchStaff', error); return []; }
+  return (data ?? []) as StaffProfile[];
 }
 
 /* ---------------- Customers ---------------- */

@@ -5,14 +5,14 @@ import CaptureModal from './CaptureModal';
 import SignaturePad from './SignaturePad';
 import {
   ACTIVITY_META, CHANNELS, DOC_CATEGORIES, DOC_STATUSES, SERVICES, STAGES,
-  STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, stageLabel,
+  STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, stageLabel,
 } from '@/lib/roles';
 import type { ActivityType, Stage } from '@/lib/roles';
 import {
-  Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, TimelineEvent,
+  Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, Lead, TimelineEvent,
   addActivity, addDocument, captureSignature, changeStage, checkInVisit, checkOutVisit,
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
-  fetchFollowUps, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
+  fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
   markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, uploadDocumentFile,
 } from '@/lib/api';
@@ -619,12 +619,16 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const { role } = useAuth();
   const { go } = useNav();
   const [c, setC] = useState<Case | null>(null);
+  const [lead, setLead] = useState<Lead | null>(null);
   const [tab, setTab] = useState<'timeline' | 'followups' | 'docs' | 'visits' | 'offers' | 'signatures' | 'backoffice'>('timeline');
   const [stagePending, setStagePending] = useState<{ stage: Stage; note: string } | null>(null);
 
   const reload = useCallback(async () => {
     const data = await fetchCase(caseId);
-    if (data) setC(data);
+    if (data) {
+      setC(data);
+      setLead(data.lead_id ? await fetchLead(data.lead_id) : null);
+    }
   }, [caseId]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -660,6 +664,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
           <div className="flex items-center gap-2 flex-wrap">
             <Micro tone="brand">{c.case_no}</Micro>
             <StagePill stage={c.current_stage} />
+            {c.source && <Pill tone="gray">{leadSourceInfo(c.source).emoji} {leadSourceInfo(c.source).label}</Pill>}
             {c.priority === 'high' && <Pill tone="red">υψηλή προτεραιότητα</Pill>}
             {c.priority === 'critical' && <Pill tone="red">κρίσιμο</Pill>}
           </div>
@@ -690,6 +695,15 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
               <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${new Date(c.next_follow_up_at) < new Date() ? 'bg-bad-100 text-bad-600' : 'bg-warn-100 text-warn-600'}`}>
                 <span className="text-xs font-medium">Επόμενο follow up</span>
                 <span className="text-xs font-semibold">{fmtDateTime(c.next_follow_up_at)}</span>
+              </div>
+            )}
+            {lead && (
+              <div className="mt-3 pt-3 border-t border-line">
+                <div className="micro text-ink/40 mb-1">Προέλευση · Lead</div>
+                <div className="text-xs text-ink/70 space-y-0.5">
+                  <div>{leadSourceInfo(lead.source).emoji} {leadSourceInfo(lead.source).label}{lead.campaign_name ? ` · 📢 ${lead.campaign_name}` : ''}</div>
+                  <div>Καταχωρήθηκε {fmtDate(lead.created_at)}{lead.converted_at ? ` · μετατροπή ${fmtDate(lead.converted_at)}` : ''}</div>
+                </div>
               </div>
             )}
           </div>

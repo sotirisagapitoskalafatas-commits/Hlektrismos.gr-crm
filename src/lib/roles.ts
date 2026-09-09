@@ -125,6 +125,39 @@ export const SERVICES: Record<string, string> = {
   web: 'Web',
 };
 
+/* ---------------- Lead pipeline (P1) ---------------- */
+export const LEAD_SOURCES: Record<string, { emoji: string; label: string }> = {
+  website: { emoji: '🌐', label: 'Ιστοσελίδα' },
+  inside_sales: { emoji: '👤', label: 'Inside Sales' },
+  field_sales: { emoji: '🚗', label: 'Field Sales' },
+  referral: { emoji: '🤝', label: 'Σύσταση' },
+  partner: { emoji: '🔗', label: 'Συνεργάτης' },
+  campaign: { emoji: '📢', label: 'Καμπάνια' },
+  import: { emoji: '📥', label: 'Εισαγωγή' },
+  other: { emoji: '📦', label: 'Άλλο' },
+  contact: { emoji: '📞', label: 'Φόρμα' },
+};
+
+export function leadSourceInfo(source?: string | null): { emoji: string; label: string } {
+  return LEAD_SOURCES[source ?? ''] ?? { emoji: '📦', label: source ?? 'Άλλο' };
+}
+
+export const LEAD_STATUSES: { id: string; label: string; short: string; emoji: string }[] = [
+  { id: 'new', label: 'Νέο', short: 'ΝΕΟ', emoji: '🆕' },
+  { id: 'contacted', label: 'Επικοινωνία', short: 'ΕΠΙ', emoji: '📞' },
+  { id: 'qualified', label: 'Qualified', short: 'QLF', emoji: '🎯' },
+  { id: 'meeting', label: 'Συνάντηση', short: 'ΣΥΝ', emoji: '🤝' },
+  { id: 'offer', label: 'Προσφορά', short: 'ΠΡΟ', emoji: '📄' },
+  { id: 'converted', label: 'Μετατράπηκε', short: 'ΜΕΤ', emoji: '✅' },
+  { id: 'lost', label: 'Χάθηκε', short: 'ΧΑΣ', emoji: '❌' },
+  { id: 'unqualified', label: 'Μη Eligible', short: 'ΜΗΔ', emoji: '🚫' },
+  { id: 'duplicate', label: 'Διπλότυπο', short: 'ΔΙΠ', emoji: '🔁' },
+];
+
+export function leadStatusInfo(status?: string | null): { id: string; label: string; short: string; emoji: string } {
+  return LEAD_STATUSES.find(x => x.id === status) ?? { id: status ?? 'new', label: status ?? 'Νέο', short: status ?? 'ΝΕΟ', emoji: '🆕' };
+}
+
 /* ---------------- Navigation (CRM OS shell) ----------------
    Single source of truth: sections → leaf items.
    Each category and every subcategory carries its own icon,

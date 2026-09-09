@@ -32,6 +32,9 @@ export type Case = {
   probability: number;
   expected_close_date: string | null;
   owner_id: string | null;
+  lead_id: string | null;
+  stage_entered_at: string | null;
+  next_action_owner_id: string | null;
   inside_sales_owner: string | null;
   field_sales_owner: string | null;
   back_office_owner: string | null;
@@ -164,7 +167,19 @@ export type Lead = {
   property_type: string | null;
   status: string | null;
   source: string | null;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  source_label: string | null;
+  created_by_user_id: string | null;
+  assigned_to_user_id: string | null;
+  first_contact_user_id: string | null;
+  referred_by_user_id: string | null;
+  converted_by_user_id: string | null;
+  converted_at: string | null;
+  converted_case_id: string | null;
   created_at: string;
+  created_by?: { full_name: string } | null;
+  assigned_to?: { full_name: string } | null;
 };
 
 function logError(method: string, err: unknown) {
@@ -878,9 +893,93 @@ export async function markNotificationsRead(): Promise<void> {
 /* ---------------- Leads (existing table) ---------------- */
 export async function fetchLeads(): Promise<Lead[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('leads')
+    .select(`*, created_by:created_by_user_id(full_name), assigned_to:assigned_to_user_id(full_name)`)
+    .order('created_at', { ascending: false });
   if (error) { logError('fetchLeads', error); return []; }
   return (data ?? []) as Lead[];
+}
+
+export async function fetchLead(id: string): Promise<Lead | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('leads')
+    .select(`*, created_by:created_by_user_id(full_name), assigned_to:assigned_to_user_id(full_name)`)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) { logError('fetchLead', error); return null; }
+  return (data ?? null) as Lead | null;
+}
+
+export type LeadInput = {
+  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  region?: string | null;
+  property_type?: string | null;
+  service_category?: string | null;
+  source?: string;
+  status?: string;
+  comments?: string | null;
+  campaign_id?: string | null;
+  campaign_name?: string | null;
+  assigned_to_user_id?: string | null;
+};
+
+/* Staff-managed lead entry. Public intake stays on insert_website_lead(). */
+export async function createLead(input: LeadInput): Promise<Lead | null> {
+  if (!supabase) return null;
+  const profile = await ensureProfile();
+  const first = input.first_name ?? null;
+  const last = input.last_name ?? null;
+  const full = input.full_name ?? ([first, last].filter(Boolean).join(' ') || 'Νέο lead');
+  const { data, error } = await supabase
+    .from('leads')
+    .insert({
+      full_name: full,
+      first_name: first,
+      last_name: last,
+      client_name: full,
+      client_contact: input.email ?? input.phone ?? null,
+      phone: input.phone ?? null,
+      email: input.email ?? null,
+      region: input.region ?? null,
+      property_type: input.property_type ?? null,
+      service_category: input.service_category ?? null,
+      source: input.source ?? 'inside_sales',
+      status: input.status ?? 'new',
+      comments: input.comments ?? null,
+      campaign_id: input.campaign_id ?? null,
+      campaign_name: input.campaign_name ?? null,
+      created_by_user_id: profile?.id ?? null,
+      assigned_to_user_id: input.assigned_to_user_id ?? profile?.id ?? null,
+    })
+    .select()
+    .single();
+  if (error) { logError('createLead', error); return null; }
+  return (data ?? null) as Lead | null;
+}
+
+export async function updateLeadStage(id: string, status: string): Promise<boolean> {
+  if (!supabase) return false;
+  const profile = await ensureProfile();
+  const { error } = await supabase.from('leads').update({ status }).eq('id', id);
+  if (error) { logError('updateLeadStage', error); return false; }
+  if (status === 'contacted' || status === 'qualified' || status === 'meeting') {
+    await supabase.from('leads').update({ first_contact_user_id: profile?.id ?? null }).eq('id', id);
+  }
+  return true;
+}
+
+/* Single-write conversion RPC (SECURITY DEFINER) — preserves attribution + lineage. */
+export async function convertLeadToCase(leadId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('convert_lead_to_case', { p_lead_id: leadId });
+  if (error) { logError('convertLeadToCase', error); return null; }
+  return (data as string) ?? null;
 }
 
 /* ---------------- Geolocation ---------------- */

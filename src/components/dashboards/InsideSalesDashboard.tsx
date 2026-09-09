@@ -12,7 +12,7 @@ export default function InsideSalesDashboard({ d }: { d: DashboardData }) {
 
   const active = activeCases(cases);
   const newLeadsToday = leads.filter(l => l.created_at && isToday(l.created_at)).length;
-  const toContact = leads.filter(l => l.status === 'new_lead' || l.status === 'qualified');
+  const toContact = leads.filter(l => l.status === 'new' || l.status === 'qualified');
   const overdue = overdueFUs(followUps);
   const today = todayFUs(followUps);
   const offer = active.filter(c => c.current_stage === 'offer').length;
@@ -52,7 +52,7 @@ export default function InsideSalesDashboard({ d }: { d: DashboardData }) {
                       {l.service_category ? ServiceLabel(l.service_category) : 'Γενικό'} · {l.created_at ? `${isToday(l.created_at) ? 'σήμερα' : 'σε αναμονή'}` : '—'}
                     </span>
                   </span>
-                  <Pill tone={l.status === 'new_lead' ? 'blue' : 'amber'}>{l.status === 'new_lead' ? 'Νέο' : 'Qualified'}</Pill>
+                  <Pill tone={l.status === 'new' ? 'blue' : 'amber'}>{l.status === 'new' ? 'Νέο' : 'Qualified'}</Pill>
                 </button>
               );
             })}

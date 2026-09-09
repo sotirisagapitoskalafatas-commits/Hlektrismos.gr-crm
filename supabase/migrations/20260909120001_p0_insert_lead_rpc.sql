@@ -19,6 +19,8 @@ declare
   v_comments text := nullif(btrim(coalesce(p_payload->>'comments','')), '');
   v_consent boolean := (p_payload->>'gdpr_consent')::boolean;
   v_files jsonb := p_payload->'attached_files';
+  v_campaign text := nullif(btrim(coalesce(p_payload->>'campaign_name', p_payload->>'utm_campaign','')), '');
+  v_campaign_id text := nullif(btrim(coalesce(p_payload->>'campaign_id','')), '');
   v_id uuid;
 begin
   if p_source is null or p_source not in ('website', 'contact') then
@@ -50,13 +52,16 @@ begin
   insert into public.leads (
     client_name, client_contact, first_name, last_name, full_name, email, phone, region,
     property_type, service_category, source, status, comments, gdpr_consent, consent_version,
-    consent_granted_at, consent_source, attached_files
+    consent_granted_at, consent_source, attached_files,
+    campaign_name, campaign_id
   ) values (
     coalesce(v_full, v_first), coalesce(v_email, v_phone, 'not-provided@hlektrismos.local'),
     v_first, v_last, v_full, coalesce(v_email, 'not-provided@hlektrismos.local'), v_phone, v_region,
-    v_prop, v_cat, p_source, 'new_lead', v_comments, v_consent, 'v1',
-    case when v_consent is true then now() else null end, case when v_consent is true then p_source else null end,
-    nullif(v_files, 'null'::jsonb)
+    v_prop, v_cat, p_source, 'new', v_comments, v_consent, 'v1',
+    case when v_consent is true then now() else null end,
+    case when v_consent is true then p_source else null end,
+    nullif(v_files, 'null'::jsonb),
+    v_campaign, v_campaign_id
   )
   returning id into v_id;
 

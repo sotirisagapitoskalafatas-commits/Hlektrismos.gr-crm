@@ -12,7 +12,8 @@ import {
   Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, TimelineEvent,
   addActivity, addDocument, captureSignature, changeStage, checkInVisit, checkOutVisit,
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
-  fetchFollowUps, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getPosition,
+  fetchFollowUps, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
+  getPosition,
   markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, uploadDocumentFile,
 } from '@/lib/api';
 import {
@@ -241,15 +242,25 @@ function DocumentsTab({ caseId }: { caseId: string }) {
   const [up, setUp] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [urls, setUrls] = useState<Record<string, string>>({});
 
-  const loadItems = useCallback(async () => setItems(await fetchDocuments(caseId)), [caseId]);
+  const loadItems = useCallback(async () => {
+    const docs = await fetchDocuments(caseId);
+    setItems(docs);
+    const resolved: Record<string, string> = {};
+    for (const d of docs) {
+      const u = await getDocumentUrl(d.file_url);
+      if (u) resolved[d.id] = u;
+    }
+    setUrls(resolved);
+  }, [caseId]);
   useEffect(() => { loadItems(); }, [loadItems]);
 
   const saveFile = async (f: File) => {
     setUp(true);
     const up = await uploadDocumentFile(f);
     if (up) {
-      await addDocument(caseId, { category, file_name: up.name, file_url: up.url, mime_type: up.mime, size: up.size, description: desc || undefined });
+      await addDocument(caseId, { category, file_name: up.name, file_url: up.path, mime_type: up.mime, size: up.size, description: desc || undefined });
     }
     setUp(false);
     setDesc('');
@@ -290,8 +301,8 @@ function DocumentsTab({ caseId }: { caseId: string }) {
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-medium text-ink truncate">{d.description || d.file_name}</div>
               <div className="text-xs text-ink/45">{DOC_CATEGORIES[d.category] ?? d.category} · {fmtDateTime(d.created_at)}</div>
-              {d.file_url && (
-                <a href={d.file_url} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline inline-block mt-0.5">
+              {urls[d.id] && (
+                <a href={urls[d.id]} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline inline-block mt-0.5">
                   Άνοιγμα αρχείου ↗
                 </a>
               )}
@@ -471,13 +482,23 @@ function SignaturesTab({ caseId }: { caseId: string }) {
   const { role } = useAuth();
   const [items, setItems] = useState<CaseSignature[]>([]);
   const [padOpen, setPadOpen] = useState(false);
+  const [imgs, setImgs] = useState<Record<string, string>>({});
 
-  const loadItems = useCallback(async () => setItems(await fetchSignatures(caseId)), [caseId]);
+  const loadItems = useCallback(async () => {
+    const sigs = await fetchSignatures(caseId);
+    setItems(sigs);
+    const resolved: Record<string, string> = {};
+    for (const s of sigs) {
+      const u = await getDocumentUrl(s.image_url);
+      if (u) resolved[s.id] = u;
+    }
+    setImgs(resolved);
+  }, [caseId]);
   useEffect(() => { loadItems(); }, [loadItems]);
 
   const onConfirm = async (file: File) => {
     const up = await uploadDocumentFile(file);
-    if (up) await captureSignature(caseId, { image_url: up.url, notes: up.name || 'Υπογραφή πελάτη' });
+    if (up) await captureSignature(caseId, { image_url: up.path, notes: up.name || 'Υπογραφή πελάτη' });
     loadItems();
   };
 
@@ -494,8 +515,8 @@ function SignaturesTab({ caseId }: { caseId: string }) {
         {items.length === 0 && <EmptyState icon={PenLine as IconType} title="Δεν υπάρχουν υπογραφές" hint="Ο πωλητής πεδίου μπορεί να προσθέσει υπογραφή πελάτη." />}
         {items.map(s => (
           <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl border border-line bg-paper/50 flex-wrap">
-            {s.image_url
-              ? <img src={s.image_url} alt="υπογραφή" className="w-9 h-9 rounded-lg object-contain bg-white border border-line shrink-0" />
+            {imgs[s.id] || (s.image_url && /^https?:/i.test(s.image_url))
+              ? <img src={imgs[s.id] ?? s.image_url} alt="υπογραφή" className="w-9 h-9 rounded-lg object-contain bg-white border border-line shrink-0" />
               : <span className="w-9 h-9 rounded-lg bg-white border border-line flex items-center justify-center shrink-0"><PenLine className="w-4 h-4 text-ink/50" /></span>}
             <div className="flex-1 min-w-[140px]">
               <div className="text-[13px] font-medium text-ink">{s.notes || 'Υπογραφή πελάτη'}</div>

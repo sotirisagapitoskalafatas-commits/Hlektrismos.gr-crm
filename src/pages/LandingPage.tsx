@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState, type SVGProps } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
@@ -60,20 +60,19 @@ const regions = [
   'Πελοπόννησος', 'Νησιά Αιγαίου', 'Κρήτη', 'Βόρειο Αιγαίο',
 ];
 
-const customerTypes = [
-  'Ιδιώτης (νοικοκυριό)',
-  'Εταιρεία (B2B)',
-  'Επαγγελματίας / Καταστηματάρχης',
-  'Αγροτικός / Αγροτέχνης',
-  'Άλλο',
-];
-
 const services = [
   'Ρεύμα',
   'Φυσικό Αέριο',
   'Φωτοβολταϊκά',
   'Ηλεκτροκίνηση',
 ];
+
+const SERVICE_KEYS: Record<string, string> = {
+  'Ρεύμα': 'energy',
+  'Φυσικό Αέριο': 'gas',
+  'Φωτοβολταϊκά': 'solar',
+  'Ηλεκτροκίνηση': 'ev',
+};
 
 const features = [
   { icon: Zap, title: 'Ρεύμα', text: 'Φθηνά προγράμματα ενέργειας ειδικά για σένα. Συγκρίνουμε πάροχους και βρίσκουμε την πιο αποδοτική λύση.' },
@@ -185,7 +184,7 @@ function useScrollReveal() {
   }, []);
 }
 
-function Flame(props: any) {
+function Flame(props: SVGProps<SVGSVGElement>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
@@ -489,25 +488,22 @@ export default function LandingPage() {
       }
     }
 
-    // Insert lead (even without files)
-    const { error } = await supabase.from('hlektrismos_leads').insert({
-      first_name: form.firstName,
-      last_name: form.lastName,
-      phone: form.phone,
-      email: form.email || 'not-provided@hlektrismos.local',
-      region: form.region || 'Δεν δηλώθηκε',
-      customer_type: form.propertyType,
-      property_type: form.propertyType,
-      provider: form.service,
-      comments: form.message || null,
-      bill_file_path: uploadedFiles.length > 0 ? uploadedFiles[0].path : null,
-      bill_file_name: uploadedFiles.length > 0 ? uploadedFiles[0].name : null,
-      bill_files: uploadedFiles.length > 0 ? uploadedFiles : null,
-      consent: form.consent,
-      lawful_basis: form.consent ? 'Consent' : null,
-      customer_category: form.propertyType === 'Σπίτι' ? 'B2C_Household' : 'B2B_Corporate',
-      pipeline_status: 'new',
-      status: 'new',
+    // Insert lead (even without files) via the hardened public RPC
+    const { data: leadId, error } = await supabase.rpc('insert_website_lead', {
+      p_source: 'website',
+      p_payload: {
+        first_name: form.firstName || null,
+        last_name: form.lastName || null,
+        full_name: `${form.firstName} ${form.lastName}`.trim() || null,
+        email: form.email || 'not-provided@hlektrismos.local',
+        phone: form.phone || null,
+        region: form.region || null,
+        property_type: form.propertyType || form.customerType || null,
+        service_category: SERVICE_KEYS[form.service] ?? form.service,
+        comments: form.message || null,
+        gdpr_consent: form.consent,
+        attached_files: uploadedFiles.length > 0 ? uploadedFiles : null,
+      },
     });
     setSubmitting(false);
     if (error) {
@@ -517,14 +513,11 @@ export default function LandingPage() {
     }
 
     // Auto-trigger OCR for uploaded bill files in background
-    if (uploadedFiles.length > 0) {
-      const leadId = (await supabase.from('hlektrismos_leads').select('id').order('created_at', { ascending: false }).limit(1).single())?.data?.id;
-      if (leadId) {
-        for (const file of uploadedFiles) {
-          supabase.functions.invoke('billing-ocr', {
-            body: { lead_id: leadId, file_url: file.path, file_type: file.type },
-          }).then(() => {}).catch(() => {});
-        }
+    if (uploadedFiles.length > 0 && leadId) {
+      for (const file of uploadedFiles) {
+        supabase.functions.invoke('billing-ocr', {
+          body: { lead_id: leadId, file_url: file.path, file_type: file.type },
+        }).then(() => {}).catch(() => {});
       }
     }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, Zap, ExternalLink } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const contactCards = [
   { icon: MapPin, label: 'Διεύθυνση', value: 'Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671', link: null },
@@ -16,9 +17,31 @@ const hours = [
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSending(true);
+    setError(null);
+    const parts = form.name.trim().split(/\s+/);
+    const { error } = await supabase.rpc('insert_website_lead', {
+      p_source: 'contact',
+      p_payload: {
+        first_name: parts[0] || null,
+        last_name: parts.slice(1).join(' ') || null,
+        full_name: form.name.trim() || null,
+        email: form.email || null,
+        phone: form.phone || null,
+        comments: form.message || null,
+      },
+    });
+    setSending(false);
+    if (error) {
+      console.error('Contact lead error:', error);
+      setError('Σφάλμα αποστολής. Δοκιμάστε ξανά ή καλέστε μας.');
+      return;
+    }
     setSubmitted(true);
   };
 
@@ -108,8 +131,9 @@ export default function ContactPage() {
                       onChange={(e) => setForm({ ...form, message: e.target.value })}
                       style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, outline: 'none', resize: 'vertical' }}
                     />
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                      <Send size={16} /> Αποστολή
+                    {error && <div style={{ fontSize: 13, color: '#e11d48', background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.2)', borderRadius: 10, padding: '12px 16px' }}>{error}</div>}
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={sending}>
+                      <Send size={16} /> {sending ? 'Αποστολή…' : 'Αποστολή'}
                     </button>
                   </form>
                 )}

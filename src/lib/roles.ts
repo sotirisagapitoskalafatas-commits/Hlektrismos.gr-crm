@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
-export const DEFAULT_ROLE: Role = 'admin';
+export const DEFAULT_ROLE: Role = 'inside_sales';
 
 export const ROLES: { id: Role; label: string; short: string; hint: string }[] = [
   { id: 'admin', label: 'Διαχειριστής', short: 'ΑΔΜ', hint: 'Πλήρης πρόσβαση' },

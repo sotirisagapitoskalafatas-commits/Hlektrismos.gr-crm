@@ -558,13 +558,21 @@ export async function setDocumentStatus(id: string, status: string): Promise<voi
   }
 }
 
-export async function uploadDocumentFile(file: File): Promise<{ url: string; name: string; mime: string; size: number } | null> {
+export async function uploadDocumentFile(file: File): Promise<{ path: string; name: string; mime: string; size: number } | null> {
   if (!supabase) return null;
   const path = `cases/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const { error } = await supabase.storage.from('client_documents').upload(path, file, { upsert: false });
   if (error) { logError('uploadDocumentFile', error); return null; }
-  const { data: urlData } = supabase.storage.from('client_documents').getPublicUrl(path);
-  return { url: urlData.publicUrl, name: file.name, mime: file.type, size: file.size };
+  return { path, name: file.name, mime: file.type, size: file.size };
+}
+
+/* Resolve a stored object into a short-lived signed URL.
+   Already-public (http) values are passed through unchanged. */
+export async function getDocumentUrl(path: string): Promise<string | null> {
+  if (!supabase || !path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const { data } = await supabase.storage.from('client_documents').createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
 }
 
 /* ---------------- Visits / check in-out ---------------- */

@@ -103,10 +103,14 @@ export function createMaplibreProvider(): MapProvider {
   }
 
   async function init(container: HTMLElement, opts?: MapProviderOpts) {
+    // maplibre-gl v6 removed the per-map `workerUrl` option; the worker URL is
+    // configured globally. Point it at the bundled same-origin worker asset so
+    // it does not resolve a runtime URL that 404s in production (which would
+    // force the slower main-thread fallback).
+    maplibregl.setWorkerUrl(maplibreWorkerUrl);
     map = new maplibregl.Map({
       container,
       style: resolveStyle(),
-      workerUrl: maplibreWorkerUrl,
       center: opts?.center ? [opts.center.lng, opts.center.lat] : [GREEK_CENTER.lng, GREEK_CENTER.lat],
       zoom: opts?.zoom ?? 11,
     });

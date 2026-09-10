@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { Role, DEFAULT_ROLE } from './roles';
+import { fetchUserRoles } from './api';
 
 export type Profile = {
   id: string;
@@ -17,6 +18,9 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   role: Role;
+  /* Canonical multi-role set from user_roles (Phase 1.1). Falls back to the
+     single profile role when the foundation tables are not yet live. */
+  roles: Role[];
   setRoleOverride: (r: Role) => void;
   clearRoleOverride: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -32,6 +36,7 @@ const ROLE_KEY = 'atlas.role.override';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [canonicalRoles, setCanonicalRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleOverride, setRoleOverrideState] = useState<Role | null>(
     () => (localStorage.getItem(ROLE_KEY) as Role) ?? null,
@@ -45,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', session.user.id)
       .maybeSingle();
     if (data) setProfile(data as Profile);
+    // Best-effort canonical multi-role read; empty if foundation not live.
+    const canonical = await fetchUserRoles(session.user.id);
+    setCanonicalRoles(canonical);
   }, [session?.user]);
 
   useEffect(() => {
@@ -96,6 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Effective role = simulator override (if any) else profile role.
   const role: Role = roleOverride ?? profile?.role ?? DEFAULT_ROLE;
 
+  // Canonical role set: prefer user_roles; fall back to the single profile role
+  // so existing single-role installs behave identically.
+  const roles: Role[] = canonicalRoles.length > 0
+    ? canonicalRoles
+    : (profile?.role ? [profile.role] : []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -104,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         role,
+        roles,
         setRoleOverride,
         clearRoleOverride,
         signIn,

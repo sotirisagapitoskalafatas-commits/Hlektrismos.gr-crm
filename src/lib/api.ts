@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { applyCanonicalLabels, loadCatalog, resolveProductId, resolveProviderId } from './catalog';
+import { ROLES } from './roles';
 import type { Role, Stage } from './roles';
 
 export type Customer = {
@@ -235,6 +236,33 @@ export async function fetchStaff(): Promise<StaffProfile[]> {
     .order('created_at', { ascending: true });
   if (error) { logError('fetchStaff', error); return []; }
   return (data ?? []) as StaffProfile[];
+}
+
+const VALID_ROLE_KEYS = new Set<string>(ROLES.map(r => r.id));
+
+/* Canonical multi-role read (CRM OS Phase 1.1).
+   ADDITIVE: the app still gates on the single `profiles.role`. This exposes the
+   full canonical role set from the `user_roles` M:N table for UIs that want it.
+   Degrades gracefully to [] if the foundation tables are absent or RLS-blocked,
+   so it is safe to ship before the foundation migration is confirmed live. */
+export async function fetchUserRoles(userId: string): Promise<Role[]> {
+  if (!supabase || !userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('roles(key)')
+      .eq('user_id', userId);
+    if (error) return [];
+    const rows = (data ?? []) as Array<{ roles: { key: string } | { key: string }[] | null }>;
+    const keys = rows.flatMap(r => {
+      const rel = r.roles;
+      if (!rel) return [];
+      return Array.isArray(rel) ? rel.map(x => x.key) : [rel.key];
+    });
+    return keys.filter((k): k is Role => VALID_ROLE_KEYS.has(k));
+  } catch {
+    return [];
+  }
 }
 
 /* ---------------- Customers ---------------- */

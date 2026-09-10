@@ -1,0 +1,39 @@
+{
+  "phase": "1.1",
+  "task": "Full audit + maplibre worker-API bug fix + additive multi-role (user_roles) app wiring",
+  "status": "PASS",
+  "commit": "pending-commit",
+  "branch": "claude/stoic-hamilton-j68206",
+  "tests": {
+    "typecheck": "PASS",
+    "lint": "FAIL (372 errors / 23 warnings, pre-existing tech debt; 0 new from this change)",
+    "build": "PASS",
+    "unit": "NONE (no test suite in repo)",
+    "integration": "NOT_TESTED",
+    "browser": "BLOCKED",
+    "rls": "BLOCKED"
+  },
+  "deployment": {
+    "local": "PASS (build only; runtime-with-data NOT_TESTED — Supabase host egress-blocked)",
+    "preview": "NOT_TESTED",
+    "production": "NOT_TESTED"
+  },
+  "changes": [
+    "src/lib/maps/maplibre-provider.ts: replace removed per-map workerUrl option with maplibregl.setWorkerUrl() (maplibre-gl v6). Restores typecheck + build.",
+    "src/lib/api.ts: add fetchUserRoles(userId) — defensive canonical multi-role read from user_roles, returns [] if tables absent/RLS-blocked.",
+    "src/lib/auth.tsx: expose additive roles: Role[] in auth context; single role behaviour unchanged.",
+    "docs/CRM-OS-FULL-AUDIT.md: full evidence-based audit.",
+    "qa-status.json: this file."
+  ],
+  "risks": [
+    "Production Supabase (nonaymiwdayfuulccxrl) unreachable in this environment (MCP permission denied + egress policy blocks *.supabase.co) — no live schema/RLS/data verification possible.",
+    "CRM-OS foundation tables (organizations/teams/user_roles/assignments/business_events/work_items/campaigns) exist as DDL in migration 20260910000100 but were entirely unwired in the app; this change begins wiring (multi-role read).",
+    "Two parallel event systems: timeline_events (used) vs business_events (canonical, unused).",
+    "Dead code: src/pages/DashboardPage.tsx (290KB), src/pages/LoginPage.tsx, src/components/LeadDetailSlideout.tsx are unreferenced and use a second, unmounted auth context.",
+    "Lint: 395 problems pre-existing (not addressed)."
+  ],
+  "blockers": [
+    "Live DB / RLS / browser / production verification require Supabase MCP authenticated against nonaymiwdayfuulccxrl (local OAuth flow, then fresh session) OR egress allow-listing of the production Supabase host."
+  ],
+  "next_action": "Unblock prod DB access (Gate 0), then execute Phase 1.1 RLS org/team scoping, Phase 1.4 assignments wiring, Phase 1.5 business_events->Timeline projection, with live DB + RLS verification."
+}

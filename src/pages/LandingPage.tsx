@@ -64,7 +64,7 @@ const CAPTIONS: CaptionDef[] = [
   {
     eyebrow: 'Εξειδικευμένοι Σύμβουλοι Ενέργειας',
     title: 'Ο προσωπικός σου σύμβουλος ενέργειας',
-    text: 'Δίπλα σου με όλες τις ενεργειακές λύσεις για το σπίτι και την επιχείρησή σου. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο — δωρεάν.',
+    text: 'Δίπλα σου με όλες τις ενεργειακές λύσεις για το σπίτι και την επιχείρησή σου. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο δωρεάν.',
     start: 0, end: 0.055, pos: 'left', vPos: 'center', maxW: 640, hero: true,
   },
   {
@@ -276,6 +276,14 @@ function CinematicTour() {
       position: 'absolute',
       maxWidth: c.maxW ?? 560,
       opacity: 0,
+      padding: 'clamp(24px,3vw,40px)',
+      borderRadius: 22,
+      background: 'rgba(6,11,16,0.5)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      backdropFilter: 'blur(14px)',
+      WebkitBackdropFilter: 'blur(14px)',
+      boxShadow: '0 24px 60px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
+      color: '#eef4f7',
     };
     if (c.pos === 'right') {
       base.right = 'clamp(20px,5vw,70px)';
@@ -347,10 +355,10 @@ function CinematicTour() {
             </p>
             {c.hero && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 32 }}>
-                <button onClick={seeSolutions} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 30px', border: '1px solid rgba(255,255,255,.25)', cursor: 'pointer', borderRadius: 999, background: 'rgba(255,255,255,.1)', backdropFilter: 'blur(8px)', color: '#fff', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16, boxShadow: '0 8px 30px rgba(0,0,0,.25)' }}>
-                  Δες τις Λύσεις <span style={{ fontSize: 18 }}>→</span>
+                <button onClick={seeSolutions} className="cine-cta" style={{ fontFamily: 'var(--font-body)' }}>
+                  Δες τις Λύσεις <span className="arrow" style={{ fontSize: 18, lineHeight: 1 }}>→</span>
                 </button>
-                <a href="tel:+302102255000" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 26px', borderRadius: 999, border: '1px solid rgba(255,255,255,.22)', background: 'rgba(255,255,255,.06)', color: '#eef4f7', fontWeight: 700, fontSize: 16, backdropFilter: 'blur(6px)', textDecoration: 'none' }}>
+                <a href="tel:+302102255000" className="cine-cta ghost">
                   <Phone size={16} /> +30 210 22 55 000
                 </a>
               </div>
@@ -382,7 +390,7 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const headerRef = useRef<HTMLElement>(null);
-  const fTilt = useTilt();
+  const fTilts = features.map(() => useTilt());
   const gTilts = galleryCards.map(() => useTilt());
   const sTilts = serviceCards.map(() => useTilt());
   const cTilt = useTilt();
@@ -497,8 +505,8 @@ export default function LandingPage() {
         {/* ── Features band ── */}
         <section style={{ padding: '56px clamp(20px,5vw,70px)', background: '#0a0f14', borderTop: '1px solid rgba(255,255,255,.06)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
-            {features.map((f) => (
-              <div key={f.num} ref={fTilt.ref} className="tilt-card" onMouseMove={fTilt.onMove} onMouseLeave={fTilt.onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
+            {features.map((f, fi) => (
+              <div key={f.num} ref={fTilts[fi].ref} className="tilt-card" onMouseMove={fTilts[fi].onMove} onMouseLeave={fTilts[fi].onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
                 <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid rgba(255,255,255,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: '#fff' }}>{f.num}</span>
                 <div>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 17.5, color: '#fff' }}>{f.title}</h3>
@@ -607,13 +615,13 @@ export default function LandingPage() {
           <img src="/images/house-tour/10-terrace-lounge-b.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(5,8,11,.96) 0%,rgba(5,8,11,.86) 42%,rgba(5,8,11,.55) 100%)' }} />
           <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.15fr)', gap: 48 }}>
-            <div>
+            <div style={{ background: 'rgba(8,13,17,.7)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 24px 60px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07)' }}>
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#fff' }}>Ζητήστε να σας καλέσουμε!</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14 }}>Έτοιμος να εξοικονομήσεις χρήματα;</h2>
               <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#cfdbe2', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
-                <a href="tel:+302102255000" style={{ fontWeight: 700, color: '#eef4f7', textDecoration: 'none' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
-                <a href="mailto:info@hlektrismos.gr" style={{ fontWeight: 700, color: '#eef4f7', textDecoration: 'none' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
+                <a href="tel:+302102255000" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
+                <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
                 <span style={{ color: '#cfdbe2' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
               </div>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#9fb2bc' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
@@ -693,7 +701,7 @@ export default function LandingPage() {
                       Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.
                     </label>
                     {formError && <p style={{ color: '#f87171', fontSize: 14 }}>{formError}</p>}
-                    <button type="submit" disabled={submitting} style={{ marginTop: 6, padding: 15, border: '1px solid rgba(255,255,255,.25)', borderRadius: 999, cursor: 'pointer', background: 'rgba(255,255,255,.1)', backdropFilter: 'blur(8px)', color: '#fff', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16 }}>
+                    <button type="submit" disabled={submitting} className="cine-cta" style={{ marginTop: 6, fontFamily: 'var(--font-body)', justifyContent: 'center', width: '100%' }}>
                       {submitting ? 'Αποστολή...' : 'Ζητήστε κλήση'}
                     </button>
                   </div>
@@ -714,29 +722,29 @@ export default function LandingPage() {
             <p style={{ fontSize: 14, lineHeight: 1.6, color: '#c3d0d6', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18, fontSize: 14, color: '#c3d0d6' }}>
               <span>Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
-              <a href="tel:+302102255000" style={{ color: '#c3d0d6', textDecoration: 'none' }}>+30 210 22 55 000</a>
-              <a href="mailto:info@hlektrismos.gr" style={{ color: '#c3d0d6', textDecoration: 'none' }}>info@hlektrismos.gr</a>
+              <a href="tel:+302102255000" className="footer-link">+30 210 22 55 000</a>
+              <a href="mailto:info@hlektrismos.gr" className="footer-link">info@hlektrismos.gr</a>
             </div>
           </div>
           <div>
             <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Υπηρεσίες</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
-              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ρεύμα</a>
-              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αέριο</a>
-              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Φωτοβολταϊκά</a>
-              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ηλεκτροκίνηση</a>
-              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ολοκληρωμένες Λύσεις</a>
+              <a href="#/services" className="footer-link">Ρεύμα</a>
+              <a href="#/services" className="footer-link">Αέριο</a>
+              <a href="#/services" className="footer-link">Φωτοβολταϊκά</a>
+              <a href="#/services" className="footer-link">Ηλεκτροκίνηση</a>
+              <a href="#/services" className="footer-link">Ολοκληρωμένες Λύσεις</a>
             </div>
           </div>
           <div>
             <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Χρήσιμοι Σύνδεσμοι</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
-              <a href="#/" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αρχική</a>
-              <a href="#about" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Σχετικά με εμάς</a>
-              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Λύσεις</a>
-              <a href="#faq" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ενέργεια Σήμερα</a>
-              <a href="#faq" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Συχνές Ερωτήσεις</a>
-              <a href="#contact" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Επικοινωνία</a>
+              <a href="#/" className="footer-link">Αρχική</a>
+              <a href="#about" className="footer-link">Σχετικά με εμάς</a>
+              <a href="#/services" className="footer-link">Λύσεις</a>
+              <a href="#faq" className="footer-link">Ενέργεια Σήμερα</a>
+              <a href="#faq" className="footer-link">Συχνές Ερωτήσεις</a>
+              <a href="#contact" className="footer-link">Επικοινωνία</a>
             </div>
           </div>
           <div>
@@ -751,9 +759,9 @@ export default function LandingPage() {
         <div style={{ position: 'relative', maxWidth: 1200, margin: '44px auto 0', paddingTop: 24, borderTop: '1px solid rgba(255,255,255,.15)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, fontSize: 13, color: '#9fb0b7' }}>
           <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
           <span style={{ display: 'flex', gap: 16 }}>
-            <a href="#/privacy" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Πολιτική Απορρήτου</a>
-            <a href="#/terms" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Όροι Χρήσης</a>
-            <a href="#/cookies" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Cookies</a>
+            <a href="#/privacy" className="footer-link" style={{ color: '#9fb0b7' }}>Πολιτική Απορρήτου</a>
+            <a href="#/terms" className="footer-link" style={{ color: '#9fb0b7' }}>Όροι Χρήσης</a>
+            <a href="#/cookies" className="footer-link" style={{ color: '#9fb0b7' }}>Cookies</a>
           </span>
         </div>
       </footer>

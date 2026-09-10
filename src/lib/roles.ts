@@ -364,4 +364,43 @@ export const TEAM_FILTERS: { id: string; label: string }[] = [
   { id: 'field_sales', label: 'Field Sales' },
   { id: 'back_office', label: 'Back Office' },
   { id: 'system', label: 'Σύστημα' },
-];
+];/* ---------------- Org role predicates (Phase 1.1) ----------------
+   Canonical role keys: admin > manager > back_office > field_sales > inside_sales.
+   `Role`, `ROLES`, `DEFAULT_ROLE`, `can()` above remain the app's source of
+   truth for the UI catalog and per-role permission matrix. */
+export const ORG_ROLES: readonly Role[] = ALL;
+
+export type OrgRole = Role;
+
+export const ROLE_LEVEL: Record<OrgRole, number> = {
+  admin: 5,
+  manager: 4,
+  back_office: 3,
+  field_sales: 2,
+  inside_sales: 1,
+};
+
+export function isOrgRole(value: unknown): value is OrgRole {
+  return typeof value === 'string' && (ALL as readonly string[]).includes(value);
+}
+
+export function asOrgRole(value: unknown): OrgRole | null {
+  return isOrgRole(value) ? value : null;
+}
+
+export function hasRole(roles: readonly OrgRole[] | null | undefined, role: OrgRole): boolean {
+  return roles?.includes(role) ?? false;
+}
+
+export function hasAnyRole(roles: readonly OrgRole[] | null | undefined, candidates: readonly OrgRole[]): boolean {
+  return candidates.some((role) => hasRole(roles, role));
+}
+
+export function isAtLeastRole(roles: readonly OrgRole[] | null | undefined, min: OrgRole): boolean {
+  const minLevel = ROLE_LEVEL[min];
+  return (roles ?? []).some((role) => ROLE_LEVEL[role] >= minLevel);
+}
+
+export function canManageRoles(roles: readonly OrgRole[] | null | undefined): boolean {
+  return hasRole(roles, 'admin') || hasRole(roles, 'manager');
+}

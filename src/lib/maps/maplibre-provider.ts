@@ -8,13 +8,22 @@ const ROUTE_LAYER = 'route-line';
 
 const GREEK_CENTER: MapCoordinate = { lat: 37.9838, lng: 23.7275 };
 
+const CARTO_SUBDOMAINS = ['a', 'b', 'c', 'd'];
+
+// Mapbox style template URLs ({s}, {r}) are NOT substituted by MapLibre for
+// raster sources — the literal host is requested and DNS fails. Emit concrete
+// CARTO subdomain URLs and drop the retina flag so tiles actually load.
+// VITE_MAP_STYLE_URL, when provided, overrides the generated CARTO raster style.
+const MAP_STYLE_URL = (import.meta.env.VITE_MAP_STYLE_URL as string | undefined)?.trim() || undefined;
+
 function buildStyle(): StyleSpecification {
   return {
     version: 8,
     sources: {
       osm: {
         type: 'raster',
-        tiles: ['https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'],
+        tiles: CARTO_SUBDOMAINS.map(s =>
+          `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`),
         tileSize: 256,
         maxzoom: 19,
         attribution: '&copy; OpenStreetMap &copy; CARTO',
@@ -62,7 +71,7 @@ export function createMaplibreProvider(): MapProvider {
   async function init(container: HTMLElement, opts?: MapProviderOpts) {
     map = new maplibregl.Map({
       container,
-      style: buildStyle(),
+      style: MAP_STYLE_URL ?? buildStyle(),
       center: opts?.center ? [opts.center.lng, opts.center.lat] : [GREEK_CENTER.lng, GREEK_CENTER.lat],
       zoom: opts?.zoom ?? 11,
     });

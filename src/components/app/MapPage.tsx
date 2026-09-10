@@ -52,7 +52,6 @@ export default function MapPage() {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapProvider | null>(null);
   const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const [cases, setCases] = useState<Case[]>([]);
   const [visits, setVisits] = useState<CaseVisit[]>([]);
@@ -69,6 +68,9 @@ export default function MapPage() {
   const [locating, setLocating] = useState(false);
 
   const [sigPending, setSigPending] = useState<Set<string>>(new Set());
+
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapRetry, setMapRetry] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -90,7 +92,6 @@ export default function MapPage() {
         service: lead.service_category,
         status: lead.status,
       })));
-      setLoading(false);
     })();
     return () => { alive = false; };
   }, []);
@@ -106,17 +107,26 @@ export default function MapPage() {
     const el = mapEl.current;
     if (!el) return;
     let cancelled = false;
+    setMapError(null);
     (async () => {
-      const p = await createMap();
-      if (cancelled) { p.destroy(); return; }
-      await p.init(el, {
-        center: { lat: 37.9838, lng: 23.7275 },
-        zoom: 10,
-        onMarkerClick: id => setSelectedId(id),
-        onMapClick: () => setSelectedId(null),
-      });
-      mapRef.current = p;
-      setReady(true);
+      try {
+        const p = await createMap();
+        if (cancelled) { p.destroy(); return; }
+        await p.init(el, {
+          center: { lat: 37.9838, lng: 23.7275 },
+          zoom: 10,
+          onMarkerClick: id => setSelectedId(id),
+          onMapClick: () => setSelectedId(null),
+        });
+        if (cancelled) { p.destroy(); return; }
+        mapRef.current = p;
+        setReady(true);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[map] init failed', err);
+          setMapError(err instanceof Error ? err.message : String(err));
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -124,7 +134,12 @@ export default function MapPage() {
       mapRef.current = null;
       setReady(false);
     };
-  }, []);
+  }, [mapRetry]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    window.setTimeout(() => mapRef.current?.invalidateSize(), 300);
+  }, [ready]);
 
   const caseById = useMemo(() => new Map(cases.map(c => [c.id, c])), [cases]);
   const visitById = useMemo(() => new Map(visits.map(v => [v.id, v])), [visits]);
@@ -335,10 +350,6 @@ export default function MapPage() {
     return null;
   }, [preview, caseById]);
 
-  if (loading) {
-    return <div className="flex items-center justify-center py-24"><Spinner /></div>;
-  }
-
   return (
     <div className="max-w-6xl space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -376,9 +387,18 @@ export default function MapPage() {
       </div>
 
       <Card className="!p-0 !border-0 !shadow-none relative" pad={false}>
-        <div ref={mapEl} className="h-[56vh] min-h-[380px] rounded-[10px] overflow-hidden border border-line bg-paper/40" />
-        {!ready && (
+        <div ref={mapEl} className="h-[56vh] min-h-[380px] sm:min-h-[500px] rounded-[10px] overflow-hidden border border-line bg-paper/40" />
+        {!ready && mapError == null && (
           <div className="absolute inset-0 flex items-center justify-center"><Spinner /></div>
+        )}
+        {mapError != null && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <Card className="max-w-sm w-full m-4 text-center">
+              <p className="text-sm font-semibold text-ink">Χάρτης μη διαθέσιμος</p>
+              <p className="text-xs text-ink/45 mt-1 break-words">{mapError}</p>
+              <div className="mt-3"><Btn onClick={() => setMapRetry(r => r + 1)}>Επανάληψη</Btn></div>
+            </Card>
+          </div>
         )}
 
         {routeStops.length < 2 && (

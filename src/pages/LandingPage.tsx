@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import ChatBot from '@/components/ChatBot';
-import { useLenis } from '@/hooks/useLenis';
+import { useLenis, scrollToTarget } from '@/hooks/useLenis';
 
 /* ─── 3D tilt cursor hook ─────────────────────────────────────── */
 function useTilt() {
@@ -384,6 +384,7 @@ export default function LandingPage() {
     region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false,
   });
   const [submitted, setSubmitted] = useState(false);
+  const [leadEmailSent, setLeadEmailSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -396,6 +397,20 @@ export default function LandingPage() {
   const cTilt = useTilt();
 
   useLenis();
+
+  // Landed on a plain in-page anchor from another page (e.g. #/services → #about).
+  // The browser can't scroll before LandingPage mounts, so do it once Lenis is up.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash || hash.startsWith('/')) return;
+    let alive = true;
+    requestAnimationFrame(() => {
+      if (!alive) return;
+      const el = document.getElementById(hash.replace(/^#/, ''));
+      if (el) scrollToTarget(el, hash === 'top');
+    });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
@@ -470,6 +485,19 @@ export default function LandingPage() {
       for (const file of uploadedFiles) {
         supabase.functions.invoke('billing-ocr', { body: { lead_id: leadId, file_url: file.path, file_type: file.type } }).catch(() => {});
       }
+    }
+
+    // Send a confirmation email to the lead (fire-and-forget; skipped when no email given)
+    const leadEmail = form.email.trim().toLowerCase();
+    if (leadEmail && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(leadEmail)) {
+      setLeadEmailSent(true);
+      supabase.functions.invoke('send-lead-confirmation', {
+        body: {
+          email: leadEmail,
+          first_name: form.firstName.trim() || leadEmail.split('@')[0],
+          service: form.service,
+        },
+      }).catch(() => {});
     }
 
     if (fileWarning) setFormError(fileWarning);
@@ -632,7 +660,9 @@ export default function LandingPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
                   <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fff' }}>✓</span>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ευχαριστούμε!</h3>
-                  <p style={{ fontSize: 14.5, color: '#a9bcc6', maxWidth: 320 }}>Λάβαμε το αίτημά σου. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες.</p>
+                  <p style={{ fontSize: 14.5, color: '#a9bcc6', maxWidth: 320 }}>
+                    Λάβαμε το αίτημά σου. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailSent ? ' — μόλις σου στείλαμε και email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : '.'}
+                  </p>
                 </div>
               ) : (
                 <form onSubmit={submitLead}>
@@ -657,7 +687,7 @@ export default function LandingPage() {
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Τύπος Ακινήτου *
-                        <select required value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                        <select required className="lead-select" value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
                           <option value="" disabled>Επιλέξτε τύπο...</option>
                           <option>Κατοικία</option>
                           <option>Διαμέρισμα</option>
@@ -666,23 +696,24 @@ export default function LandingPage() {
                         </select>
                       </label>
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Περιοχή (προαιρετικό)
-                        <select value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                        <select className="lead-select" value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
                           <option value="">Επιλέξτε περιοχή...</option>
                           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </label>
                     </div>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Υπηρεσία ενδιαφέροντος
-                      <select value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                      <select className="lead-select" value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
                         {serviceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Σχόλια (προαιρετικά)
                       <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
                     </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>
+                      <span style={{ fontSize: 13, color: '#cfdbe2' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)</span>
                       {form.billFiles.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
                           {form.billFiles.map((f, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#cfdbe2' }}>
                               <FileText size={14} style={{ color: '#fff', flexShrink: 0 }} />
@@ -693,9 +724,24 @@ export default function LandingPage() {
                           ))}
                         </div>
                       )}
-                      <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleBillChange} style={{ padding: 10, borderRadius: 10, border: '1px dashed rgba(255,255,255,.2)', background: 'rgba(255,255,255,.03)', color: '#a9bcc6', fontSize: 13 }} />
-                      <span style={{ fontSize: 12, color: '#7f939c' }}>PDF, JPG ή PNG έως 25MB το καθένα — μπορείτε να ανεβάσετε πολλαπλά. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
-                    </label>
+                      <input id="lead-file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleBillChange} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }} />
+                      <label
+                        htmlFor="lead-file-input"
+                        role="button"
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-file-input')?.click(); } }}
+                        tabIndex={0}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderRadius: 10, border: '1px dashed rgba(255,255,255,.3)', background: 'rgba(255,255,255,.03)', cursor: 'pointer', fontSize: 13.5, color: '#cfdbe2', transition: 'background .2s ease, border-color .2s ease' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.6)'; e.currentTarget.style.background = 'rgba(255,255,255,.07)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.3)'; e.currentTarget.style.background = 'rgba(255,255,255,.03)'; }}
+                      >
+                        <Upload size={16} style={{ color: '#fff', flexShrink: 0 }} />
+                        <span style={{ flex: 1 }}>
+                          {form.billFiles.length === 0 ? 'Κάνε κλικ και επίλεξε αρχεία' : `Πρόσθεσε κι άλλα αρχεία (+${form.billFiles.length} ήδη επιλεγμένα)`}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#7f939c', flexShrink: 0 }}>PDF / JPG / PNG</span>
+                      </label>
+                      <span style={{ fontSize: 12, color: '#7f939c' }}>Μπορείς να επιλέξεις πολλά αρχεία μαζί ή να προσθέτεις περισσότερα σταδιακά — έως 25MB το καθένα. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
+                    </div>
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
                       Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.

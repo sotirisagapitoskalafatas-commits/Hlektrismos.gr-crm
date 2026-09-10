@@ -107,13 +107,13 @@ export default function ServicesPage() {
             </a>
             <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
               <a href="#/services" onClick={() => setMenuOpen(false)} style={{ color: '#fff', fontWeight: 800 }}>Υπηρεσίες</a>
-              <a href="#/about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-              <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
-              <a href="#/contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
+              <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
+              <a href="#faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
+              <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
               <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
             </nav>
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-            <a href="#/contact" className="header-cta">Ζητήστε κλήση</a>
+            <a href="#contact" className="header-cta">Ζητήστε κλήση</a>
           </div>
         </header>
 
@@ -166,10 +166,10 @@ export default function ServicesPage() {
               <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Χρήσιμοι Σύνδεσμοι</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
                 <a href="#/" style={footerLink}>Αρχική</a>
-                <a href="#/about" style={footerLink}>Σχετικά με εμάς</a>
+                <a href="#about" style={footerLink}>Σχετικά με εμάς</a>
                 <a href="#/services" style={footerLink}>Λύσεις</a>
-                <a href="#/faq" style={footerLink}>Συχνές Ερωτήσεις</a>
-                <a href="#/contact" style={footerLink}>Επικοινωνία</a>
+                <a href="#faq" style={footerLink}>Συχνές Ερωτήσεις</a>
+                <a href="#contact" style={footerLink}>Επικοινωνία</a>
               </div>
             </div>
             <div>

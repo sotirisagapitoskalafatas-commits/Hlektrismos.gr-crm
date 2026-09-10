@@ -7,6 +7,31 @@ import { supabase } from '@/lib/supabase';
 import ChatBot from '@/components/ChatBot';
 import { useLenis } from '@/hooks/useLenis';
 
+/* ─── 3D tilt cursor hook ─────────────────────────────────────── */
+function useTilt() {
+  const ref = useRef<HTMLDivElement>(null);
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    el.style.setProperty('--mx', `${x * 100}%`);
+    el.style.setProperty('--my', `${y * 100}%`);
+    const tiltX = (0.5 - y) * 12;
+    const tiltY = (x - 0.5) * 12;
+    el.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale(1.02)`;
+    el.style.boxShadow = `${-tiltY * 2}px ${tiltX * 2}px 40px rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.12)`;
+  };
+  const onLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)';
+    el.style.boxShadow = '0 1px 2px rgba(20,30,25,.04)';
+  };
+  return { ref, onMove, onLeave };
+}
+
 /* ─── Cinematic tour frames ─────────────────────────────────── */
 const FRAMES = [
   '/images/house-tour/01-terrace-hero.png',
@@ -303,18 +328,18 @@ function CinematicTour() {
             style={capStyle(c)}
           >
             {c.hero && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(47,212,131,.4)', background: 'rgba(47,212,131,.08)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#7bedb4' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.3)', background: 'rgba(255,255,255,.08)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#fff' }}>
                 {c.eyebrow}
               </span>
             )}
             {!c.hero && (
-              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#fff' }}>
                 {c.eyebrow}
               </span>
             )}
             <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: c.hero ? 800 : 700, fontSize: c.hero ? 'clamp(38px,5.4vw,74px)' : 'clamp(28px,3.6vw,48px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, textShadow: '0 4px 30px rgba(0,0,0,.55)' }}>
               {c.hero ? (
-                <>{c.title.split(' σύμβουλος ')[0]} <span style={{ background: 'linear-gradient(120deg,#2fd483,#18c9c0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>σύμβουλος ενέργειας</span></>
+                <>{c.title.split(' σύμβουλος ')[0]} <span style={{ color: '#fff' }}>σύμβουλος ενέργειας</span></>
               ) : c.title}
             </h2>
             <p style={{ fontSize: c.hero ? 'clamp(16px,1.5vw,20px)' : 17, lineHeight: 1.55, color: '#cfdbe2', marginTop: 14, maxWidth: c.hero ? 520 : undefined, textWrap: 'pretty' as const }}>
@@ -322,7 +347,7 @@ function CinematicTour() {
             </p>
             {c.hero && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 32 }}>
-                <button onClick={seeSolutions} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 30px', border: 'none', cursor: 'pointer', borderRadius: 999, background: 'linear-gradient(135deg,#18c9c0,#2fd483)', color: '#05231a', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16, boxShadow: '0 12px 34px rgba(47,212,131,.36)' }}>
+                <button onClick={seeSolutions} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 30px', border: '1px solid rgba(255,255,255,.25)', cursor: 'pointer', borderRadius: 999, background: 'rgba(255,255,255,.1)', backdropFilter: 'blur(8px)', color: '#fff', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16, boxShadow: '0 8px 30px rgba(0,0,0,.25)' }}>
                   Δες τις Λύσεις <span style={{ fontSize: 18 }}>→</span>
                 </button>
                 <a href="tel:+302102255000" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 26px', borderRadius: 999, border: '1px solid rgba(255,255,255,.22)', background: 'rgba(255,255,255,.06)', color: '#eef4f7', fontWeight: 700, fontSize: 16, backdropFilter: 'blur(6px)', textDecoration: 'none' }}>
@@ -335,8 +360,8 @@ function CinematicTour() {
 
         <div ref={hintRef} style={{ position: 'absolute', left: '50%', bottom: 34, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, opacity: 1, transition: 'opacity .4s' }}>
           <span style={{ fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase' as const, color: '#9fb2bc' }}>Κύλιση</span>
-          <div style={{ width: 24, height: 38, border: '2px solid rgba(255,255,255,.4)', borderRadius: 14, display: 'flex', justifyContent: 'center', paddingTop: 7 }}>
-            <div style={{ width: 4, height: 8, borderRadius: 2, background: 'var(--accent)', animation: 'hlk-bob 1.5s ease-in-out infinite' }} />
+            <div style={{ width: 24, height: 38, border: '2px solid rgba(255,255,255,.4)', borderRadius: 14, display: 'flex', justifyContent: 'center', paddingTop: 7 }}>
+              <div style={{ width: 4, height: 8, borderRadius: 2, background: '#fff', animation: 'hlk-bob 1.5s ease-in-out infinite' }} />
           </div>
         </div>
       </div>
@@ -357,6 +382,10 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const headerRef = useRef<HTMLElement>(null);
+  const fTilt = useTilt();
+  const gTilts = galleryCards.map(() => useTilt());
+  const sTilts = serviceCards.map(() => useTilt());
+  const cTilt = useTilt();
 
   useLenis();
 
@@ -446,8 +475,8 @@ export default function LandingPage() {
       <header className="site-header" ref={headerRef}>
         <div className="container nav-wrap">
           <a href="#top" className="brand">
-            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 50, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-            <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#8aa0ad', borderLeft: '1px solid rgba(255,255,255,.18)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 60, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#b0c4cc', borderLeft: '1px solid rgba(255,255,255,.22)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
           </a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
             <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
@@ -466,14 +495,14 @@ export default function LandingPage() {
         <CinematicTour />
 
         {/* ── Features band ── */}
-        <section style={{ padding: '56px clamp(20px,5vw,70px)', background: '#f7f4ee', borderTop: '1px solid rgba(20,20,16,.08)', borderBottom: '1px solid rgba(20,20,16,.08)' }}>
+        <section style={{ padding: '56px clamp(20px,5vw,70px)', background: '#0a0f14', borderTop: '1px solid rgba(255,255,255,.06)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
             {features.map((f) => (
-              <div key={f.num} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: 'var(--accent)' }}>{f.num}</span>
+              <div key={f.num} ref={fTilt.ref} className="tilt-card" onMouseMove={fTilt.onMove} onMouseLeave={fTilt.onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
+                <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid rgba(255,255,255,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: '#fff' }}>{f.num}</span>
                 <div>
-                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 17.5, color: '#14181a' }}>{f.title}</h3>
-                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: '#586a60', marginTop: 6 }}>{f.text}</p>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 17.5, color: '#fff' }}>{f.title}</h3>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: '#b0c4cc', marginTop: 6 }}>{f.text}</p>
                 </div>
               </div>
             ))}
@@ -481,20 +510,20 @@ export default function LandingPage() {
         </section>
 
         {/* ── Gallery ── */}
-        <section style={{ padding: 'clamp(70px,9vh,120px) clamp(20px,5vw,70px)', background: '#fdfcfa' }}>
+        <section style={{ padding: 'clamp(70px,9vh,120px) clamp(20px,5vw,70px)', background: '#0c1117' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Gallery</span>
-            <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#14181a' }}>Η ενέργεια σε εικόνα</h2>
-            <p style={{ fontSize: 17, color: '#586a60', marginTop: 14, maxWidth: 600 }}>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
+            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#fff' }}>Gallery</span>
+            <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#fff' }}>Η ενέργεια σε εικόνα</h2>
+            <p style={{ fontSize: 17, color: '#b0c4cc', marginTop: 14, maxWidth: 600 }}>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 44 }}>
-              {galleryCards.map((g) => (
-                <a key={g.title} href="#services" style={{ position: 'relative', display: 'block', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', textDecoration: 'none' }}>
+              {galleryCards.map((g, gi) => (
+                <a key={g.title} href="#services" ref={gTilts[gi].ref} className="tilt-card" onMouseMove={gTilts[gi].onMove} onMouseLeave={gTilts[gi].onLeave} style={{ position: 'relative', display: 'block', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', textDecoration: 'none', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
                   <img src={g.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .6s ease' }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(5,8,11,0) 42%,rgba(5,8,11,.92))' }} />
                   <div style={{ position: 'absolute', left: 18, right: 18, bottom: 16 }}>
                     <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 19, color: '#fff' }}>{g.title}</h4>
                     <p style={{ fontSize: 13, color: '#cfdbe2', marginTop: 4 }}>{g.sub}</p>
-                    <span style={{ display: 'inline-flex', marginTop: 9, fontSize: 12.5, fontWeight: 800, color: 'var(--accent)' }}>Μάθε περισσότερα →</span>
+                    <span style={{ display: 'inline-flex', marginTop: 9, fontSize: 12.5, fontWeight: 800, color: '#fff' }}>Μάθε περισσότερα →</span>
                   </div>
                 </a>
               ))}
@@ -503,18 +532,17 @@ export default function LandingPage() {
         </section>
 
         {/* ── Services ── */}
-        <section id="services" style={{ position: 'relative', padding: 'clamp(80px,11vh,150px) clamp(20px,5vw,70px) clamp(90px,12vh,160px)', background: 'radial-gradient(120% 90% at 80% 0%,rgba(24,201,192,.07),transparent 55%),radial-gradient(100% 80% at 10% 100%,rgba(47,212,131,.06),transparent 55%),#f7f4ee' }}>
+        <section id="services" style={{ position: 'relative', padding: 'clamp(80px,11vh,150px) clamp(20px,5vw,70px) clamp(90px,12vh,160px)', background: 'radial-gradient(120% 90% at 80% 0%,rgba(255,255,255,.03),transparent 55%),radial-gradient(100% 80% at 10% 100%,rgba(255,255,255,.02),transparent 55%),#0a0f14' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
             <div style={{ maxWidth: 720 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Υπηρεσίες</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.4vw,58px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#14181a' }}>Για το σπίτι και<br />την επιχείρηση!</h2>
-              <p style={{ fontSize: 'clamp(16px,1.5vw,19px)', lineHeight: 1.55, color: '#586a60', marginTop: 18 }}>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#fff' }}>Υπηρεσίες</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.4vw,58px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#fff' }}>Για το σπίτι και<br />την επιχείρηση!</h2>
+              <p style={{ fontSize: 'clamp(16px,1.5vw,19px)', lineHeight: 1.55, color: '#b0c4cc', marginTop: 18 }}>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 22, marginTop: 'clamp(44px,6vh,72px)' }}>
-              {serviceCards.map((s) => (
-                <div key={s.num} style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: '#fff', border: '1px solid rgba(20,20,16,.08)', boxShadow: '0 1px 2px rgba(20,30,25,.04)', transition: 'transform .5s cubic-bezier(.22,1,.36,1),box-shadow .5s,border-color .5s' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-10px)'; e.currentTarget.style.boxShadow = '0 30px 50px rgba(20,30,25,.14),0 0 0 1px rgba(47,212,131,.4)'; e.currentTarget.style.borderColor = 'rgba(47,212,131,.5)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 1px 2px rgba(20,30,25,.04)'; e.currentTarget.style.borderColor = 'rgba(20,20,16,.08)'; }}
+              {serviceCards.map((s, si) => (
+                <div key={s.num} ref={sTilts[si].ref} className="tilt-card" onMouseMove={sTilts[si].onMove} onMouseLeave={sTilts[si].onLeave}
+                  style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}
                 >
                   <div style={{ position: 'relative', height: 178, overflow: 'hidden' }}>
                     <img src={s.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -522,11 +550,11 @@ export default function LandingPage() {
                   </div>
                   <div style={{ padding: '26px 26px 30px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: -52, position: 'relative' }}>
-                      <span style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 15, color: '#05231a', background: 'linear-gradient(135deg,#18c9c0,#2fd483)', boxShadow: '0 8px 22px rgba(47,212,131,.4)' }}>{s.num}</span>
+                      <span style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 15, color: '#0a0f14', background: '#fff', boxShadow: '0 8px 22px rgba(0,0,0,.3)' }}>{s.num}</span>
                     </div>
-                    <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 23, marginTop: 16, color: '#14181a' }}>{s.title}</h3>
-                    <p style={{ fontSize: 15, lineHeight: 1.55, color: '#586a60', marginTop: 10 }}>{s.desc}</p>
-                    <a href="#contact" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 18, fontWeight: 800, fontSize: 14.5, color: 'var(--accent)', textDecoration: 'none' }}>Δες περισσότερα →</a>
+                    <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 23, marginTop: 16, color: '#fff' }}>{s.title}</h3>
+                    <p style={{ fontSize: 15, lineHeight: 1.55, color: '#b0c4cc', marginTop: 10 }}>{s.desc}</p>
+                    <a href="#contact" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 18, fontWeight: 800, fontSize: 14.5, color: '#fff', textDecoration: 'none' }}>Δες περισσότερα →</a>
                   </div>
                 </div>
               ))}
@@ -535,15 +563,15 @@ export default function LandingPage() {
         </section>
 
         {/* ── About ── */}
-        <section id="about" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#f7f4ee' }}>
+        <section id="about" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#0c1117' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 56, alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Ποιοι Είμαστε</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', lineHeight: 1.06, color: '#14181a' }}>Ο προσωπικός σου<br />σύμβουλος ενέργειας!</h2>
-              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#586a60', marginTop: 20 }}>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
-              <div style={{ marginTop: 26, padding: '22px 24px', borderRadius: 16, background: 'rgba(47,212,131,.07)', border: '1px solid rgba(47,212,131,.25)' }}>
-                <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 15.5, color: 'var(--accent)' }}>Το όραμά μας</h3>
-                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#45564c', marginTop: 8 }}>Διασφαλίζουμε ότι κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, που παρέχει εξατομικευμένες υπηρεσίες καθ' όλη τη διάρκεια της συνεργασίας.</p>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#fff' }}>Ποιοι Είμαστε</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', lineHeight: 1.06, color: '#fff' }}>Ο προσωπικός σου<br />σύμβουλος ενέργειας!</h2>
+              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#b0c4cc', marginTop: 20 }}>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
+              <div style={{ marginTop: 26, padding: '22px 24px', borderRadius: 16, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)' }}>
+                <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 15.5, color: '#fff' }}>Το όραμά μας</h3>
+                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#b0c4cc', marginTop: 8 }}>Διασφαλίζουμε ότι κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, που παρέχει εξατομικευμένες υπηρεσίες καθ' όλη τη διάρκεια της συνεργασίας.</p>
               </div>
             </div>
             <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', boxShadow: '0 24px 60px rgba(20,30,25,.16)' }}>
@@ -553,21 +581,21 @@ export default function LandingPage() {
         </section>
 
         {/* ── FAQ ── */}
-        <section id="faq" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#fdfcfa' }}>
+        <section id="faq" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#0a0f14' }}>
           <div style={{ maxWidth: 820, margin: '0 auto' }}>
             <div style={{ textAlign: 'center' as const, marginBottom: 48 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Συχνές Ερωτήσεις</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#14181a' }}>Όλα όσα χρειάζεται να γνωρίζεις</h2>
-              <p style={{ fontSize: 16.5, color: '#586a60', marginTop: 14 }}>Όλα όσα πρέπει να ξέρεις για την αλλαγή παρόχου ενέργειας.</p>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#fff' }}>Συχνές Ερωτήσεις</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#fff' }}>Όλα όσα χρειάζεται να γνωρίζεις</h2>
+              <p style={{ fontSize: 16.5, color: '#b0c4cc', marginTop: 14 }}>Όλα όσα πρέπει να ξέρεις για την αλλαγή παρόχου ενέργειας.</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {faqs.map((f, i) => (
-                <details key={i} open={i === 0} style={{ padding: '20px 22px', borderRadius: 14, background: '#fff', border: '1px solid rgba(20,20,16,.08)', boxShadow: '0 1px 2px rgba(20,30,25,.04)' }}>
-                  <summary onClick={(e) => { e.preventDefault(); setOpenFaq(openFaq === i ? null : i); }} style={{ cursor: 'pointer', fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 16, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, color: '#171c18' }}>
+                <details key={i} open={i === 0} style={{ padding: '20px 22px', borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                  <summary onClick={(e) => { e.preventDefault(); setOpenFaq(openFaq === i ? null : i); }} style={{ cursor: 'pointer', fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 16, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, color: '#eef4f7' }}>
                     {f.q}
-                    <span style={{ flex: 'none', color: 'var(--accent)', fontSize: 19, fontWeight: 400, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}>+</span>
+                    <span style={{ flex: 'none', color: '#fff', fontSize: 19, fontWeight: 400, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}>+</span>
                   </summary>
-                  <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#586a60', marginTop: 13 }}>{f.a}</p>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#b0c4cc', marginTop: 13 }}>{f.a}</p>
                 </details>
               ))}
             </div>
@@ -580,7 +608,7 @@ export default function LandingPage() {
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(5,8,11,.96) 0%,rgba(5,8,11,.86) 42%,rgba(5,8,11,.55) 100%)' }} />
           <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.15fr)', gap: 48 }}>
             <div>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Ζητήστε να σας καλέσουμε!</span>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#fff' }}>Ζητήστε να σας καλέσουμε!</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14 }}>Έτοιμος να εξοικονομήσεις χρήματα;</h2>
               <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#cfdbe2', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
@@ -591,10 +619,10 @@ export default function LandingPage() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#9fb2bc' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
             </div>
 
-            <div style={{ background: 'rgba(8,13,17,.82)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)' }}>
+            <div ref={cTilt.ref} className="tilt-card" onMouseMove={cTilt.onMove} onMouseLeave={cTilt.onLeave} style={{ background: 'rgba(8,13,17,.82)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
               {submitted ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
-                  <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(47,212,131,.14)', border: '1px solid rgba(47,212,131,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: 'var(--accent)' }}>✓</span>
+                  <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fff' }}>✓</span>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ευχαριστούμε!</h3>
                   <p style={{ fontSize: 14.5, color: '#a9bcc6', maxWidth: 320 }}>Λάβαμε το αίτημά σου. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες.</p>
                 </div>
@@ -648,8 +676,8 @@ export default function LandingPage() {
                       {form.billFiles.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                           {form.billFiles.map((f, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(47,212,131,.08)', borderRadius: 8, fontSize: 13, color: '#cfdbe2' }}>
-                              <FileText size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#cfdbe2' }}>
+                              <FileText size={14} style={{ color: '#fff', flexShrink: 0 }} />
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{f.name}</span>
                               <span style={{ fontSize: 11, flexShrink: 0 }}>{(f.size / 1024 / 1024).toFixed(1)}MB</span>
                               <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2, lineHeight: 1 }}>×</button>
@@ -662,10 +690,10 @@ export default function LandingPage() {
                     </label>
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
-                      Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#2fd483' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.
+                      Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.
                     </label>
                     {formError && <p style={{ color: '#f87171', fontSize: 14 }}>{formError}</p>}
-                    <button type="submit" disabled={submitting} style={{ marginTop: 6, padding: 15, border: 'none', borderRadius: 999, cursor: 'pointer', background: 'linear-gradient(135deg,#18c9c0,#2fd483)', color: '#05231a', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16, boxShadow: '0 12px 30px rgba(47,212,131,.32)' }}>
+                    <button type="submit" disabled={submitting} style={{ marginTop: 6, padding: 15, border: '1px solid rgba(255,255,255,.25)', borderRadius: 999, cursor: 'pointer', background: 'rgba(255,255,255,.1)', backdropFilter: 'blur(8px)', color: '#fff', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16 }}>
                       {submitting ? 'Αποστολή...' : 'Ζητήστε κλήση'}
                     </button>
                   </div>
@@ -682,7 +710,7 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(4,7,10,.94) 0%,rgba(4,7,10,.90) 55%,rgba(4,7,10,.96) 100%)' }} />
         <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(220px,1.4fr) repeat(3,minmax(140px,1fr))', gap: 40 }}>
           <div>
-            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 52, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 70, width: 'auto', filter: 'brightness(0) invert(1)' }} />
             <p style={{ fontSize: 14, lineHeight: 1.6, color: '#c3d0d6', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18, fontSize: 14, color: '#c3d0d6' }}>
               <span>Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>

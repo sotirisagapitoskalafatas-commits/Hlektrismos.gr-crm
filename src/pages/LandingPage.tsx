@@ -24,6 +24,7 @@ import {
   FileText,
 } from 'lucide-react';
 import ChatBot from '@/components/ChatBot';
+import HouseTourSection from '@/components/HouseTourSection';
 import { useLenis } from '@/hooks/useLenis';
 import { supabase } from '@/lib/supabase';
 
@@ -610,6 +611,8 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        <HouseTourSection />
 
         <section className="greece-journey" id="journey" ref={journeySectionRef}>
           {/* Sticky viewport: the 3D map stays pinned while info cards scroll past */}

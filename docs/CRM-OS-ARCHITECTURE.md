@@ -280,8 +280,8 @@ JARVIS (Master — coordinates strategy/priorities/exception handling; NO unrest
 
 **Phase 1 — Data foundation [MIGRATE]/[NEW] (biggest rework stabilizer)**
 - STATUS (2026-09-10): foundation applied to the live project via `supabase/migrations/20260910000100_crm_os_foundation_phase1.sql` (idempotent). Seeded + backfilled live: `organizations` (1), `roles` (5), `user_roles` (1, mirroring `profiles.role`), `providers` (12), `products` (6), `assignments` (20, backfilled from cases.owner_id / cases.inside_sales_owner / leads.assigned_to_user_id). Created empty, awaiting feature wiring: `departments`, `teams`, `territories`, `provider_regions`, `business_events` (append-only + idempotency_key), `campaigns`, `work_items`. Security advisors clean for the new tables (all RLS-enabled-with-policies; remaining `rls_enabled_no_policy` lints are the 8 pre-existing legacy tables only). NOTE: canonical work table is `work_items` — the legacy frontend-facing `tasks` VIEW (over `calendar_events`) keeps its name.
-1. `organizations`, `roles`, `departments`, `teams`, `user_roles`, `profiles` (dept/team/manager/timezone/language/availability/is_active/last_login).
-2. `providers`, `products`, `provider_regions`; convert `leads.provider/program` and `cases.provider/program` to FKs (data backfill idempotent, preserve text display).
+1. `organizations`, `roles`, `departments`, `teams`, `user_roles`, `profiles` (dept/team/manager/timezone/language/availability/is_active/last_login). **DONE — foundation applied (see above).**
+2. `providers`, `products`, `provider_regions`; convert `leads.provider/program` and `cases.provider/program` to FKs (data backfill idempotent, preserve text display). **DONE via `supabase/migrations/20260910000200_crm_os_phase12_provider_product_fk.sql`** — additive `provider_id`/`product_id` FKs on `leads`+`cases` (legacy text columns preserved as read-back); deterministic org-scoped resolvers `crm_resolve_provider_id` / `crm_resolve_product_id` (unique-match only; canonical aliases `ΕΛΙΝ→Elin`, `Φυσικό Αέριο→Φυσικό Αέριο Ελλάδος`); keyword + provider-category product rules; idempotent backfill (`WHERE *_id IS NULL`, no invented records); BEFORE INSERT/UPDATE auto-resolve triggers on both tables cover all write paths (RPCs, edge functions, webhooks). UI resolution is centralized in `src/lib/catalog.ts` (mirrored TS rules) and applied at the `src/lib/api.ts` fetch choke-points so existing display sites (CaseDetail/LeadDetail/BackOffice) are unchanged. Live result: 5/5 non-blank cases mapped, 0 unresolved, 0 ambiguous; leads had no values (all blank).
 3. `companies`, `sites`, `contacts`; normalize `leads`/`customers` company/site text columns.
 4. `assignments` + migrate `deals.assigned_to` (text) and `service_requests.owner` (text) → FK-based; keep `cases` typed owners derived from assignments.
 5. `business_events` backbone + wire existing Timeline writes to it; retire `activity_log` after a parity period; consolidate `app_notifications`→`notifications`.
@@ -315,3 +315,72 @@ Distinguish LOCAL / PREVIEW / PRODUCTION on the same gates (map PRODUCTION = PAS
 ## 17. Git / deployment guardrails
 
 Before any commit: `git status`, `git diff`, `git diff --cached`; secret scan (`git grep 'cb1_'`, staged-blob scan). Commit only intended files. Push only `origin HEAD:main` fast-forward. Verify remote HEAD (e.g., `git ls-remote origin main`). Never force-push, never rewrite history. `.env.local`, QA secrets file, `scripts/.browser-out/` never committed.
+
+---
+
+## 18. Map & Navigation capability (REQUIRED architectural capability)
+
+Declared as an in-scope CRM OS capability. It is recorded here as the contract and **must not block** the Phase-1 data-foundation sequencing; it is implemented in its own phase after 1.2 (tracked separately, reported as **NOT TESTED** until exercised on production-grade wiring).
+
+### 18.1 Architecture (composition over the existing map stack)
+```
+CRMMap
+  → MapProvider        (rendering; CARTO/OSM attribution STAYS, never hidden)
+  → MapLibreProvider   (visualization; worker bundled same-origin)
+
+NavigationService      (A: turn-by-turn handoff to external apps, B: in-app route)
+  → Google Maps        (external handoff on mobile)
+  → Apple Maps         (external handoff where supported)
+
+RoutingProvider        (real road routing — RESTRICTED: ORS initially, OSRM-compatible for self-hosting)
+  → ORS                (real road geometry + ETA)
+  → OSRM-compatible    (future/self-host)
+```
+- Map init NEVER depends on GPS, routing, or CRM data; the map renders when GPS/routing are unavailable.
+- Every valid CRM location (Customers / Sites / Cases / Visits / Follow-ups / Field Sales appointments) exposes: Navigate, Open in Google Maps, Open in Apple Maps (where supported), Route from current location, distance, estimated travel time.
+- GPS: browser/device geolocation with explicit permission, `lat/lng/accuracy/timestamp`, no hidden continuous background tracking.
+- **No fake data**: real road routing only (never Haversine as a substitute road route, never invented coordinates). Missing coordinates → **LOCATION UNAVAILABLE**; missing ORS key must not break the map; routing failure/absence → **ROUTING UNAVAILABLE / ESTIMATE** with truthful provider/result/status.
+- Marker → Preview → Site/Customer/Case 360, preview shows customer/site, address, case number where applicable, service, stage/status, distance, Navigate.
+- Field Sales My Day: today's scheduled visits, route order, scheduled time, distance between stops, travel duration, total route distance/time, route progress, navigate-to-next-stop. Scheduled appointments are authoritative — optimization may only operate within allowed scheduling constraints (never reorders fixed appointments).
+- Check-in/Check-out: persists visit + case + user + timestamp + lat/lng + accuracy, writes a canonical `business_events` row (idempotency-keyed), writes a Timeline entry, and the UI shows success ONLY after backend confirmation.
+- Offline: navigation links remain available offline; check-in/out and important field actions queue locally and sync on reconnect (offline queue exists: `src/lib/offline/*`).
+- Mobile UX tested at 375 / 390 / 430 / 360 px; map has explicit usable height and is never hidden behind bottom navigation.
+- Attribution for the configured map provider is always visible.
+- Gate: internal routing and external handoff distinct — "Open Google Maps" alone is NOT navigation; each reports its actual provider/result/status.
+
+### 18.2 Phase binding
+- Phase 1.3+ (after 1.2 provider/product migration, which is the current primary task). See §15 roadmap — the 1.2 work is committed and production-verified independently.
+
+---
+
+## 19. OS intelligence roadmap (captured requirements — OBSERVE→UNDERSTAND→PRIORITIZE→PLAN→APPROVE→EXECUTE→VERIFY→MEASURE→LEARN)
+
+Future modules over the Phase-1+2 foundations (surveys recorded for architecture; none faked/claimed until purpose-built):
+- Universal "Next Action" engine (per-object: next action / owner / due / reason; detect no-, overdue-, blocked-, wrong-owner-, stale-, conflicting-action).
+- AI Workload/Capacity engine (skills, territory, availability, workload, capacity for assignment recommendations + round-robin rules).
+- Business Health Score (sales/operations/back office/providers/cash/revenue/retention/capacity/data-quality with explanatory drivers).
+- Bottleneck-Detection engine (funnel stage leak detection across Lead→…→Activation→Completed with affected cohorts).
+- Forecasting engine (pipeline vs weighted vs expected-month vs high-confidence vs at-risk; ML later).
+- Revenue-Leakage detection (won-not-activated, activated-not-invoiced, commission missing/mismatch, discount-without-approval, duplicates).
+- Customer lifecycle / Renewal / Churn engine (New→Active→Healthy→At-Risk→Renewal→Renewed/Churned with automated next actions).
+- Opportunity/Upsell engine (recommendation-driven, policy-controlled, never AI-invented offers).
+- Data Quality Center + repair suggestions (duplicates, missing/invalid fields, stale, broken mappings).
+- Identity Resolution engine (phone/email/VAT/company/address graph, human-approved merge ≥94%).
+- Business/Relationship Graph (Customer↔Site↔Case↔Lead↔Provider↔Agent↔Campaign↔Offer↔Document edges).
+- Exception Management Center (SLA breach, provider delay, missing docs, duplicates, conflicts, failed automation/integration).
+- AI Control Room (actions today, success rate, awaiting approval, escalated, blocked, failed; per-action reason/evidence/confidence/risk/permission/approval/result).
+- Simulation mode before AI destructive actions + rollback/undo (audit, versioning, soft delete, restore, approval, transaction history, "Rollback AI action").
+- "What changed?" engine + Daily AI Briefing (morning + evening) over real data.
+- Command Center natural-language interface + Scenario/What-if engine (capacity additions, provider-delay stress).
+- Geospatial intelligence (density, conversion by area, field workload, visit efficiency, opportunity gaps).
+- Process Mining over `business_events` (stage-skip detection, team velocity comparison).
+- Experimentation system (hypothesis/target/control/variant/metric/confidence/decision).
+- Knowledge OS (provider rules, tariffs, playbooks, legal, SOPs, training; permission-aware RAG).
+- Skills/Certification registry (feeds assignment + capacity).
+- Trust/confidence layer (confidence + evidence + fact-type tags; "UNKNOWN — insufficient evidence").
+- Business Memory (structured: what happened / why / tried / worked / failed / decisions).
+- Financial reconciliation (sale→contract→submission→activation→invoice→payment→commission→reconciliation).
+- System Health / Operations Center (API, DB, messaging, maps, routing, AI, jobs, webhooks with latency/failure/queue).
+- AI Guardrails / kill switches (GLOBAL AI PAUSE; per-module pause; admin-only).
+
+Capability gate: each module lands only on real data via `business_events` + the canonical relational spine; unbuilt modules remain **NOT TESTED** in the QA matrix.

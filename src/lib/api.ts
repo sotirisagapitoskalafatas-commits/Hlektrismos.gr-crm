@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { applyCanonicalLabels, loadCatalog, resolveProductId, resolveProviderId } from './catalog';
 import type { Role, Stage } from './roles';
 
 export type Customer = {
@@ -46,6 +47,8 @@ export type Case = {
   lng: number | null;
   provider: string | null;
   program: string | null;
+  provider_id: string | null;
+  product_id: string | null;
   application_status: string | null;
   activation_status: string | null;
   notes: string;
@@ -177,6 +180,10 @@ export type Lead = {
   converted_by_user_id: string | null;
   converted_at: string | null;
   converted_case_id: string | null;
+  provider: string | null;
+  program: string | null;
+  provider_id: string | null;
+  product_id: string | null;
   created_at: string;
   created_by?: { full_name: string } | null;
   assigned_to?: { full_name: string } | null;
@@ -366,7 +373,8 @@ export async function fetchCases(opts?: { search?: string; stage?: string; inclu
     if (opts?.stage && opts.stage !== 'all') {
       list = list.filter(c => c.current_stage === opts.stage);
     }
-    return list;
+    const catalog = await loadCatalog();
+    return applyCanonicalLabels(list, catalog);
   } catch (e) { logError('fetchCases', e); return []; }
 }
 
@@ -378,13 +386,24 @@ export async function fetchCase(id: string): Promise<Case | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) { logError('fetchCase', error); return null; }
-  return (data ?? null) as Case | null;
+  const row = (data ?? null) as Case | null;
+  if (!row) return null;
+  const catalog = await loadCatalog();
+  return applyCanonicalLabels([row], catalog)[0];
 }
 
 export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?: boolean; role?: Role }): Promise<void> {
   if (!supabase) return;
   const prev = opts?.log ? await fetchCase(id) : null;
+  const catalog = await loadCatalog();
+  const providerId =
+    patch.provider_id ?? (patch.provider !== undefined ? resolveProviderId(patch.provider, catalog) : undefined);
+  const productId =
+    patch.product_id ??
+    (patch.program !== undefined ? resolveProductId(patch.program, providerId ?? null, catalog) : undefined);
   const upd: Record<string, unknown> = { ...patch };
+  if (providerId && upd.provider_id === undefined) upd.provider_id = providerId;
+  if (productId && upd.product_id === undefined) upd.product_id = productId;
   delete upd.case_no;
   delete upd.id;
   delete upd.customer;
@@ -898,7 +917,8 @@ export async function fetchLeads(): Promise<Lead[]> {
     .select(`*, created_by:created_by_user_id(full_name), assigned_to:assigned_to_user_id(full_name)`)
     .order('created_at', { ascending: false });
   if (error) { logError('fetchLeads', error); return []; }
-  return (data ?? []) as Lead[];
+  const catalog = await loadCatalog();
+  return applyCanonicalLabels((data ?? []) as Lead[], catalog);
 }
 
 export async function fetchLead(id: string): Promise<Lead | null> {
@@ -909,7 +929,10 @@ export async function fetchLead(id: string): Promise<Lead | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) { logError('fetchLead', error); return null; }
-  return (data ?? null) as Lead | null;
+  const row = (data ?? null) as Lead | null;
+  if (!row) return null;
+  const catalog = await loadCatalog();
+  return applyCanonicalLabels([row], catalog)[0];
 }
 
 export type LeadInput = {
@@ -927,6 +950,8 @@ export type LeadInput = {
   campaign_id?: string | null;
   campaign_name?: string | null;
   assigned_to_user_id?: string | null;
+  provider?: string | null;
+  program?: string | null;
 };
 
 /* Staff-managed lead entry. Public intake stays on insert_website_lead(). */
@@ -936,6 +961,9 @@ export async function createLead(input: LeadInput): Promise<Lead | null> {
   const first = input.first_name ?? null;
   const last = input.last_name ?? null;
   const full = input.full_name ?? ([first, last].filter(Boolean).join(' ') || 'Νέο lead');
+  const catalog = await loadCatalog();
+  const providerId = resolveProviderId(input.provider, catalog);
+  const productId = resolveProductId(input.program, providerId, catalog);
   const { data, error } = await supabase
     .from('leads')
     .insert({
@@ -954,6 +982,10 @@ export async function createLead(input: LeadInput): Promise<Lead | null> {
       comments: input.comments ?? null,
       campaign_id: input.campaign_id ?? null,
       campaign_name: input.campaign_name ?? null,
+      provider: input.provider ?? null,
+      program: input.program ?? null,
+      provider_id: providerId,
+      product_id: productId,
       created_by_user_id: profile?.id ?? null,
       assigned_to_user_id: input.assigned_to_user_id ?? profile?.id ?? null,
     })

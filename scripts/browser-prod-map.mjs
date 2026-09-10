@@ -98,8 +98,8 @@ async function run() {
       return { canvas: !!canvas, failureUi, keyMissing, watermark, attribution: !!attribution, errs, boxText: boxText.replace(/\s+/g, ' ') };
     });
 
-    pass('prod-map-failure-box-present', state.failureUi);
-    pass('prod-key-missing-error-shown', state.keyMissing, state.boxText.slice(0, 180));
+    pass('prod-map-failure-box-absent', !state.failureUi);
+    pass('prod-key-missing-error-absent', !state.keyMissing, state.boxText.slice(0, 180));
     pass('prod-carto-tiles-requested', tileResponses.length > 0, `responses=${tileResponses.length}`);
     pass('prod-carto-tiles-200', tileResponses.length > 0 && tileResponses.every(t => t.startsWith('200')), tileResponses.slice(0, 3).join(' | '));
     pass('prod-map-canvas', state.canvas, `errs=${state.errs.length}`);

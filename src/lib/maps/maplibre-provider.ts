@@ -1,6 +1,10 @@
 import * as maplibregl from 'maplibre-gl';
 import type { StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// Bundle the MapLibre worker as a same-origin asset (module worker) instead of
+// letting it resolve a runtime URL that 404s in production and forces the
+// main-thread fallback.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { MapCoordinate, MapMarkerData, MapProvider, MapProviderOpts } from './types';
 
 const ROUTE_SRC = 'route';
@@ -102,6 +106,7 @@ export function createMaplibreProvider(): MapProvider {
     map = new maplibregl.Map({
       container,
       style: resolveStyle(),
+      workerUrl: maplibreWorkerUrl,
       center: opts?.center ? [opts.center.lng, opts.center.lat] : [GREEK_CENTER.lng, GREEK_CENTER.lat],
       zoom: opts?.zoom ?? 11,
     });

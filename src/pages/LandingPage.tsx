@@ -1,59 +1,102 @@
-import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, Suspense, lazy, useEffect, useRef, useState, type SVGProps } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import {
-  ArrowRight,
-  Bot,
-  Check,
-  ChevronDown,
-  Gauge,
-  Home,
-  Leaf,
-  Lock,
-  Mail,
-  Menu,
-  Phone,
-  Plug,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Users,
-  X,
-  Upload,
-  Zap,
-  FileText,
+  ArrowRight, Phone, Mail, Home, FileText, Upload, X, Menu,
+  ChevronDown, Check, Lock,
 } from 'lucide-react';
-import ChatBot from '@/components/ChatBot';
-import HouseTourSection from '@/components/HouseTourSection';
-import { useLenis } from '@/hooks/useLenis';
 import { supabase } from '@/lib/supabase';
+import ChatBot from '@/components/ChatBot';
+import { useLenis } from '@/hooks/useLenis';
 
-const GreeceMap3D = lazy(() => import('@/components/greece/GreeceMap3D').then(m => ({ default: m.GreeceMap3D })));
-const HeroParticles = lazy(() => import('@/components/three/HeroParticles'));
+/* ─── Cinematic tour frames ─────────────────────────────────── */
+const FRAMES = [
+  '/images/house-tour/01-terrace-hero.png',
+  '/images/house-tour/02-living-room-entry.png',
+  '/images/house-tour/03-living-room-deep.png',
+  '/images/house-tour/04-kitchen-wide.png',
+  '/images/house-tour/05-panel-hallway.png',
+  '/images/house-tour/06-panel-closeup.png',
+  '/images/house-tour/07-kitchen-sunset.png',
+  '/images/house-tour/08-terrace-acropolis.png',
+  '/images/house-tour/09-terrace-lounge-a.png',
+  '/images/house-tour/10-terrace-lounge-b.png',
+  '/images/house-tour/11-terrace-wide.png',
+  '/images/house-tour/12-rooftop-solar.png',
+];
 
-gsap.registerPlugin(ScrollTrigger);
-
-type LeadForm = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  region: string;
-  customerType: string;
-  propertyType: string;
-  service: string;
-  message: string;
-  billFiles: File[];
-  consent: boolean;
+type CaptionDef = {
+  eyebrow: string;
+  title: string;
+  text: string;
+  start: number;
+  end: number;
+  pos: 'left' | 'right' | 'center';
+  vPos: 'center' | 'bottom';
+  maxW?: number;
+  hero?: boolean;
 };
 
-const greekJourney = [
-  { region: 'Αττική', city: 'Αθήνα', title: 'Η αφετηρία της εξοικονόμησης', text: 'Ξεκινάμε από την παροχή σου και συγκρίνουμε άμεσα τα διαθέσιμα προγράμματα για σπίτι, γραφείο ή κατάστημα.', x: 56, y: 34 },
-  { region: 'Κεντρική Ελλάδα', city: 'Θεσσαλία', title: 'Λύσεις για κάθε κατανάλωση', text: 'Από μικρές κατοικίες μέχρι αγροτικές και επαγγελματικές εγκαταστάσεις, βρίσκουμε το σωστό ενεργειακό προφίλ.', x: 61, y: 28 },
-  { region: 'Βόρεια Ελλάδα', city: 'Θεσσαλονίκη', title: 'Η ενέργεια της ανάπτυξης', text: 'Υποστήριξη για επιχειρήσεις και οικογένειες σε όλη τη Μακεδονία και τη Θράκη με προσωπικό σύμβουλο.', x: 63, y: 17 },
-  { region: 'Νησιά Ιονίου', city: 'Κέρκυρα · Ζάκυνθος', title: 'Ενέργεια χωρίς σύνορα', text: 'Εξυπηρέτηση σε κάθε νησί, με προτάσεις που λαμβάνουν υπόψη εποχικότητα, τουρισμό και πραγματική χρήση.', x: 37, y: 45 },
-  { region: 'Νησιά Αιγαίου', city: 'Κυκλάδες · Δωδεκάνησα', title: 'Έξυπνη ενέργεια στα νησιά', text: 'Προγράμματα ρεύματος, φωτοβολταϊκά και λύσεις ηλεκτροκίνησης για τις ανάγκες κάθε νησιωτικής κοινότητας.', x: 71, y: 52 },
-  { region: 'Κρήτη', city: 'Ηράκλειο · Χανιά', title: 'Η πράσινη επόμενη μέρα', text: 'Σχεδιάζουμε το επόμενο βήμα με φωτοβολταϊκά, ενεργειακή αυτονομία και λύσεις για κατοικίες και τουριστικές μονάδες.', x: 63, y: 75 },
+const CAPTIONS: CaptionDef[] = [
+  {
+    eyebrow: 'Εξειδικευμένοι Σύμβουλοι Ενέργειας',
+    title: 'Ο προσωπικός σου σύμβουλος ενέργειας',
+    text: 'Δίπλα σου με όλες τις ενεργειακές λύσεις για το σπίτι και την επιχείρησή σου. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο — δωρεάν.',
+    start: 0, end: 0.055, pos: 'left', vPos: 'center', maxW: 640, hero: true,
+  },
+  {
+    eyebrow: 'Μπαίνουμε μέσα',
+    title: 'Η ενέργεια ζει σε κάθε γωνιά του σπιτιού σου',
+    text: 'Ακολουθούμε τη ροή της ενέργειας από την είσοδο μέχρι την καρδιά του σπιτιού.',
+    start: 0.10, end: 0.24, pos: 'left', vPos: 'bottom', maxW: 560,
+  },
+  {
+    eyebrow: 'Έξυπνη διαχείριση',
+    title: 'Ρεύμα & Αέριο, υπό πλήρη έλεγχο',
+    text: 'Παρακολούθηση κατανάλωσης, αυτοπαραγωγή και δίκτυο σε πραγματικό χρόνο, δίπλα στο έξυπνο σύστημα του σπιτιού.',
+    start: 0.33, end: 0.50, pos: 'right', vPos: 'center', maxW: 420,
+  },
+  {
+    eyebrow: 'Άνεση & θέρμανση',
+    title: 'Ζεστασιά χωρίς συμβιβασμούς',
+    text: 'Εξατομικευμένες λύσεις φυσικού αερίου με τα πιο αποδοτικά τιμολογιακά πλάνα.',
+    start: 0.55, end: 0.66, pos: 'left', vPos: 'bottom', maxW: 520,
+  },
+  {
+    eyebrow: 'Έξω, στη θέα',
+    title: 'Αποθήκευση & εξοικονόμηση',
+    text: 'Η ενέργεια που παράγεις μένει δική σου — αυτονομία, ανεξαρτησία, μικρότερος λογαριασμός.',
+    start: 0.70, end: 0.86, pos: 'left', vPos: 'center', maxW: 520,
+  },
+  {
+    eyebrow: 'Φωτοβολταϊκά',
+    title: 'Η πράσινη επόμενη μέρα',
+    text: 'Η ενέργεια που κινεί όλο το ταξίδι — από τη στέγη σου, στον ήλιο της Μεσογείου.',
+    start: 0.90, end: 1.01, pos: 'center', vPos: 'center', maxW: 720,
+  },
+];
+
+/* ─── Section content ───────────────────────────────────────── */
+const features = [
+  { num: '01', title: '100% Δωρεάν', text: 'Η υπηρεσία μας είναι εντελώς δωρεάν, χωρίς κρυφές χρεώσεις.' },
+  { num: '02', title: 'Άμεση Εξυπηρέτηση', text: 'Επικοινωνία μέσα σε λίγες ώρες με τον προσωπικό σου σύμβουλο.' },
+  { num: '03', title: 'Εξατομικευμένη Λύση', text: 'Πρόταση φτιαγμένη ειδικά για τις δικές σου ανάγκες κατανάλωσης.' },
+];
+
+const galleryCards = [
+  { img: '/images/house-tour/06-panel-closeup.png', title: 'Ρεύμα', sub: 'Φθηνά Προγράμματα Ενέργειας' },
+  { img: '/images/house-tour/07-kitchen-sunset.png', title: 'Αέριο', sub: 'Εξατομικευμένες Λύσεις Φυσικού Αερίου' },
+  { img: '/images/house-tour/12-rooftop-solar.png', title: 'Φωτοβολταϊκά', sub: 'Καινοτομία & Βιώσιμη Ανάπτυξη' },
+  { img: '/images/house-tour/01-terrace-hero.png', title: 'Ηλεκτροκίνηση', sub: 'Οδηγούμε Οικολογικά' },
+  { img: '/images/house-tour/05-panel-hallway.png', title: 'Αποθήκευση Ενέργειας', sub: 'Αυτονομία & Εξοικονόμηση' },
+  { img: '/images/house-tour/11-terrace-wide.png', title: 'Εξοικονόμηση Ενέργειας', sub: 'Ανάλυση & Στρατηγική' },
+];
+
+const serviceCards = [
+  { num: '01', img: '/images/house-tour/06-panel-closeup.png', title: 'Ρεύμα', desc: 'Τα φθηνά προγράμματα ενέργειας ειδικά για σένα.' },
+  { num: '02', img: '/images/house-tour/07-kitchen-sunset.png', title: 'Αέριο', desc: 'Εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι και την επιχείρηση.' },
+  { num: '03', img: '/images/house-tour/12-rooftop-solar.png', title: 'Φωτοβολταϊκά', desc: 'Καινοτομία και βιώσιμη ανάπτυξη στον χώρο σου.' },
+  { num: '04', img: '/images/house-tour/01-terrace-hero.png', title: 'Ηλεκτροκίνηση', desc: 'Οδηγούμε οικολογικά, κινούμαστε ηλεκτρικά.' },
+  { num: '05', img: '/images/house-tour/04-kitchen-wide.png', title: 'Αποθήκευση Ενέργειας', desc: 'Λύσεις αποθήκευσης με μπαταρίες για αυτονομία και εξοικονόμηση.' },
+  { num: '06', img: '/images/house-tour/11-terrace-wide.png', title: 'Εξοικονόμηση Ενέργειας', desc: 'Ανάλυση κατανάλωσης και στρατηγικές για μείωση του λογαριασμού.' },
 ];
 
 const regions = [
@@ -62,35 +105,16 @@ const regions = [
   'Πελοπόννησος', 'Νησιά Αιγαίου', 'Κρήτη', 'Βόρειο Αιγαίο',
 ];
 
-const services = [
-  'Ρεύμα',
-  'Φυσικό Αέριο',
-  'Φωτοβολταϊκά',
-  'Ηλεκτροκίνηση',
-];
+const serviceOptions = ['Ρεύμα', 'Αέριο', 'Φωτοβολταϊκά', 'Ηλεκτροκίνηση', 'Αποθήκευση Ενέργειας', 'Εξοικονόμηση Ενέργειας'];
 
 const SERVICE_KEYS: Record<string, string> = {
   'Ρεύμα': 'energy',
-  'Φυσικό Αέριο': 'gas',
+  'Αέριο': 'gas',
   'Φωτοβολταϊκά': 'solar',
   'Ηλεκτροκίνηση': 'ev',
+  'Αποθήκευση Ενέργειας': 'storage',
+  'Εξοικονόμηση Ενέργειας': 'efficiency',
 };
-
-const features = [
-  { icon: Zap, title: 'Ρεύμα', text: 'Φθηνά προγράμματα ενέργειας ειδικά για σένα. Συγκρίνουμε πάροχους και βρίσκουμε την πιο αποδοτική λύση.' },
-  { icon: Flame, title: 'Αέριο', text: 'Εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι και την επιχείρηση με τα καλύτερα τιμολογιακά πλάνα.' },
-  { icon: Leaf, title: 'Φωτοβολταϊκά', text: 'Καινοτομία και βιώσιμη ανάπτυξη στον χώρο σου. Επένδυσε στην πράσινη ενέργεια με ασφάλεια.' },
-  { icon: Plug, title: 'Ηλεκτροκίνηση', text: 'Οδηγούμε οικολογικά, κινούμαστε ηλεκτρικά. Λύσεις φόρτισης και EV για κάθε ανάγκη.' },
-  { icon: ShieldCheck, title: 'Αποθήκευση Ενέργειας', text: 'Λύσεις αποθήκευσης ενέργειας με μπαταρίες για αυτονομία και εξοικονόμηση.' },
-  { icon: TrendingUp, title: 'Εξοικονόμηση Ενέργειας', text: 'Ανάλυση κατανάλωσης και στρατηγικές για μείωση του λογαριασμού ρεύματος.' },
-];
-
-const stats = [
-  { value: '100%', label: 'Δωρεάν Υπηρεσία' },
-  { value: '7', label: 'Εργάσιμες για Αλλαγή' },
-  { value: '24/7', label: 'Υποστήριξη' },
-  { value: '12.000+', label: 'Ικανοποιημένοι Πελάτες' },
-];
 
 const faqs = [
   { q: 'Είναι δωρεάν η υπηρεσία;', a: 'Ναι, η υπηρεσία μας είναι εντελώς δωρεάν, χωρίς κρυφές χρεώσεις. Αποζημιωνόμαστε από τους παρόχους, όχι από εσάς.' },
@@ -108,389 +132,283 @@ const faqs = [
   { q: 'Που απευθυνόμαστε σε περίπτωση διακοπής;', a: 'Σε περίπτωση διακοπής, απευθυνόμαστε στον ΔΕΔΔΗΕ που είναι υπεύθυνος για τη λειτουργία και συντήρηση του δικτύου.' },
 ];
 
-const advantages = [
-  { icon: Gauge, title: '100% Δωρεάν', text: 'Η υπηρεσία μας είναι εντελώς δωρεάν, χωρίς κρυφές χρεώσεις.' },
-  { icon: TrendingUp, title: 'Άμεση Εξυπηρέτηση', text: 'Επικοινωνία μέσα σε λίγες ώρες με τον προσωπικό σου σύμβουλο.' },
-  { icon: Users, title: 'Εξατομικευμένη Λύση', text: 'Πρόταση φτιαγμένη ειδικά για τις δικές σου ανάγκες κατανάλωσης.' },
-];
+/* ─── Lead form types ───────────────────────────────────────── */
+type LeadForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  region: string;
+  propertyType: string;
+  service: string;
+  message: string;
+  billFiles: File[];
+  consent: boolean;
+};
 
-const galleryItems = [
-  {
-    image: '/images/energy1.jpg',
-    title: 'Ρεύμα',
-    subtitle: 'Φθηνά Προγράμματα Ενέργειας',
-    description: 'Φθηνά προγράμματα ενέργειας ειδικά για σένα. Συγκρίνουμε πάροχους και βρίσκουμε τον φθηνότερο — δωρεάν.',
-    details: 'Στο δυναμικό περιβάλλον της αγοράς ενέργειας, είμαστε εδώ για να δώσουμε λύσεις. Με συνεχή έρευνα και αναζήτηση των βέλτιστων προσφορών, προσφέρουμε δωρεάν συμβουλές σε εκείνους που επιθυμούν την καλύτερη επιλογή ενέργειας για το σπίτι ή την επιχείρησή τους.',
-    wide: true,
-    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
-  },
-  {
-    image: '/images/energy2.jpg',
-    title: 'Αέριο',
-    subtitle: 'Εξατομικευμένες Λύσεις Φυσικού Αερίου',
-    description: 'Εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι με τα καλύτερα τιμολογικά πλάνα.',
-    details: 'Προσφέρουμε εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι και την επιχείρηση. Συγκρίνουμε τιμές και όρους για να βρούμε το πιο αποδοτικό πρόγραμμα για τις ανάγκες σου.',
-    wide: false,
-    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
-  },
-  {
-    image: '/images/energy3.jpg',
-    title: 'Φωτοβολταϊκά',
-    subtitle: 'Καινοτομία & Βιώσιμη Ανάπτυξη',
-    description: 'Καινοτομία και Βιώσιμη Ανάπτυξη, τώρα στο χώρο σου. Επένδυσε στην πράσινη ενέργεια.',
-    details: 'Εγκατεστημένα φωτοβολταϊκά συστήματα για κατοικίες και επιχειρήσεις. Αυτονομία, εξοικονόμηση και βιωσιμότητα σε ένα βήμα. Αξιοποιήστε την ηλιακή ενέργεια για να μειώσετε драстικά τον λογαριασμό σας.',
-    wide: false,
-    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
-  },
-  {
-    image: '/images/energy4.jpg',
-    title: 'Ηλεκτροκίνηση',
-    subtitle: 'Οδηγούμε Οικολογικά',
-    description: 'Οδηγούμε οικολογικά, κινούμαστε ηλεκτρικά. Λύσεις φόρτισης και EV για κάθε ανάγκη.',
-    details: 'Λύσεις ηλεκτρικής κίνησης: από την εγκατάσταση σταθμών φόρτισης έως η συμβουλευτική για επιλογή ηλεκτρικού οχήματος. Κινηθείτε βιώσιμα με χαμηλότερο κόστος.',
-    wide: true,
-    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
-  },
-  {
-    image: '/images/energy5.jpg',
-    title: 'Αποθήκευση Ενέργειας',
-    subtitle: 'Αυτονομία & Εξοικονόμηση',
-    description: 'Λύσεις αποθήκευσης ενέργειας με μπαταρίες για αυτονομία και εξοικονόμηση.',
-    details: 'Συστήματα αποθήκευσης ενέργειας για αυτονομία από το δίκτυο. Αποθηκεύστε πλεονάσματα από φωτοβολταϊκά και χρησιμοποιήστε τα όταν χρειάζεστε. Μειώστε το κόστος και αυξήστε την ασφάλεια ενέργειας.',
-    wide: false,
-    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
-  },
-  {
-    image: '/images/energy6.jpg',
-    title: 'Εξοικονόμηση Ενέργειας',
-    subtitle: 'Ανάλυση & Στρατηγική',
-    description: 'Ανάλυση κατανάλωσης και στρατηγικές για μείωση του λογαριασμού ρεύματος.',
-    details: 'Αναλύουμε την κατανάλωσή σου και σου προτείνουμε πραγματικές στρατηγικές για μείωση του λογαριασμού. Με δεδομένα και εμπειρία, βρίσκουμε πάντα τον καλύτερο τρόπο να εξοικονομήσεις.',
-    wide: false,
-    link: 'https://hlektrismos.gr/olokliromenes-lyseis/',
-  },
-];
+/* ─── Cinematic tour (scroll-scrubbed 12-frame sequence) ────── */
+function CinematicTour() {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const frameRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const captionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const hintRef = useRef<HTMLDivElement>(null);
 
-function useScrollReveal() {
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-        }
-      }),
-      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' },
-    );
-    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-}
+    const section = sectionRef.current;
+    if (!section) return;
 
-function Flame(props: SVGProps<SVGSVGElement>) {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const N = FRAMES.length;
+    let cur = -1;
+    let target = 0;
+    let running = false;
+    let raf = 0;
+    const shown = new Set<number>();
+
+    frameRefs.current.forEach((f, i) => {
+      if (f) {
+        f.style.visibility = i === 0 ? 'visible' : 'hidden';
+        f.style.opacity = i === 0 ? '1' : '0';
+      }
+    });
+    shown.add(0);
+
+    const apply = (p: number) => {
+      const sp = p * (N - 1);
+      const base = Math.min(Math.floor(sp), N - 2);
+      const frac = sp - base;
+
+      for (const i of shown) {
+        if (i !== base && i !== base + 1) {
+          const f = frameRefs.current[i];
+          if (f) { f.style.visibility = 'hidden'; f.style.opacity = '0'; }
+          shown.delete(i);
+        }
+      }
+
+      const pairs: [number, number, number][] = [
+        [base, 1 - frac, 1 + 0.14 * frac],
+        [base + 1, frac, 1.14 - 0.14 * frac],
+      ];
+      for (const [i, op, sc] of pairs) {
+        if (i >= N) continue;
+        const f = frameRefs.current[i];
+        if (!f) continue;
+        if (!shown.has(i)) { f.style.visibility = 'visible'; shown.add(i); }
+        f.style.opacity = op.toFixed(3);
+        f.style.transform = reduce ? 'scale(1.02)' : `scale(${sc.toFixed(4)})`;
+      }
+
+      const m = 0.028;
+      captionRefs.current.forEach((c) => {
+        if (!c) return;
+        const s = +(c.dataset.start ?? 0);
+        const e = +(c.dataset.end ?? 0);
+        let o = 0;
+        if (p >= s - m && p <= e + m) o = Math.max(0, Math.min((p - (s - m)) / m, ((e + m) - p) / m, 1));
+        c.style.opacity = o.toFixed(3);
+        c.style.pointerEvents = o > 0.5 ? 'auto' : 'none';
+      });
+
+      if (hintRef.current) hintRef.current.style.opacity = p > 0.04 ? '0' : '1';
+    };
+
+    const readTarget = () => {
+      const total = section.offsetHeight - window.innerHeight;
+      const scrolled = Math.min(Math.max(window.scrollY - section.offsetTop, 0), total);
+      return total > 0 ? scrolled / total : 0;
+    };
+
+    const ease = reduce ? 1 : 0.09;
+
+    const tick = () => {
+      target = readTarget();
+      if (cur < 0) cur = target;
+      cur += (target - cur) * ease;
+      if (Math.abs(target - cur) < 0.0004) {
+        cur = target; apply(cur); running = false; return;
+      }
+      apply(cur);
+      raf = requestAnimationFrame(tick);
+    };
+
+    const kick = () => { if (!running) { running = true; raf = requestAnimationFrame(tick); } };
+
+    apply(readTarget());
+    window.addEventListener('scroll', kick, { passive: true });
+    window.addEventListener('resize', kick);
+    kick();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', kick);
+      window.removeEventListener('resize', kick);
+    };
+  }, []);
+
+  const capStyle = (c: CaptionDef): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      position: 'absolute',
+      maxWidth: c.maxW ?? 560,
+      opacity: 0,
+    };
+    if (c.pos === 'right') {
+      base.right = 'clamp(20px,5vw,70px)';
+      base.textAlign = 'right';
+    } else if (c.pos === 'center') {
+      base.left = '50%';
+      base.textAlign = 'center';
+    } else {
+      base.left = 'clamp(20px,5vw,70px)';
+    }
+    if (c.vPos === 'bottom') {
+      base.bottom = 'clamp(60px,12vh,120px)';
+    } else {
+      base.top = '50%';
+      base.transform = c.pos === 'center' ? 'translate(-50%,-50%)' : 'translateY(-50%)';
+    }
+    return base;
+  };
+
+  const seeSolutions = () => {
+    const s = sectionRef.current;
+    if (s) window.scrollTo({ top: s.offsetTop + s.offsetHeight - window.innerHeight + 2, behavior: 'smooth' });
+  };
+
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
-    </svg>
+    <section ref={sectionRef} data-cine-section style={{ position: 'relative', width: '100%', height: '1180vh' }}>
+      <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100%', overflow: 'hidden', background: '#05080b' }}>
+        {FRAMES.map((src, i) => (
+          <div
+            key={i}
+            ref={(el) => { frameRefs.current[i] = el; }}
+            style={{ position: 'absolute', inset: 0, opacity: i === 0 ? 1 : 0, transform: 'scale(1.06)', willChange: 'transform,opacity' }}
+          >
+            {i === 0
+              ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" />
+              : <img src={src} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            }
+          </div>
+        ))}
+
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(5,8,11,.72) 0%,rgba(5,8,11,.28) 42%,rgba(5,8,11,0) 68%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg,rgba(5,8,11,.55) 0%,rgba(5,8,11,0) 32%)', pointerEvents: 'none' }} />
+
+        {CAPTIONS.map((c, i) => (
+          <div
+            key={i}
+            ref={(el) => { captionRefs.current[i] = el; }}
+            data-start={c.start}
+            data-end={c.end}
+            style={capStyle(c)}
+          >
+            {c.hero && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(47,212,131,.4)', background: 'rgba(47,212,131,.08)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#7bedb4' }}>
+                {c.eyebrow}
+              </span>
+            )}
+            {!c.hero && (
+              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>
+                {c.eyebrow}
+              </span>
+            )}
+            <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: c.hero ? 800 : 700, fontSize: c.hero ? 'clamp(38px,5.4vw,74px)' : 'clamp(28px,3.6vw,48px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, textShadow: '0 4px 30px rgba(0,0,0,.55)' }}>
+              {c.hero ? (
+                <>{c.title.split(' σύμβουλος ')[0]} <span style={{ background: 'linear-gradient(120deg,#2fd483,#18c9c0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>σύμβουλος ενέργειας</span></>
+              ) : c.title}
+            </h2>
+            <p style={{ fontSize: c.hero ? 'clamp(16px,1.5vw,20px)' : 17, lineHeight: 1.55, color: '#cfdbe2', marginTop: 14, maxWidth: c.hero ? 520 : undefined, textWrap: 'pretty' as const }}>
+              {c.text}
+            </p>
+            {c.hero && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 32 }}>
+                <button onClick={seeSolutions} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 30px', border: 'none', cursor: 'pointer', borderRadius: 999, background: 'linear-gradient(135deg,#18c9c0,#2fd483)', color: '#05231a', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16, boxShadow: '0 12px 34px rgba(47,212,131,.36)' }}>
+                  Δες τις Λύσεις <span style={{ fontSize: 18 }}>→</span>
+                </button>
+                <a href="tel:+302102255000" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 26px', borderRadius: 999, border: '1px solid rgba(255,255,255,.22)', background: 'rgba(255,255,255,.06)', color: '#eef4f7', fontWeight: 700, fontSize: 16, backdropFilter: 'blur(6px)', textDecoration: 'none' }}>
+                  <Phone size={16} /> +30 210 22 55 000
+                </a>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <div ref={hintRef} style={{ position: 'absolute', left: '50%', bottom: 34, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, opacity: 1, transition: 'opacity .4s' }}>
+          <span style={{ fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase' as const, color: '#9fb2bc' }}>Κύλιση</span>
+          <div style={{ width: 24, height: 38, border: '2px solid rgba(255,255,255,.4)', borderRadius: 14, display: 'flex', justifyContent: 'center', paddingTop: 7 }}>
+            <div style={{ width: 4, height: 8, borderRadius: 2, background: 'var(--accent)', animation: 'hlk-bob 1.5s ease-in-out infinite' }} />
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
+/* ─── Main landing page ─────────────────────────────────────── */
 export default function LandingPage() {
   const [form, setForm] = useState<LeadForm>({
     firstName: '', lastName: '', email: '', phone: '',
-    region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false,
+    region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false,
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [galleryModal, setGalleryModal] = useState<number | null>(null);
-  const [journeyIndex, setJourneyIndex] = useState(0);
-  const activeJourney = greekJourney[journeyIndex];
 
-  // Refs driven imperatively by GSAP ScrollTrigger — no per-frame React re-renders.
-  const rootRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
-  const heroRef = useRef<HTMLElement>(null);
-  const heroBgRef = useRef<HTMLDivElement>(null);
-  const heroContentRef = useRef<HTMLDivElement>(null);
-  const heroVisualRef = useRef<HTMLDivElement>(null);
-  const particlesRef = useRef<HTMLDivElement>(null);
-  const pageProgressRef = useRef<HTMLDivElement>(null);
-  const journeySectionRef = useRef<HTMLElement>(null);
-  const journeyFillRef = useRef<HTMLSpanElement>(null);
-  const journeyProgressRef = useRef(0);
-  const journeyMapWrapRef = useRef<HTMLDivElement>(null);
-  // The 3D map (Mapbox chunk + tiles) is heavy — mount it only when the
-  // journey section approaches the viewport instead of on page load.
-  const [journeyMapLive, setJourneyMapLive] = useState(false);
 
-  useEffect(() => {
-    const el = journeyMapWrapRef.current;
-    if (!el || journeyMapLive) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setJourneyMapLive(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: '800px 0px' },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [journeyMapLive]);
+  useLenis();
 
-  // Gallery: cursor-following 3D tilt + glare, scroll-scrubbed depth entrance
-  // and photo/card parallax. Entirely skipped under prefers-reduced-motion.
-  const galleryReducedMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const handleGalleryTilt = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (galleryReducedMotion) return;
-    const el = e.currentTarget;
-    const r = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width - 0.5;
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty('--ry', `${(px * 7).toFixed(2)}deg`);
-    el.style.setProperty('--rx', `${(-py * 5.5).toFixed(2)}deg`);
-    el.style.setProperty('--gx', `${((px + 0.5) * 100).toFixed(1)}%`);
-    el.style.setProperty('--gy', `${((py + 0.5) * 100).toFixed(1)}%`);
-  };
-
-  const resetGalleryTilt = (e: ReactMouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.setProperty('--rx', '0deg');
-    e.currentTarget.style.setProperty('--ry', '0deg');
-  };
-
-  // Showcase banner gets a hero-grade tilt range — it's one big image, not a grid card.
-  const handleShowcaseTilt = (e: ReactMouseEvent<HTMLElement>) => {
-    if (galleryReducedMotion) return;
-    const el = e.currentTarget;
-    const r = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width - 0.5;
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty('--ry', `${(px * 10).toFixed(2)}deg`);
-    el.style.setProperty('--rx', `${(-py * 8).toFixed(2)}deg`);
-    el.style.setProperty('--gx', `${((px + 0.5) * 100).toFixed(1)}%`);
-    el.style.setProperty('--gy', `${((py + 0.5) * 100).toFixed(1)}%`);
-  };
-
-  const resetShowcaseTilt = (e: ReactMouseEvent<HTMLElement>) => {
-    e.currentTarget.style.setProperty('--rx', '0deg');
-    e.currentTarget.style.setProperty('--ry', '0deg');
-  };
-
-  useEffect(() => {
-    if (galleryReducedMotion) return;
-    const ctx = gsap.context(() => {
-      gsap.utils.toArray<HTMLElement>('.gallery-item').forEach((item) => {
-        gsap.fromTo(
-          item,
-          { y: 64, opacity: 0, rotateX: 10, scale: 0.95, transformPerspective: 1100 },
-          {
-            y: 0,
-            opacity: 1,
-            rotateX: 0,
-            scale: 1,
-            duration: 1.05,
-            ease: 'power3.out',
-            scrollTrigger: { trigger: item, start: 'top 88%', once: true },
-          },
-        );
-        const media = item.querySelector('.gallery-media');
-        if (media) {
-          gsap.fromTo(
-            media,
-            { yPercent: -5 },
-            {
-              yPercent: 5,
-              ease: 'none',
-              scrollTrigger: { trigger: item, start: 'top bottom', end: 'bottom top', scrub: true },
-            },
-          );
-        }
-      });
-
-      // Showcase banner: 3D entrance + scroll-scrubbed parallax (replaces the
-      // .reveal class fade so the two systems don't fight over the element).
-      gsap.utils.toArray<HTMLElement>('.energy-showcase-frame').forEach((frame) => {
-        gsap.fromTo(
-          frame,
-          { y: 90, opacity: 0, rotateX: 14, scale: 0.94, transformPerspective: 1200 },
-          {
-            y: 0,
-            opacity: 1,
-            rotateX: 0,
-            scale: 1,
-            duration: 1.15,
-            ease: 'power3.out',
-            scrollTrigger: { trigger: frame, start: 'top 88%', once: true },
-          },
-        );
-        const showcaseMedia = frame.querySelector('.energy-showcase-media');
-        if (showcaseMedia) {
-          gsap.fromTo(
-            showcaseMedia,
-            { yPercent: -7 },
-            {
-              yPercent: 7,
-              ease: 'none',
-              scrollTrigger: { trigger: frame, start: 'top bottom', end: 'bottom top', scrub: true },
-            },
-          );
-        }
-      });
-    });
-    return () => ctx.revert();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Force light mode on the public landing page (CRM dashboard keeps its dark theme).
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     localStorage.setItem('theme', 'light');
   }, []);
 
-  useScrollReveal();
-  useLenis();
-
-  // All scroll-driven visuals run through GSAP ScrollTrigger, writing straight
-  // to DOM nodes via quickSetters — the component only re-renders when the
-  // discrete journeyIndex actually changes.
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      // ── Header state (class toggle, no re-render) ──
-      const header = headerRef.current;
-      if (header) {
-        const headerTrigger = ScrollTrigger.create({
-          start: 40,
-          end: 'max',
-          onToggle: (self) => header.classList.toggle('scrolled', self.isActive),
-        });
-        header.classList.toggle('scrolled', headerTrigger.isActive);
-      }
-
-      // ── Page scroll-progress bar ──
-      const pageFill = pageProgressRef.current;
-      if (pageFill && rootRef.current) {
-        const setPageProgress = gsap.quickSetter(pageFill, 'width', '%');
-        const pageTrigger = ScrollTrigger.create({
-          trigger: rootRef.current,
-          start: 'top top',
-          end: 'bottom bottom',
-          onUpdate: (self) => setPageProgress(self.progress * 100),
-        });
-        setPageProgress(pageTrigger.progress * 100);
-      }
-
-      // ── Hero micro-parallax + fade-out ──
-      const hero = heroRef.current;
-      if (hero) {
-        const bgTarget = heroBgRef.current;
-        const setBgY = bgTarget ? gsap.quickSetter(bgTarget, 'y', 'px') : null;
-        const setBgScale = bgTarget ? gsap.quickSetter(bgTarget, 'scale') : null;
-        const setContentY = heroContentRef.current ? gsap.quickSetter(heroContentRef.current, 'y', 'px') : null;
-        const fadeTargets = [heroBgRef.current, heroContentRef.current, heroVisualRef.current, particlesRef.current]
-          .filter((el): el is HTMLDivElement => Boolean(el));
-        const setFade = fadeTargets.length > 0 ? gsap.quickSetter(fadeTargets, 'opacity') : null;
-
-        const applyHero = (progress: number) => {
-          const y = progress * hero.offsetHeight;
-          setBgY?.(y * 0.4);
-          setBgScale?.(1 + y * 0.0003);
-          setContentY?.(y * 0.12);
-          setFade?.(Math.max(0, 1 - y / 600));
-        };
-        const heroTrigger = ScrollTrigger.create({
-          trigger: hero,
-          start: 'top top',
-          end: () => `+=${hero.offsetHeight}`,
-          onUpdate: (self) => applyHero(self.progress),
-        });
-        applyHero(heroTrigger.progress);
-      }
-
-      // ── Greece journey — sticky 3D map progress ──
-      const journey = journeySectionRef.current;
-      if (journey) {
-        const setJourneyFill = journeyFillRef.current ? gsap.quickSetter(journeyFillRef.current, 'width', '%') : null;
-        const applyJourney = (progress: number) => {
-          journeyProgressRef.current = progress; // consumed inside GreeceMap3D's camera rig
-          setJourneyFill?.(progress * 100);
-          const next = Math.min(greekJourney.length - 1, Math.floor(progress * greekJourney.length));
-          setJourneyIndex((current) => (current === next ? current : next));
-        };
-        const journeyTrigger = ScrollTrigger.create({
-          trigger: journey,
-          start: 'top top',
-          end: 'bottom bottom',
-          onUpdate: (self) => applyJourney(self.progress),
-        });
-        applyJourney(journeyTrigger.progress);
-      }
-    }, rootRef);
-    return () => ctx.revert();
+    const header = headerRef.current;
+    if (!header) return;
+    const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((current) => ({ ...current, [field]: value }));
+  const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((c) => ({ ...c, [field]: value }));
 
   const handleBillChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) {
-      return;
-    }
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    const maxSize = 25 * 1024 * 1024; // 25MB per file
-    const validFiles: File[] = [];
+    if (!files || files.length === 0) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+    const maxSize = 25 * 1024 * 1024;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (!allowedTypes.includes(file.type)) {
-        setFormError(`Το αρχείο "${file.name}" δεν είναι αποδεκτό. Επιτρέπονται μόνο PDF, JPG, PNG.`);
-        e.target.value = '';
-        return;
-      }
-      if (file.size > maxSize) {
-        setFormError(`Το αρχείο "${file.name}" υπερβαίνει το όριο 25MB.`);
-        e.target.value = '';
-        return;
-      }
-      validFiles.push(file);
+      if (!allowed.includes(file.type)) { setFormError(`Το αρχείο "${file.name}" δεν είναι αποδεκτό. Επιτρέπονται μόνο PDF, JPG, PNG.`); e.target.value = ''; return; }
+      if (file.size > maxSize) { setFormError(`Το αρχείο "${file.name}" υπερβαίνει το όριο 25MB.`); e.target.value = ''; return; }
     }
     setFormError('');
-    setForm(prev => ({ ...prev, billFiles: [...prev.billFiles, ...validFiles] }));
+    setForm((p) => ({ ...p, billFiles: [...p.billFiles, ...Array.from(files)] }));
     e.target.value = '';
   };
 
-  const removeBillFile = (index: number) => {
-    setForm(prev => ({ ...prev, billFiles: prev.billFiles.filter((_, i) => i !== index) }));
-  };
+  const removeBillFile = (i: number) => setForm((p) => ({ ...p, billFiles: p.billFiles.filter((_, idx) => idx !== i) }));
 
   const submitLead = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
     setSubmitting(true);
 
-    // Try to upload files, but don't block the lead insert if upload fails
     const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
     let fileWarning = '';
     for (const file of form.billFiles) {
       try {
         const { uploadDocument } = await import('@/lib/storage');
         const { data, error: uploadError } = await uploadDocument(file);
-        if (uploadError) {
-          fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε. Θα μπορέσετε να το ανεβάσετε αργότερα.`;
-          console.error('File upload error:', uploadError);
-        } else if (data) {
-          uploadedFiles.push(data);
-        }
-      } catch (uploadErr) {
-        fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`;
-        console.error('File upload exception:', uploadErr);
-      }
+        if (uploadError) { fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`; }
+        else if (data) { uploadedFiles.push(data); }
+      } catch { fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`; }
     }
 
-    // Insert lead (even without files) via the hardened public RPC
     const { data: leadId, error } = await supabase.rpc('insert_website_lead', {
       p_source: 'website',
       p_payload: {
@@ -500,63 +418,40 @@ export default function LandingPage() {
         email: form.email || 'not-provided@hlektrismos.local',
         phone: form.phone || null,
         region: form.region || null,
-        property_type: form.propertyType || form.customerType || null,
+        property_type: form.propertyType || null,
         service_category: SERVICE_KEYS[form.service] ?? form.service,
         comments: form.message || null,
         gdpr_consent: form.consent,
         attached_files: uploadedFiles.length > 0 ? uploadedFiles : null,
       },
     });
-    setSubmitting(false);
-    if (error) {
-      console.error('Lead insert error:', error);
-      setFormError(`Σφάλμα καταχώρησης: ${error.message || 'Παρακαλώ δοκιμάστε ξανά.'}`);
-      return;
-    }
 
-    // Auto-trigger OCR for uploaded bill files in background
+    setSubmitting(false);
+    if (error) { setFormError(`Σφάλμα καταχώρησης: ${error.message || 'Παρακαλώ δοκιμάστε ξανά.'}`); return; }
+
     if (uploadedFiles.length > 0 && leadId) {
       for (const file of uploadedFiles) {
-        supabase.functions.invoke('billing-ocr', {
-          body: { lead_id: leadId, file_url: file.path, file_type: file.type },
-        }).then(() => {}).catch(() => {});
+        supabase.functions.invoke('billing-ocr', { body: { lead_id: leadId, file_url: file.path, file_type: file.type } }).catch(() => {});
       }
     }
 
-    if (fileWarning) {
-      setFormError(fileWarning);
-    }
+    if (fileWarning) setFormError(fileWarning);
     setSubmitted(true);
-    setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', customerType: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
+    setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
   };
 
   return (
-    <div className="app-shell" ref={rootRef}>
-      <div className="scroll-progress"><div className="scroll-progress-fill" ref={pageProgressRef} /></div>
-
+    <div className="app-shell">
+      {/* ── Header ── */}
       <header className="site-header" ref={headerRef}>
         <div className="container nav-wrap">
           <a href="#top" className="brand">
-            <svg viewBox="0 0 100 100" style={{ width: 34, height: 34 }} xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="brandGradientHeader" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#0EA5E9" />
-                  <stop offset="100%" stopColor="#0B2545" />
-                </linearGradient>
-                <filter id="subtleShadowHeader" x="-10%" y="-10%" width="120%" height="120%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0B2545" floodOpacity="0.25"/>
-                </filter>
-              </defs>
-              <circle cx="50" cy="50" r="43" fill="none" stroke="url(#brandGradientHeader)" strokeWidth="4.5" filter="url(#subtleShadowHeader)" />
-              <circle cx="50" cy="50" r="35" fill="none" stroke="url(#brandGradientHeader)" strokeWidth="1.5" opacity="0.5" />
-              <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradientHeader)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadowHeader)" />
-            </svg>
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0B2545, #0EA5E9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hlektrismos.gr</span>
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <span style={{ fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#8aa0ad', borderLeft: '1px solid rgba(255,255,255,.18)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
           </a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
             <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
             <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-            <a href="#journey" onClick={() => setMenuOpen(false)}>Σε όλη την Ελλάδα</a>
             <a href="#faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
             <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
             <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
@@ -567,156 +462,71 @@ export default function LandingPage() {
       </header>
 
       <main id="top">
-        <section className="hero" ref={heroRef}>
-          <div className="hero-bg">
-            <div className="hero-bg-image" ref={heroBgRef} />
-            <div className="hero-bg-overlay" />
-            <div className="hero-grid-bg" />
-            <div className="hero-glow-1" />
-            <div className="hero-glow-2" />
-            <div className="hero-particles" ref={particlesRef} aria-hidden="true">
-              <Suspense fallback={null}>
-                <HeroParticles />
-              </Suspense>
-            </div>
-          </div>
-          <div className="container hero-grid">
-            <div className="hero-content" ref={heroContentRef}>
-              <div className="eyebrow"><span className="eyebrow-dot" /> Εξειδικευμένοι Σύμβουλοι Ενέργειας</div>
-              <h1>Ο προσωπικός σου <span className="gradient">σύμβουλος ενέργειας</span></h1>
-              <p className="hero-intro">Δίπλα σου με όλες τις ενεργειακές λύσεις για το σπίτι και την επιχείρησή σου! Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο — δωρεάν.</p>
-              <div className="hero-actions">
-                <a href="#services" className="btn btn-primary">Δες τις Λύσεις <ArrowRight size={18} /></a>
-                <a href="tel:+302102255000" className="btn btn-ghost"><Phone size={16} /> +30 210 22 55 000</a>
-              </div>
-            </div>
-            <div className="hero-visual" ref={heroVisualRef}>
-              <div className="orbit-stage">
-                <div className="orbit-ring orbit-ring-1" />
-                <div className="orbit-ring orbit-ring-2" />
-                <div className="orbit-ring orbit-ring-3" />
-                <div className="orbit-core"><div className="orbit-core-inner" /></div>
-                <div className="orbit-node" style={{ top: 'calc(50% - 110px)', left: '50%' }}><Zap size={20} /></div>
-                <div className="orbit-node" style={{ top: 'calc(50% + 80px)', left: 'calc(50% - 140px)' }}><Leaf size={20} /></div>
-                <div className="orbit-node" style={{ top: 'calc(50% + 60px)', left: 'calc(50% + 130px)' }}><Plug size={20} /></div>
-                <div className="orbit-node" style={{ top: 'calc(50% - 160px)', left: 'calc(50% + 100px)' }}><Bot size={20} /></div>
-              </div>
-            </div>
-          </div>
-          <div className="container" style={{ position: 'relative', zIndex: 2 }}>
-            <div className="stats-strip">
-              {stats.map((s) => (
-                <div className="stat-cell" key={s.label}><strong>{s.value}</strong><span>{s.label}</span></div>
-              ))}
-            </div>
-          </div>
-        </section>
+        {/* ── Cinematic tour ── */}
+        <CinematicTour />
 
-        <HouseTourSection />
-
-        <section className="greece-journey" id="journey" ref={journeySectionRef}>
-          {/* Sticky viewport: the 3D map stays pinned while info cards scroll past */}
-          <div className="journey-sticky">
-            <div className="journey-map-wrap" aria-hidden="true" ref={journeyMapWrapRef}>
-              <Suspense fallback={<div className="journey-canvas" />}>
-                {journeyMapLive && (
-                  <GreeceMap3D activeRegion={journeyIndex} progressRef={journeyProgressRef} className="journey-canvas" />
-                )}
-              </Suspense>
-            </div>
-            <div className="journey-map-vignette" />
-
-            <div
-              className={`journey-scroll-hint${journeyIndex > 0 ? ' journey-scroll-hint-hidden' : ''}`}
-              aria-hidden="true"
-            >
-              <span className="journey-mouse"><i /></span>
-              <span>Κύλιση</span>
-            </div>
-
-            <div className="journey-intro-overlay">
-              <div className="eyebrow" style={{ margin: '0 auto' }}><span className="eyebrow-dot" /> Παντού στην Ελλάδα</div>
-              <h2>Η ενέργεια <span style={{ color: '#7fe8c0' }}>ταξιδεύει μαζί σου.</span></h2>
-              <p>Καθώς κατεβαίνεις, γνωρίζεις τις λύσεις μας σε κάθε γωνιά της Ελλάδας — από την Αθήνα μέχρι την Κρήτη.</p>
-            </div>
-
-            <article key={activeJourney.city} className="journey-region-card">
-              <span className="journey-stop-region">{activeJourney.region}</span>
-              <h3>{activeJourney.title}</h3>
-              <p>{activeJourney.text}</p>
-              <strong>{activeJourney.city}</strong>
-            </article>
-
-            <div className="journey-hud">
-              <div className="journey-progress-bar">
-                <div className="track"><span className="fill" ref={journeyFillRef} /></div>
-              </div>
-              <div className="journey-current-label">{activeJourney.region} — {activeJourney.city}</div>
-            </div>
-          </div>
-
-          <div className="container">
-            <div className="journey-stops">
-              {greekJourney.map((stop, index) => (
-                <article
-                  className={`journey-stop reveal visible${index === journeyIndex ? ' active' : ''}`}
-                  key={stop.city}
-                >
-                  <span className="journey-stop-number">0{index + 1}</span>
-                  <div><span className="journey-stop-region">{stop.region}</span><h3>{stop.title}</h3><p>{stop.text}</p><strong>{stop.city}</strong></div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="advantages-section">
-          <div className="container">
-            <div className="advantages-grid">
-              {advantages.map((a, i) => (
-                <div className={`advantage-card reveal stagger-${i + 1}`} key={a.title}>
-                  <div className="advantage-icon"><a.icon size={24} /></div>
-                  <h3>{a.title}</h3>
-                  <p>{a.text}</p>
+        {/* ── Features band ── */}
+        <section style={{ padding: '56px clamp(20px,5vw,70px)', background: '#f7f4ee', borderTop: '1px solid rgba(20,20,16,.08)', borderBottom: '1px solid rgba(20,20,16,.08)' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
+            {features.map((f) => (
+              <div key={f.num} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: 'var(--accent)' }}>{f.num}</span>
+                <div>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 17.5, color: '#14181a' }}>{f.title}</h3>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: '#586a60', marginTop: 6 }}>{f.text}</p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Gallery ── */}
+        <section style={{ padding: 'clamp(70px,9vh,120px) clamp(20px,5vw,70px)', background: '#fdfcfa' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Gallery</span>
+            <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#14181a' }}>Η ενέργεια σε εικόνα</h2>
+            <p style={{ fontSize: 17, color: '#586a60', marginTop: 14, maxWidth: 600 }}>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 44 }}>
+              {galleryCards.map((g) => (
+                <a key={g.title} href="#services" style={{ position: 'relative', display: 'block', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', textDecoration: 'none' }}>
+                  <img src={g.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .6s ease' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(5,8,11,0) 42%,rgba(5,8,11,.92))' }} />
+                  <div style={{ position: 'absolute', left: 18, right: 18, bottom: 16 }}>
+                    <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 19, color: '#fff' }}>{g.title}</h4>
+                    <p style={{ fontSize: 13, color: '#cfdbe2', marginTop: 4 }}>{g.sub}</p>
+                    <span style={{ display: 'inline-flex', marginTop: 9, fontSize: 12.5, fontWeight: 800, color: 'var(--accent)' }}>Μάθε περισσότερα →</span>
+                  </div>
+                </a>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="gallery-section" id="gallery">
-          <div className="container">
-            <div className="section-heading reveal">
-              <div className="eyebrow"><span className="eyebrow-dot" /> Gallery</div>
-              <h2>Η ενέργεια <span className="gradient-text">σε εικόνα</span></h2>
-              <p>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
+        {/* ── Services ── */}
+        <section id="services" style={{ position: 'relative', padding: 'clamp(80px,11vh,150px) clamp(20px,5vw,70px) clamp(90px,12vh,160px)', background: 'radial-gradient(120% 90% at 80% 0%,rgba(24,201,192,.07),transparent 55%),radial-gradient(100% 80% at 10% 100%,rgba(47,212,131,.06),transparent 55%),#f7f4ee' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <div style={{ maxWidth: 720 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Υπηρεσίες</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.4vw,58px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#14181a' }}>Για το σπίτι και<br />την επιχείρηση!</h2>
+              <p style={{ fontSize: 'clamp(16px,1.5vw,19px)', lineHeight: 1.55, color: '#586a60', marginTop: 18 }}>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
             </div>
-            <div className="gallery-grid">
-              {galleryItems.map((item, i) => (
-                <div
-                  key={item.title}
-                  className={`gallery-item ${item.wide ? 'gallery-item-wide' : ''}`}
-                  onClick={() => setGalleryModal(i)}
-                  style={{ cursor: 'pointer' }}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 22, marginTop: 'clamp(44px,6vh,72px)' }}>
+              {serviceCards.map((s) => (
+                <div key={s.num} style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: '#fff', border: '1px solid rgba(20,20,16,.08)', boxShadow: '0 1px 2px rgba(20,30,25,.04)', transition: 'transform .5s cubic-bezier(.22,1,.36,1),box-shadow .5s,border-color .5s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-10px)'; e.currentTarget.style.boxShadow = '0 30px 50px rgba(20,30,25,.14),0 0 0 1px rgba(47,212,131,.4)'; e.currentTarget.style.borderColor = 'rgba(47,212,131,.5)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 1px 2px rgba(20,30,25,.04)'; e.currentTarget.style.borderColor = 'rgba(20,20,16,.08)'; }}
                 >
-                  <div className="gallery-float">
-                    <div
-                      className="gallery-tilt"
-                      onMouseMove={handleGalleryTilt}
-                      onMouseLeave={resetGalleryTilt}
-                    >
-                      <div className="gallery-media">
-                        <img src={item.image} alt={item.title} loading="lazy" />
-                      </div>
-                      <div className="gallery-glare" aria-hidden="true" />
-                      <div className="gallery-3d-card">
-                        <div className="gallery-card-inner">
-                          <h3>{item.title}</h3>
-                          <p>{item.subtitle}</p>
-                          <span className="gallery-card-cta">Μάθε περισσότερα →</span>
-                        </div>
-                      </div>
+                  <div style={{ position: 'relative', height: 178, overflow: 'hidden' }}>
+                    <img src={s.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(7,11,15,0) 30%,rgba(7,11,15,.85))' }} />
+                  </div>
+                  <div style={{ padding: '26px 26px 30px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: -52, position: 'relative' }}>
+                      <span style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 15, color: '#05231a', background: 'linear-gradient(135deg,#18c9c0,#2fd483)', boxShadow: '0 8px 22px rgba(47,212,131,.4)' }}>{s.num}</span>
                     </div>
+                    <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 23, marginTop: 16, color: '#14181a' }}>{s.title}</h3>
+                    <p style={{ fontSize: 15, lineHeight: 1.55, color: '#586a60', marginTop: 10 }}>{s.desc}</p>
+                    <a href="#contact" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 18, fontWeight: 800, fontSize: 14.5, color: 'var(--accent)', textDecoration: 'none' }}>Δες περισσότερα →</a>
                   </div>
                 </div>
               ))}
@@ -724,281 +534,202 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {galleryModal !== null && (
-          <div className="gallery-modal-overlay" onClick={() => setGalleryModal(null)}>
-            <div className="gallery-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="gallery-modal-close" onClick={() => setGalleryModal(null)}><X size={24} /></button>
-              <div className="gallery-modal-image">
-                <img src={galleryItems[galleryModal].image} alt={galleryItems[galleryModal].title} />
-              </div>
-              <div className="gallery-modal-content">
-                <h2>{galleryItems[galleryModal].title}</h2>
-                <h3>{galleryItems[galleryModal].subtitle}</h3>
-                <p className="gallery-modal-desc">{galleryItems[galleryModal].description}</p>
-                <p className="gallery-modal-details">{galleryItems[galleryModal].details}</p>
-                <div className="gallery-modal-actions">
-                  <a href={galleryItems[galleryModal].link} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-                    Μάθε Περισσότερα <ArrowRight size={16} />
-                  </a>
-                  <a href="tel:+302102255000" className="btn btn-ghost">
-                    <Phone size={16} /> Καλέστε μας
-                  </a>
-                </div>
+        {/* ── About ── */}
+        <section id="about" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#f7f4ee' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 56, alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Ποιοι Είμαστε</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', lineHeight: 1.06, color: '#14181a' }}>Ο προσωπικός σου<br />σύμβουλος ενέργειας!</h2>
+              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#586a60', marginTop: 20 }}>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
+              <div style={{ marginTop: 26, padding: '22px 24px', borderRadius: 16, background: 'rgba(47,212,131,.07)', border: '1px solid rgba(47,212,131,.25)' }}>
+                <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 15.5, color: 'var(--accent)' }}>Το όραμά μας</h3>
+                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#45564c', marginTop: 8 }}>Διασφαλίζουμε ότι κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, που παρέχει εξατομικευμένες υπηρεσίες καθ' όλη τη διάρκεια της συνεργασίας.</p>
               </div>
             </div>
-          </div>
-        )}
-
-        <section className="section section-bg-services" id="services">
-          <div className="container">
-            <div className="section-heading reveal">
-              <div className="eyebrow"><span className="eyebrow-dot" /> Υπηρεσίες</div>
-              <h2>Για το σπίτι και <span className="gradient-text">την επιχείρηση!</span></h2>
-              <p>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
-            </div>
-            <div className="services-grid">
-              {features.map((f, i) => (
-                <div className={`service-card reveal stagger-${i + 1}`} key={f.title}>
-                  <div className="service-icon"><f.icon size={28} /></div>
-                  <h3>{f.title}</h3>
-                  <p>{f.text}</p>
-                  <a href="#contact" className="service-link">Δες περισσότερα <ArrowRight size={14} /></a>
-                </div>
-              ))}
+            <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', boxShadow: '0 24px 60px rgba(20,30,25,.16)' }}>
+              <img src="/images/energy1.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           </div>
         </section>
 
-        <section className="section section-bg-about" id="about">
-          <div className="container">
-            <div className="about-grid">
-              <div className="about-copy reveal-left">
-                <div className="eyebrow"><span className="eyebrow-dot" /> Ποιοι Είμαστε</div>
-                <h2>Ο προσωπικός σου <span className="gradient-text">σύμβουλος ενέργειας!</span></h2>
-                <p>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
-                <div className="about-vision">
-                  <ShieldCheck size={20} />
-                  <div>
-                    <strong>Το όραμά μας</strong>
-                    <p>Διασφαλίζουμε ότι κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, που παρέχει εξατομικευμένες υπηρεσίες καθ' όλη τη διάρκεια της συνεργασίας.</p>
-                  </div>
-                </div>
-              </div>
-              <div className="about-visual reveal-right">
-                <div className="about-logo-wrap">
-                  <img src="/images/image.png" alt="Ηλεκτρισμός - Ενεργειακοί Σύμβουλοι" className="official-logo" />
-                </div>
-                <div className="about-orb">
-                  <div className="about-orb-inner" />
-                  <Sparkles size={48} className="about-orb-icon" />
-                </div>
-              </div>
+        {/* ── FAQ ── */}
+        <section id="faq" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#fdfcfa' }}>
+          <div style={{ maxWidth: 820, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center' as const, marginBottom: 48 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Συχνές Ερωτήσεις</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#14181a' }}>Όλα όσα χρειάζεται να γνωρίζεις</h2>
+              <p style={{ fontSize: 16.5, color: '#586a60', marginTop: 14 }}>Όλα όσα πρέπει να ξέρεις για την αλλαγή παρόχου ενέργειας.</p>
             </div>
-          </div>
-        </section>
-
-        <section className="gdpr-section section-bg-gdpr" id="gdpr">
-          <div className="container">
-            <div className="gdpr-inner reveal-scale">
-              <div className="gdpr-shield"><ShieldCheck size={36} /></div>
-              <div>
-                <h3>Το GDPR δεν είναι checkbox. Είναι η αρχιτεκτονική.</h3>
-                <p>Το Hlektrismos.gr είναι χτισμένο privacy-first. Δεν κάνουμε ποτέ scraping third-party sites ή social platforms. Κάθε επαφή έχει τεκμηριωμένο lawful basis και μπορεί να ασκήσει τα δικαιώματά της από ένα self-service πάνελ.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section section-bg-faq" id="faq">
-          <div className="container">
-            <div className="section-heading reveal">
-              <div className="eyebrow"><span className="eyebrow-dot" /> Συχνές Ερωτήσεις</div>
-              <h2>Όλα όσα χρειάζεται <span className="gradient-text">να γνωρίζεις</span></h2>
-              <p>Όλα όσα πρέπει να ξέρεις για την αλλαγή παρόχου ενέργειας.</p>
-            </div>
-            <div className="faq-list reveal">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {faqs.map((f, i) => (
-                <div className={`faq-item ${openFaq === i ? 'open' : ''}`} key={i} onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  <div className="faq-q">{f.q}<ChevronDown size={20} className="faq-chevron" /></div>
-                  <div className="faq-a">{f.a}</div>
-                </div>
+                <details key={i} open={i === 0} style={{ padding: '20px 22px', borderRadius: 14, background: '#fff', border: '1px solid rgba(20,20,16,.08)', boxShadow: '0 1px 2px rgba(20,30,25,.04)' }}>
+                  <summary onClick={(e) => { e.preventDefault(); setOpenFaq(openFaq === i ? null : i); }} style={{ cursor: 'pointer', fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 16, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, color: '#171c18' }}>
+                    {f.q}
+                    <span style={{ flex: 'none', color: 'var(--accent)', fontSize: 19, fontWeight: 400, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}>+</span>
+                  </summary>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#586a60', marginTop: 13 }}>{f.a}</p>
+                </details>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="energy-showcase" aria-label="Ενεργειακές εγκαταστάσεις Hlektrismos">
-          <div className="container">
-            <figure
-              className="energy-showcase-frame"
-              onMouseMove={handleShowcaseTilt}
-              onMouseLeave={resetShowcaseTilt}
-            >
-              <div className="energy-showcase-tilt">
-                <div className="energy-showcase-media">
-                  <img src="/images/energy8.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" />
-                </div>
-                <span className="energy-showcase-glare" aria-hidden="true" />
+        {/* ── Contact ── */}
+        <section id="contact" style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)' }}>
+          <img src="/images/house-tour/10-terrace-lounge-b.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(5,8,11,.96) 0%,rgba(5,8,11,.86) 42%,rgba(5,8,11,.55) 100%)' }} />
+          <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.15fr)', gap: 48 }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>Ζητήστε να σας καλέσουμε!</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14 }}>Έτοιμος να εξοικονομήσεις χρήματα;</h2>
+              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#cfdbe2', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
+                <a href="tel:+302102255000" style={{ fontWeight: 700, color: '#eef4f7', textDecoration: 'none' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
+                <a href="mailto:info@hlektrismos.gr" style={{ fontWeight: 700, color: '#eef4f7', textDecoration: 'none' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
+                <span style={{ color: '#cfdbe2' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
               </div>
-            </figure>
-          </div>
-        </section>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#9fb2bc' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
+            </div>
 
-        <section className="contact-section section-bg-contact" id="contact">
-          <div className="contact-glow" />
-          <div className="container">
-            <div className="contact-grid">
-              <div className="contact-copy reveal-left">
-                <div className="eyebrow"><span className="eyebrow-dot" /> Ζητήστε να σας καλέσουμε!</div>
-                <h2>Έτοιμος να εξοικονομήσεις <span className="gradient-text">χρήματα;</span></h2>
-                <p>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
-            <div className="contact-points">
-                   <div className="contact-point"><Phone size={18} /> +30 210 22 55 000</div>
-                    <div className="contact-point"><Mail size={18} /> info@hlektrismos.gr</div>
-                   <div className="contact-point"><Home size={18} /> Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</div>
-                   <div className="contact-point"><Lock size={18} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</div>
-                 </div>
-              </div>
-              <div className="form-card reveal-right">
-                {submitted ? (
-                  <div className="success-state">
-                    <div className="success-icon"><Check size={28} /></div>
-                    <h3>Αίτημα ελήφθη!</h3>
-                    <p>Ένας εξειδικευμένος σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου άμεσα.</p>
-                  </div>
-                ) : (
-                  <form onSubmit={submitLead}>
-                    <h3>Ζητήστε να σας καλέσουμε</h3>
-                    <p className="form-sub">Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε άμεσα. 100% δωρεάν.</p>
-                    <div className="form-grid">
-                      <div className="form-field"><label>Όνομα</label><input required value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" /></div>
-                      <div className="form-field"><label>Επώνυμο</label><input required value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" /></div>
-                      <div className="form-field"><label>Email <span className="optional-label">(προαιρετικό)</span></label><input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" /></div>
-                      <div className="form-field"><label>Τηλέφωνο *</label><input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" /></div>
-                      <div className="form-field">
-                        <label>Τύπος Ακινήτου *</label>
-                        <select required value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)}>
+            <div style={{ background: 'rgba(8,13,17,.82)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)' }}>
+              {submitted ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
+                  <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(47,212,131,.14)', border: '1px solid rgba(47,212,131,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: 'var(--accent)' }}>✓</span>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ευχαριστούμε!</h3>
+                  <p style={{ fontSize: 14.5, color: '#a9bcc6', maxWidth: 320 }}>Λάβαμε το αίτημά σου. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες.</p>
+                </div>
+              ) : (
+                <form onSubmit={submitLead}>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ζητήστε να σας καλέσουμε</h3>
+                  <p style={{ fontSize: 14, color: '#a9bcc6', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε άμεσα. 100% δωρεάν.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Όνομα
+                        <input required type="text" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Επώνυμο
+                        <input required type="text" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      </label>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Email (προαιρετικό)
+                        <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Τηλέφωνο *
+                        <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      </label>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Τύπος Ακινήτου *
+                        <select required value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
                           <option value="" disabled>Επιλέξτε τύπο...</option>
-                          <option value="Σπίτι">Σπίτι</option>
-                          <option value="Επιχείρηση">Επιχείρηση</option>
+                          <option>Κατοικία</option>
+                          <option>Διαμέρισμα</option>
+                          <option>Επιχείρηση</option>
+                          <option>Κατάστημα</option>
                         </select>
-                      </div>
-                      <div className="form-field">
-                        <label>Περιοχή <span className="optional-label">(προαιρετικό)</span></label>
-                        <select value={form.region} onChange={(e) => update('region', e.target.value)}>
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Περιοχή (προαιρετικό)
+                        <select value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
                           <option value="">Επιλέξτε περιοχή...</option>
                           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
-                      </div>
-                      <div className="form-field full">
-                        <label>Υπηρεσία ενδιαφέροντος</label>
-                        <select value={form.service} onChange={(e) => update('service', e.target.value)}>
-                          {services.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                      <div className="form-field full"><label>Σχόλια <span className="optional-label">(προαιρετικά)</span></label><textarea value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." /></div>
-                      <div className="form-field full">
-                        <label>Ανέβασε λογαριασμούς / αρχεία <span className="optional-label">(προαιρετικό)</span></label>
-                        {form.billFiles.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-                            {form.billFiles.map((f, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(0,102,204,0.06)', borderRadius: '8px', fontSize: '13px' }}>
-                                <FileText size={14} style={{ color: '#0066cc', flexShrink: 0 }} />
-                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexShrink: 0 }}>{(f.size / 1024 / 1024).toFixed(1)}MB</span>
-                                <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: '2px', lineHeight: 1 }}>×</button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <label className="bill-upload">
-                          <Upload size={18} />
-                          <span>{form.billFiles.length > 0 ? `Ανέβασε άλλο αρχείο (${form.billFiles.length} ήδη)` : 'PDF, JPG ή PNG έως 25MB το καθένα — μπορείτε να ανεβάσετε πολλαπλά'}</span>
-                          <input type="file" accept="application/pdf,image/jpeg,image/png" multiple onChange={handleBillChange} />
-                        </label>
-                        <small className="upload-note">Μπορείτε να ανεβάσετε πολλαπλά αρχεία (PDF, JPG, PNG). Κάθε αρχείο έως 25MB. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</small>
-                      </div>
+                      </label>
                     </div>
-                    <div className="consent-row">
-                      <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} id="consent" />
-                      <label htmlFor="consent">Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την πολιτική απορρήτου GDPR. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</label>
-                    </div>
-                    {formError && <p className="form-error">{formError}</p>}
-                    <button className="btn btn-primary form-submit" disabled={submitting}>
-                      {submitting ? 'Αποστολή...' : 'Ζητήστε κλήση'} <ArrowRight size={18} />
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Υπηρεσία ενδιαφέροντος
+                      <select value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                        {serviceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Σχόλια (προαιρετικά)
+                      <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#cfdbe2' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)
+                      {form.billFiles.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                          {form.billFiles.map((f, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(47,212,131,.08)', borderRadius: 8, fontSize: 13, color: '#cfdbe2' }}>
+                              <FileText size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{f.name}</span>
+                              <span style={{ fontSize: 11, flexShrink: 0 }}>{(f.size / 1024 / 1024).toFixed(1)}MB</span>
+                              <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2, lineHeight: 1 }}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleBillChange} style={{ padding: 10, borderRadius: 10, border: '1px dashed rgba(255,255,255,.2)', background: 'rgba(255,255,255,.03)', color: '#a9bcc6', fontSize: 13 }} />
+                      <span style={{ fontSize: 12, color: '#7f939c' }}>PDF, JPG ή PNG έως 25MB το καθένα — μπορείτε να ανεβάσετε πολλαπλά. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
+                    </label>
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
+                      <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
+                      Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#2fd483' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.
+                    </label>
+                    {formError && <p style={{ color: '#f87171', fontSize: 14 }}>{formError}</p>}
+                    <button type="submit" disabled={submitting} style={{ marginTop: 6, padding: 15, border: 'none', borderRadius: 999, cursor: 'pointer', background: 'linear-gradient(135deg,#18c9c0,#2fd483)', color: '#05231a', fontFamily: 'var(--font-body)', fontWeight: 800, fontSize: 16, boxShadow: '0 12px 30px rgba(47,212,131,.32)' }}>
+                      {submitting ? 'Αποστολή...' : 'Ζητήστε κλήση'}
                     </button>
-                  </form>
-                )}
-              </div>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="container">
-          <div className="footer-grid">
-            <div className="footer-brand">
-              <a href="#top" className="brand">
-                <svg viewBox="0 0 100 100" style={{ width: 34, height: 34 }} xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="brandGradientFooter" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#0EA5E9" />
-                      <stop offset="100%" stopColor="#0B2545" />
-                    </linearGradient>
-                    <filter id="subtleShadowFooter" x="-10%" y="-10%" width="120%" height="120%">
-                      <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0B2545" floodOpacity="0.25"/>
-                    </filter>
-                  </defs>
-                  <circle cx="50" cy="50" r="43" fill="none" stroke="url(#brandGradientFooter)" strokeWidth="4.5" filter="url(#subtleShadowFooter)" />
-                  <circle cx="50" cy="50" r="35" fill="none" stroke="url(#brandGradientFooter)" strokeWidth="1.5" opacity="0.5" />
-                  <path d="M 54 15 L 28 50 L 48 50 L 36 85 L 75 42 L 53 42 Z" fill="url(#brandGradientFooter)" stroke="white" strokeWidth="1.5" strokeLinejoin="round" filter="url(#subtleShadowFooter)" />
-                </svg>
-                <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0B2545, #0EA5E9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hlektrismos.gr</span>
-              </a>
-              <p>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
-              <div className="footer-contact-info">
-                <a href="https://maps.app.goo.gl/6h38xGoe2mW7mqTb8" target="_blank" rel="noopener noreferrer">Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</a>
-                <a href="tel:+302102255000">+30 210 22 55 000</a>
-                <a href="mailto:info@hlektrismos.gr">info@hlektrismos.gr</a>
-              </div>
+      {/* ── Footer ── */}
+      <footer style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px' }}>
+        <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(4,7,10,.94) 0%,rgba(4,7,10,.90) 55%,rgba(4,7,10,.96) 100%)' }} />
+        <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(220px,1.4fr) repeat(3,minmax(140px,1fr))', gap: 40 }}>
+          <div>
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 34, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: '#c3d0d6', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18, fontSize: 14, color: '#c3d0d6' }}>
+              <span>Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
+              <a href="tel:+302102255000" style={{ color: '#c3d0d6', textDecoration: 'none' }}>+30 210 22 55 000</a>
+              <a href="mailto:info@hlektrismos.gr" style={{ color: '#c3d0d6', textDecoration: 'none' }}>info@hlektrismos.gr</a>
             </div>
-            <div className="footer-col">
-              <h4>Υπηρεσίες</h4>
-              <a href="#services">Ρεύμα</a>
-              <a href="#services">Αέριο</a>
-              <a href="#services">Φωτοβολταϊκά</a>
-              <a href="#services">Ηλεκτροκίνηση</a>
-              <a href="#services">Ολοκληρωμένες Λύσεις</a>
+          </div>
+          <div>
+            <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Υπηρεσίες</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
+              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ρεύμα</a>
+              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αέριο</a>
+              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Φωτοβολταϊκά</a>
+              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ηλεκτροκίνηση</a>
+              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ολοκληρωμένες Λύσεις</a>
             </div>
-            <div className="footer-col">
-              <h4>Χρήσιμοι Σύνδεσμοι</h4>
-              <a href="#/">Αρχική</a>
-              <a href="#about">Σχετικά με εμάς</a>
-              <a href="#services">Λύσεις</a>
-              <a href="#faq">Ενέργεια Σήμερα</a>
-              <a href="#faq">Συχνές Ερωτήσεις</a>
-              <a href="#contact">Επικοινωνία</a>
+          </div>
+          <div>
+            <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Χρήσιμοι Σύνδεσμοι</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
+              <a href="#/" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αρχική</a>
+              <a href="#about" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Σχετικά με εμάς</a>
+              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Λύσεις</a>
+              <a href="#faq" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ενέργεια Σήμερα</a>
+              <a href="#faq" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Συχνές Ερωτήσεις</a>
+              <a href="#contact" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Επικοινωνία</a>
             </div>
-            <div className="footer-col">
-              <h4>Ώρες Λειτουργίας</h4>
-              <span>Είμαστε εδώ για εσένα</span>
+          </div>
+          <div>
+            <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Ώρες Λειτουργίας</h4>
+            <p style={{ fontSize: 13, color: '#9fb0b7', marginTop: 16 }}>Είμαστε εδώ για εσένα</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, fontSize: 14, color: '#c3d0d6' }}>
               <span>Δευτέρα - Παρασκευή 09:00 - 17:00</span>
               <span>Σάββατο - Κυριακή Κλειστά</span>
             </div>
           </div>
-          <div className="footer-bottom">
-            <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
-            <div className="footer-legal-links">
-              <a href="#/privacy">Πολιτική Απορρήτου</a>
-              <span>·</span>
-              <a href="#/terms">Όροι Χρήσης</a>
-              <span>·</span>
-              <a href="#/cookies">Cookies</a>
-            </div>
-          </div>
+        </div>
+        <div style={{ position: 'relative', maxWidth: 1200, margin: '44px auto 0', paddingTop: 24, borderTop: '1px solid rgba(255,255,255,.15)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, fontSize: 13, color: '#9fb0b7' }}>
+          <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
+          <span style={{ display: 'flex', gap: 16 }}>
+            <a href="#/privacy" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Πολιτική Απορρήτου</a>
+            <a href="#/terms" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Όροι Χρήσης</a>
+            <a href="#/cookies" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Cookies</a>
+          </span>
         </div>
       </footer>
+
       <ChatBot />
     </div>
   );

@@ -274,10 +274,12 @@ JARVIS (Master — coordinates strategy/priorities/exception handling; NO unrest
 
 ## 15. Phased roadmap (sequenced; each phase has acceptance gate)
 
-**Phase 0 (gate: unblock current production)**
-- Finish P0 CARTO fix verification (set `CRM_VITE_CARTO_API_KEY` — the CARTO key, using the private non-public-framework-prefix name — on the production Vercel env for the project serving `hlektrismos-crm.vercel.app`, redeploy the latest main, re-run `scripts/browser-prod-map.mjs` + `scripts/browser-prod-full.mjs`; PRODUCTION = PASS). Until then nothing else ships to production.
+**Phase 0 — DONE (gate: unblock current production)**
+- PRODUCTION = PASS. CARTO key set on the production Vercel env (`CRM_VITE_CARTO_API_KEY`, private non-public-framework-prefix name); redeployed bundle `index-DYhetBXf.js` is live on both `powerfor-energy-crm.vercel.app` and `hlektrismos-crm.vercel.app`. `scripts/browser-prod-map.mjs` + `scripts/browser-prod-full.mjs`: all substantive gates GREEN (authenticated keyed tiles 200, canvas painted, no failure box/watermark, attribution present, zero console errors).
+- Worker asset fix committed `c89c412` (bundle `maplibre-gl-worker-*.mjs` via `?url` + explicit `workerUrl`) and pushed to `origin/main`; pending operator redeploy to remove the harmless production 404 (`maplibre-gl-worker.mjs`) — map renders regardless via main-thread fallback.
 
 **Phase 1 — Data foundation [MIGRATE]/[NEW] (biggest rework stabilizer)**
+- STATUS (2026-09-10): foundation applied to the live project via `supabase/migrations/20260910000100_crm_os_foundation_phase1.sql` (idempotent). Seeded + backfilled live: `organizations` (1), `roles` (5), `user_roles` (1, mirroring `profiles.role`), `providers` (12), `products` (6), `assignments` (20, backfilled from cases.owner_id / cases.inside_sales_owner / leads.assigned_to_user_id). Created empty, awaiting feature wiring: `departments`, `teams`, `territories`, `provider_regions`, `business_events` (append-only + idempotency_key), `campaigns`, `work_items`. Security advisors clean for the new tables (all RLS-enabled-with-policies; remaining `rls_enabled_no_policy` lints are the 8 pre-existing legacy tables only). NOTE: canonical work table is `work_items` — the legacy frontend-facing `tasks` VIEW (over `calendar_events`) keeps its name.
 1. `organizations`, `roles`, `departments`, `teams`, `user_roles`, `profiles` (dept/team/manager/timezone/language/availability/is_active/last_login).
 2. `providers`, `products`, `provider_regions`; convert `leads.provider/program` and `cases.provider/program` to FKs (data backfill idempotent, preserve text display).
 3. `companies`, `sites`, `contacts`; normalize `leads`/`customers` company/site text columns.
@@ -306,7 +308,7 @@ Teams/admin & user management; unified Inbox + Work Center; Campaign/Creative UI
 
 Use `PASS / FAIL / NOT TESTED`. NOT TESTED requires the reason. The initial user-facing fork is exactly: authentication, multi-user roles, permissions, password mgmt, leads, customers, cases, timeline, tasks, calendar, documents, signatures, energy providers, back office, map, GPS, routing, check-in/out, commissions, reporting, search, social/email/sms/phone/whatsapp/viber (or NOT TESTED), campaigns, lead discovery (or NOT TESTED), automation, AI agents/managers/orchestrator/JARVIS, audit, data integrity, security/RLS, mobile.
 
-Distinguish LOCAL / PREVIEW / PRODUCTION on the same gates (the map P0 is currently the only PRODUCTION FAIL and it is blocked on the deployment env var, not on code).
+Distinguish LOCAL / PREVIEW / PRODUCTION on the same gates (map PRODUCTION = PASS; the worker-asset 404 fix in `c89c412` awaits the next redeploy).
 
 ---
 

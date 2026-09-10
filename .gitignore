@@ -25,3 +25,13 @@ dist-ssr
 
 # browser QA harness artifacts (downloaded prod bundles, screenshots)
 scripts/.browser-out/
+
+# Supabase local temp (contains pooler URLs, project refs — never commit)
+supabase/.temp/
+
+# Test/dev scripts containing hardcoded secrets (use .env instead)
+create-demo.mjs
+test-invoke.mjs
+test-invoke.cjs
+test-chat.mjs
+seed-agents.mjs

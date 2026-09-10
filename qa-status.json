@@ -1,39 +1,46 @@
 {
   "phase": "1.1",
-  "task": "Full audit + maplibre worker-API bug fix + additive multi-role (user_roles) app wiring",
-  "status": "PASS",
-  "commit": "pending-commit",
-  "branch": "claude/stoic-hamilton-j68206",
+  "task": "Post-merge production verification of org/team/role model (Phase 1.1) at 98cad15",
+  "status": "BLOCKED",
+  "commit": "98cad15",
+  "branch": "main",
   "tests": {
     "typecheck": "PASS",
-    "lint": "FAIL (372 errors / 23 warnings, pre-existing tech debt; 0 new from this change)",
+    "lint": "PASS",
     "build": "PASS",
     "unit": "NONE (no test suite in repo)",
     "integration": "NOT_TESTED",
-    "browser": "BLOCKED",
+    "browser": "NOT_TESTED",
     "rls": "BLOCKED"
   },
   "deployment": {
-    "local": "PASS (build only; runtime-with-data NOT_TESTED — Supabase host egress-blocked)",
+    "local": "PASS (build only)",
     "preview": "NOT_TESTED",
-    "production": "NOT_TESTED"
+    "production": "NOT_TESTED (hlektrismos-crm.vercel.app serves index-C35snZ3H.js; local HEAD build is index-8T6nNq9g.js — not current)"
+  },
+  "production": {
+    "db": "BLOCKED",
+    "migration_state": "BLOCKED",
+    "harness": "BLOCKED",
+    "rls": "BLOCKED",
+    "multi_role": "BLOCKED",
+    "org_isolation": "BLOCKED",
+    "phase_12_regression": "BLOCKED (live); code-level PASS",
+    "browser": "NOT_TESTED",
+    "map": "NOT_TESTED",
+    "navigation": "NOT_TESTED",
+    "security": "FAIL"
   },
   "changes": [
-    "src/lib/maps/maplibre-provider.ts: replace removed per-map workerUrl option with maplibregl.setWorkerUrl() (maplibre-gl v6). Restores typecheck + build.",
-    "src/lib/api.ts: add fetchUserRoles(userId) — defensive canonical multi-role read from user_roles, returns [] if tables absent/RLS-blocked.",
-    "src/lib/auth.tsx: expose additive roles: Role[] in auth context; single role behaviour unchanged.",
-    "docs/CRM-OS-FULL-AUDIT.md: full evidence-based audit.",
-    "qa-status.json: this file."
-  ],
-  "risks": [
-    "Production Supabase (nonaymiwdayfuulccxrl) unreachable in this environment (MCP permission denied + egress policy blocks *.supabase.co) — no live schema/RLS/data verification possible.",
-    "CRM-OS foundation tables (organizations/teams/user_roles/assignments/business_events/work_items/campaigns) exist as DDL in migration 20260910000100 but were entirely unwired in the app; this change begins wiring (multi-role read).",
-    "Two parallel event systems: timeline_events (used) vs business_events (canonical, unused).",
-    "Dead code: src/pages/DashboardPage.tsx (290KB), src/pages/LoginPage.tsx, src/components/LeadDetailSlideout.tsx are unreferenced and use a second, unmounted auth context.",
-    "Lint: 395 problems pre-existing (not addressed)."
+    "Merged OpenCode Phase 1.1 additions with remote foundation: src/lib/roles.ts (catalog + predicates), src/types/crm.ts, migration 20260910103000 (role RPCs + user_roles_audit), scripts/verify_phase11.sql",
+    "Confirmed single mounted AuthProvider (src/lib/auth.tsx); legacy src/hooks/useAuth.tsx present only in unreferenced files",
+    "docs/PHASE-1-PRODUCTION-VERIFICATION.md: evidence-based production verification report",
+    "qa-status.json: this file"
   ],
   "blockers": [
-    "Live DB / RLS / browser / production verification require Supabase MCP authenticated against nonaymiwdayfuulccxrl (local OAuth flow, then fresh session) OR egress allow-listing of the production Supabase host."
+    "No SUPABASE_ACCESS_TOKEN, no DB password, no psql; Supabase CLI not authenticated; MCP bound to jbmccmokfvyvijmumuzn (not used as substitute).",
+    "SECURITY=FAIL: production pooler connection string with embedded password committed under supabase/.temp/ (origin/main, since b387df6); 5 test scripts embed full JWT tokens. See docs/PHASE-1-PRODUCTION-VERIFICATION.md §4. Values never printed.",
+    "Committed/compromised password deliberately NOT used for verification; requires rotation + removal from history."
   ],
-  "next_action": "Unblock prod DB access (Gate 0), then execute Phase 1.1 RLS org/team scoping, Phase 1.4 assignments wiring, Phase 1.5 business_events->Timeline projection, with live DB + RLS verification."
+  "next_action": "After credential rotation and provisioning of an authorized access path (SUPABASE_ACCESS_TOKEN or new DB password) for nonaymiwdayfuulccxrl: inspect live migration state, apply only required Phase 1.1 migration(s), run scripts/verify_phase11.sql, verify RLS / multi-role / org isolation / audit, confirm Phase 1.2 regression-free, deploy 98cad15, then browser-test production role flows."
 }

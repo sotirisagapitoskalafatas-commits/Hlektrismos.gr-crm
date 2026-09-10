@@ -479,7 +479,7 @@ export default function LandingPage() {
             <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#b0c4cc', borderLeft: '1px solid rgba(255,255,255,.22)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
           </a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
-            <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
+            <a href="#/services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
             <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
             <a href="#faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
             <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
@@ -721,11 +721,11 @@ export default function LandingPage() {
           <div>
             <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Υπηρεσίες</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
-              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ρεύμα</a>
-              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αέριο</a>
-              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Φωτοβολταϊκά</a>
-              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ηλεκτροκίνηση</a>
-              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ολοκληρωμένες Λύσεις</a>
+              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ρεύμα</a>
+              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αέριο</a>
+              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Φωτοβολταϊκά</a>
+              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ηλεκτροκίνηση</a>
+              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ολοκληρωμένες Λύσεις</a>
             </div>
           </div>
           <div>
@@ -733,7 +733,7 @@ export default function LandingPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
               <a href="#/" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Αρχική</a>
               <a href="#about" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Σχετικά με εμάς</a>
-              <a href="#services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Λύσεις</a>
+              <a href="#/services" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Λύσεις</a>
               <a href="#faq" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Ενέργεια Σήμερα</a>
               <a href="#faq" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Συχνές Ερωτήσεις</a>
               <a href="#contact" style={{ color: '#c3d0d6', textDecoration: 'none' }}>Επικοινωνία</a>

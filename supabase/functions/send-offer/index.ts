@@ -83,7 +83,36 @@ ${savings > 0 ? `✅ Εξοικονόμηση: €${savings.toFixed(2)}/μήνα
       }
     }
 
-    // 4. Send via Email (if email available)
+    // 4. Send via WhatsApp (if phone available and Infobip configured)
+    let whatsappResult = null;
+    if (customer_phone) {
+      try {
+        const infobipApiKey = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "INFOBIP_API_KEY").single()).data?.setting_value;
+        const infobipBaseUrl = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "INFOBIP_BASE_URL").single()).data?.setting_value;
+        const whatsappSenderId = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "WHATSAPP_SENDER_ID").single()).data?.setting_value;
+
+        if (infobipApiKey && infobipBaseUrl) {
+          whatsappResult = await fetch(`${infobipBaseUrl}/whatsapp/1/send-message`, {
+            method: "POST",
+            headers: {
+              "Authorization": `App ${infobipApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: whatsappSenderId || "Hlektrismos",
+              to: customer_phone,
+              type: "text",
+              text: { previewUrl: false, body: message },
+            }),
+          });
+          console.log(`[send-offer] WhatsApp: ${whatsappResult.status}`);
+        }
+      } catch (err: any) {
+        console.warn(`[send-offer] WhatsApp failed: ${err.message}`);
+      }
+    }
+
+    // 5. Send via Email (if email available)
     let emailResult = null;
     if (customer_email) {
       try {
@@ -110,7 +139,7 @@ ${savings > 0 ? `✅ Εξοικονόμηση: €${savings.toFixed(2)}/μήνα
       }
     }
 
-    // 5. Update lead status to follow_up
+    // 6. Update lead status to follow_up
     await supabase.from("hlektrismos_leads").update({
       status: "follow_up",
       last_contact_at: new Date().toISOString(),

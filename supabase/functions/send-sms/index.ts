@@ -22,7 +22,7 @@ serve(async (req) => {
     const { data: settings } = await supabase
       .from("crm_settings")
       .select("setting_key, setting_value")
-      .in("setting_key", ["INFOBIP_API_KEY", "INFOBIP_BASE_URL"]);
+      .in("setting_key", ["INFOBIP_API_KEY", "INFOBIP_BASE_URL", "WHATSAPP_SENDER_ID"]);
 
     const config: Record<string, string> = {};
     settings?.forEach((s: any) => {
@@ -72,6 +72,14 @@ serve(async (req) => {
             destinations: [{ to: lead.phone }],
             viber: { text: personalizedMessage, type: "TEXT" },
           };
+        } else if (channel === "whatsapp") {
+          endpoint = `${baseUrl}/whatsapp/1/send-message`;
+          body = {
+            from: config.WHATSAPP_SENDER_ID || "Hlektrismos",
+            to: lead.phone,
+            type: "text",
+            text: { previewUrl: false, body: personalizedMessage },
+          };
         } else {
           endpoint = `${baseUrl}/sms/2/text/advanced`;
           body = {
@@ -112,7 +120,7 @@ serve(async (req) => {
 
           await supabase.from("lead_notes").insert({
             lead_id: lead.id,
-            content: `📱 ${channel === "viber" ? "Viber" : "SMS"} campaign sent`,
+            content: `📱 ${channel === "viber" ? "Viber" : channel === "whatsapp" ? "WhatsApp" : "SMS"} campaign sent`,
             author: "system",
             note_type: "sms_campaign",
           });

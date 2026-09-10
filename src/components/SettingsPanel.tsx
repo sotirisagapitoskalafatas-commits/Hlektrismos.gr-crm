@@ -59,7 +59,7 @@ const GROUPS: GroupDef[] = [
       { id: 'campaigns', label: '📣 Campaigns', desc: 'Resend, Infobip bulk sending', render: (p) => <CampaignSettings settings={p.settings} update={p.update} /> },
       { id: 'voice', label: '📞 Voice AI', desc: 'Vapi.ai, ElevenLabs Greek voices', render: (p) => <VoiceSettings settings={p.settings} update={p.update} /> },
       { id: 'ai-assistant', label: '🤖 AI Widget', desc: 'CRM chatbot widget', render: () => <AiAssistantSettings /> },
-      { id: 'communications', label: '💬 SMS & Viber', desc: 'PBX, Viber gateways', render: (p) => <CommunicationsSettings settings={p.settings} update={p.update} /> },
+      { id: 'communications', label: '💬 SMS, Viber & WhatsApp', desc: 'PBX, Viber, WhatsApp gateways', render: (p) => <CommunicationsSettings settings={p.settings} update={p.update} /> },
       { id: 'excel-import', label: '📥 Excel Εισαγωγή', desc: 'Μαζική εισαγωγή leads/πελατών', render: () => <ExcelSyncSettings /> },
     ],
   },
@@ -1159,6 +1159,15 @@ function CommunicationsSettings({ settings, update }: { settings: Record<string,
         <FieldRow label="SMS API Key"><TextInput type="password" value={s.sms_api_key || ''} onChange={(v) => update('communications_config', { ...s, sms_api_key: v })} placeholder="sk_..." /></FieldRow>
         <FieldRow label="Viber Enabled"><Toggle checked={s.viber_enabled === true} onChange={(v) => update('communications_config', { ...s, viber_enabled: v })} /></FieldRow>
         <FieldRow label="Viber API Key"><TextInput type="password" value={s.viber_api_key || ''} onChange={(v) => update('communications_config', { ...s, viber_api_key: v })} /></FieldRow>
+        <FieldRow label="WhatsApp Enabled" desc="Infobip WhatsApp channel">
+          <Toggle checked={s.whatsapp_enabled === true} onChange={(v) => update('communications_config', { ...s, whatsapp_enabled: v })} />
+        </FieldRow>
+        <FieldRow label="WhatsApp Sender ID" desc="Alphanumeric sender name">
+          <TextInput value={s.whatsapp_sender_id || ''} onChange={(v) => update('communications_config', { ...s, whatsapp_sender_id: v })} placeholder="Hlektrismos" />
+        </FieldRow>
+        <FieldRow label="WhatsApp Template Name" desc="Pre-approved Meta template (optional)">
+          <TextInput value={s.whatsapp_template_name || ''} onChange={(v) => update('communications_config', { ...s, whatsapp_template_name: v })} placeholder="offer_notification" />
+        </FieldRow>
         <FieldRow label="PBX Provider">
           <SelectInput value={s.pbx_provider || ''} onChange={(v) => update('communications_config', { ...s, pbx_provider: v })} options={[
             { value: '', label: '— Επιλέξτε —' },

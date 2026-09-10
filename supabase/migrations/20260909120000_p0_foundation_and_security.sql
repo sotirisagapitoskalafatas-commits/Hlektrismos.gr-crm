@@ -10,9 +10,17 @@
 alter table public.profiles
   alter column role set default 'inside_sales';
 
-alter table public.profiles
-  add constraint if not exists profiles_role_check
-  check (role in ('admin', 'manager', 'inside_sales', 'field_sales', 'back_office'));
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'profiles_role_check' and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_role_check
+      check (role in ('admin', 'manager', 'inside_sales', 'field_sales', 'back_office'));
+  end if;
+end $$;
 
 -- ── 2) Signup trigger: assign safe role ───────────────────────────────────────
 create or replace function public.handle_new_user()

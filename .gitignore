@@ -22,3 +22,6 @@ dist-ssr
 *.sw?
 .env
 *_output.txt
+
+# browser QA harness artifacts (downloaded prod bundles, screenshots)
+scripts/.browser-out/

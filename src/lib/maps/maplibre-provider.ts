@@ -13,26 +13,53 @@ const CARTO_SUBDOMAINS = ['a', 'b', 'c', 'd'];
 // Mapbox style template URLs ({s}, {r}) are NOT substituted by MapLibre for
 // raster sources — the literal host is requested and DNS fails. Emit concrete
 // CARTO subdomain URLs and drop the retina flag so tiles actually load.
-// VITE_MAP_STYLE_URL, when provided, overrides the generated CARTO raster style.
+// CARTO basemap tiles are always authenticated via ?key=<VITE_CARTO_API_KEY>;
+// unauthenticated raster tiles show CARTO's "API key required" watermark and
+// are never used.
+function cartoKey(): string {
+  const key = (import.meta.env.VITE_CARTO_API_KEY as string | undefined)?.trim();
+  if (!key) {
+    throw new Error(
+      'CARTO basemap key missing: set VITE_CARTO_API_KEY. Unauthenticated (watermarked) CARTO tiles are never used.',
+    );
+  }
+  return key;
+}
+
+// Attribution required by the CARTO free tier: OpenStreetMap + CARTO, clickable.
+const CARTO_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>';
+
+// Configuration priority:
+//   1. VITE_MAP_STYLE_URL — explicit operator-supplied map style. If it is
+//      CARTO-hosted, it must itself be authenticated (this code does not patch it).
+//   2. Authenticated CARTO Voyager raster (keyed via VITE_CARTO_API_KEY).
+// There is deliberately NO unauthenticated fallback.
 const MAP_STYLE_URL = (import.meta.env.VITE_MAP_STYLE_URL as string | undefined)?.trim() || undefined;
 
 function buildStyle(): StyleSpecification {
+  const key = encodeURIComponent(cartoKey());
   return {
     version: 8,
     sources: {
       osm: {
         type: 'raster',
         tiles: CARTO_SUBDOMAINS.map(s =>
-          `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`),
+          `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${key}`),
         tileSize: 256,
         maxzoom: 19,
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        attribution: CARTO_ATTRIBUTION,
       },
     },
     layers: [
       { id: 'osm', type: 'raster', source: 'osm' },
     ],
   };
+}
+
+function resolveStyle(): StyleSpecification | string {
+  if (MAP_STYLE_URL) return MAP_STYLE_URL;
+  return buildStyle();
 }
 
 function markerElement(m: MapMarkerData): HTMLElement {
@@ -71,7 +98,7 @@ export function createMaplibreProvider(): MapProvider {
   async function init(container: HTMLElement, opts?: MapProviderOpts) {
     map = new maplibregl.Map({
       container,
-      style: MAP_STYLE_URL ?? buildStyle(),
+      style: resolveStyle(),
       center: opts?.center ? [opts.center.lng, opts.center.lat] : [GREEK_CENTER.lng, GREEK_CENTER.lat],
       zoom: opts?.zoom ?? 11,
     });

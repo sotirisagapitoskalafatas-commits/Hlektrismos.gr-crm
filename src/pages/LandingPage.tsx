@@ -446,8 +446,8 @@ export default function LandingPage() {
       <header className="site-header" ref={headerRef}>
         <div className="container nav-wrap">
           <a href="#top" className="brand">
-            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-            <span style={{ fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#8aa0ad', borderLeft: '1px solid rgba(255,255,255,.18)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 50, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#8aa0ad', borderLeft: '1px solid rgba(255,255,255,.18)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
           </a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
             <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
@@ -682,7 +682,7 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(4,7,10,.94) 0%,rgba(4,7,10,.90) 55%,rgba(4,7,10,.96) 100%)' }} />
         <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(220px,1.4fr) repeat(3,minmax(140px,1fr))', gap: 40 }}>
           <div>
-            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 34, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 52, width: 'auto', filter: 'brightness(0) invert(1)' }} />
             <p style={{ fontSize: 14, lineHeight: 1.6, color: '#c3d0d6', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18, fontSize: 14, color: '#c3d0d6' }}>
               <span>Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>

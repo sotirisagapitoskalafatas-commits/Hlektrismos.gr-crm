@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_MAP_STYLE_URL?: string;
   readonly VITE_CARTO_API_KEY?: string;
+  readonly CRM_VITE_CARTO_API_KEY?: string;
 }
 
 interface ImportMeta {

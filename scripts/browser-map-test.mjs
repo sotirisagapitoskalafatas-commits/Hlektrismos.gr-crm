@@ -17,6 +17,8 @@ const PASSWORD = fsAcct.password; // never logged
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+const REDACT = u => u.replace(/([?&])(key)=[^&#]+/g, '$1$2=<redacted>');
+
 function startServer() {
   const viteBin = 'node_modules/vite/bin/vite.js';
   const child = spawn(process.execPath, [viteBin, 'preview', '--port', String(PORT), '--strictPort'], {
@@ -162,11 +164,11 @@ async function run() {
     page.on('pageerror', e => { pageErrors.push(String(e)); process.stdout.write(`[pageerror] ${e}\n`); });
     page.on('requestfailed', r => {
       const u = r.url();
-      if (!u.includes('supabase.co')) failedRequests.push(`${r.failure()?.errorText ?? '?'} :: ${u}`);
+      if (!u.includes('supabase.co')) failedRequests.push(`${r.failure()?.errorText ?? '?'} :: ${REDACT(u)}`);
     });
     page.on('response', async r => {
       const u = r.url();
-      if (/basemaps\.cartocdn\.com/i.test(u)) tileResponses.push(`${r.status()} :: ${u.slice(0, 140)}`);
+      if (/basemaps\.cartocdn\.com/i.test(u)) tileResponses.push(`${r.status()} :: ${REDACT(u).slice(0, 140)}`);
       if (/rest\/v1\/follow_ups/i.test(u)) {
         let body = '';
         try { body = (await r.text()).slice(0, 300); } catch { /* ignore */ }
@@ -177,7 +179,7 @@ async function run() {
       const u = r.url();
       if (/rest\/v1\/follow_ups/i.test(u)) process.stdout.write(`[req follow_ups] ${r.method()} ${u.slice(0, 200)}\n`);
       if (/tiles\.|tile\.|basemaps|raster|\.png|\.mvt|\.pbf|carto/i.test(u) && r.resourceType() === 'image') {
-        tileRequests.push(u.slice(0, 160));
+        tileRequests.push(REDACT(u).slice(0, 160));
       }
     });
 

@@ -275,7 +275,7 @@ JARVIS (Master — coordinates strategy/priorities/exception handling; NO unrest
 ## 15. Phased roadmap (sequenced; each phase has acceptance gate)
 
 **Phase 0 (gate: unblock current production)**
-- Finish P0 CARTO fix verification (set `VITE_CARTO_API_KEY` on the production Vercel env for the project serving `hlektrismos-crm.vercel.app`, redeploy `2242dbe`, re-run `scripts/browser-prod-map.mjs` + `scripts/browser-prod-full.mjs`; PRODUCTION = PASS). Until then nothing else ships to production.
+- Finish P0 CARTO fix verification (set `CRM_VITE_CARTO_API_KEY` — the CARTO key, using the private non-public-framework-prefix name — on the production Vercel env for the project serving `hlektrismos-crm.vercel.app`, redeploy the latest main, re-run `scripts/browser-prod-map.mjs` + `scripts/browser-prod-full.mjs`; PRODUCTION = PASS). Until then nothing else ships to production.
 
 **Phase 1 — Data foundation [MIGRATE]/[NEW] (biggest rework stabilizer)**
 1. `organizations`, `roles`, `departments`, `teams`, `user_roles`, `profiles` (dept/team/manager/timezone/language/availability/is_active/last_login).

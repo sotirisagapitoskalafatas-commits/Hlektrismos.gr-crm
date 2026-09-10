@@ -16,6 +16,7 @@ const TILE_RE = /^https:\/\/[abcd]\.basemaps\.cartocdn\.com\/rastertiles\/voyage
 const BAD_STATUS = [400, 401, 402, 403, 429];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const REDACT = u => u.replace(/([?&])(key)=[^&#]+/g, '$1$2=<redacted>');
 const results = [];
 const pass = (k, ok, detail = '') => results.push({ k, ok: Boolean(ok), detail });
 
@@ -48,7 +49,7 @@ function makeTracker(page) {
       const st = r.status();
       const rt = r.request().resourceType();
       t.tileRes.push({ st, url: r.url(), rt });
-      if (BAD_STATUS.includes(st)) t.bad.push(`${st} ${r.url()}`);
+      if (BAD_STATUS.includes(st)) t.bad.push(`${st} ${REDACT(r.url())}`);
     }
   });
   return t;

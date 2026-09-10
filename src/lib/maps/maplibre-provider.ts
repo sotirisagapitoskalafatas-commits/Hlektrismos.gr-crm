@@ -13,14 +13,17 @@ const CARTO_SUBDOMAINS = ['a', 'b', 'c', 'd'];
 // Mapbox style template URLs ({s}, {r}) are NOT substituted by MapLibre for
 // raster sources — the literal host is requested and DNS fails. Emit concrete
 // CARTO subdomain URLs and drop the retina flag so tiles actually load.
-// CARTO basemap tiles are always authenticated via ?key=<VITE_CARTO_API_KEY>;
+// CARTO basemap tiles are always authenticated via ?key=<CARTO key>;
 // unauthenticated raster tiles show CARTO's "API key required" watermark and
 // are never used.
 function cartoKey(): string {
-  const key = (import.meta.env.VITE_CARTO_API_KEY as string | undefined)?.trim();
+  const key = (
+    (import.meta.env.CRM_VITE_CARTO_API_KEY as string | undefined) ||
+    (import.meta.env.VITE_CARTO_API_KEY as string | undefined)
+  )?.trim();
   if (!key) {
     throw new Error(
-      'CARTO basemap key missing: set VITE_CARTO_API_KEY. Unauthenticated (watermarked) CARTO tiles are never used.',
+      'CARTO basemap key missing: set CRM_VITE_CARTO_API_KEY (or VITE_CARTO_API_KEY) at build time. Unauthenticated (watermarked) CARTO tiles are never used.',
     );
   }
   return key;
@@ -33,7 +36,7 @@ const CARTO_ATTRIBUTION =
 // Configuration priority:
 //   1. VITE_MAP_STYLE_URL — explicit operator-supplied map style. If it is
 //      CARTO-hosted, it must itself be authenticated (this code does not patch it).
-//   2. Authenticated CARTO Voyager raster (keyed via VITE_CARTO_API_KEY).
+//   2. Authenticated CARTO Voyager raster (keyed via CRM_VITE_CARTO_API_KEY).
 // There is deliberately NO unauthenticated fallback.
 const MAP_STYLE_URL = (import.meta.env.VITE_MAP_STYLE_URL as string | undefined)?.trim() || undefined;
 

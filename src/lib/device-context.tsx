@@ -98,11 +98,18 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   const isStandalone = appContext !== 'BROWSER';
 
   return (
-    <Ctx.Provider value={{
-      device, appContext, orientation,
-      isTouch, hasHover, safeAreaInsets,
-      prefersReducedMotion, isStandalone,
-    }}>
+    <Ctx.Provider
+      value={{
+        device,
+        appContext,
+        orientation,
+        isTouch,
+        hasHover,
+        safeAreaInsets,
+        prefersReducedMotion,
+        isStandalone,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

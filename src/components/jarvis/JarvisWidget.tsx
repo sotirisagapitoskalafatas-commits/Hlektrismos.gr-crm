@@ -2,8 +2,10 @@
 /*  JarvisWidget — floating AI assistant dock.                         */
 /*  Layer 1: ALIVE (ring + mascot + drag + persistence + panel).       */
 /*  Layer 2: USEFUL — real chat via useJarvisChat → `chat` edge        */
-/*  function (Gemini + tariff RAG), visitor memory, callback leads.    */
-/*  `onSend` remains an override seam for tests/previews.              */
+/*           function (Gemini + tariff RAG), visitor memory, leads.    */
+/*  Layer 3: ACTION — explicit nav commands («άνοιξε τις υποθέσεις»)   */
+/*           navigate the CRM via useNav/useRoute; still asks login    */
+/*           when signed out. `onSend` remains an override seam.       */
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useRef, useState } from 'react';
@@ -13,6 +15,10 @@ import { useJarvisGaze } from './useJarvisGaze';
 import { useJarvisBlink } from './useJarvisBlink';
 import { useJarvisPosition } from './useJarvisPosition';
 import { useJarvisChat } from '@/lib/jarvis-chat';
+import { detectNavIntent } from '@/lib/jarvis-actions';
+import { useNav } from '@/lib/nav';
+import { useRoute } from '@/lib/router';
+import { useAuth } from '@/lib/auth';
 import type { JarvisState } from './types';
 
 const FAB = { w: 96, h: 96 };
@@ -30,6 +36,9 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
   const [input, setInput] = useState('');
   const [pulse, setPulse] = useState(true);
 
+  const { go } = useNav();
+  const [route, navigate] = useRoute();
+  const { session } = useAuth();
   const [pos, drag] = useJarvisPosition(FAB, bottomOffset);
   const gaze = useJarvisGaze(wrapRef, state);
   const { blink, doBlink } = useJarvisBlink();
@@ -70,6 +79,24 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
     transition('typing');
     await new Promise(r => window.setTimeout(r, 380));
     transition('thinking');
+
+    if (!onSend) {
+      const nav = detectNavIntent(trimmed);
+      if (nav) {
+        chat.push('user', trimmed);
+        if (route === 'app' || session) {
+          if (route !== 'app') navigate('app');
+          go(nav.page);
+          chat.push('jarvis', nav.reply);
+        } else {
+          navigate('login');
+          chat.push('jarvis', nav.noAuthReply);
+        }
+        transition('success');
+        return;
+      }
+    }
+
     try {
       if (onSend) {
         chat.push('user', trimmed);

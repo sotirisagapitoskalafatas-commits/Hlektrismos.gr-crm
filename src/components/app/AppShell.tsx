@@ -5,10 +5,10 @@ import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLES, can,
-  findNav, flattenNav, navForRole, roleLabel,
+  findNav, flattenNav, navForRole, roleLabel, sectionColor,
 } from '@/lib/roles';
 import type { NavLeaf, Role } from '@/lib/roles';
-import { Btn, IconBtn, Logo, Micro, Modal, Spinner } from '@/lib/ui';
+import { Btn, IconBtn, Logo, Micro, Modal, Spinner, rgbaOf } from '@/lib/ui';
 import {
   AppNotification, Case, fetchCases, fetchFollowUps, fetchLeads,
   fetchNotifications, markNotificationsRead,
@@ -106,24 +106,32 @@ function Drawer({ open, onClose }: {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5" aria-label="Πλοήγηση">
-          {sections.map(s => (
-            <div key={s.id}>
-              <div className={`flex items-center gap-1.5 px-2 mb-1.5 ${s.accent ? 'nav-cat-accent' : 'nav-cat-icon'}`}>
-                <s.icon className="w-3.5 h-3.5" aria-hidden="true" />
-                <Micro>{s.label}</Micro>
+          {sections.map(s => {
+            const c = sectionColor(s);
+            return (
+              <div key={s.id}>
+                <div className="flex items-center gap-1.5 px-2 mb-1.5">
+                  <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.12) }}>
+                    <s.icon className="w-3.5 h-3.5" style={{ color: c }} aria-hidden="true" />
+                  </span>
+                  <span className="micro" style={{ color: c }}>{s.label}</span>
+                </div>
+                <div className="space-y-0.5">
+                  {s.children.map((item: NavLeaf) => (
+                    <button key={item.key} onClick={() => { go(item.page); onClose(); }}
+                      style={view.page === item.page ? (item.accent
+                        ? { background: 'rgba(8,145,178,0.14)', color: '#0e7490', boxShadow: 'inset 0 0 0 1px rgba(8,145,178,0.3)' }
+                        : { background: rgbaOf(c, 0.16), color: c, boxShadow: `inset 2px 0 0 0 ${c}` }) : undefined}
+                      className={`nav-leaf w-full ${view.page === item.page ? (item.accent ? 'nav-atlas-active' : 'nav-active') : item.accent ? 'nav-atlas nav-atlas-pulse' : ''}`}>
+                      <item.icon className="w-[18px] h-[18px] nav-ico" style={view.page === item.page ? { color: c } : undefined} aria-hidden="true" />
+                      <span className="flex-1 text-left truncate">{item.label}</span>
+                      {item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-0.5">
-                {s.children.map((item: NavLeaf) => (
-                  <button key={item.key} onClick={() => { go(item.page); onClose(); }}
-                    className={`nav-leaf w-full ${view.page === item.page ? (item.accent ? 'nav-atlas-active' : 'nav-active') : item.accent ? 'nav-atlas nav-atlas-pulse' : ''}`}>
-                    <item.icon className="w-[18px] h-[18px] nav-ico" aria-hidden="true" />
-                    <span className="flex-1 text-left truncate">{item.label}</span>
-                    {item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         <div className="shrink-0 border-t border-ink/5 px-4 py-4 space-y-3">

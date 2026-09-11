@@ -6,13 +6,13 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, navForRole, roleLabel } from '@/lib/roles';
+import { MATURITY_LABEL, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
 import type { NavLeaf } from '@/lib/roles';
-import { Logo, Micro } from '@/lib/ui';
+import { Logo, Micro, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-function LeafButton({ item, active, compact, badge, onClick }: {
-  item: NavLeaf; active: boolean; compact?: boolean; badge?: number; onClick: () => void;
+function LeafButton({ item, active, compact, badge, color, onClick }: {
+  item: NavLeaf; active: boolean; compact?: boolean; badge?: number; color: string; onClick: () => void;
 }) {
   const b = badge ?? 0;
   const label = item.label;
@@ -22,21 +22,28 @@ function LeafButton({ item, active, compact, badge, onClick }: {
     compact ? 'justify-center relative' : '',
   ].join(' ');
 
+  const activeStyle: React.CSSProperties = item.accent
+    ? { background: rgbaOf('#0e7490', 0.14), color: '#0e7490', boxShadow: 'inset 0 0 0 1px rgba(8,145,178,0.3)' }
+    : { background: rgbaOf(color, 0.16), color, boxShadow: 'inset 2px 0 0 0 ' + color };
+
   return (
     <button key={item.key} onClick={onClick}
       title={label}
       aria-label={compact ? label : undefined}
       aria-current={active ? 'page' : undefined}
+      style={active ? activeStyle : undefined}
       className={cls}>
-      <item.icon className={compact ? 'w-[20px] h-[20px]' : 'nav-ico w-[18px] h-[18px]'} aria-hidden="true" />
+      <item.icon className={compact ? 'w-[20px] h-[20px]' : 'nav-ico w-[18px] h-[18px]'}
+        style={active ? { color } : undefined} aria-hidden="true" />
       {!compact && <span className="flex-1 text-left truncate">{label}</span>}
       {!compact && item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
       {b > 0 && (
-        <span className={`nav-badge ${compact ? 'absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 !min-w-4 !h-4 !px-1 text-[8px]' : ''}`}>
+        <span className={`nav-badge ${compact ? 'absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 !min-w-4 !h-4 !px-1 text-[8px]' : ''}`}
+          style={{ background: rgbaOf(color, 0.14), color }}>
           {b > 9 ? '9+' : b}
         </span>
       )}
-      {active && <span className="nav-dot" aria-hidden="true" />}
+      {active && <span className="nav-dot" style={{ background: color }} aria-hidden="true" />}
     </button>
   );
 }
@@ -90,26 +97,31 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label="Κύρια πλοήγηση">
         {!collapsed ? (
           <div className="space-y-5">
-            {sections.map(s => (
-              <div key={s.id}>
-                <div className={`flex items-center gap-1.5 px-2 mb-1.5 ${s.accent ? 'nav-cat-accent' : 'nav-cat-icon'}`}>
-                  <s.icon className="w-3.5 h-3.5" aria-hidden="true" />
-                  <Micro>{s.label}</Micro>
+            {sections.map(s => {
+              const c = sectionColor(s);
+              return (
+                <div key={s.id}>
+                  <div className="flex items-center gap-1.5 px-2 mb-1.5">
+                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.12) }}>
+                      <s.icon className="w-3.5 h-3.5" style={{ color: c }} aria-hidden="true" />
+                    </span>
+                    <span className="micro" style={{ color: c }}>{s.label}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {s.children.map((item: NavLeaf) => (
+                      <LeafButton key={item.key} item={item} active={view.page === item.page}
+                        color={c} badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  {s.children.map((item: NavLeaf) => (
-                    <LeafButton key={item.key} item={item} active={view.page === item.page}
-                      badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1">
             {leaves.map((item: NavLeaf) => (
               <LeafButton key={item.key} item={item} active={view.page === item.page} compact
-                badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
+                color={categoryColor(item.page)} badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
             ))}
           </div>
         )}

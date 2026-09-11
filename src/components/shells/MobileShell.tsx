@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
+import { categoryColor } from '@/lib/roles';
 import type { PageKey } from '@/lib/roles';
 import {
   Briefcase, Compass, Home, Map, MoreHorizontal, Plus, Route, X,
@@ -34,14 +35,18 @@ function BottomTabBar({ current, counts, onMore }: {
         {TABS.map(t => {
           const active = current === t.page;
           const b = t.badge ? counts[t.badge] : 0;
+          const c = categoryColor(t.page);
           return (
             <button key={t.page} onClick={() => go(t.page)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? 'text-brand-500' : 'text-ink/45'}`}>
+              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? '' : 'text-ink/45'}`}
+              style={active ? { color: c } : undefined}>
+              {active && <span className="absolute top-0 inset-x-3 h-[2px] rounded-b-full" style={{ background: c }} aria-hidden="true" />}
               <span className="relative">
                 <t.icon className="w-5 h-5" />
                 {b > 0 && (
-                  <span className="absolute -top-1 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-bad-600 text-white text-[9px] font-semibold flex items-center justify-center">
+                  <span className={`absolute -top-1 -right-2.5 min-w-4 h-4 px-1 rounded-full text-white text-[9px] font-semibold flex items-center justify-center ${active ? '' : 'bg-bad-600'}`}
+                    style={active ? { background: c } : undefined}>
                     {b > 9 ? '9+' : b}
                   </span>
                 )}

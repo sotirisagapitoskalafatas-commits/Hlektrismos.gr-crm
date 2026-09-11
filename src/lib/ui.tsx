@@ -148,6 +148,26 @@ export function Spinner() {
   return <div className="w-5 h-5 border-2 border-line border-t-ink rounded-full animate-spin" />;
 }
 
+/* ---------------- Color helpers (category palette) ---------------- */
+export function hexToRgb(hex: string): [number, number, number] {
+  const v = hex.replace('#', '');
+  const full = v.length === 3 ? v.split('').map(c => c + c).join('') : v;
+  const n = parseInt(full, 16);
+  if (isNaN(n)) return [15, 23, 42];
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** rgba(hex, alpha) — e.g. rgbaOf('#0066cc', 0.16) */
+export function rgbaOf(hex: string, alpha: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Tinted chip background + colored text for a given hex hue. */
+export function tinted(hex: string, alpha = 0.16): React.CSSProperties {
+  return { background: rgbaOf(hex, alpha), color: hex };
+}
+
 export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const s = size === 'lg' ? 'w-9 h-9' : size === 'sm' ? 'w-6 h-6' : 'w-8 h-8';
   const zap = size === 'lg' ? 'w-5 h-5' : size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';

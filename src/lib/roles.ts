@@ -190,6 +190,22 @@ export type NavSection = {
   children: NavLeaf[];
 };
 
+/* ---------------- Category colors (CRM Shell Redesign) ----------------
+   Each category and its leaves carry the design-computed hue. Active
+   leaves render as rgba(color,.16) + 2px colored left border; count
+   badges use rgba(color,.14). */
+export type NavSectionId = 'home' | 'sales' | 'field' | 'operations' | 'customers' | 'analytics' | 'system';
+
+export const CATEGORY_COLORS: Record<NavSectionId, string> = {
+  home: '#1e293b',
+  sales: '#0066cc',
+  field: '#b45309',
+  operations: '#7c3aed',
+  customers: '#15803d',
+  analytics: '#0e7490',
+  system: '#475569',
+};
+
 const ALL: Role[] = ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'];
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -274,6 +290,15 @@ export function findNav(page: PageKey | 'case'): { section: NavSection; item: Na
     }
   }
   return null;
+}
+
+export function sectionColor(s: Pick<NavSection, 'id'>): string {
+  return CATEGORY_COLORS[s.id as NavSectionId] ?? CATEGORY_COLORS.home;
+}
+
+export function categoryColor(page: PageKey | 'case'): string {
+  const nav = findNav(page);
+  return nav ? sectionColor(nav.section) : CATEGORY_COLORS.home;
 }
 
 export const PAGE_TITLES: Record<PageKey, string> = {

@@ -6,24 +6,27 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, navForRole, roleLabel } from '@/lib/roles';
+import { MATURITY_LABEL, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
 import type { NavLeaf } from '@/lib/roles';
-import { Logo, Micro } from '@/lib/ui';
+import { Logo, Micro, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-function LeafButton({ item, active, badge, onClick }: {
-  item: NavLeaf; active: boolean; badge?: number; onClick: () => void;
+function LeafButton({ item, active, badge, color, onClick }: {
+  item: NavLeaf; active: boolean; badge?: number; color: string; onClick: () => void;
 }) {
   const b = badge ?? 0;
   return (
     <button key={item.key} onClick={onClick}
       aria-current={active ? 'page' : undefined}
+      style={active ? (item.accent
+        ? { background: rgbaOf('#0e7490', 0.14), color: '#0e7490', boxShadow: 'inset 0 0 0 1px rgba(8,145,178,0.3)' }
+        : { background: rgbaOf(color, 0.16), color, boxShadow: 'inset 2px 0 0 0 ' + color }) : undefined}
       className={`nav-leaf ${active ? (item.accent ? 'nav-atlas-active' : 'nav-active') : item.accent ? 'nav-atlas nav-atlas-pulse' : ''}`}>
-      <item.icon className="w-[18px] h-[18px] nav-ico" aria-hidden="true" />
+      <item.icon className="w-[18px] h-[18px] nav-ico" style={active ? { color } : undefined} aria-hidden="true" />
       <span className="flex-1 text-left truncate">{item.label}</span>
       {item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
-      {b > 0 && <span className="nav-badge">{b > 9 ? '9+' : b}</span>}
-      {active && <span className="nav-dot" aria-hidden="true" />}
+      {b > 0 && <span className="nav-badge" style={{ background: rgbaOf(color, 0.14), color }}>{b > 9 ? '9+' : b}</span>}
+      {active && <span className="nav-dot" style={{ background: color }} aria-hidden="true" />}
     </button>
   );
 }
@@ -73,25 +76,30 @@ export default function TabletShell({ counts }: TabletShellProps) {
           <div className="flex flex-col items-center gap-1">
             {sections.flatMap(s => s.children).map((item: NavLeaf) => (
               <LeafButton key={item.key} item={item} active={view.page === item.page}
-                badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
+                color={categoryColor(item.page)} badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
             ))}
           </div>
         ) : (
           <div className="space-y-4">
-            {sections.map(s => (
-              <div key={s.id}>
-                <div className={`flex items-center gap-1.5 px-2 mb-1 ${s.accent ? 'nav-cat-accent' : 'nav-cat-icon'}`}>
-                  <s.icon className="w-3.5 h-3.5" aria-hidden="true" />
-                  <Micro>{s.label}</Micro>
+            {sections.map(s => {
+              const c = sectionColor(s);
+              return (
+                <div key={s.id}>
+                  <div className="flex items-center gap-1.5 px-2 mb-1">
+                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.12) }}>
+                      <s.icon className="w-3.5 h-3.5" style={{ color: c }} aria-hidden="true" />
+                    </span>
+                    <span className="micro" style={{ color: c }}>{s.label}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {s.children.map((item: NavLeaf) => (
+                      <LeafButton key={item.key} item={item} active={view.page === item.page}
+                        color={c} badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  {s.children.map((item: NavLeaf) => (
-                    <LeafButton key={item.key} item={item} active={view.page === item.page}
-                      badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </nav>

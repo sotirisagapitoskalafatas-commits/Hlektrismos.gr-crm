@@ -7,7 +7,6 @@
 /* ------------------------------------------------------------------ */
 
 import type { PageKey, Role } from '@/lib/roles';
-import { can } from '@/lib/roles';
 import type { CaseVisit, FieldTarget } from '@/lib/api';
 import { fetchFieldTargets, fetchVisits, fieldCheckin, addActivity } from '@/lib/api';
 import { getCurrentLocation } from '@/lib/geo/location';
@@ -15,6 +14,7 @@ import { geocodeAddress } from '@/lib/geo/geocoder';
 import { planRoute } from '@/lib/routing/routing-provider';
 import { distanceKm, formatDistance, formatDuration } from '@/lib/geo/distance';
 import { isToday, fmtTime } from '@/lib/ui';
+import { fieldAllowed } from '@/lib/field-sales/policy';
 
 export type FieldSalesNav = { page: PageKey; caseId?: string; filters?: Record<string, string> };
 
@@ -180,7 +180,7 @@ async function getUserLocation(): Promise<FieldSalesResult> {
 }
 
 async function startCheckIn(ctx: FieldSalesCtx): Promise<FieldSalesResult> {
-  if (!ctx.role || !can(ctx.role, 'check_in')) {
+  if (!ctx.role || !fieldAllowed(ctx.role, 'check_in')) {
     return { type: 'done', text: 'Ο ρόλος σας δεν έχει δικαίωμα Check-in.' };
   }
   const visits = (await fetchVisits({ user: true })).filter(v =>
@@ -216,7 +216,7 @@ function confirmVisit(v: CaseVisit): FieldSalesResult {
 }
 
 async function doConfirmedCheckIn(visitId: string, label: string, ctx: FieldSalesCtx): Promise<FieldSalesResult> {
-  if (!ctx.role || !can(ctx.role, 'check_in')) {
+  if (!ctx.role || !fieldAllowed(ctx.role, 'check_in')) {
     return { type: 'done', text: 'Ο ρόλος σας δεν έχει δικαίωμα Check-in.' };
   }
   let coords: { lat: number; lng: number; accuracy?: number } | undefined;

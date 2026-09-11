@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNav } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
-import { ACTIVE_STAGES, BACK_OFFICE_STAGES, SERVICES, stageLabel, can } from '@/lib/roles';
+import { ACTIVE_STAGES, BACK_OFFICE_STAGES, SERVICES, stageLabel } from '@/lib/roles';
+import { fieldAllowed, fieldDecision } from '@/lib/field-sales/policy';
 import { Case, CaseVisit, FollowUp, fetchAllCaseStats, fetchCases, fetchFollowUps, fetchLeads, fetchVisits, fetchFieldTargets, fieldCheckin, updateLeadLocation } from '@/lib/api';
 import { Btn, Card, Micro, Spinner, StagePill, fmtTime, isToday } from '@/lib/ui';
 import { createMap } from '@/lib/maps/map-provider';
@@ -380,6 +381,9 @@ export default function MapPage() {
 
   const locateLead = async (l: { id: string; name: string; address: string | null }) => {
     if (!l.address) { toast('Το lead δεν έχει διεύθυνση.', 'warn'); return; }
+    const gate = fieldDecision(role, 'edit_address');
+    if (!gate.allowed) { toast('Δεν έχετε δικαίωμα επεξεργασίας τοποθεσίας.', 'warn'); return; }
+    if (gate.gate === 'approve' && !window.confirm(`Καταχώρηση της διεύθυνσης "${l.address}" ως θέση του lead "${l.name}";`)) return;
     const geo = await geocodeAddress(l.address, origin ?? undefined);
     if (geo.length === 0) { toast(`Δεν βρέθηκε θέση για: ${l.address}`, 'warn'); return; }
     const ok = await updateLeadLocation(l.id, geo[0].position, 'geocoder');
@@ -694,7 +698,7 @@ export default function MapPage() {
                 <>
                   <Btn onClick={() => preview.v.case_id && openCase(preview.v.case_id)}>Άνοιγμα Case</Btn>
                   {previewPos && <Btn variant="outline" onClick={() => openNavigation(previewPos!)}><Navigation className="w-3.5 h-3.5" /> Πλοήγηση</Btn>}
-                  {preview.v.status === 'planned' && can(role, 'check_in') && (
+                  {preview.v.status === 'planned' && fieldAllowed(role, 'check_in') && (
                     <Btn variant="ok" onClick={() => doFieldCheckIn(preview.v)} disabled={checkInBusy === preview.v.id}>
                       {checkInBusy === preview.v.id ? <Spinner /> : <LogIn className="w-3.5 h-3.5" />} Check In
                     </Btn>

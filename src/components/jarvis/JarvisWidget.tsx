@@ -16,6 +16,8 @@ import { useJarvisBlink } from './useJarvisBlink';
 import { useJarvisPosition } from './useJarvisPosition';
 import { useJarvisChat } from '@/lib/jarvis-chat';
 import { detectNavIntent } from '@/lib/jarvis-actions';
+import { detectFieldSalesIntent, resumeFieldSales, runFieldSalesIntent } from '@/lib/field-sales/jarvis-tools';
+import type { FieldSalesCtx, FieldSalesFlow, FieldSalesResult } from '@/lib/field-sales/jarvis-tools';
 import { useNav } from '@/lib/nav';
 import { useRoute } from '@/lib/router';
 import { useAuth } from '@/lib/auth';
@@ -36,15 +38,26 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
   const [input, setInput] = useState('');
   const [pulse, setPulse] = useState(true);
 
-  const { go } = useNav();
+  const { go, openCase } = useNav();
   const [route, navigate] = useRoute();
-  const { session } = useAuth();
+  const { session, role } = useAuth();
   const [pos, drag] = useJarvisPosition(FAB, bottomOffset);
   const gaze = useJarvisGaze(wrapRef, state);
   const { blink, doBlink } = useJarvisBlink();
 
   const moved = useRef(false);
   const lastPtr = useRef<{ x: number; y: number } | null>(null);
+  const fieldFlowRef = useRef<FieldSalesFlow | null>(null);
+
+  const applyFieldResult = (res: FieldSalesResult) => {
+    fieldFlowRef.current = res.type === 'flow' ? res.flow : null;
+    if (res.nav) {
+      if (res.nav.page === 'case' && res.nav.caseId) openCase(res.nav.caseId);
+      else go(res.nav.page, res.nav.filters);
+    }
+    chat.push('jarvis', res.text);
+    transition('success');
+  };
 
   /* Keep pulse going while idle; slow down once open. */
   useEffect(() => {
@@ -80,6 +93,16 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
     await new Promise(r => window.setTimeout(r, 380));
     transition('thinking');
 
+    if (!onSend && (session || route === 'app')) {
+      const ctx: FieldSalesCtx = { role: role ?? null };
+      if (fieldFlowRef.current) {
+        chat.push('user', trimmed);
+        const res = await resumeFieldSales(trimmed, fieldFlowRef.current, ctx);
+        applyFieldResult(res);
+        return;
+      }
+    }
+
     if (!onSend) {
       const nav = detectNavIntent(trimmed);
       if (nav) {
@@ -93,6 +116,17 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
           chat.push('jarvis', nav.noAuthReply);
         }
         transition('success');
+        return;
+      }
+    }
+
+    if (!onSend && session) {
+      const ctx: FieldSalesCtx = { role: role ?? null };
+      const fi = detectFieldSalesIntent(trimmed);
+      if (fi) {
+        chat.push('user', trimmed);
+        const res = await runFieldSalesIntent(fi, ctx);
+        applyFieldResult(res);
         return;
       }
     }

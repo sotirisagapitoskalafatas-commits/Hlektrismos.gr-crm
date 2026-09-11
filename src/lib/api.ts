@@ -1015,7 +1015,7 @@ export async function fetchFieldTargets(search?: string): Promise<FieldTarget[]>
   const [cases, customers, leads] = await Promise.all([
     supabase
       .from('cases')
-      .select('id, title, lat, lng, address, location, current_stage, customer:customers(full_name)')
+      .select('id, case_no, title, lat, lng, address, location, current_stage, customer:customers(full_name)')
       .not('lat', 'is', null)
       .not('lng', 'is', null),
     supabase
@@ -1031,8 +1031,9 @@ export async function fetchFieldTargets(search?: string): Promise<FieldTarget[]>
   ]);
 
   const results: FieldTarget[] = [
-    ...(cases.data ?? [])
-      .map(c => ({ entity_type: 'case' as const, id: c.id, label: asLabel(c as { title?: string; customer?: { full_name?: string } | null; full_name?: string; client_name?: string; first_name?: string; last_name?: string }), sublabel: (c as { customer?: { full_name?: string } | null }).customer?.full_name ?? '', position: { lat: c.lat as number, lng: c.lng as number }, address: c.address ?? undefined, stage: c.current_stage ?? undefined })),
+    ...(
+      cases.data ?? []
+    ).map(c => ({ entity_type: 'case' as const, id: c.id, label: asLabel(c as { title?: string; customer?: { full_name?: string } | null; full_name?: string; client_name?: string; first_name?: string; last_name?: string }), sublabel: [c.case_no, (c as { customer?: { full_name?: string } | null }).customer?.full_name ?? ''].filter(Boolean).join(' · '), position: { lat: c.lat as number, lng: c.lng as number }, address: c.address ?? undefined, stage: c.current_stage ?? undefined })),
     ...(customers.data ?? [])
       .filter(c => !cases.data?.some(cs => cs.customer && (cs.customer as { full_name: string }).full_name === c.full_name))
       .map(c => ({ entity_type: 'customer' as const, id: c.id, label: c.full_name, sublabel: c.phone ?? '', position: { lat: c.lat as number, lng: c.lng as number }, address: c.address ?? undefined })),

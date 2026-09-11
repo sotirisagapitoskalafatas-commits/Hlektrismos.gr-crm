@@ -350,6 +350,19 @@ export default function MapPage() {
     return null;
   }, [preview, caseById]);
 
+  const results = useMemo(() => {
+    return markers
+      .filter(m => m.id !== 'me')
+      .map(m => ({
+        id: m.id,
+        title: m.title,
+        subtitle: m.subtitle,
+        color: m.color,
+        distance: myLoc ? distanceKm(myLoc, m.position) : null,
+      }))
+      .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+  }, [markers, myLoc]);
+
   return (
     <div className="max-w-6xl space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -386,6 +399,33 @@ export default function MapPage() {
           placeholder="Αναζήτηση πελάτη, case, διεύθυνση ή πόλη…" />
       </div>
 
+      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        <div className="hidden md:block order-2 md:order-1 min-w-0">
+          <Card className="!p-0" pad={false}>
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <Micro tone="brand">Χάρτης · αποτελέσματα</Micro>
+              <span className="pill bg-ink/10 text-ink/70">{results.length}</span>
+            </div>
+            <div className="max-h-[52vh] overflow-y-auto divide-y divide-line">
+              {results.map(r => (
+                <button key={r.id} onClick={() => setSelectedId(r.id)}
+                  className={`w-full text-left px-4 py-2.5 transition-colors flex items-center gap-2.5 ${selectedId === r.id ? 'bg-brand-50' : 'hover:bg-ink/[0.03]'}`}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-medium text-ink truncate">{r.title}</span>
+                    {r.subtitle && <span className="block text-xs text-ink/45 truncate">{r.subtitle}</span>}
+                  </span>
+                  {r.distance != null && <span className="text-[11px] text-ink/45 shrink-0">{formatDistance(r.distance)}</span>}
+                </button>
+              ))}
+              {results.length === 0 && (
+                <p className="px-4 py-4 text-xs text-ink/40">Δεν βρέθηκαν σημεία για τη συγκεκριμένη κατηγορία.</p>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <div className="order-1 md:order-2 min-w-0">
       <Card className="!p-0 !border-0 !shadow-none relative" pad={false}>
         <div ref={mapEl} className="h-[56vh] min-h-[380px] sm:min-h-[500px] rounded-[10px] overflow-hidden border border-line bg-paper/40" />
         {!ready && mapError == null && (
@@ -485,6 +525,8 @@ export default function MapPage() {
           </div>
         )}
       </Card>
+        </div>
+      </div>
 
       {filter === 'leads' && (
         <Card className="!p-0" pad={false}>

@@ -23,6 +23,17 @@ export function roleLabel(r: Role) {
   return ROLES.find(x => x.id === r)?.label ?? r;
 }
 
+/* ---------------- Role colors (CRM Shell Redesign) ----------------
+   Hue per role, used by the role simulator chips, avatar ring and
+   notification accents. Design palette. */
+export const ROLE_COLOR: Record<Role, string> = {
+  admin: '#475569',
+  manager: '#0891b2',
+  inside_sales: '#0066cc',
+  field_sales: '#b45309',
+  back_office: '#7c3aed',
+};
+
 /* ---------------- Stages ---------------- */
 export type Stage =
   | 'new' | 'contacted' | 'offer' | 'application' | 'signed'

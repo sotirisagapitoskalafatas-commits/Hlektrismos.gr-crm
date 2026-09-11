@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
+import { MATURITY_LABEL, ROLE_COLOR, ROLES, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
 import type { NavLeaf } from '@/lib/roles';
 import { Logo, Micro, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -130,17 +130,25 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
       {/* User footer */}
       <div className={`shrink-0 border-t border-ink/[0.06] py-3 ${collapsed ? 'flex justify-center px-0' : 'px-4'}`}>
         {collapsed ? (
-          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold" aria-hidden="true">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold" aria-hidden="true"
+            style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </div>
         ) : (
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+              style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
               {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-              <Micro>{roleLabel(role)}</Micro>
+              <div className="flex items-center gap-1.5">
+                <Micro>{roleLabel(role)}</Micro>
+                <span className="pill !text-[9px] !py-0 !px-1"
+                  style={{ background: rgbaOf(ROLE_COLOR[role], 0.12), color: ROLE_COLOR[role] }}>
+                  {ROLES.find(r => r.id === role)?.short}
+                </span>
+              </div>
             </div>
           </div>
         )}

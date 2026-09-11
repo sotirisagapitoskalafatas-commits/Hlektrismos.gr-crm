@@ -4,22 +4,24 @@ import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
-  BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLES, can,
+  BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, ROLES, can,
   findNav, flattenNav, navForRole, roleLabel, sectionColor,
 } from '@/lib/roles';
-import type { NavLeaf, Role } from '@/lib/roles';
-import { Btn, IconBtn, Logo, Micro, Modal, Spinner, rgbaOf } from '@/lib/ui';
+import type { NavLeaf } from '@/lib/roles';
+import { Btn, IconBtn, Logo, Micro, Modal, Spinner, rgbaOf, timeUntil } from '@/lib/ui';
 import {
   AppNotification, Case, fetchCases, fetchFollowUps, fetchLeads,
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, ChevronDown, CircleHelp, Download, LogOut, Menu, Plus, Search,
+  Bell, ChevronDown, ChevronRight, CircleHelp, Download, LogOut, Menu, Plus, Search,
   SlidersHorizontal, UserCircle, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';
 import TabletShell from '@/components/shells/TabletShell';
 import DesktopShell from '@/components/shells/DesktopShell';
+import QuickAdd from './QuickAdd';
+import RoleSwitcher from './RoleSwitcher';
 
 import HomePage from './HomePage';
 import CasesPage from './CasesPage';
@@ -82,11 +84,21 @@ function useNotifications() {
   return { notifs, unread, load };
 }
 
+/* Notification type chips (CRM Shell Redesign) */
+const NOTIF_TYPE: Record<string, { label: string; color: string }> = {
+  followup: { label: 'Follow Up', color: '#0066cc' },
+  visit: { label: 'Επίσκεψη', color: '#b45309' },
+  document: { label: 'Έγγραφο', color: '#7c3aed' },
+};
+function notifMeta(type: string) {
+  return NOTIF_TYPE[type] ?? { label: 'Σύστημα', color: '#0e7490' };
+}
+
 /* ---------------- Mobile slide-over drawer (shared "more" menu) ---------------- */
 function Drawer({ open, onClose }: {
   open: boolean; onClose: () => void;
 }) {
-  const { role, profile, setRoleOverride, signOut } = useAuth();
+  const { role, profile, signOut } = useAuth();
   const { view, go } = useNav();
   const sections = navForRole(role);
 
@@ -134,27 +146,21 @@ function Drawer({ open, onClose }: {
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-ink/5 px-4 py-4 space-y-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
-              {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
+<div className="shrink-0 border-t border-ink/5 px-4 py-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
+                {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
+                <Micro>{roleLabel(role)}{role !== profile?.role ? ' · sim' : ''}</Micro>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-              <Micro>{roleLabel(role)}{role !== profile?.role ? ' · sim' : ''}</Micro>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <select value={role} onChange={e => setRoleOverride(e.target.value as Role)}
-              aria-label="Επίδειξη ρόλου (demo)" title="Προσομοίωση ρόλου (demo)"
-              className="flex-1 text-[12px] font-medium bg-white border border-line rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-brand-500 appearance-none">
-              {ROLES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
-            <Btn variant="ghost" onClick={() => { signOut(); window.location.hash = '/'; }} className="!px-2">
-              <LogOut className="w-3.5 h-3.5" />
+            <RoleSwitcher />
+            <Btn variant="danger" onClick={() => { signOut(); window.location.hash = '/'; onClose(); }} className="w-full justify-center">
+              <LogOut className="w-3.5 h-3.5" /> Αποσύνδεση
             </Btn>
           </div>
-        </div>
       </aside>
     </div>
   );
@@ -164,7 +170,7 @@ function Drawer({ open, onClose }: {
 function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
   onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void;
 }) {
-  const { role, profile, user, setRoleOverride } = useAuth();
+  const { role, profile, user } = useAuth();
   const { view, openCase, go } = useNav();
   const { notifs, unread, load } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -179,6 +185,8 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
     ? ['Cases', 'Case Detail']
     : nav ? [nav.section.label, nav.item.label] : ['ATLAS'];
 
+  const navCat = view.page === 'case' ? '#0066cc' : nav ? sectionColor(nav.section) : '#475569';
+
   const openNotifs = async () => {
     const next = !notifOpen;
     setNotifOpen(next);
@@ -192,10 +200,17 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
       </button>
 
       <div className="flex-1 min-w-0">
-        <div className="micro text-ink/35 truncate leading-tight">{crumb.join(' / ')}</div>
+        <div className="micro truncate leading-tight inline-flex items-center gap-1">
+          {crumb.map((c, i) => (
+            <span key={`${view.page}-${i}`} className="inline-flex items-center gap-1">
+              <span style={i === 0 ? { color: navCat } : undefined} className={i === 0 ? 'font-semibold' : 'text-ink/55'}>{c}</span>
+              {i < crumb.length - 1 && <ChevronRight className="w-3 h-3 text-ink/25" aria-hidden="true" />}
+            </span>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
           <h1 className="text-[17px] font-bold text-ink tracking-tight truncate leading-tight font-[var(--font-display)]">{title}</h1>
-          {sim && <span className="pill bg-brand-500/10 text-brand-500">sim {roleLabel(role)}</span>}
+          {sim && <span className="pill text-[11px]" style={{ background: rgbaOf(ROLE_COLOR[role], 0.12), color: ROLE_COLOR[role] }}>sim {roleLabel(role)}</span>}
         </div>
       </div>
 
@@ -206,11 +221,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
         <kbd className="micro bg-white/70 text-ink/40 rounded px-1.5 py-0.5 border border-ink/10">⌘K</kbd>
       </button>
 
-      <button onClick={() => go('cases')}
-        className="flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] bg-brand-500 text-white text-[13px] font-semibold hover:brightness-110 transition-[filter] shadow-[0_4px_16px_rgba(0,102,204,0.28)]">
-        <Plus className="w-4 h-4" />
-        <span className="hidden md:inline">Νέο</span>
-      </button>
+      <QuickAdd />
 
       {showInstall && (
         <button onClick={() => void install()}
@@ -237,17 +248,26 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
               {notifs.length === 0 && (
                 <div className="text-center text-xs text-ink/40 py-6">Καμία ειδοποίηση</div>
               )}
-              {notifs.map(n => (
-                <button key={n.id}
-                  onClick={() => { if (n.case_id) openCase(n.case_id); setNotifOpen(false); }}
-                  className="w-full text-left px-2 py-2 rounded-lg hover:bg-ink/5 flex gap-2.5 items-start">
-                  <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${n.read_at ? 'bg-ink/15' : 'bg-brand-500'}`} />
-                  <span className="min-w-0">
+              {notifs.map(n => {
+                const m = notifMeta(n.type);
+                return (
+                  <button key={n.id}
+                    onClick={() => { if (n.case_id) openCase(n.case_id); setNotifOpen(false); }}
+                    className="w-full text-left px-2 py-2 rounded-lg hover:bg-ink/5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="min-w-[6px] w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: n.read_at ? 'rgba(15,23,42,0.15)' : m.color }} />
+                      <span className="pill !px-1.5 !py-0 !text-[10px]"
+                        style={{ background: rgbaOf(m.color, 0.12), color: m.color }}>
+                        {m.label}
+                      </span>
+                      <span className="ml-auto micro text-ink/35 whitespace-nowrap">{timeUntil(n.created_at)}</span>
+                    </div>
                     <span className="block text-[13px] font-medium text-ink leading-tight">{n.title}</span>
-                    {n.body && <span className="block text-xs text-ink/50 mt-0.5 truncate">{n.body}</span>}
-                  </span>
-                </button>
-              ))}
+                    {n.body && <span className="block text-xs text-ink/50 truncate">{n.body}</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -257,7 +277,8 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
       <div className="relative pl-1.5">
         <button onClick={() => setAcctOpen(o => !o)} aria-label="Λογαριασμός" aria-haspopup="menu"
           className="flex items-center gap-2 rounded-full bg-ink/[0.045] hover:bg-ink/[0.08] pl-1 pr-2 py-1 transition-colors">
-          <span className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold ${sim ? 'bg-bad-500/10 text-bad-600' : 'bg-brand-500/12 text-brand-500'}`}>
+          <span className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold"
+            style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </span>
           <span className="hidden md:block text-left">
@@ -302,13 +323,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
               </button>
 
               <div className="px-2 py-2 border-t border-line mt-1.5">
-                <div className="micro text-ink/40 mb-1.5">Επίδειξη ρόλου (demo)</div>
-                <select value={role} onChange={e => setRoleOverride(e.target.value as Role)}
-                  aria-label="Επίδειξη ρόλου"
-                  className="w-full text-[13px] font-medium bg-white border border-line rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-brand-500 appearance-none">
-                  {ROLES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                </select>
-                <p className="text-[11px] text-ink/40 mt-1.5">Ο φυσικός ρόλος προέρχεται από τον λογαριασμό σας. Η προσομοίωση είναι προσωρινή, μόνο για επίδειξη.</p>
+                <RoleSwitcher />
               </div>
 
               <Btn variant="danger" onClick={onSignOut} className="w-full justify-center mt-1">

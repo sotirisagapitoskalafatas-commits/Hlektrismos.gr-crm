@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Building2, Bot, Map as MapIcon, Compass, Briefcase,
   CalendarDays, Gauge, Settings, Home, ChevronRight, Bell, Plus, Search,
   UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
-  UserCircle, SlidersHorizontal,
+  UserCircle, SlidersHorizontal, Smartphone,
 } from 'lucide-react';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
@@ -166,7 +166,7 @@ export function leadStatusInfo(status?: string | null): { id: string; label: str
 export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
   | 'home' | 'leads' | 'cases' | 'followups' | 'customers'
-  | 'map' | 'myday' | 'backoffice' | 'reports' | 'admin'
+  | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'admin'
   | 'account' | 'preferences';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice';
@@ -217,6 +217,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Navigation,
     children: [
       { key: 'myday', label: 'Ημέρα μου', icon: Sun, page: 'myday', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
+      { key: 'fieldmode', label: 'Λειτουργία Πεδίου', icon: Smartphone, page: 'field', roles: ['admin', 'manager', 'field_sales'], maturity: 'beta' },
       { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
     ],
   },
@@ -283,6 +284,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   followups: 'Follow Ups',
   myday: 'Ημέρα μου',
   map: 'Χάρτης',
+  field: 'Λειτουργία Πεδίου',
   backoffice: 'Operations',
   reports: 'Reports',
   admin: 'Διαχείριση',

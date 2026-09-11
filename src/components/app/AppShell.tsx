@@ -35,6 +35,7 @@ const SettingsPage = lazy(() => import('./SettingsPage'));
 const MyDayPage = lazy(() => import('./MyDayPage'));
 const MapPage = lazy(() => import('./MapPage'));
 const BackOfficePage = lazy(() => import('./BackOfficePage'));
+const FieldModePage = lazy(() => import('@/components/field-sales/FieldModePage'));
 
 /* NOTE: Rail, Drawer, MobileTabBar, MobileQuickActions are now in
    DesktopShell, MobileShell respectively.  Header + Palette remain
@@ -382,7 +383,7 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
 /* ---------------- Shell ---------------- */
 
 export default function AppShell() {
-  const { signOut } = useAuth();
+  const { signOut, role } = useAuth();
   const { view } = useNav();
   const { device } = useDeviceContext();
   const isMobile = device === 'PHONE';
@@ -421,6 +422,7 @@ export default function AppShell() {
       case 'followups': return <FollowUpsPage />;
       case 'leads': return <LeadsPage />;
       case 'myday': return <MyDayPage />;
+      case 'field': return can(role, 'check_in') ? <FieldModePage /> : <HomePage />;
       case 'map': return <MapPage />;
       case 'backoffice': return <BackOfficePage />;
       case 'customers': return <CustomersPage />;

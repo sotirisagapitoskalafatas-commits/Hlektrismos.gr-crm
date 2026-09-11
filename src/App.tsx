@@ -1,5 +1,6 @@
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { DeviceProvider } from '@/lib/device-context';
 import { useRoute } from '@/lib/router';
 import { NavProvider } from '@/lib/nav';
 import { ToastProvider } from '@/lib/toast';
@@ -67,13 +68,15 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavProvider>
-        <ToastProvider>
-          <AppContent />
-        </ToastProvider>
-      </NavProvider>
+    <DeviceProvider>
+      <AuthProvider>
+        <NavProvider>
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
+        </NavProvider>
+      </AuthProvider>
       <SpeedInsights />
-    </AuthProvider>
+    </DeviceProvider>
   );
 }

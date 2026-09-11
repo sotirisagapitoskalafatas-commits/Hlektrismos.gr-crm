@@ -1,21 +1,24 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import {
   BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLES, can,
   findNav, flattenNav, navForRole, roleLabel,
 } from '@/lib/roles';
-import type { NavBadge, NavLeaf, Role } from '@/lib/roles';
+import type { NavLeaf, Role } from '@/lib/roles';
 import { Btn, IconBtn, Logo, Micro, Modal, Spinner } from '@/lib/ui';
 import {
   AppNotification, Case, fetchCases, fetchFollowUps, fetchLeads,
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, Briefcase, ChevronDown, ChevronsLeft, ChevronsRight, CircleHelp,
-  Compass, Home, LogOut, Map, Menu, MoreHorizontal, Plus, Route, Search,
+  Bell, ChevronDown, CircleHelp, LogOut, Menu, Search,
   SlidersHorizontal, UserCircle, X,
 } from 'lucide-react';
+import MobileShell from '@/components/shells/MobileShell';
+import TabletShell from '@/components/shells/TabletShell';
+import DesktopShell from '@/components/shells/DesktopShell';
 
 import HomePage from './HomePage';
 import CasesPage from './CasesPage';
@@ -31,6 +34,10 @@ const SettingsPage = lazy(() => import('./SettingsPage'));
 const MyDayPage = lazy(() => import('./MyDayPage'));
 const MapPage = lazy(() => import('./MapPage'));
 const BackOfficePage = lazy(() => import('./BackOfficePage'));
+
+/* NOTE: Rail, Drawer, MobileTabBar, MobileQuickActions are now in
+   DesktopShell, MobileShell respectively.  Header + Palette remain
+   here as shared chrome across all shells. */
 
 /* ---------------- Shell-wide counts (nav badges) ---------------- */
 type ShellCounts = { leads: number; followups: number; backoffice: number };
@@ -73,124 +80,9 @@ function useNotifications() {
   return { notifs, unread, load };
 }
 
-/* ---------------- Shared navigation leaf (glass capsule) ---------------- */
-function LeafButton({ item, active, compact, badge, onClick }: {
-  item: NavLeaf; active: boolean; compact?: boolean; badge?: number; onClick: () => void;
-}) {
-  const b = badge ?? 0;
-  const label = `${item.label}`;
-  const cls = [
-    'nav-leaf',
-    active ? (item.accent ? 'nav-atlas-active' : 'nav-active')
-      : item.accent ? 'nav-atlas nav-atlas-pulse' : '',
-    compact ? 'justify-center relative' : '',
-  ].join(' ');
-
-  return (
-    <button key={item.key} onClick={onClick}
-      title={compact ? label : label}
-      aria-label={compact ? label : undefined}
-      aria-current={active ? 'page' : undefined}
-      className={cls}>
-      <item.icon className={compact ? 'w-[20px] h-[20px]' : 'nav-ico w-[18px] h-[18px]'} aria-hidden="true" />
-      {!compact && <span className="flex-1 text-left truncate">{item.label}</span>}
-      {!compact && item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
-      {b > 0 && (
-        <span className={`nav-badge ${compact ? 'absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 !min-w-4 !h-4 !px-1 text-[8px]' : ''}`}>
-          {b > 9 ? '9+' : b}
-        </span>
-      )}
-      {active && <span className="nav-dot" aria-hidden="true" />}
-    </button>
-  );
-}
-
-/* ---------------- Desktop rail ---------------- */
-function Rail({ collapsed, onToggle, counts }: {
-  collapsed: boolean; onToggle: () => void; counts: ShellCounts;
-}) {
-  const { role, profile } = useAuth();
-  const { view, go } = useNav();
-  const sections = navForRole(role);
-  const leaves = flattenNav(sections);
-
-  return (
-    <aside id="shell-rail" className={`glass-nav hidden lg:flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-64'}`}>
-      <div className={`flex items-center gap-2.5 h-14 shrink-0 border-b border-ink/5 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
-        <Logo size={collapsed ? 'sm' : 'md'} />
-        {!collapsed && (
-          <>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-bold tracking-tight text-ink leading-none">ATLAS CRM</div>
-              <div className="micro text-ink/35 mt-1">Ηlektrismos.gr</div>
-            </div>
-            <button onClick={onToggle} title="Σύμπτυξη sidebar" aria-label="Σύμπτυξη sidebar"
-              className="text-ink/35 hover:text-ink p-1 rounded-md hover:bg-ink/5">
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
-          </>
-        )}
-        {collapsed && (
-          <button onClick={onToggle} title="Ανάπτυξη sidebar" aria-label="Ανάπτυξη sidebar"
-            className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5">
-            <ChevronsRight className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label="Κύρια πλοήγηση">
-        {!collapsed && (
-          <div className="space-y-5">
-            {sections.map(s => (
-              <div key={s.id}>
-                <div className={`flex items-center gap-1.5 px-2 mb-1.5 ${s.accent ? 'nav-cat-accent' : 'nav-cat-icon'}`}>
-                  <s.icon className="w-3.5 h-3.5" aria-hidden="true" />
-                  <Micro>{s.label}</Micro>
-                </div>
-                <div className="space-y-0.5">
-                  {s.children.map(item => (
-                    <LeafButton key={item.key} item={item} active={view.page === item.page}
-                      badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {collapsed && (
-          <div className="flex flex-col items-center gap-1">
-            {leaves.map(({ item }) => (
-              <LeafButton key={item.key} item={item} active={view.page === item.page} compact
-                badge={item.badge ? counts[item.badge] : 0} onClick={() => go(item.page)} />
-            ))}
-          </div>
-        )}
-      </nav>
-
-      <div className={`shrink-0 border-t border-ink/5 py-3 ${collapsed ? 'flex justify-center px-0' : 'px-4'}`}>
-        {collapsed ? (
-          <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold" aria-hidden="true">
-            {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
-              {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-              <Micro>{roleLabel(role)}{role !== profile?.role ? ' · sim' : ''}</Micro>
-            </div>
-          </div>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-/* ---------------- Mobile slide-over drawer ---------------- */
-function Drawer({ open, onClose, counts }: {
-  open: boolean; onClose: () => void; counts: ShellCounts;
+/* ---------------- Mobile slide-over drawer (shared "more" menu) ---------------- */
+function Drawer({ open, onClose }: {
+  open: boolean; onClose: () => void;
 }) {
   const { role, profile, setRoleOverride, signOut } = useAuth();
   const { view, go } = useNav();
@@ -219,9 +111,13 @@ function Drawer({ open, onClose, counts }: {
                 <Micro>{s.label}</Micro>
               </div>
               <div className="space-y-0.5">
-                {s.children.map(item => (
-                  <LeafButton key={item.key} item={item} active={view.page === item.page}
-                    badge={item.badge ? counts[item.badge] : 0} onClick={() => { go(item.page); onClose(); }} />
+                {s.children.map((item: NavLeaf) => (
+                  <button key={item.key} onClick={() => { go(item.page); onClose(); }}
+                    className={`nav-leaf w-full ${view.page === item.page ? (item.accent ? 'nav-atlas-active' : 'nav-active') : item.accent ? 'nav-atlas nav-atlas-pulse' : ''}`}>
+                    <item.icon className="w-[18px] h-[18px] nav-ico" aria-hidden="true" />
+                    <span className="flex-1 text-left truncate">{item.label}</span>
+                    {item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
+                  </button>
                 ))}
               </div>
             </div>
@@ -254,7 +150,7 @@ function Drawer({ open, onClose, counts }: {
   );
 }
 
-/* ---------------- Header ---------------- */
+/* ---------------- Header (shared across shells) ---------------- */
 function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
   onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void;
 }) {
@@ -471,118 +367,18 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-/* ---------------- Field Sales mobile bottom bar + quick actions ---------------- */
-function MobileTabBar({ current, counts, onMore }: {
-  current: string; counts: ShellCounts; onMore: () => void;
-}) {
-  const { go } = useNav();
-  const tabs: { page: 'home' | 'myday' | 'map' | 'cases'; label: string; icon: typeof Home; badge?: NavBadge }[] = [
-    { page: 'home', label: 'Αρχική', icon: Home },
-    { page: 'myday', label: 'Ημέρα μου', icon: Compass, badge: 'followups' },
-    { page: 'map', label: 'Χάρτης', icon: Map },
-    { page: 'cases', label: 'Cases', icon: Briefcase },
-  ];
-
-  return (
-    <nav aria-label="Γρήγορη πλοήγηση"
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 glass-nav border-t border-ink/10 pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-5">
-        {tabs.map(t => {
-          const active = current === t.page;
-          const b = t.badge ? counts[t.badge] : 0;
-          return (
-            <button key={t.page} onClick={() => go(t.page)}
-              aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? 'text-brand-600' : 'text-ink/50'}`}>
-              <span className="relative">
-                <t.icon className="w-5 h-5" />
-                {b > 0 && (
-                  <span className="absolute -top-1 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-bad-600 text-white text-[9px] font-semibold flex items-center justify-center">
-                    {b > 9 ? '9+' : b}
-                  </span>
-                )}
-              </span>
-              {t.label}
-            </button>
-          );
-        })}
-        <button onClick={onMore} aria-label="Περισσότερα"
-          className="flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium text-ink/50 transition-colors">
-          <MoreHorizontal className="w-5 h-5" />
-          Περισσότερα
-        </button>
-      </div>
-    </nav>
-  );
-}
-
-function MobileQuickActions({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  const { go } = useNav();
-  const actions = [
-    { label: 'Ημέρα μου', sub: 'πρόγραμμα & check-in', icon: Compass, run: () => go('myday') },
-    { label: 'Χάρτης', sub: 'cases & επισκέψεις κοντά', icon: Map, run: () => go('map') },
-    { label: 'Δρομολόγιο', sub: 'βέλτιστη σειρά στάσεων', icon: Route, run: () => go('map', { focus: 'route' }) },
-    { label: 'Όλες οι εργασίες', sub: 'cases & follow ups', icon: Briefcase, run: () => go('cases') },
-  ];
-  return (
-    <div className="lg:hidden" aria-hidden={!open}>
-      <button onClick={onToggle} aria-expanded={open}
-        aria-label={open ? 'Κλείσιμο γρήγορων ενεργειών' : 'Γρήγορες ενέργειες'}
-        className="fixed right-4 z-50 w-14 h-14 rounded-full bg-brand-500 text-white shadow-cardlg flex items-center justify-center hover:bg-brand-600 transition-transform active:scale-95"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 78px)' }}>
-        {open ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
-      </button>
-
-      <div className={`fixed inset-0 z-40 ${open ? '' : 'pointer-events-none'}`}>
-        <div className={`absolute inset-0 bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onToggle} />
-        <div role="dialog" aria-modal="true" aria-label="Γρήγορες ενέργειες"
-          className={`absolute inset-x-0 bottom-0 z-10 max-w-lg mx-auto bg-paper rounded-t-3xl border-t border-line shadow-cardlg transition-transform duration-250 pb-[env(safe-area-inset-bottom)] ${open ? 'translate-y-0' : 'translate-y-full'}`}>
-          <div className="flex items-center justify-between px-5 pt-4 pb-2">
-            <div>
-              <div className="text-[15px] font-semibold text-ink">Γρήγορες ενέργειες</div>
-              <div className="micro text-ink/40">Field Sales</div>
-            </div>
-            <button onClick={onToggle} aria-label="Κλείσιμο"
-              className="w-9 h-9 rounded-full bg-ink/5 flex items-center justify-center text-ink/60 hover:bg-ink/10">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="px-5 pt-1 pb-6 grid grid-cols-2 gap-3">
-            {actions.map(a => (
-              <button key={a.label} onClick={() => { a.run(); onToggle(); }}
-                className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4 text-left hover:border-brand-500/40 min-h-[64px] active:scale-[0.99]">
-                <span className="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center shrink-0">
-                  <a.icon className="w-5 h-5 text-brand-600" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[14px] font-semibold text-ink leading-tight">{a.label}</span>
-                  <span className="block text-[11px] text-ink/45 truncate">{a.sub}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- Shell ---------------- */
 
 export default function AppShell() {
-  const { role, signOut } = useAuth();
+  const { signOut } = useAuth();
   const { view } = useNav();
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('atlas.nav.collapsed') === '1');
+  const { device } = useDeviceContext();
+  const isMobile = device === 'PHONE';
+  const isTablet = device === 'TABLET';
+  const isDesktop = device === 'DESKTOP';
   const [drawer, setDrawer] = useState(false);
-  const [sheet, setSheet] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const counts = useShellCounts();
-
-  useEffect(() => {
-    const onPrefs = () => setCollapsed(localStorage.getItem('atlas.nav.collapsed') === '1');
-    window.addEventListener('atlas:prefs', onPrefs);
-    return () => window.removeEventListener('atlas:prefs', onPrefs);
-  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -590,22 +386,16 @@ export default function AppShell() {
         e.preventDefault();
         setPaletteOpen(o => !o);
       }
-      if (e.key === 'Escape') { setPaletteOpen(false); setDrawer(false); setSheet(false); }
+      if (e.key === 'Escape') { setPaletteOpen(false); setDrawer(false); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = drawer || sheet ? 'hidden' : '';
+    document.body.style.overflow = drawer ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
-  }, [drawer, sheet]);
-
-  const toggleCollapsed = () => setCollapsed(c => {
-    const n = !c;
-    localStorage.setItem('atlas.nav.collapsed', n ? '1' : '0');
-    return n;
-  });
+  }, [drawer]);
 
   const onSignOut = () => { signOut(); window.location.hash = '/'; };
 
@@ -631,10 +421,11 @@ export default function AppShell() {
   return (
     <div className="relative min-h-screen bg-paper text-ink flex">
       <div className="shell-backdrop" aria-hidden="true" />
-      <Rail collapsed={collapsed} onToggle={toggleCollapsed} counts={counts} />
+      {isDesktop && <DesktopShell counts={counts} />}
+      {isTablet && <TabletShell counts={counts} />}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
         <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} />
-        <main className={`flex-1 overflow-y-auto px-4 sm:px-6 pt-5 ${role === 'field_sales' ? 'pb-28 lg:pb-5' : 'pb-5'}`}>
+        <main className={`flex-1 overflow-y-auto px-4 sm:px-6 pt-5 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-5'}`}>
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>
               {body}
@@ -642,12 +433,13 @@ export default function AppShell() {
           </div>
         </main>
       </div>
-      <Drawer open={drawer} onClose={() => setDrawer(false)} counts={counts} />
-      {role === 'field_sales' && (
+      {isMobile ? (
         <>
-          <MobileTabBar current={view.page} counts={counts} onMore={() => setDrawer(true)} />
-          <MobileQuickActions open={sheet} onToggle={() => setSheet(s => !s)} />
+          <MobileShell current={view.page} counts={counts} onMore={() => setDrawer(true)} />
+          <Drawer open={drawer} onClose={() => setDrawer(false)} />
         </>
+      ) : (
+        <Drawer open={drawer} onClose={() => setDrawer(false)} />
       )}
       <Palette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>

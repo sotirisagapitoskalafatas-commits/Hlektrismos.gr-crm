@@ -4,6 +4,16 @@
 @tailwind utilities;
 
 :root {
+  /* Safe-area insets (populated by browsers on notched devices) */
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+
+  /* Touch-optimization: set to 1 on coarse pointers via media query */
+  --touch: 0;
+  --tap-highlight: rgba(59, 130, 246, 0.18);
+
   --bg: #ffffff;
   --bg-2: #f4f8fc;
   --surface: rgba(0, 71, 160, 0.03);
@@ -2511,3 +2521,51 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 }
 @keyframes hlk-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(9px) } }
 @keyframes hlk-glow { 0%,100% { opacity:.55 } 50% { opacity: 1 } }
+
+/* ============================================================
+   Multi-device responsive foundation
+   ============================================================ */
+
+/* Coarse pointers (touch) → larger tap targets + ripple highlight */
+@media (pointer: coarse) {
+  :root { --touch: 1; }
+  .nav-leaf, .btn, button, [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: var(--tap-highlight);
+  }
+}
+
+/* Fine pointer → no tap flash */
+@media (hover: hover) {
+  :root { --hover: 1; }
+}
+
+html { height: 100%; }
+
+body {
+  min-height: 100%;
+  overscroll-behavior-x: none;
+  height: 100dvh;
+}
+
+/* Notched-device content insets */
+.safe-top    { padding-top: var(--sat); }
+.safe-bottom { padding-bottom: var(--sab); }
+.safe-left   { padding-left: var(--sal); }
+.safe-right  { padding-right: var(--sar); }
+
+/* Prevent double-tap zoom on interactive elements in the CRM shell */
+#root button, #root a { touch-action: manipulation; }
+
+/* Keyboard focus visibility (desktop) */
+@media (hover: hover) {
+  #root :focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion: kill big anim loops inside the shell */
+@media (prefers-reduced-motion: reduce) {
+  #root .animate-fadein, #root .animate-fadein-up { animation: none !important; }
+}

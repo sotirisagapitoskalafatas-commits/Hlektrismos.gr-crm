@@ -4,13 +4,12 @@ import {
   ChevronDown, Check, Lock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import ChatBot from '@/components/ChatBot';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
 
 /* ─── 3D tilt cursor hook ─────────────────────────────────────── */
-function useTilt() {
-  const ref = useRef<HTMLDivElement>(null);
-  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+function useTilt<T extends HTMLElement = HTMLDivElement>() {
+  const ref = useRef<T>(null);
+  const onMove = (e: React.MouseEvent<T>) => {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -394,7 +393,7 @@ export default function LandingPage() {
 
   const headerRef = useRef<HTMLElement>(null);
   const fTilts = features.map(() => useTilt());
-  const gTilts = galleryCards.map(() => useTilt());
+  const gTilts = galleryCards.map(() => useTilt<HTMLAnchorElement>());
   const sTilts = serviceCards.map(() => useTilt());
   const cTilt = useTilt();
 
@@ -813,8 +812,6 @@ export default function LandingPage() {
           </span>
         </div>
       </footer>
-
-      <ChatBot />
     </div>
   );
 }

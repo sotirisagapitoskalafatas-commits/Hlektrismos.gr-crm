@@ -7,17 +7,18 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
+import type { PageKey } from '@/lib/roles';
 import {
   Briefcase, Compass, Home, Map, MoreHorizontal, Plus, Route, X,
 } from 'lucide-react';
 
 type Counts = { leads: number; followups: number; backoffice: number };
 
-const TABS = [
-  { page: 'home' as const,      label: 'Αρχική',     icon: Home },
-  { page: 'cases' as const,     label: 'Cases',      icon: Briefcase },
-  { page: 'myday' as const,     label: 'Ημέρα μου',  icon: Compass },
-  { page: 'map' as const,       label: 'Χάρτης',     icon: Map },
+const TABS: { page: PageKey; label: string; icon: typeof Home; badge?: keyof Counts }[] = [
+  { page: 'home',      label: 'Αρχική',     icon: Home },
+  { page: 'cases',     label: 'Cases',      icon: Briefcase },
+  { page: 'myday',     label: 'Ημέρα μου',  icon: Compass, badge: 'followups' },
+  { page: 'map',       label: 'Χάρτης',     icon: Map },
 ];
 
 function BottomTabBar({ current, counts, onMore }: {
@@ -32,12 +33,18 @@ function BottomTabBar({ current, counts, onMore }: {
       <div className="grid grid-cols-5">
         {TABS.map(t => {
           const active = current === t.page;
+          const b = t.badge ? counts[t.badge] : 0;
           return (
             <button key={t.page} onClick={() => go(t.page)}
               aria-current={active ? 'page' : undefined}
               className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? 'text-brand-600' : 'text-ink/50'}`}>
               <span className="relative">
                 <t.icon className="w-5 h-5" />
+                {b > 0 && (
+                  <span className="absolute -top-1 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-bad-600 text-white text-[9px] font-semibold flex items-center justify-center">
+                    {b > 9 ? '9+' : b}
+                  </span>
+                )}
               </span>
               {t.label}
             </button>

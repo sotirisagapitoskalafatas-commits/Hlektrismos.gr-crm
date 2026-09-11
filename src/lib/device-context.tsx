@@ -42,13 +42,15 @@ function getDeviceClass(w: number): DeviceClass {
 function getAppContext(): AppContext {
   if (typeof window === 'undefined') return 'BROWSER';
   // Capacitor native
+  interface CapacitorLike { isNativePlatform?: () => boolean }
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if ((window as any).Capacitor?.isNativePlatform?.()) return 'CAPACITOR';
+    const cap = (window as unknown as { Capacitor?: CapacitorLike }).Capacitor;
+    if (cap?.isNativePlatform?.()) return 'CAPACITOR';
   } catch { /* ignore */ }
   // PWA standalone
   if (window.matchMedia('(display-mode: standalone)').matches) return 'PWA';
-  if ((navigator as any).standalone === true) return 'PWA';
+  const nav = navigator as unknown as { standalone?: boolean };
+  if (nav.standalone === true) return 'PWA';
   return 'BROWSER';
 }
 

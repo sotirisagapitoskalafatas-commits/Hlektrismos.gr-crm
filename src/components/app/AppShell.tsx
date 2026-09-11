@@ -13,7 +13,7 @@ import {
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, ChevronDown, CircleHelp, LogOut, Menu, Search,
+  Bell, ChevronDown, CircleHelp, LogOut, Menu, Plus, Search,
   SlidersHorizontal, UserCircle, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';

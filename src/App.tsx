@@ -7,6 +7,7 @@ import { ToastProvider } from '@/lib/toast';
 import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/components/LoginPage';
 import AppShell from '@/components/app/AppShell';
+import { JarvisWidget } from '@/components/jarvis/JarvisWidget';
 import AboutPage from '@/pages/AboutPage';
 import ServicesPage from '@/pages/ServicesPage';
 import EnergyPage from '@/pages/EnergyPage';
@@ -73,6 +74,7 @@ export default function App() {
         <NavProvider>
           <ToastProvider>
             <AppContent />
+            <JarvisWidget />
           </ToastProvider>
         </NavProvider>
       </AuthProvider>

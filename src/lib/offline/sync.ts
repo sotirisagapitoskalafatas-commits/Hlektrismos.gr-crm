@@ -1,4 +1,4 @@
-import { checkInVisit, checkOutVisit } from '@/lib/api';
+import { fieldCheckin, fieldCheckout } from '@/lib/api';
 import { listQueue, removeQueued } from './queue';
 
 export async function flushQueue(): Promise<{ done: number; failed: number }> {
@@ -9,10 +9,12 @@ export async function flushQueue(): Promise<{ done: number; failed: number }> {
     try {
       if (item.kind === 'check_in') {
         const p = item.payload as { visitId: string; coords?: { lat: number; lng: number; accuracy?: number } };
-        await checkInVisit(p.visitId, p.coords);
+        const res = await fieldCheckin(p.visitId, p.coords);
+        if (!res.accepted && res.code !== 'IDEMPOTENT') throw new Error(res.message ?? 'OUTSIDE_RADIUS');
       } else if (item.kind === 'check_out') {
         const p = item.payload as { visitId: string; coords?: { lat: number; lng: number; accuracy?: number }; notes?: string };
-        await checkOutVisit(p.visitId, p.coords, p.notes);
+        const res = await fieldCheckout(p.visitId, p.coords, p.notes);
+        if (!res.accepted && res.code !== 'IDEMPOTENT') throw new Error(res.message ?? 'OUTSIDE_RADIUS');
       } else {
         removeQueued(item.id);
         continue;

@@ -129,7 +129,7 @@ export function createMaplibreProvider(): MapProvider {
         onMarkerClick?.(hit.dataset.id);
         return;
       }
-      opts?.onMapClick?.();
+      opts?.onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     });
     await new Promise<void>(resolve => {
       if (map?.loaded()) { resolve(); return; }

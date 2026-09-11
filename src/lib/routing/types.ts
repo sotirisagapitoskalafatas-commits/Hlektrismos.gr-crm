@@ -19,7 +19,7 @@ export type RoutePlan = {
   totalDistanceMeters: number;
   totalDurationSeconds: number;
   polyline?: MapCoordinate[];
-  source: 'ors' | 'haversine';
+  source: 'osrm' | 'ors' | 'haversine';
   estimated: boolean;
   error?: string | null;
 };

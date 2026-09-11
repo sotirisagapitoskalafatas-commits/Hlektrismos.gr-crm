@@ -14,7 +14,7 @@ import { SERVICES, can } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import {
   Case, CaseDocument, CaseVisit, FollowUp, addActivity, addDocument,
-  checkInVisit, checkOutVisit, fetchCases, fetchDocuments, fetchFollowUps,
+  fieldCheckin, fieldCheckout, fetchCases, fetchDocuments, fetchFollowUps,
   fetchVisits, getDocumentUrl, uploadDocumentFile,
 } from '@/lib/api';
 import { Btn, Card, EmptyState, Micro, Spinner, StagePill, fmtTime, isToday, timeUntil, todayLabel } from '@/lib/ui';
@@ -295,13 +295,13 @@ export default function FieldModePage() {
       setQueued(countQueue());
       return;
     }
-    const ok = await checkInVisit(v.id, coords);
+    const res = await fieldCheckin(v.id, coords);
     setBusyId(null);
-    if (ok) {
-      toast(coords ? `Check In ✓ (ακρίβεια ±${coords.accuracy ?? '?'} μ)` : 'Check In ✓', 'ok');
+    if (res.accepted || res.code === 'IDEMPOTENT') {
+      toast(res.code === 'IDEMPOTENT' ? res.message ?? 'Έχει ήδη γίνει Check In.' : (res.message ?? `Check In ✓${coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : ''}`), 'ok');
       await load();
     } else {
-      toast('Το Check In απέτυχε. Προσπαθήστε ξανά.', 'bad');
+      toast(res.message ?? 'Το Check In δεν έγινε αποδεκτό.', 'warn');
     }
   };
 
@@ -317,14 +317,14 @@ export default function FieldModePage() {
       setQueued(countQueue());
       return;
     }
-    const ok = await checkOutVisit(v.id, coords, note);
+    const res = await fieldCheckout(v.id, coords, note);
     setBusyId(null);
     setNotes('');
-    if (ok) {
-      toast('Check Out ✓ — Καλή συνέχεια!', 'ok');
+    if (res.accepted || res.code === 'IDEMPOTENT') {
+      toast(res.message ?? 'Check Out ✓ — Καλή συνέχεια!', 'ok');
       await load();
     } else {
-      toast('Το Check Out απέτυχε. Προσπαθήστε ξανά.', 'bad');
+      toast(res.message ?? 'Το Check Out απέτυχε.', 'bad');
     }
   };
 

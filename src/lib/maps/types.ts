@@ -14,7 +14,7 @@ export type MapProviderOpts = {
   center?: MapCoordinate;
   zoom?: number;
   onMarkerClick?: (id: string) => void;
-  onMapClick?: () => void;
+  onMapClick?: (coord: MapCoordinate) => void;
 };
 
 export interface MapProvider {

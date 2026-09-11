@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { applyCanonicalLabels, loadCatalog, resolveProductId, resolveProviderId } from './catalog';
 import { ROLES } from './roles';
 import type { Role, Stage } from './roles';
+import type { MapCoordinate } from './maps/types';
 
 export type Customer = {
   id: string;
@@ -171,6 +172,11 @@ export type Lead = {
   property_type: string | null;
   status: string | null;
   source: string | null;
+  lat: number | null;
+  lng: number | null;
+  location_source: string | null;
+  location_confidence: string | null;
+  address: string | null;
   campaign_id: string | null;
   campaign_name: string | null;
   source_label: string | null;
@@ -935,6 +941,125 @@ export async function markNotificationsRead(): Promise<void> {
     .update({ read_at: new Date().toISOString() })
     .eq('user_id', profile.id)
     .is('read_at', null);
+}
+
+/* ---------------- Field Sales — server-validated check-in / check-out ---------------- */
+export type FieldCheckinResult = {
+  accepted: boolean;
+  code: 'INSIDE_RADIUS' | 'OUTSIDE_RADIUS' | 'GPS_UNCERTAIN' | 'NO_TARGET' | 'NO_VISIT' | 'IDEMPOTENT';
+  visitId?: string;
+  caseId?: string;
+  message?: string;
+  distanceMeters?: number;
+  radiusM?: number;
+  accuracyM?: number;
+  status?: string;
+  already?: boolean;
+};
+
+export async function fieldCheckin(
+  visitId: string,
+  coords?: { lat: number; lng: number; accuracy?: number },
+  opts?: { radius_m?: number; notes?: string },
+): Promise<FieldCheckinResult> {
+  if (!supabase) return { accepted: false, code: 'NO_VISIT', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.rpc('field_checkin', {
+    p_visit_id: visitId,
+    p_lat: coords?.lat ?? null,
+    p_lng: coords?.lng ?? null,
+    p_accuracy_m: coords?.accuracy ?? null,
+    p_radius_m: opts?.radius_m ?? null,
+    p_notes: opts?.notes ?? '',
+  });
+  if (error) { logError('fieldCheckin', error); return { accepted: false, code: 'NO_VISIT', message: 'Σφάλμα κλήσης Check-in.' }; }
+  return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
+}
+
+export async function fieldCheckout(
+  visitId: string,
+  coords?: { lat: number; lng: number; accuracy?: number },
+  notes?: string,
+): Promise<FieldCheckinResult> {
+  if (!supabase) return { accepted: false, code: 'NO_VISIT', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.rpc('field_checkout', {
+    p_visit_id: visitId,
+    p_lat: coords?.lat ?? null,
+    p_lng: coords?.lng ?? null,
+    p_accuracy_m: coords?.accuracy ?? null,
+    p_notes: notes ?? '',
+  });
+  if (error) { logError('fieldCheckout', error); return { accepted: false, code: 'NO_VISIT', message: 'Σφάλμα κλήσης Check-out.' }; }
+  return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
+}
+
+/* Combine cases + customers + leads into a unified search set for Field Sales map.
+   Returns only records that already have real coordinates — never fabricates positions. */
+export type FieldTarget = {
+  entity_type: 'case' | 'customer' | 'lead';
+  id: string;
+  label: string;
+  sublabel: string;
+  position: MapCoordinate;
+  address?: string;
+  status?: string;
+  stage?: string;
+  source?: string;
+};
+
+function asLabel(c: { title?: string; customer?: { full_name?: string } | null; full_name?: string; client_name?: string; first_name?: string; last_name?: string }): string {
+  return c.title || c.customer?.full_name || c.full_name || c.client_name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Χωρίς τίτλο';
+}
+
+export async function fetchFieldTargets(search?: string): Promise<FieldTarget[]> {
+  if (!supabase) return [];
+  const [cases, customers, leads] = await Promise.all([
+    supabase
+      .from('cases')
+      .select('id, title, lat, lng, address, location, current_stage, customer:customers(full_name)')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null),
+    supabase
+      .from('customers')
+      .select('id, full_name, lat, lng, address, phone')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null),
+    supabase
+      .from('leads')
+      .select('id, full_name, client_name, first_name, last_name, lat, lng, address, status, source')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null),
+  ]);
+
+  const results: FieldTarget[] = [
+    ...(cases.data ?? [])
+      .map(c => ({ entity_type: 'case' as const, id: c.id, label: asLabel(c as { title?: string; customer?: { full_name?: string } | null; full_name?: string; client_name?: string; first_name?: string; last_name?: string }), sublabel: (c as { customer?: { full_name?: string } | null }).customer?.full_name ?? '', position: { lat: c.lat as number, lng: c.lng as number }, address: c.address ?? undefined, stage: c.current_stage ?? undefined })),
+    ...(customers.data ?? [])
+      .filter(c => !cases.data?.some(cs => cs.customer && (cs.customer as { full_name: string }).full_name === c.full_name))
+      .map(c => ({ entity_type: 'customer' as const, id: c.id, label: c.full_name, sublabel: c.phone ?? '', position: { lat: c.lat as number, lng: c.lng as number }, address: c.address ?? undefined })),
+    ...(leads.data ?? [])
+      .map(l => ({ entity_type: 'lead' as const, id: l.id, label: asLabel(l as { title?: string; customer?: { full_name?: string } | null; full_name?: string; client_name?: string; first_name?: string; last_name?: string }), sublabel: l.status ?? '', position: { lat: l.lat as number, lng: l.lng as number }, address: l.address ?? undefined, status: l.status ?? undefined, source: l.source ?? undefined })),
+  ];
+
+  if (search) {
+    const s = search.toLowerCase();
+    return results.filter(t =>
+      t.label.toLowerCase().includes(s) ||
+      t.sublabel.toLowerCase().includes(s) ||
+      (t.address ?? '').toLowerCase().includes(s),
+    );
+  }
+  return results;
+}
+
+/* Write coordinates to a lead row (from geocoded map pin). */
+export async function updateLeadLocation(leadId: string, coords: { lat: number; lng: number }, source: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('leads')
+    .update({ lat: coords.lat, lng: coords.lng, location_source: source, location_confidence: source === 'user' ? 'exact' : 'approximate' })
+    .eq('id', leadId);
+  if (error) { logError('updateLeadLocation', error); return false; }
+  return true;
 }
 
 /* ---------------- Leads (existing table) ---------------- */

@@ -100,7 +100,7 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
           <div className="px-5 pb-2 flex items-center gap-2 flex-wrap">
             <span className="pill bg-ok-100 text-ok-600">{formatDistance(plan.totalDistanceMeters / 1000)}</span>
             <span className="pill bg-brand-100 text-brand-600">{formatDuration(plan.totalDurationSeconds)}</span>
-            <span className="pill bg-ink/10 text-ink/70">{plan.estimated ? 'Εκτίμηση ευθείας γραμμής' : 'openrouteservice'}</span>
+            <span className="pill bg-ink/10 text-ink/70">{plan.source === 'osrm' ? 'OSRM' : plan.source === 'ors' ? 'openrouteservice' : 'Εκτίμηση ευθείας γραμμής'}</span>
           </div>
           {plan.estimated && (
             <p className="px-5 pb-2 text-[11px] text-warn-600">

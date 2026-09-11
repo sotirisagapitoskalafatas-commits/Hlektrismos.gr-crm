@@ -992,6 +992,48 @@ export async function fieldCheckout(
   return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
 }
 
+/* ---------------- Field Sales — travel metrics (slice 8) ---------------- */
+export type FieldMetricsDay = {
+  day: string;
+  user_id: string;
+  full_name: string;
+  checkins: number;
+  accepted: number;
+  visits: number;
+  distance_km: number;
+  travel_h: number;
+};
+
+export type FieldMetricsTotals = {
+  checkins: number;
+  accepted: number;
+  visits: number;
+  distance_km: number;
+  travel_h: number;
+  active_days: number;
+};
+
+export type FieldMetrics = {
+  forbidden?: boolean;
+  days: FieldMetricsDay[];
+  totals: FieldMetricsTotals;
+};
+
+export const EMPTY_FIELD_METRICS: FieldMetrics = {
+  days: [],
+  totals: { checkins: 0, accepted: 0, visits: 0, distance_km: 0, travel_h: 0, active_days: 0 },
+};
+
+export async function fetchFieldSalesMetrics(p_user_id?: string, p_days = 30): Promise<FieldMetrics> {
+  if (!supabase) return EMPTY_FIELD_METRICS;
+  const { data, error } = await supabase.rpc('field_sales_metrics', {
+    p_user_id: p_user_id ?? null,
+    p_days,
+  });
+  if (error) { logError('fieldSalesMetrics', error); return EMPTY_FIELD_METRICS; }
+  return (data as FieldMetrics) ?? EMPTY_FIELD_METRICS;
+}
+
 /* Combine cases + customers + leads into a unified search set for Field Sales map.
    Returns only records that already have real coordinates — never fabricates positions. */
 export type FieldTarget = {

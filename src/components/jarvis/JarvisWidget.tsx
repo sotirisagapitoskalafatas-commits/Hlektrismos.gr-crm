@@ -118,40 +118,42 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
   };
 
   return (
-    <div ref={wrapRef} className="jv-dock"
-      style={{ left: pos.x, top: pos.y }}
-      onPointerDown={e => {
-        drag.start();
-        moved.current = false;
-        lastPtr.current = { x: e.clientX, y: e.clientY };
-        transition('dragging');
-      }}
-      onPointerMove={e => {
-        if (drag.dragging) {
-          const p = lastPtr.current;
-          if (p && (Math.abs(e.clientX - p.x) > 4 || Math.abs(e.clientY - p.y) > 4)) moved.current = true;
-          drag.move(e.clientX, e.clientY);
-        }
-      }}
-      onPointerUp={() => { drag.end(); transition(open ? 'open' : 'idle'); }}
-      onPointerLeave={() => { drag.end(); if (!open) transition('idle'); }}
-      data-state={state}>
-      {/* FAB (ring + mascot) */}
-      <button
-        className={`jv-fab ${open ? 'jv-fab-open' : ''}`}
-        aria-label={open ? 'Κλείσιμο JARVIS' : 'Άνοιγμα JARVIS'}
-        aria-expanded={open}
-        onMouseEnter={() => { if (!open && !drag.dragging) transition('hover'); }}
-        onMouseLeave={() => { if (!open && !drag.dragging) transition('idle'); }}
-        onClick={toggle}
-        style={{ cursor: drag.dragging ? 'grabbing' : 'grab' }}>
-        <JarvisRing state={state} pulse={pulse} />
-        <div className="jv-fab-inner">
-          <JarvisMascot gaze={gaze} blink={blink} state={state} />
-        </div>
-      </button>
+    <>
+      <div ref={wrapRef} className="jv-dock"
+        style={{ left: pos.x, top: pos.y }}
+        onPointerDown={e => {
+          drag.start();
+          moved.current = false;
+          lastPtr.current = { x: e.clientX, y: e.clientY };
+          transition('dragging');
+        }}
+        onPointerMove={e => {
+          if (drag.dragging) {
+            const p = lastPtr.current;
+            if (p && (Math.abs(e.clientX - p.x) > 4 || Math.abs(e.clientY - p.y) > 4)) moved.current = true;
+            drag.move(e.clientX, e.clientY);
+          }
+        }}
+        onPointerUp={() => { drag.end(); transition(open ? 'open' : 'idle'); }}
+        onPointerLeave={() => { drag.end(); if (!open) transition('idle'); }}
+        data-state={state}>
+        {/* FAB (ring + mascot) — NOT the panel; dragging can't fight the chat. */}
+        <button
+          className={`jv-fab ${open ? 'jv-fab-open' : ''}`}
+          aria-label={open ? 'Κλείσιμο JARVIS' : 'Άνοιγμα JARVIS'}
+          aria-expanded={open}
+          onMouseEnter={() => { if (!open && !drag.dragging) transition('hover'); }}
+          onMouseLeave={() => { if (!open && !drag.dragging) transition('idle'); }}
+          onClick={toggle}
+          style={{ cursor: drag.dragging ? 'grabbing' : 'grab' }}>
+          <JarvisRing state={state} pulse={pulse} />
+          <div className="jv-fab-inner">
+            <JarvisMascot gaze={gaze} blink={blink} state={state} />
+          </div>
+        </button>
+      </div>
 
-      {/* Panel */}
+      {/* Panel — sibling of the dock, always clamped inside the viewport. */}
       {open && (
         <div className="jv-panel" role="dialog" aria-label="JARVIS βοηθός"
           style={panelStyle(pos, FAB.w, FAB.h)}>
@@ -202,42 +204,51 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
           </form>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 const PANEL_W = 320;
 const PANEL_H = 440;
+const PANEL_GAP = 12;
 
+/* The panel is always fully inside the viewport. Horizontal: open on the
+   side of the FAB with room (otherwise pin to the edge). Vertical: open
+   below the FAB when there is room, above it otherwise, clamped top/bottom. */
 function panelStyle(pos: { x: number; y: number }, fabW: number, fabH: number): React.CSSProperties {
-  const right = Math.max(8, Math.min(16, window.innerWidth - (pos.x + fabW)));
-  const left = window.innerWidth - (pos.x + fabW) < 330
-    ? pos.x + fabW + 12
-    : undefined;
-  const below = pos.y > window.innerHeight - PANEL_H - 40;
-  const style: React.CSSProperties = {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const pw = Math.min(PANEL_W, vw - 24);
+  const ph = Math.min(PANEL_H, vh - 140);
+  const fabRight = pos.x + fabW;
+  const fabBottom = pos.y + fabH;
+
+  const fitsLeft = pos.x - PANEL_GAP - pw >= 8;
+  const fitsRight = fabRight + PANEL_GAP + pw <= vw - 8;
+  let left: number;
+  if (fitsLeft && fitsRight) left = pos.x > vw / 2 ? pos.x - PANEL_GAP - pw : fabRight + PANEL_GAP;
+  else if (fitsRight) left = fabRight + PANEL_GAP;
+  else if (fitsLeft) left = pos.x - PANEL_GAP - pw;
+  else left = vw - pw - 8;
+  left = Math.max(8, Math.min(left, vw - pw - 8));
+
+  const fitsAbove = pos.y - PANEL_GAP - ph >= 8;
+  const fitsBelow = fabBottom + PANEL_GAP + ph <= vh - 8;
+  let top: number;
+  if (fitsAbove && fitsBelow) top = pos.y > vh / 2 ? pos.y - PANEL_GAP - ph : fabBottom + PANEL_GAP;
+  else if (fitsAbove) top = pos.y - PANEL_GAP - ph;
+  else if (fitsBelow) top = fabBottom + PANEL_GAP;
+  else top = vh - ph - 8;
+  top = Math.max(8, Math.min(top, vh - ph - 8));
+
+  return {
     position: 'fixed',
-    width: PANEL_W,
-    maxWidth: 'calc(100vw - 24px)',
-    height: PANEL_H,
-    maxHeight: 'calc(100dvh - 140px)',
+    left,
+    top,
+    width: pw,
+    height: ph,
     zIndex: 99,
   };
-  if (left !== undefined) {
-    style.left = Math.min(left, window.innerWidth - 330);
-    style.right = undefined;
-  } else {
-    style.right = right;
-    delete style.left;
-  }
-  if (below) {
-    style.top = Math.max(8, pos.y + fabH + 12);
-    style.bottom = undefined;
-  } else {
-    style.bottom = Math.max(8, window.innerHeight - pos.y + 12);
-    style.top = undefined;
-  }
-  return style;
 }
 
 function statusLabel(s: JarvisState): string {

@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
+import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLES, can,
   findNav, flattenNav, navForRole, roleLabel,
@@ -13,7 +14,7 @@ import {
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, ChevronDown, CircleHelp, LogOut, Menu, Plus, Search,
+  Bell, ChevronDown, CircleHelp, Download, LogOut, Menu, Plus, Search,
   SlidersHorizontal, UserCircle, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';
@@ -159,6 +160,8 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
   const { notifs, unread, load } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
+  const { canInstall, install } = usePwaInstall();
+  const showInstall = canInstall && !isStandalone();
 
   const sim = role !== profile?.role;
   const nav = findNav(view.page);
@@ -193,6 +196,15 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
         <span>Γρήγορη αναζήτηση</span>
         <kbd className="micro bg-ink/5 rounded px-1 py-0.5">⌘K</kbd>
       </button>
+
+      {showInstall && (
+        <button onClick={() => void install()}
+          title="Εγκατάσταση εφαρμογής στον υπολογιστή σας"
+          className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-brand-600 text-white text-[12px] font-medium hover:bg-brand-700 transition-colors">
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Εγκατάσταση</span>
+        </button>
+      )}
 
       {/* Notifications */}
       <div className="relative">
@@ -396,6 +408,8 @@ export default function AppShell() {
     document.body.style.overflow = drawer ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [drawer]);
+
+  useEffect(() => { void cacheAppShell(); }, []);
 
   const onSignOut = () => { signOut(); window.location.hash = '/'; };
 

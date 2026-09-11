@@ -46,14 +46,14 @@ export default function TabletShell({ counts }: TabletShellProps) {
   });
 
   return (
-    <aside className={`glass-nav flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-56'}`}>
+    <aside className={`glass-nav flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-[220px]'}`}>
       {/* Brand */}
-      <div className={`flex items-center gap-2 h-14 shrink-0 border-b border-ink/5 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
+      <div className={`flex items-center gap-2 h-[60px] shrink-0 border-b border-ink/[0.06] ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
         <Logo size={collapsed ? 'sm' : 'md'} />
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-bold tracking-tight text-ink leading-none">ATLAS</div>
+              <div className="text-[13px] font-bold tracking-tight text-ink leading-none font-[var(--font-display)]">ATLAS</div>
             </div>
             <button onClick={toggleCollapsed} aria-label="Σύμπτυξη" className="text-ink/35 hover:text-ink p-1 rounded-md hover:bg-ink/5">
               <ChevronsLeft className="w-4 h-4" />
@@ -97,14 +97,14 @@ export default function TabletShell({ counts }: TabletShellProps) {
       </nav>
 
       {/* User */}
-      <div className={`shrink-0 border-t border-ink/5 py-3 ${collapsed ? 'flex justify-center' : 'px-3'}`}>
+      <div className={`shrink-0 border-t border-ink/[0.06] py-3 ${collapsed ? 'flex justify-center' : 'px-3'}`}>
         {collapsed ? (
-          <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold">
+          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold">
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold shrink-0">
               {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">

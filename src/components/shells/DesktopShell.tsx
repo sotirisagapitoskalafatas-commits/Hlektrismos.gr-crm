@@ -62,14 +62,14 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
   });
 
   return (
-    <aside id="shell-rail" className={`glass-nav hidden lg:flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-64'}`}>
+    <aside id="shell-rail" className={`glass-nav hidden lg:flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-[246px]'}`}>
       {/* Brand */}
-      <div className={`flex items-center gap-2.5 h-14 shrink-0 border-b border-ink/5 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
+      <div className={`flex items-center gap-2.5 h-[60px] shrink-0 border-b border-ink/[0.06] sticky top-0 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
         <Logo size={collapsed ? 'sm' : 'md'} />
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-bold tracking-tight text-ink leading-none">ATLAS CRM</div>
+              <div className="text-[13px] font-bold tracking-tight text-ink leading-none font-[var(--font-display)]">ATLAS CRM</div>
               <div className="micro text-ink/35 mt-1">Ηlektrismos.gr</div>
             </div>
             <button onClick={toggleCollapsed} title="Σύμπτυξη sidebar" aria-label="Σύμπτυξη sidebar"
@@ -116,14 +116,14 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
       </nav>
 
       {/* User footer */}
-      <div className={`shrink-0 border-t border-ink/5 py-3 ${collapsed ? 'flex justify-center px-0' : 'px-4'}`}>
+      <div className={`shrink-0 border-t border-ink/[0.06] py-3 ${collapsed ? 'flex justify-center px-0' : 'px-4'}`}>
         {collapsed ? (
-          <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold" aria-hidden="true">
+          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold" aria-hidden="true">
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </div>
         ) : (
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold shrink-0">
               {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">

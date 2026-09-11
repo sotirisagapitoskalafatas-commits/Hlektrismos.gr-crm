@@ -94,10 +94,10 @@ function Drawer({ open, onClose }: {
     <div className={`fixed inset-0 z-50 lg:hidden ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
       <div className={`absolute inset-0 bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
       <aside className={`glass-drawer absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] flex flex-col transition-transform duration-250 ${open ? 'translate-x-0' : '-translate-x-full'}`} aria-label="Πλοήγηση">
-        <div className="flex items-center gap-2.5 h-14 shrink-0 px-4 border-b border-ink/5">
+        <div className="flex items-center gap-2.5 h-[60px] shrink-0 px-4 border-b border-ink/[0.06]">
           <Logo size="md" />
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-bold tracking-tight text-ink leading-none">ATLAS CRM</div>
+            <div className="text-[13px] font-bold tracking-tight text-ink leading-none font-[var(--font-display)]">ATLAS CRM</div>
             <div className="micro text-ink/35 mt-1">Ηlektrismos.gr</div>
           </div>
           <button onClick={onClose} aria-label="Κλείσιμο μενού" className="text-ink/45 hover:text-ink p-1 rounded-md hover:bg-ink/5">
@@ -178,7 +178,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
   };
 
   return (
-    <header className="flex items-center gap-2.5 sm:gap-3 px-3 sm:px-6 h-14 border-b border-line bg-paper/80 backdrop-blur-sm shrink-0 z-30">
+    <header className="flex items-center gap-2.5 sm:gap-3 px-3 sm:px-6 h-[60px] border-b border-ink/[0.06] bg-white/70 backdrop-blur-xl backdrop-saturate-150 shrink-0 z-30 [box-shadow:0_2px_16px_rgba(15,23,42,0.05)]">
       <button className="lg:hidden text-ink/60 hover:text-ink p-1 rounded-md hover:bg-ink/5" onClick={onOpenDrawer} aria-label="Άνοιγμα μενού">
         <Menu className="w-4.5 h-4.5" />
       </button>
@@ -186,22 +186,28 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
       <div className="flex-1 min-w-0">
         <div className="micro text-ink/35 truncate leading-tight">{crumb.join(' / ')}</div>
         <div className="flex items-center gap-2">
-          <h1 className="text-[15px] font-semibold text-ink tracking-tight truncate leading-tight">{title}</h1>
-          {sim && <span className="pill bg-warn-100 text-warn-600">sim {roleLabel(role)}</span>}
+          <h1 className="text-[17px] font-bold text-ink tracking-tight truncate leading-tight font-[var(--font-display)]">{title}</h1>
+          {sim && <span className="pill bg-brand-500/10 text-brand-500">sim {roleLabel(role)}</span>}
         </div>
       </div>
 
       <button onClick={onOpenPalette}
-        className="hidden sm:flex items-center gap-2 px-2.5 h-8 rounded-lg border border-line bg-white text-ink/45 hover:text-ink/80 hover:border-ink/30 text-[12px] transition-colors">
-        <Search className="w-3.5 h-3.5" />
-        <span>Γρήγορη αναζήτηση</span>
-        <kbd className="micro bg-ink/5 rounded px-1 py-0.5">⌘K</kbd>
+        className="flex items-center gap-2 h-9 px-3 rounded-[10px] bg-ink/[0.045] text-ink/45 hover:text-ink/75 hover:bg-ink/[0.07] text-[13px] transition-colors w-[280px] max-w-[38vw]">
+        <Search className="w-4 h-4 shrink-0" />
+        <span className="flex-1 text-left truncate">Αναζήτηση…</span>
+        <kbd className="micro bg-white/70 text-ink/40 rounded px-1.5 py-0.5 border border-ink/10">⌘K</kbd>
+      </button>
+
+      <button onClick={() => go('cases')}
+        className="flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] bg-brand-500 text-white text-[13px] font-semibold hover:brightness-110 transition-[filter] shadow-[0_4px_16px_rgba(0,102,204,0.28)]">
+        <Plus className="w-4 h-4" />
+        <span className="hidden md:inline">Νέο</span>
       </button>
 
       {showInstall && (
         <button onClick={() => void install()}
           title="Εγκατάσταση εφαρμογής στον υπολογιστή σας"
-          className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-brand-600 text-white text-[12px] font-medium hover:bg-brand-700 transition-colors">
+          className="flex items-center gap-1.5 h-9 px-2.5 rounded-[9px] bg-ink/[0.05] text-ink/70 text-[12px] font-medium hover:bg-ink/[0.09] transition-colors">
           <Download className="w-3.5 h-3.5" />
           <span className="hidden md:inline">Εγκατάσταση</span>
         </button>
@@ -240,10 +246,10 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
       </div>
 
       {/* Account menu */}
-      <div className="relative pl-2 border-l border-line">
+      <div className="relative pl-1.5">
         <button onClick={() => setAcctOpen(o => !o)} aria-label="Λογαριασμός" aria-haspopup="menu"
-          className="flex items-center gap-2 rounded-lg hover:bg-ink/5 px-1.5 py-1 transition-colors">
-          <span className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold">
+          className="flex items-center gap-2 rounded-full bg-ink/[0.045] hover:bg-ink/[0.08] pl-1 pr-2 py-1 transition-colors">
+          <span className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold ${sim ? 'bg-bad-500/10 text-bad-600' : 'bg-brand-500/12 text-brand-500'}`}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </span>
           <span className="hidden md:block text-left">
@@ -441,7 +447,7 @@ export default function AppShell() {
       {isTablet && <TabletShell counts={counts} />}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
         <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} />
-        <main className={`flex-1 overflow-y-auto px-4 sm:px-6 pt-5 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-5'}`}>
+        <main className={`flex-1 overflow-y-auto px-4 sm:px-7 pt-6 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-10'}`}>
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>
               {body}

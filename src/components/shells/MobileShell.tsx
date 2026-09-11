@@ -28,7 +28,7 @@ function BottomTabBar({ current, counts, onMore }: {
 
   return (
     <nav aria-label="Γρήγορη πλοήγηση"
-      className="fixed inset-x-0 bottom-0 z-40 glass-nav border-t border-ink/10"
+      className="fixed inset-x-0 bottom-0 z-40 bg-white/90 backdrop-blur-xl backdrop-saturate-150 border-t border-ink/[0.08]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="grid grid-cols-5">
         {TABS.map(t => {
@@ -37,7 +37,7 @@ function BottomTabBar({ current, counts, onMore }: {
           return (
             <button key={t.page} onClick={() => go(t.page)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? 'text-brand-600' : 'text-ink/50'}`}>
+              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? 'text-brand-500' : 'text-ink/45'}`}>
               <span className="relative">
                 <t.icon className="w-5 h-5" />
                 {b > 0 && (
@@ -51,7 +51,7 @@ function BottomTabBar({ current, counts, onMore }: {
           );
         })}
         <button onClick={onMore} aria-label="Περισσότερα"
-          className="flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium text-ink/50 transition-colors">
+          className="flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium text-ink/45 transition-colors">
           <MoreHorizontal className="w-5 h-5" />
           Περισσότερα
         </button>
@@ -73,8 +73,8 @@ function FieldQuickActions({ open, onToggle }: { open: boolean; onToggle: () => 
     <div aria-hidden={!open}>
       <button onClick={onToggle} aria-expanded={open}
         aria-label={open ? 'Κλείσιμο γρήγορων ενεργειών' : 'Γρήγορες ενέργειες'}
-        className="fixed right-4 z-50 w-14 h-14 rounded-full bg-brand-500 text-white shadow-cardlg flex items-center justify-center active:scale-95 transition-transform"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 78px)' }}>
+        className="fixed right-4 z-50 w-[52px] h-[52px] rounded-full bg-gradient-to-br from-brand-500 to-cyan-600 text-white shadow-[0_10px_26px_rgba(0,102,204,0.4)] flex items-center justify-center active:scale-95 transition-transform"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 84px)' }}>
         {open ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
       </button>
 

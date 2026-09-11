@@ -149,10 +149,10 @@ export function Spinner() {
 }
 
 export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const s = size === 'lg' ? 'w-9 h-9' : size === 'sm' ? 'w-6 h-6' : 'w-7 h-7';
+  const s = size === 'lg' ? 'w-9 h-9' : size === 'sm' ? 'w-6 h-6' : 'w-8 h-8';
   const zap = size === 'lg' ? 'w-5 h-5' : size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
   return (
-    <div className={`${s} rounded-lg bg-ink text-paper flex items-center justify-center shrink-0`}>
+    <div className={`${s} rounded-lg bg-gradient-to-br from-brand-500 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-[0_4px_16px_rgba(0,102,204,0.3)]`}>
       <Zap className={zap} fill="currentColor" strokeWidth={0} />
     </div>
   );

@@ -108,7 +108,7 @@ export default function ServicesPage() {
             <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
               <a href="#/services" onClick={() => setMenuOpen(false)} style={{ color: '#fff', fontWeight: 800 }}>Υπηρεσίες</a>
               <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-              <a href="#faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
+              <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
               <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
               <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
             </nav>
@@ -168,7 +168,7 @@ export default function ServicesPage() {
                 <a href="#/" style={footerLink}>Αρχική</a>
                 <a href="#about" style={footerLink}>Σχετικά με εμάς</a>
                 <a href="#/services" style={footerLink}>Λύσεις</a>
-                <a href="#faq" style={footerLink}>Συχνές Ερωτήσεις</a>
+                <a href="#/faq" style={footerLink}>Συχνές Ερωτήσεις</a>
                 <a href="#contact" style={footerLink}>Επικοινωνία</a>
               </div>
             </div>

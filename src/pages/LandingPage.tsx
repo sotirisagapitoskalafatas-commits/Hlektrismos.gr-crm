@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import {
   ArrowRight, Phone, Mail, Home, FileText, Upload, X, Menu,
-  ChevronDown, Check, Lock,
+  Lock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
@@ -518,7 +518,7 @@ export default function LandingPage() {
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
             <a href="#/services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
             <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-            <a href="#faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
+            <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
             <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
             <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
           </nav>
@@ -790,7 +790,7 @@ export default function LandingPage() {
               <a href="#about" className="footer-link">Σχετικά με εμάς</a>
               <a href="#/services" className="footer-link">Λύσεις</a>
               <a href="#faq" className="footer-link">Ενέργεια Σήμερα</a>
-              <a href="#faq" className="footer-link">Συχνές Ερωτήσεις</a>
+              <a href="#/faq" className="footer-link">Συχνές Ερωτήσεις</a>
               <a href="#contact" className="footer-link">Επικοινωνία</a>
             </div>
           </div>

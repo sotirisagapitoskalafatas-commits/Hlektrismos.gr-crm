@@ -55,7 +55,7 @@ export default function ContactPage() {
             <a href="#/about">Σχετικά</a>
             <a href="#/services">Υπηρεσίες</a>
             <a href="#/energy">Ενέργεια</a>
-            <a href="#/faq">FAQ</a>
+            <a href="#/faq">Συχνές Ερωτήσεις</a>
             <a href="#/contact">Επικοινωνία</a>
             <a href="#/login" className="nav-dashboard">Σύνδεση</a>
           </nav>

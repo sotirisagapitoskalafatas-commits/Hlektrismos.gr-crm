@@ -14,7 +14,8 @@ import {
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
   fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
-  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, uploadDocumentFile,
+  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, updateCase, updateCustomer,
+  uploadDocumentFile,
 } from '@/lib/api';
 import {
   Btn, Card, CardHeader, EmptyState, Field, IconBtn, Micro, Modal, Pill, Spinner, StagePill,
@@ -22,8 +23,8 @@ import {
 } from '@/lib/ui';
 import {
   ArrowLeft, CalendarClock, Camera, Check, CheckCircle2, ChevronRight, ClipboardCheck,
-  FileText, FolderOpen, LogIn, LogOut, Mail, MapPin, MessageCircle, MessageSquare, PenLine,
-  Phone, Plus, Send, StickyNote,
+  Crosshair, FileText, FolderOpen, LogIn, LogOut, Mail, MapPin, MessageCircle, MessageSquare,
+  Pencil, PenLine, Phone, Plus, Send, StickyNote, X,
 } from 'lucide-react';
 import type { IconType } from '@/lib/ui';
 
@@ -622,6 +623,58 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const [lead, setLead] = useState<Lead | null>(null);
   const [tab, setTab] = useState<'timeline' | 'followups' | 'docs' | 'visits' | 'offers' | 'signatures' | 'backoffice'>('timeline');
   const [stagePending, setStagePending] = useState<{ stage: Stage; note: string } | null>(null);
+  const [editContact, setEditContact] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', lat: '', lng: '',
+  });
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactLocating, setContactLocating] = useState(false);
+
+  const openContactEdit = () => {
+    setContactForm({
+      full_name: c?.customer?.full_name ?? '',
+      phone: c?.customer?.phone ?? '',
+      email: c?.customer?.email ?? '',
+      address: c?.address || c?.customer?.address || '',
+      city: c?.customer?.city ?? '',
+      postal_code: c?.customer?.postal_code ?? '',
+      lat: c?.lat ?? c?.customer?.lat ?? '',
+      lng: c?.lng ?? c?.customer?.lng ?? '',
+    });
+    setEditContact(true);
+  };
+
+  const fillContactLocation = async () => {
+    setContactLocating(true);
+    const coords = await getPosition();
+    setContactLocating(false);
+    if (coords) setContactForm(f => ({ ...f, lat: String(coords.lat), lng: String(coords.lng) }));
+  };
+
+  const saveContact = async () => {
+    if (!c) return;
+    setContactSaving(true);
+    if (c.customer_id) {
+      await updateCustomer(c.customer_id, {
+        full_name: contactForm.full_name?.trim() || c.customer?.full_name || '—',
+        phone: contactForm.phone || null,
+        email: contactForm.email || null,
+        address: contactForm.address || null,
+        city: contactForm.city || null,
+        postal_code: contactForm.postal_code || null,
+        lat: contactForm.lat === '' ? null : Number(contactForm.lat),
+        lng: contactForm.lng === '' ? null : Number(contactForm.lng),
+      });
+    }
+    await updateCase(c.id, {
+      address: contactForm.address ?? c.address,
+      lat: contactForm.lat === '' ? null : Number(contactForm.lat),
+      lng: contactForm.lng === '' ? null : Number(contactForm.lng),
+    });
+    setContactSaving(false);
+    setEditContact(false);
+    await reload();
+  };
 
   const reload = useCallback(async () => {
     const data = await fetchCase(caseId);
@@ -639,6 +692,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
 
   const allowedNext = STAGE_TRANSITIONS[c.current_stage] ?? [];
   const canChange = can(role, 'change_stage');
+  const canEditContact = can(role, 'edit_case');
   const isBO = can(role, 'create_application');
   const stages = STAGES.filter(s => s.id !== 'lost' && s.id !== 'cancelled');
   const stageIdx = stages.findIndex(s => s.id === c.current_stage);
@@ -654,7 +708,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   if (isBO) tabs.push({ id: 'backoffice', label: 'Back Office', icon: ClipboardCheck });
 
   return (
-    <div className="max-w-6xl space-y-4">
+    <div className="max-w-7xl space-y-4">
       {/* Header */}
       <div className="flex items-start gap-3 flex-wrap">
         <IconBtn title="Πίσω" onClick={() => go('cases')}>
@@ -685,28 +739,76 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       {/* Customer + Stage */}
       <div className="grid lg:grid-cols-3 gap-4">
         <Card>
-          <Micro>Πελάτης</Micro>
-          <div className="mt-2 space-y-1.5 text-[13px] text-ink/75">
-            <div className="font-medium text-ink">{c.customer?.full_name ?? '—'}</div>
-            {c.customer?.phone && <div>📞 {c.customer.phone}</div>}
-            {c.customer?.email && <div>✉️ {c.customer.email}</div>}
-            {(c.customer?.address || c.address) && <div>📍 {c.address || c.customer?.address}</div>}
-            {c.next_follow_up_at && (
-              <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${new Date(c.next_follow_up_at) < new Date() ? 'bg-bad-100 text-bad-600' : 'bg-warn-100 text-warn-600'}`}>
-                <span className="text-xs font-medium">Επόμενο follow up</span>
-                <span className="text-xs font-semibold">{fmtDateTime(c.next_follow_up_at)}</span>
-              </div>
-            )}
-            {lead && (
-              <div className="mt-3 pt-3 border-t border-line">
-                <div className="micro text-ink/40 mb-1">Προέλευση · Lead</div>
-                <div className="text-xs text-ink/70 space-y-0.5">
-                  <div>{leadSourceInfo(lead.source).emoji} {leadSourceInfo(lead.source).label}{lead.campaign_name ? ` · 📢 ${lead.campaign_name}` : ''}</div>
-                  <div>Καταχωρήθηκε {fmtDate(lead.created_at)}{lead.converted_at ? ` · μετατροπή ${fmtDate(lead.converted_at)}` : ''}</div>
-                </div>
-              </div>
+          <div className="flex items-center justify-between gap-2">
+            <Micro>Πελάτης</Micro>
+            {canEditContact && (
+              editContact
+                ? <button onClick={() => setEditContact(false)} title="Ακύρωση" className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors"><X className="w-3.5 h-3.5" /></button>
+                : <button onClick={openContactEdit} title="Επεξεργασία στοιχείων" className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
             )}
           </div>
+
+          {editContact ? (
+            <div className="mt-3 space-y-2.5">
+              <Field label="Ονοματεπώνυμο">
+                <input className="field" value={contactForm.full_name ?? ''} onChange={e => setContactForm(f => ({ ...f, full_name: e.target.value }))} />
+              </Field>
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                <Field label="Τηλέφωνο">
+                  <input type="tel" className="field" value={contactForm.phone ?? ''} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))} placeholder="69…" />
+                </Field>
+                <Field label="Email">
+                  <input type="email" className="field" value={contactForm.email ?? ''} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.gr" />
+                </Field>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                <Field label="Διεύθυνση">
+                  <input className="field" value={contactForm.address ?? ''} onChange={e => setContactForm(f => ({ ...f, address: e.target.value }))} placeholder="Οδός, αριθμός…" />
+                </Field>
+                <Field label="Πόλη">
+                  <input className="field" value={contactForm.city ?? ''} onChange={e => setContactForm(f => ({ ...f, city: e.target.value }))} />
+                </Field>
+              </div>
+              <Field label="Τοποθεσία (συντεταγμένες)">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <input type="number" step="any" className="field" value={contactForm.lat ?? ''} onChange={e => setContactForm(f => ({ ...f, lat: e.target.value }))} placeholder="lat" />
+                  <input type="number" step="any" className="field" value={contactForm.lng ?? ''} onChange={e => setContactForm(f => ({ ...f, lng: e.target.value }))} placeholder="lng" />
+                </div>
+                <button type="button" onClick={fillContactLocation} disabled={contactLocating}
+                  className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-600 hover:underline">
+                  <Crosshair className="w-3.5 h-3.5" /> {contactLocating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
+                </button>
+              </Field>
+              <div className="flex gap-2 pt-1">
+                <Btn onClick={saveContact} disabled={contactSaving || !contactForm.full_name?.trim()}>
+                  {contactSaving ? <Spinner /> : <Check className="w-3.5 h-3.5" />} Αποθήκευση
+                </Btn>
+                <Btn variant="ghost" onClick={() => setEditContact(false)}>Ακύρωση</Btn>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 space-y-1.5 text-[13px] text-ink/75">
+              <div className="font-medium text-ink">{c.customer?.full_name ?? '—'}</div>
+              {c.customer?.phone && <div>📞 {c.customer.phone}</div>}
+              {c.customer?.email && <div>✉️ {c.customer.email}</div>}
+              {(c.customer?.address || c.address) && <div>📍 {c.address || c.customer?.address}</div>}
+              {c.next_follow_up_at && (
+                <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${new Date(c.next_follow_up_at) < new Date() ? 'bg-bad-100 text-bad-600' : 'bg-warn-100 text-warn-600'}`}>
+                  <span className="text-xs font-medium">Επόμενο follow up</span>
+                  <span className="text-xs font-semibold">{fmtDateTime(c.next_follow_up_at)}</span>
+                </div>
+              )}
+              {lead && (
+                <div className="mt-3 pt-3 border-t border-line">
+                  <div className="micro text-ink/40 mb-1">Προέλευση · Lead</div>
+                  <div className="text-xs text-ink/70 space-y-0.5">
+                    <div>{leadSourceInfo(lead.source).emoji} {leadSourceInfo(lead.source).label}{lead.campaign_name ? ` · 📢 ${lead.campaign_name}` : ''}</div>
+                    <div>Καταχωρήθηκε {fmtDate(lead.created_at)}{lead.converted_at ? ` · μετατροπή ${fmtDate(lead.converted_at)}` : ''}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         <Card className="lg:col-span-2">
@@ -750,8 +852,8 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${tab === t.id ? 'bg-ink text-paper' : 'bg-white border border-line text-ink/55 hover:text-ink'}`}>
-            <t.icon className="w-3.5 h-3.5" /> {t.label}
+            className={`shrink-0 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-ink text-paper' : 'bg-white border border-line text-ink/55 hover:text-ink'}`}>
+            <t.icon className="w-4 h-4" /> {t.label}
           </button>
         ))}
       </div>

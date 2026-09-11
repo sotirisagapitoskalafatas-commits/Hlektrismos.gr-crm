@@ -317,6 +317,20 @@ export async function fetchCustomers(): Promise<Customer[]> {
   return (data ?? []) as Customer[];
 }
 
+/* Update a customer's contact / location fields (phone, email, address, city,
+   postal_code, lat/lng, notes, full_name, company). Whitelist only. */
+export async function updateCustomer(id: string, patch: Partial<Pick<Customer, 'full_name' | 'phone' | 'email' | 'company' | 'address' | 'city' | 'postal_code' | 'notes' | 'lat' | 'lng'>>): Promise<boolean> {
+  if (!supabase) return false;
+  const upd: Record<string, unknown> = {};
+  for (const k of ['full_name', 'phone', 'email', 'company', 'address', 'city', 'postal_code', 'notes', 'lat', 'lng'] as const) {
+    if (patch[k] !== undefined) upd[k] = patch[k] ?? null;
+  }
+  if (Object.keys(upd).length === 0) return true;
+  const { error } = await supabase.from('customers').update(upd).eq('id', id);
+  if (error) { logError('updateCustomer', error); return false; }
+  return true;
+}
+
 /* ---------------- Cases ---------------- */
 export async function createCase(input: {
   title: string;
@@ -1228,6 +1242,32 @@ export async function updateLeadStage(id: string, status: string): Promise<boole
   if (status === 'contacted' || status === 'qualified' || status === 'meeting') {
     await supabase.from('leads').update({ first_contact_user_id: profile?.id ?? null }).eq('id', id);
   }
+  return true;
+}
+
+/* Update a lead's contact / location fields (full_name, phone, email, address,
+   lat/lng, property_type, region, comments). Whitelist only. */
+export async function updateLead(id: string, patch: Partial<Pick<Lead, 'full_name' | 'phone' | 'email' | 'address' | 'lat' | 'lng' | 'property_type' | 'comments'>>): Promise<boolean> {
+  if (!supabase) return false;
+  const upd: Record<string, unknown> = {
+    first_name: null,
+    last_name: null,
+    client_name: null,
+  };
+  if (patch.full_name !== undefined) {
+    const parts = String(patch.full_name ?? '').trim().split(' ');
+    upd.full_name = patch.full_name ?? null;
+    upd.first_name = parts[0] ?? null;
+    upd.last_name = parts.slice(1).join(' ');
+    upd.client_name = patch.full_name;
+  }
+  for (const k of ['phone', 'email', 'address', 'lat', 'lng', 'property_type', 'comments'] as const) {
+    if (patch[k] !== undefined) upd[k] = patch[k] ?? null;
+  }
+  if (Object.keys(upd).filter(k => !['first_name', 'last_name', 'client_name'].includes(k)).length === 0
+      && patch.full_name === undefined) return true;
+  const { error } = await supabase.from('leads').update(upd).eq('id', id);
+  if (error) { logError('updateLead', error); return false; }
   return true;
 }
 

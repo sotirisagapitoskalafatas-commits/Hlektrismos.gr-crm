@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
-import { Lead, convertLeadToCase, createLead, fetchLeads, updateLeadStage } from '@/lib/api';
+import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLead, updateLeadStage } from '@/lib/api';
 import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
-import { ArrowRight, ExternalLink, Plus, Users } from 'lucide-react';
+import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Users } from 'lucide-react';
 
 const EMPTY_FORM = { full_name: '', phone: '', email: '', service_category: 'energy', source: 'inside_sales', property_type: '', campaign_name: '', comments: '' };
 
@@ -18,6 +18,46 @@ export default function LeadsPage() {
   const [tab, setTab] = useState<string>('new');
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editing, setEditing] = useState<Lead | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: '', phone: '', email: '', address: '', lat: '', lng: '', comments: '',
+  });
+  const [locating, setLocating] = useState(false);
+
+  const openEdit = (l: Lead) => {
+    setEditing(l);
+    setEditForm({
+      full_name: l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '',
+      phone: l.phone || '',
+      email: l.email || '',
+      address: l.address || '',
+      lat: l.lat ?? '',
+      lng: l.lng ?? '',
+      comments: l.comments || '',
+    });
+  };
+
+  const fillMyLocation = async () => {
+    setLocating(true);
+    const coords = await getPosition();
+    setLocating(false);
+    if (coords) setEditForm(f => ({ ...f, lat: String(coords.lat), lng: String(coords.lng) }));
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const ok = await updateLead(editing.id, {
+      full_name: editForm.full_name || null,
+      phone: editForm.phone || null,
+      email: editForm.email || null,
+      address: editForm.address || null,
+      lat: editForm.lat === '' ? null : Number(editForm.lat),
+      lng: editForm.lng === '' ? null : Number(editForm.lng),
+      comments: editForm.comments || null,
+    });
+    if (!ok) setErr('Αποτυχία ενημέρωσης lead.');
+    else { setEditing(null); await load(); }
+  };
 
   const load = useCallback(async () => {
     const list = await fetchLeads();
@@ -153,6 +193,10 @@ export default function LeadsPage() {
                   </span>
                   {isStaff && !converted && (
                     <>
+                      <button onClick={() => openEdit(l)} title="Επεξεργασία Lead"
+                        className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                       <select className="field !w-auto !py-1.5 text-xs" value={l.status ?? 'new'}
                         onChange={e => onStage(l, e.target.value)}>
                         {LEAD_STATUSES.filter(s => s.id !== 'converted').map(s => (
@@ -175,6 +219,42 @@ export default function LeadsPage() {
           </div>
         )}
       </Card>
+
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title="Επεξεργασία Lead" micro="Στοιχεία επικοινωνίας">
+        <div className="space-y-4">
+          <Field label="Ονοματεπώνυμο">
+            <input className="field" value={editForm.full_name ?? ''} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+          </Field>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Τηλέφωνο">
+              <input type="tel" className="field" value={editForm.phone ?? ''} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="69…" />
+            </Field>
+            <Field label="Email">
+              <input type="email" className="field" value={editForm.email ?? ''} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.gr" />
+            </Field>
+          </div>
+          <Field label="Διεύθυνση">
+            <input className="field" value={editForm.address ?? ''} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Οδός, αριθμός…" />
+          </Field>
+          <Field label="Τοποθεσία (γεωγραφικές συντεταγμένες)">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <input type="number" step="any" className="field" value={editForm.lat ?? ''} onChange={e => setEditForm(f => ({ ...f, lat: e.target.value }))} placeholder="lat" />
+              <input type="number" step="any" className="field" value={editForm.lng ?? ''} onChange={e => setEditForm(f => ({ ...f, lng: e.target.value }))} placeholder="lng" />
+            </div>
+            <button type="button" onClick={fillMyLocation} disabled={locating}
+              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-600 hover:underline">
+              <Crosshair className="w-3.5 h-3.5" /> {locating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
+            </button>
+          </Field>
+          <Field label="Σχόλια">
+            <textarea className="field" rows={2} value={editForm.comments ?? ''} onChange={e => setEditForm(f => ({ ...f, comments: e.target.value }))} />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <Btn variant="ghost" onClick={() => setEditing(null)}>Ακύρωση</Btn>
+          <Btn onClick={saveEdit} disabled={!editForm.full_name?.trim()}>Αποθήκευση</Btn>
+        </div>
+      </Modal>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Νέο Lead" micro="Χειροκίνητη εισαγωγή">
         <div className="space-y-4">

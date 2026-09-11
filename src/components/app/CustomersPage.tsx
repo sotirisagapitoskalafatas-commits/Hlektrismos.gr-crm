@@ -1,17 +1,66 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { SERVICES } from '@/lib/roles';
-import { Case, Customer, fetchCases, fetchCustomers } from '@/lib/api';
-import { Card, CardHeader, EmptyState, Micro, Pill, Spinner, StagePill, fmtDateTime, fmtMoney } from '@/lib/ui';
-import { ArrowUpRight, Briefcase as BriefcaseIcon, Globe as GlobeIcon, MapPin, Phone, Search, Send as SendIcon, UserRound, Users } from 'lucide-react';
+import { SERVICES, can } from '@/lib/roles';
+import { Case, Customer, fetchCases, fetchCustomers, getPosition, updateCustomer } from '@/lib/api';
+import { Btn, Card, CardHeader, EmptyState, Field, Micro, Pill, Spinner, StagePill, fmtDateTime, fmtMoney } from '@/lib/ui';
+import { ArrowUpRight, Briefcase as BriefcaseIcon, Check, Crosshair, Globe as GlobeIcon, MapPin, Pencil, Phone, Search, Send as SendIcon, UserRound, Users, X } from 'lucide-react';
 
 export default function CustomersPage() {
+  const { role } = useAuth();
   const { openCase } = useNav();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [editForm, setEditForm] = useState({
+    full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', lat: '', lng: '', notes: '',
+  });
+
+  const canEdit = can(role, 'edit_case');
+
+  const openEdit = useCallback((c: Customer) => {
+    setEditing(true);
+    setEditForm({
+      full_name: c.full_name ?? '',
+      phone: c.phone ?? '',
+      email: c.email ?? '',
+      address: c.address ?? '',
+      city: c.city ?? '',
+      postal_code: c.postal_code ?? '',
+      lat: c.lat ?? '',
+      lng: c.lng ?? '',
+      notes: c.notes ?? '',
+    });
+  }, []);
+
+  const fillMyLocation = async () => {
+    setLocating(true);
+    const coords = await getPosition();
+    setLocating(false);
+    if (coords) setEditForm(f => ({ ...f, lat: String(coords.lat), lng: String(coords.lng) }));
+  };
+
+  const saveEdit = async (id: string) => {
+    setSaving(true);
+    const ok = await updateCustomer(id, {
+      full_name: editForm.full_name?.trim() || 'Χωρίς όνομα',
+      phone: editForm.phone || null,
+      email: editForm.email || null,
+      address: editForm.address || null,
+      city: editForm.city || null,
+      postal_code: editForm.postal_code || null,
+      lat: editForm.lat === '' ? null : Number(editForm.lat),
+      lng: editForm.lng === '' ? null : Number(editForm.lng),
+      notes: editForm.notes ?? '',
+    });
+    setSaving(false);
+    if (ok) { setEditing(false); await load(); }
+  };
 
   const load = useCallback(async () => {
     const [cs, ks] = await Promise.all([fetchCustomers(), fetchCases({ includeDone: true, search: '' })]);
@@ -145,14 +194,65 @@ export default function CustomersPage() {
                       <div className="text-xs text-ink/50 truncate">{selected.city ?? '—'}{selected.postal_code ? ` ${selected.postal_code}` : ''}</div>
                     </div>
                     <Pill tone="gray">{fmtDateTime(selected.created_at)}</Pill>
+                    {canEdit && (
+                      editing
+                        ? <button onClick={() => setEditing(false)} title="Ακύρωση" className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors"><X className="w-3.5 h-3.5" /></button>
+                        : <button onClick={() => openEdit(selected)} title="Επεξεργασία" className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                    )}
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <InfoRow icon={Phone} label="Τηλέφωνο" value={selected.phone ?? '—'} />
-                    <InfoRow icon={SendIcon} label="Email" value={selected.email ?? '—'} />
-                    <InfoRow icon={MapPin} label="Διεύθυνση" value={selected.address ?? '—'} />
-                    <InfoRow icon={GlobeIcon} label="Τοποθεσία" value={selected.lat != null && selected.lng != null ? `${selected.lat.toFixed(4)}, ${selected.lng.toFixed(4)}` : '—'} />
-                  </div>
+                  {editing ? (
+                    <div className="mt-4 space-y-2">
+                      <Field label="Ονοματεπώνυμο">
+                        <input className="field" value={editForm.full_name ?? ''} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+                      </Field>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Field label="Τηλέφωνο">
+                          <input type="tel" className="field" value={editForm.phone ?? ''} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+                        </Field>
+                        <Field label="Email">
+                          <input type="email" className="field" value={editForm.email ?? ''} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                        </Field>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Field label="Διεύθυνση">
+                          <input className="field" value={editForm.address ?? ''} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+                        </Field>
+                        <Field label="Πόλη">
+                          <input className="field" value={editForm.city ?? ''} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+                        </Field>
+                      </div>
+                      <Field label="Ταχυδρομικός Κώδικας">
+                        <input className="field" value={editForm.postal_code ?? ''} onChange={e => setEditForm(f => ({ ...f, postal_code: e.target.value }))} />
+                      </Field>
+                      <Field label="Τοποθεσία (συντεταγμένες)">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="number" step="any" className="field" value={editForm.lat ?? ''} onChange={e => setEditForm(f => ({ ...f, lat: e.target.value }))} placeholder="lat" />
+                          <input type="number" step="any" className="field" value={editForm.lng ?? ''} onChange={e => setEditForm(f => ({ ...f, lng: e.target.value }))} placeholder="lng" />
+                        </div>
+                        <button type="button" onClick={fillMyLocation} disabled={locating}
+                          className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-600 hover:underline">
+                          <Crosshair className="w-3.5 h-3.5" /> {locating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
+                        </button>
+                      </Field>
+                      <Field label="Σημειώσεις">
+                        <textarea className="field" rows={2} value={editForm.notes ?? ''} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+                      </Field>
+                      <div className="flex gap-2 pt-1">
+                        <Btn onClick={() => saveEdit(selected.id)} disabled={saving || !editForm.full_name?.trim()}>
+                          {saving ? <Spinner /> : <Check className="w-3.5 h-3.5" />} Αποθήκευση
+                        </Btn>
+                        <Btn variant="ghost" onClick={() => setEditing(false)}>Ακύρωση</Btn>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <InfoRow icon={Phone} label="Τηλέφωνο" value={selected.phone ?? '—'} />
+                      <InfoRow icon={SendIcon} label="Email" value={selected.email ?? '—'} />
+                      <InfoRow icon={MapPin} label="Διεύθυνση" value={selected.address ?? '—'} />
+                      <InfoRow icon={GlobeIcon} label="Τοποθεσία" value={selected.lat != null && selected.lng != null ? `${selected.lat.toFixed(4)}, ${selected.lng.toFixed(4)}` : '—'} />
+                    </div>
+                  )}
 
                   {selected.notes && <p className="text-xs text-ink/50 mt-3 bg-ink/[0.03] rounded-lg px-3 py-2">{selected.notes}</p>}
 

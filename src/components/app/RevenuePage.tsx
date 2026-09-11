@@ -47,7 +47,7 @@ export default function RevenuePage() {
     }
     const funnel = STAGES
       .filter(s => perStage.has(s.id))
-      .map(s => ({ stage: (perStage.get(s.id) as { count: number; value: number }) }));
+      .map(s => ({ id: s.id, ...(perStage.get(s.id) as { count: number; value: number }) }));
     const offersTotal = offers.reduce((s, o) => s + (o.amount ?? 0), 0);
     const byStatus = offers.reduce<Record<string, number>>((acc, o) => {
       acc[o.status] = (acc[o.status] ?? 0) + (o.amount ?? 0);
@@ -113,15 +113,15 @@ export default function RevenuePage() {
             <CardHeader micro="Pipeline" title="Ανοικτά cases ανά στάδιο" />
             {funnel.length === 0 && <p className="text-xs text-ink/40 py-2">Κανένα ενεργό case.</p>}
             <div className="space-y-2">
-              {funnel.map(({ stage }) => (
-                <div key={stage.stage.id} className="rounded-xl border border-line bg-paper/50 px-3 py-2">
+              {funnel.map((st) => (
+                <div key={st.id} className="rounded-xl border border-line bg-paper/50 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium text-ink">{stageLabel(stage.stage.id)}</span>
-                    <span className="text-[13px] font-semibold text-ink">{fmtMoney(Math.round(stage.value))}</span>
+                    <span className="text-[13px] font-medium text-ink">{stageLabel(st.id)}</span>
+                    <span className="text-[13px] font-semibold text-ink">{fmtMoney(Math.round(st.value))}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 mt-0.5">
-                    <span className="micro text-ink/40">{STAGES.findIndex(s => s.id === stage.stage.id) + 1} / {STAGES.length}</span>
-                    <span className="pill bg-ink/[0.06] text-ink/60">· {stage.count} cases</span>
+                    <span className="micro text-ink/40">{STAGES.findIndex(s => s.id === st.id) + 1} / {STAGES.length}</span>
+                    <span className="pill bg-ink/[0.06] text-ink/60">· {st.count} cases</span>
                   </div>
                 </div>
               ))}

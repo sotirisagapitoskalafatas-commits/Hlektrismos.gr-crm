@@ -29,6 +29,9 @@ import CaseDetailPage from './CaseDetailPage';
 import FollowUpsPage from './FollowUpsPage';
 import LeadsPage from './LeadsPage';
 
+const MyWorkPage = lazy(() => import('./MyWorkPage'));
+const RevenuePage = lazy(() => import('./RevenuePage'));
+
 const CustomersPage = lazy(() => import('./CustomersPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const AccountPage = lazy(() => import('./AccountPage'));
@@ -446,6 +449,7 @@ export default function AppShell() {
   const body = (() => {
     switch (view.page) {
       case 'home': return <HomePage />;
+      case 'mywork': return <MyWorkPage />;
       case 'cases': return <CasesPage />;
       case 'case': return <CaseDetailPage caseId={view.caseId!} />;
       case 'followups': return <FollowUpsPage />;
@@ -456,6 +460,7 @@ export default function AppShell() {
       case 'backoffice': return <BackOfficePage />;
       case 'customers': return <CustomersPage />;
       case 'reports': return <ReportsPage />;
+      case 'revenue': return <RevenuePage />;
       case 'account': return <AccountPage />;
       case 'preferences': return <PreferencesPage />;
       case 'admin': return <SettingsPage />;

@@ -835,6 +835,35 @@ export async function fetchOffers(caseId: string): Promise<CaseOffer[]> {
   return (data ?? []) as CaseOffer[];
 }
 
+/* All offers with case + customer joined (Revenue control center). */
+export type RevenueOffer = {
+  id: string;
+  case_id: string;
+  offer_no: string;
+  amount: number;
+  status: string;
+  valid_until: string | null;
+  sent_at: string | null;
+  created_at: string;
+  case: {
+    id: string;
+    case_no: string;
+    title: string;
+    current_stage: string;
+    customer: { id: string; full_name: string } | null;
+  } | null;
+};
+
+export async function fetchAllOffers(): Promise<RevenueOffer[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('case_offers')
+    .select(`*, case:cases(id, case_no, title, current_stage, customer:customers(id, full_name))`)
+    .order('created_at', { ascending: false });
+  if (error) { logError('fetchAllOffers', error); return []; }
+  return (data ?? []) as RevenueOffer[];
+}
+
 export async function createOffer(caseId: string, input: { amount: number; notes?: string; valid_until?: string }): Promise<CaseOffer | null> {
   if (!supabase) return null;
   const profile = await ensureProfile();

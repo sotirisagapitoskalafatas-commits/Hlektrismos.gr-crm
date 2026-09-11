@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Building2, Bot, Map as MapIcon, Compass, Briefcase,
   CalendarDays, Gauge, Settings, Home, ChevronRight, Bell, Plus, Search,
   UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
-  UserCircle, SlidersHorizontal, Smartphone,
+  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet,
 } from 'lucide-react';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
@@ -177,8 +177,8 @@ export function leadStatusInfo(status?: string | null): { id: string; label: str
    optional Atlas accent. The shell renders this config. */
 export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
-  | 'home' | 'leads' | 'cases' | 'followups' | 'customers'
-  | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'admin'
+  | 'home' | 'mywork' | 'leads' | 'cases' | 'followups' | 'customers'
+  | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
   | 'account' | 'preferences';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice';
@@ -227,6 +227,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Home,
     children: [
       { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, page: 'home', roles: ALL, maturity: 'live' },
+      { key: 'mywork', label: 'My Work', icon: Inbox, page: 'mywork', roles: ALL, maturity: 'live' },
     ],
   },
   {
@@ -271,6 +272,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: BarChart3,
     children: [
       { key: 'reports', label: 'Reports', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
+      { key: 'revenue', label: 'Έσοδα', icon: Wallet, page: 'revenue', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
   {
@@ -315,6 +317,7 @@ export function categoryColor(page: PageKey | 'case'): string {
 
 export const PAGE_TITLES: Record<PageKey, string> = {
   home: 'Πίνακας Ελέγχου',
+  mywork: 'My Work',
   leads: 'Leads',
   cases: 'Cases',
   customers: 'Πελάτες',
@@ -324,6 +327,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   field: 'Λειτουργία Πεδίου',
   backoffice: 'Operations',
   reports: 'Reports',
+  revenue: 'Έσοδα',
   admin: 'Διαχείριση',
   account: 'Λογαριασμός',
   preferences: 'Προτιμήσεις',

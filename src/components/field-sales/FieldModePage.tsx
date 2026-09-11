@@ -21,7 +21,6 @@ import { Btn, Card, EmptyState, Micro, Spinner, StagePill, fmtTime, isToday, tim
 import { GEO_ERRORS, getCurrentLocation } from '@/lib/geo/location';
 import type { GeoErrorCode, UserLocation } from '@/lib/geo/location';
 import { distanceKm, durationMinutes, formatDistance } from '@/lib/geo/distance';
-import { openNavigation } from '@/lib/maps/navigate';
 import { createMap } from '@/lib/maps/map-provider';
 import type { MapCoordinate, MapMarkerData, MapProvider } from '@/lib/maps/types';
 import { enqueue, countQueue, isOnline } from '@/lib/offline/queue';
@@ -29,6 +28,7 @@ import { flushQueue } from '@/lib/offline/sync';
 import { useToast } from '@/lib/toast';
 import RoutePanel from '@/components/field-sales/RoutePanel';
 import type { RouteStopInput } from '@/components/field-sales/RoutePanel';
+import NavigationButton from '@/components/navigation/NavigationButton';
 import CaptureModal from '@/components/app/CaptureModal';
 import {
   CalendarClock, Camera, CheckCircle2, ChevronRight, Compass, FileText,
@@ -492,9 +492,9 @@ export default function FieldModePage() {
 
         <div className="grid grid-cols-2 gap-2">
           <Btn variant="brand" onClick={() => setStep(2)}><MapPin className="w-3.5 h-3.5" /> Χάρτης</Btn>
-          <Btn variant="outline" onClick={() => { const p = visitCoords(target); if (p) openNavigation(p, { label: target.case?.customer?.full_name ?? undefined }); }}>
-            <Navigation className="w-3.5 h-3.5" /> Οδηγίες
-          </Btn>
+          {visitCoords(target) && (
+            <NavigationButton destination={{ ...visitCoords(target)!, label: target.case?.customer?.full_name ?? undefined }} caseId={target.case_id ?? undefined} label="Οδηγίες" showSelector={false} />
+          )}
           <Btn variant="outline" onClick={() => setStep(3)}>Πελάτης</Btn>
           <Btn variant="outline" onClick={() => setStep(4)}>Case</Btn>
         </div>

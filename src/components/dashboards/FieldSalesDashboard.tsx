@@ -1,7 +1,7 @@
 import { useNav } from '@/lib/nav';
 import { Btn, Card, CardHeader, EmptyState, Pill, fmtDate, fmtTime, isToday } from '@/lib/ui';
-import { CalendarClock, Compass, Map, MapPin, Navigation, Route, Users } from 'lucide-react';
-import { openNavigation } from '@/lib/maps/navigate';
+import { CalendarClock, Compass, Map, MapPin, Route, Users } from 'lucide-react';
+import NavigationButton from '@/components/navigation/NavigationButton';
 import { CaseVisit } from '@/lib/api';
 import type { DashboardData } from './data';
 import { overdueFUs, todayFUs } from './data';
@@ -38,13 +38,6 @@ export default function FieldSalesDashboard({ d }: { d: DashboardData }) {
   const overdue = overdueFUs(followUps);
   const today = todayFUs(followUps);
   const todayVisits = visits.filter(v => v.scheduled_at && isToday(v.scheduled_at) && v.status !== 'cancelled');
-
-  const openNav = (v: CaseVisit) => {
-    const p = v.location;
-    if (p && typeof p.lat === 'number' && typeof p.lng === 'number') {
-      openNavigation({ lat: p.lat, lng: p.lng }, { label: v.case?.customer?.full_name ?? v.case?.title });
-    }
-  };
 
   const ctas = [
     { icon: Compass, label: 'Ημέρα μου', sub: 'πρόγραμμα & check-in', onClick: () => go('myday') },
@@ -101,7 +94,7 @@ export default function FieldSalesDashboard({ d }: { d: DashboardData }) {
               <div className="mt-4 flex gap-2">
                 <Btn variant="primary" onClick={() => next.case_id && openCase(next.case_id)}>Άνοιγμα Case</Btn>
                 {next.location && typeof next.location.lat === 'number' && typeof next.location.lng === 'number' && (
-                  <Btn variant="outline" onClick={() => openNav(next)}><Navigation className="w-3.5 h-3.5" /> Πλοήγηση</Btn>
+                  <NavigationButton destination={{ lat: next.location.lat, lng: next.location.lng, label: next.case?.customer?.full_name ?? next.case?.title }} caseId={next.case_id ?? undefined} label="Πλοήγηση" showSelector={false} />
                 )}
               </div>
             </div>

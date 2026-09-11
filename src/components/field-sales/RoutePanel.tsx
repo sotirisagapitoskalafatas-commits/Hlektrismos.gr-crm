@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { RoutePlan, RouteStop } from '@/lib/routing/types';
 import { planRoute } from '@/lib/routing/routing-provider';
-import { openNavigation } from '@/lib/maps/navigate';
 import { formatDistance, formatDuration } from '@/lib/geo/distance';
+import NavigationButton from '@/components/navigation/NavigationButton';
 import { Btn, Card, Micro, Spinner } from '@/lib/ui';
-import { Navigation, Route as RouteIcon, X } from 'lucide-react';
+import { Route as RouteIcon, X } from 'lucide-react';
 
 export type RouteStopInput = {
   id: string;
@@ -64,16 +64,12 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
     return () => { alive = false; };
   }, [ordered, onPlan]);
 
-  const navigateStops = () => {
-    if (ordered.length === 0) return;
-    const mid = ordered.slice(1, -1);
-    if (ordered.some(s => s.lat !== 0)) {
-      openNavigation(
-        { lat: ordered[ordered.length - 1].lat, lng: ordered[ordered.length - 1].lng },
-        { waypoints: mid.map(s => ({ lat: s.lat, lng: s.lng })) },
-      );
-    }
-  };
+  const navigateStops = ordered.length < 2
+    ? null
+    : {
+        destination: { lat: ordered[ordered.length - 1].lat, lng: ordered[ordered.length - 1].lng, label: ordered[ordered.length - 1].label },
+        waypoints: ordered.slice(1, -1).map(s => ({ lat: s.lat, lng: s.lng, label: s.label })),
+      };
 
   return (
     <Card className="!p-0" pad={false}>
@@ -128,9 +124,9 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
           </div>
 
           <div className="px-5 pb-4">
-            <Btn onClick={navigateStops} className="w-full justify-center">
-              <Navigation className="w-3.5 h-3.5" /> Πλοήγηση διαδρομής (Google Maps)
-            </Btn>
+            {navigateStops && (
+              <NavigationButton variant="primary" label="Πλοήγηση διαδρομής" className="w-full justify-center" showSelector={false} {...navigateStops} />
+            )}
           </div>
         </>
       )}

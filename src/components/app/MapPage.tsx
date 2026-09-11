@@ -8,15 +8,10 @@ import { Btn, Card, Micro, Spinner, StagePill, fmtTime, isToday } from '@/lib/ui
 import { createMap } from '@/lib/maps/map-provider';
 import type { MapCoordinate, MapProvider, MapMarkerData } from '@/lib/maps/types';
 import { GEO_ERRORS, getCurrentLocation } from '@/lib/geo/location';
-import type { GeoErrorCode, UserLocation } from '@/lib/geo/location';
-import { distanceKm, formatDistance, formatDuration } from '@/lib/geo/distance';
-import { geocodeAddress } from '@/lib/geo/geocoder';
-import { planRoute } from '@/lib/routing/routing-provider';
-import type { RoutePlan } from '@/lib/routing/types';
-import { openNavigation } from '@/lib/maps/navigate';
 import { useToast } from '@/lib/toast';
 import RoutePanel from '@/components/field-sales/RoutePanel';
 import type { RouteStopInput } from '@/components/field-sales/RoutePanel';
+import NavigationButton from '@/components/navigation/NavigationButton';
 import { Crosshair, LogIn, MapPin, Navigation, Route as RouteIcon, Search, Sun, X } from 'lucide-react';
 
 type FilterId = 'all' | 'active' | 'leads' | 'today' | 'followups' | 'pending_sig' | 'backoffice' | 'completed';
@@ -691,13 +686,13 @@ export default function MapPage() {
               {preview.kind === 'case' && (
                 <>
                   <Btn onClick={() => openCase(preview.c.id)}><MapPin className="w-3.5 h-3.5" /> Άνοιγμα Case</Btn>
-                  {previewPos && <Btn variant="outline" onClick={() => openNavigation(previewPos!, { label: preview.c.customer?.full_name ?? undefined })}><Navigation className="w-3.5 h-3.5" /> Πλοήγηση</Btn>}
+                  {previewPos && <NavigationButton destination={previewPos} origin={origin} caseId={preview.c.id} label="Πλοήγηση" showSelector={false} />}
                 </>
               )}
               {preview.kind === 'visit' && (
                 <>
                   <Btn onClick={() => preview.v.case_id && openCase(preview.v.case_id)}>Άνοιγμα Case</Btn>
-                  {previewPos && <Btn variant="outline" onClick={() => openNavigation(previewPos!)}><Navigation className="w-3.5 h-3.5" /> Πλοήγηση</Btn>}
+                  {previewPos && <NavigationButton destination={previewPos} origin={origin} caseId={preview.v.case_id ?? undefined} label="Πλοήγηση" showSelector={false} />}
                   {preview.v.status === 'planned' && fieldAllowed(role, 'check_in') && (
                     <Btn variant="ok" onClick={() => doFieldCheckIn(preview.v)} disabled={checkInBusy === preview.v.id}>
                       {checkInBusy === preview.v.id ? <Spinner /> : <LogIn className="w-3.5 h-3.5" />} Check In
@@ -711,10 +706,8 @@ export default function MapPage() {
               {preview.kind === 'lead' && (
                 <>
                   {preview.l.lat != null && preview.l.lng != null && (
-                    <Btn variant="outline" onClick={() => openNavigation({ lat: preview.l.lat!, lng: preview.l.lng! }, { label: preview.l.name })}>
-                      <Navigation className="w-3.5 h-3.5" /> Πλοήγηση
-                    </Btn>
-                  )}
+                      <NavigationButton destination={{ lat: preview.l.lat, lng: preview.l.lng, label: preview.l.name }} origin={origin} label="Πλοήγηση" showSelector={false} />
+                    )}
                   {preview.l.lat == null && preview.l.address && (
                     <Btn variant="brand" onClick={() => locateLead(preview.l)}>
                       <MapPin className="w-3.5 h-3.5" /> Καταχώρηση στον χάρτη

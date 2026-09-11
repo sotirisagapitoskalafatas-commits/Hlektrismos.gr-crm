@@ -3,7 +3,9 @@ import { useAuth } from '@/lib/auth';
 import { ROLES, roleLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { Btn, Card, CardHeader, Micro, Pill } from '@/lib/ui';
-import { History, PanelLeft, RefreshCcw, SlidersHorizontal, UserCog } from 'lucide-react';
+import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
+import type { NavigationApp } from '@/lib/navigation/external-maps';
+import { History, Navigation, PanelLeft, RefreshCcw, SlidersHorizontal, UserCog } from 'lucide-react';
 
 export function dispatchPrefsChanged() {
   window.dispatchEvent(new Event('atlas:prefs'));
@@ -12,6 +14,7 @@ export function dispatchPrefsChanged() {
 export default function PreferencesPage() {
   const { role, profile, setRoleOverride, clearRoleOverride } = useAuth();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('atlas.nav.collapsed') === '1');
+  const [navApp, setNavApp] = useState<NavigationApp>(() => getNavigationPreference());
 
   const realRole = profile?.role ?? null;
   const sim = role !== realRole;
@@ -21,6 +24,11 @@ export default function PreferencesPage() {
     setCollapsed(next);
     localStorage.setItem('atlas.nav.collapsed', next ? '1' : '0');
     dispatchPrefsChanged();
+  };
+
+  const changeNavApp = (next: NavigationApp) => {
+    setNavApp(next);
+    setNavigationPreference(next);
   };
 
   return (
@@ -48,6 +56,23 @@ export default function PreferencesPage() {
           <SlidersHorizontal className="w-3 h-3" />
           Οι προτιμήσεις αποθηκεύονται τοπικά σε αυτόν τον browser και εφαρμόζονται αμέσως.
         </p>
+      </Card>
+
+      {/* Navigation app */}
+      <Card>
+        <CardHeader micro="Πλοήγηση" title="Εφαρμογή πλοήγησης" className="mb-3" />
+        <select value={navApp} onChange={e => changeNavApp(e.target.value as NavigationApp)}
+          aria-label="Εφαρμογή πλοήγησης"
+          className="w-full sm:w-72 text-[13px] font-medium bg-white border border-line rounded-lg px-2 py-2 text-ink focus:outline-none focus:border-brand-500 appearance-none">
+          {NAV_APP_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+        <div className="flex items-start gap-2 text-[11px] text-ink/40 mt-3">
+          <Navigation className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span className="flex-1 text-xs text-ink/45">
+            Με «Αυτόματο» η πιο ενδεδειγμένη εφαρμογή επιλέγεται αυτόματα (Apple Maps σε iOS, αλλιώς Google Maps).
+            Τα κουμπιά «Πλοήγηση» της εφαρμογής τη χρησιμοποιούν άμεσα. Τρέχουσα: <strong className="text-ink/70">{navigationAppLabel(navApp)}</strong>
+          </span>
+        </div>
       </Card>
 
       {/* Role simulator */}

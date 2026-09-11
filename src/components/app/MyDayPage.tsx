@@ -8,11 +8,11 @@ import { Btn, Card, CardHeader, EmptyState, Micro, Spinner, StagePill, fmtTime, 
 import { GEO_ERRORS, getCurrentLocation } from '@/lib/geo/location';
 import type { GeoErrorCode, UserLocation } from '@/lib/geo/location';
 import { distanceKm, durationMinutes, formatDistance } from '@/lib/geo/distance';
-import { openNavigation } from '@/lib/maps/navigate';
 import type { MapCoordinate } from '@/lib/maps/types';
 import { enqueue, countQueue, isOnline } from '@/lib/offline/queue';
 import { flushQueue } from '@/lib/offline/sync';
 import { useToast } from '@/lib/toast';
+import NavigationButton from '@/components/navigation/NavigationButton';
 import { CalendarClock, ChevronDown, Compass, LogIn, LogOut, MapPin, Navigation, RefreshCw, Sun } from 'lucide-react';
 
 function CheckDone() {
@@ -244,9 +244,7 @@ export default function MyDayPage() {
                             {d != null && <span className="text-xs text-ink/45">· ~{durationMinutes(d)} λεπτά διαδρομή</span>}
                           </div>
                           {pos && (
-                            <Btn variant="outline" onClick={() => openNavigation(pos, { label: v.case?.customer?.full_name ?? undefined })}>
-                              <Navigation className="w-3.5 h-3.5" /> Πλοήγηση (Google Maps)
-                            </Btn>
+                            <NavigationButton destination={{ ...pos, label: v.case?.customer?.full_name ?? undefined }} caseId={v.case_id ?? undefined} label="Πλοήγηση" showSelector={false} />
                           )}
                           {v.status === 'in_progress' && (
                             <div>

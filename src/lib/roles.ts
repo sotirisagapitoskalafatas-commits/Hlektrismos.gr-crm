@@ -62,7 +62,7 @@ export type ActivityType =
   | 'follow_up' | 'note' | 'document' | 'visit' | 'meeting' | 'check_in'
   | 'check_out' | 'photo' | 'signature' | 'document_check' | 'application'
   | 'provider_submission' | 'activation' | 'status_change' | 'assignment'
-  | 'comment' | 'completed';
+  | 'comment' | 'completed' | 'navigation';
 
 export const ACTIVITY_META: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; team: Role | 'system' }> = {
   created: { icon: Sparkles, label: 'Δημιουργία Case', team: 'system' },
@@ -77,6 +77,7 @@ export const ACTIVITY_META: Record<string, { icon: React.ComponentType<{ classNa
   document: { icon: FolderOpen, label: 'Έγγραφο', team: 'system' },
   visit: { icon: MapPin, label: 'Επίσκεψη', team: 'field_sales' },
   meeting: { icon: Users, label: 'Συνάντηση', team: 'field_sales' },
+  navigation: { icon: Navigation, label: 'Πλοήγηση', team: 'field_sales' },
   check_in: { icon: LogIn, label: 'Check In', team: 'field_sales' },
   check_out: { icon: LogOut, label: 'Check Out', team: 'field_sales' },
   photo: { icon: Camera, label: 'Φωτογραφία', team: 'field_sales' },

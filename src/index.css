@@ -2744,6 +2744,31 @@ body {
 }
 .jv-panel-input button:disabled { opacity: 0.4; cursor: default; }
 
+/* Quick-start chips */
+.jv-chips {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  flex-wrap: wrap;
+}
+.jv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 232, 255, 0.22);
+  background: rgba(59, 130, 246, 0.12);
+  color: #DCE7F5;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.jv-chip:hover {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(103, 232, 255, 0.45);
+}
+
 /* Dock sits above the mobile bottom tab bar */
 @media (max-width: 767px) {
   .jv-dock { z-index: 75; }

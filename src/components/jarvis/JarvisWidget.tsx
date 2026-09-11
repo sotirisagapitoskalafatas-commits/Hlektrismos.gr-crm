@@ -1,7 +1,9 @@
 /* ------------------------------------------------------------------ */
-/*  JarvisWidget — floating AI assistant dock (Layer 1: ALIVE).        */
-/*  Ring + mascot + drag + position persistence + panel scaffolding.   */
-/*  Layer 2 hooks a real chat backend via onSend (plug seam).          */
+/*  JarvisWidget — floating AI assistant dock.                         */
+/*  Layer 1: ALIVE (ring + mascot + drag + persistence + panel).       */
+/*  Layer 2: USEFUL — real chat via useJarvisChat → `chat` edge        */
+/*  function (Gemini + tariff RAG), visitor memory, callback leads.    */
+/*  `onSend` remains an override seam for tests/previews.              */
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useRef, useState } from 'react';
@@ -10,11 +12,12 @@ import { JarvisRing } from './JarvisRing';
 import { useJarvisGaze } from './useJarvisGaze';
 import { useJarvisBlink } from './useJarvisBlink';
 import { useJarvisPosition } from './useJarvisPosition';
+import { useJarvisChat } from '@/lib/jarvis-chat';
 import type { JarvisState } from './types';
 
 const FAB = { w: 96, h: 96 };
 
-interface Message { id: number; from: 'jarvis' | 'user'; text: string }
+const QUICK_STARTERS = ['Ρεύμα', 'Αέριο', 'Φωτοβολταϊκά', 'Ζητώ κλήση'];
 
 export function JarvisWidget({ bottomOffset = 88, onSend }: {
   bottomOffset?: number;
@@ -23,9 +26,7 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<JarvisState>('idle');
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(() => [
-    { id: 0, from: 'jarvis', text: 'Γεια σας! Είμαι ο JARVIS. Πώς μπορώ να σας βοηθήσω σήμερα; ⚡' },
-  ]);
+  const chat = useJarvisChat();
   const [input, setInput] = useState('');
   const [pulse, setPulse] = useState(true);
 
@@ -33,7 +34,6 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
   const gaze = useJarvisGaze(wrapRef, state);
   const { blink, doBlink } = useJarvisBlink();
 
-  const msgId = useRef(1);
   const moved = useRef(false);
   const lastPtr = useRef<{ x: number; y: number } | null>(null);
 
@@ -63,23 +63,31 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
     });
   };
 
-  const submit = async (text: string) => {
-    const trimmed = text.trim();
+  const submit = async (raw: string) => {
+    const trimmed = raw.trim();
     if (!trimmed) return;
     setInput('');
-    setMessages(m => [...m, { id: msgId.current++, from: 'user', text: trimmed }]);
     transition('typing');
     await new Promise(r => window.setTimeout(r, 380));
     transition('thinking');
     try {
-      const reply = onSend ? await onSend(trimmed) : localEcho(trimmed);
-      setMessages(m => [...m, { id: msgId.current++, from: 'jarvis', text: reply }]);
+      if (onSend) {
+        chat.push('user', trimmed);
+        chat.push('jarvis', await onSend(trimmed));
+      } else {
+        chat.push('jarvis', await chat.send(trimmed));
+      }
       transition('success');
     } catch {
-      setMessages(m => [...m, { id: msgId.current++, from: 'jarvis', text: 'Συγγνώμη, είχα μια διακοπή. Δοκιμάστε ξανά σε λίγο. 🔄' }]);
-      transition('error');
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        chat.push('jarvis', 'Φαίνεται πως είστε εκτός σύνδεσης. Θα απαντήσω μόλις επανέλθει το δίκτυο. 📡');
+        transition('offline');
+      } else {
+        chat.push('jarvis', 'Συγγνώμη, παρουσιάστηκε μια διακοπή. Δοκιμάστε ξανά σε λίγο. 🔄');
+        transition('error');
+      }
     }
-    window.setTimeout(() => setState(s => (s === 'success' || s === 'error' ? 'open' : s)), 900);
+    window.setTimeout(() => setState(s => (['success', 'error', 'offline'].includes(s) ? 'open' : s)), 900);
   };
 
   return (
@@ -134,7 +142,7 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
           </div>
 
           <div className="jv-panel-body">
-            {messages.map(m => (
+            {chat.messages.map(m => (
               <div key={m.id} className={`jv-msg ${m.from === 'user' ? 'jv-msg-user' : 'jv-msg-jarvis'}`}>
                 {m.text}
               </div>
@@ -145,6 +153,16 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
               </div>
             )}
           </div>
+
+          {chat.messages.length <= 1 && (
+            <div className="jv-chips">
+              {QUICK_STARTERS.map(q => (
+                <button key={q} type="button" className="jv-chip" onClick={() => submit(q)}>
+                  {q === 'Ζητώ κλήση' ? '📞' : q === 'Ρεύμα' ? '⚡' : q === 'Αέριο' ? '🔥' : '☀️'} {q}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form className="jv-panel-input" onSubmit={e => { e.preventDefault(); submit(input); }}>
             <input
@@ -193,14 +211,6 @@ function panelStyle(pos: { x: number; y: number }, fabW: number, fabH: number): 
     style.top = undefined;
   }
   return style;
-}
-
-function localEcho(text: string): string {
-  const t = text.toLowerCase();
-  if (t.includes('τιμή') || t.includes('κόστος') || t.includes('ποσο')) {
-    return 'Οι τιμές εξαρτώνται από τον πάροχο. Θέλετε να σας στείλω μια σύγκριση προσφορών;';
-  }
-  return `Έλαβα το μήνυμά σας: «${text}». Θα αναπτυχθώ πλήρως στο επόμενο στάδιο. ⚡`;
 }
 
 function statusLabel(s: JarvisState): string {

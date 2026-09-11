@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Building2, Bot, Map as MapIcon, Compass, Briefcase,
   CalendarDays, Gauge, Settings, Home, ChevronRight, Bell, Plus, Search,
   UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
-  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet,
+  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar,
 } from 'lucide-react';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
@@ -177,7 +177,7 @@ export function leadStatusInfo(status?: string | null): { id: string; label: str
    optional Atlas accent. The shell renders this config. */
 export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
-  | 'home' | 'mywork' | 'leads' | 'cases' | 'followups' | 'customers'
+  | 'home' | 'mywork' | 'leads' | 'prospecting' | 'cases' | 'followups' | 'customers'
   | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
   | 'account' | 'preferences';
 
@@ -236,6 +236,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: ShoppingBag,
     children: [
       { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live', badge: 'leads' },
+      { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live' },
       { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live' },
       { key: 'followups', label: 'Follow Ups', icon: CalendarClock, page: 'followups', roles: ALL, maturity: 'live', badge: 'followups' },
     ],
@@ -319,6 +320,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   home: 'Πίνακας Ελέγχου',
   mywork: 'My Work',
   leads: 'Leads',
+  prospecting: 'B2B Prospecting',
   cases: 'Cases',
   customers: 'Πελάτες',
   followups: 'Follow Ups',

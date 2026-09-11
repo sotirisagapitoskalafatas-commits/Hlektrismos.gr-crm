@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import CaptureModal from './CaptureModal';
 import SignaturePad from './SignaturePad';
+import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import {
   ACTIVITY_META, CHANNELS, DOC_CATEGORIES, DOC_STATUSES, SERVICES, STAGES,
   STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, stageLabel,
@@ -14,7 +15,7 @@ import {
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
   fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
-  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, uploadDocumentFile,
+  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, updateCase, uploadDocumentFile,
 } from '@/lib/api';
 import {
   Btn, Card, CardHeader, EmptyState, Field, IconBtn, Micro, Modal, Pill, Spinner, StagePill,
@@ -541,8 +542,27 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
   const [docs, setDocs] = useState<CaseDocument[]>([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [supply, setSupply] = useState({ provider: c.provider ?? '', program: c.program ?? '' });
+  const [savingSupply, setSavingSupply] = useState(false);
 
   useEffect(() => { fetchDocuments(c.id).then(setDocs); }, [c.id]);
+  useEffect(() => { setSupply({ provider: c.provider ?? '', program: c.program ?? '' }); }, [c.provider, c.program]);
+
+  const canEditSupply = can(role, 'submit_provider') || can(role, 'create_application') || can(role, 'edit_case');
+  const supplyDirty = supply.provider !== (c.provider ?? '') || supply.program !== (c.program ?? '');
+
+  const saveSupply = async () => {
+    setSavingSupply(true);
+    await updateCase(c.id, { provider: supply.provider || null, program: supply.program || null }, { log: true, role });
+    await addActivity(c.id, {
+      role,
+      activity_type: 'note',
+      title: 'Πάροχος & πρόγραμμα',
+      description: `${supply.provider || '—'}${supply.program ? ` · ${supply.program}` : ''}`,
+    });
+    setSavingSupply(false);
+    reload();
+  };
 
   const doAction = async (type: ActivityType, title: string, desc: string) => {
     setBusy(true);
@@ -608,7 +628,33 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
         </div>
       ) : null}
 
-      {c.provider && <div className="mt-3 text-xs text-ink/45">Πάροχος: <span className="font-medium text-ink/70">{c.provider}</span></div>}
+      {/* Πάροχος & πρόγραμμα — από τον κατάλογο ενέργειας */}
+      <div className="mt-4 p-3 rounded-xl bg-paper border border-line">
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <div>
+            <div className="text-[13px] font-medium text-ink">Πάροχος & πρόγραμμα</div>
+            <div className="text-xs text-ink/45">
+              {c.provider
+                ? <span className="inline-flex items-center gap-1.5"><ProviderDot provider={c.provider} />{c.provider}{c.program ? ` · ${c.program}` : ''}</span>
+                : 'Δεν έχει οριστεί πάροχος για αυτό το case.'}
+            </div>
+          </div>
+          {canEditSupply && supplyDirty && (
+            <Btn variant="brand" disabled={savingSupply} onClick={saveSupply}>
+              <Check className="w-3.5 h-3.5" /> Αποθήκευση
+            </Btn>
+          )}
+        </div>
+        {canEditSupply ? (
+          <ProviderProgramPicker
+            provider={supply.provider}
+            program={supply.program}
+            service={c.service_type ?? 'energy'}
+            onChange={next => setSupply(next)}
+          />
+        ) : null}
+      </div>
+
       {c.application_status && <div className="mt-1 text-xs text-ink/45">Κατάσταση αίτησης: {c.application_status}{c.activation_status ? ` · Ενεργοποίηση: ${c.activation_status}` : ''}</div>}
     </Card>
   );

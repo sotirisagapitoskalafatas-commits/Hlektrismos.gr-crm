@@ -4,9 +4,13 @@ import { useNav } from '@/lib/nav';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
 import { Lead, convertLeadToCase, createLead, fetchLeads, updateLeadStage } from '@/lib/api';
 import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
+import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import { ArrowRight, ExternalLink, Plus, Users } from 'lucide-react';
 
-const EMPTY_FORM = { full_name: '', phone: '', email: '', service_category: 'energy', source: 'inside_sales', property_type: '', campaign_name: '', comments: '' };
+const EMPTY_FORM = {
+  full_name: '', phone: '', email: '', service_category: 'energy', source: 'inside_sales',
+  property_type: '', campaign_name: '', comments: '', lead_type: 'B2C', provider: '', program: '',
+};
 
 export default function LeadsPage() {
   const { role } = useAuth();
@@ -62,6 +66,9 @@ export default function LeadsPage() {
       property_type: form.property_type.trim() || null,
       campaign_name: form.campaign_name.trim() || null,
       comments: form.comments.trim() || null,
+      lead_type: form.lead_type,
+      provider: form.provider || null,
+      program: form.program || null,
     });
     if (!lead) { setErr('Δεν ήταν δυνατή η δημιουργία του lead.'); return; }
     setModal(false);
@@ -137,8 +144,14 @@ export default function LeadsPage() {
                       {(l.email ? ` · ${l.email}` : '')}
                       {l.property_type ? ` · ${l.property_type}` : ''}
                     </div>
-                    {(l.campaign_name || l.assigned_to?.full_name || l.created_by?.full_name) && (
+                    {(l.campaign_name || l.provider || l.company || l.assigned_to?.full_name || l.created_by?.full_name) && (
                       <div className="text-[11px] text-ink/35 mt-0.5 flex items-center gap-2 flex-wrap">
+                        {l.company && <span>🏢 {l.company}</span>}
+                        {l.provider && (
+                          <span className="inline-flex items-center gap-1">
+                            <ProviderDot provider={l.provider} /> {l.provider}{l.program ? ` · ${l.program}` : ''}
+                          </span>
+                        )}
                         {l.campaign_name && <span>📢 {l.campaign_name}</span>}
                         {l.assigned_to?.full_name && <span>👤 {l.assigned_to.full_name}</span>}
                         {!l.assigned_to?.full_name && l.created_by?.full_name && <span>✍️ {l.created_by.full_name}</span>}
@@ -202,13 +215,30 @@ export default function LeadsPage() {
             </Field>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Τύπος πελάτη">
+              <select className="field" value={form.lead_type}
+                onChange={e => setForm(f => ({ ...f, lead_type: e.target.value, provider: '', program: '' }))}>
+                <option value="B2C">B2C — Οικιακός</option>
+                <option value="B2B">B2B — Επιχείρηση</option>
+              </select>
+            </Field>
             <Field label="Τύπος ιδιοκτησίας">
               <input className="field" value={form.property_type} onChange={e => setForm(f => ({ ...f, property_type: e.target.value }))} placeholder="π.χ. μονοκατοικία" />
             </Field>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Καμπάνια">
               <input className="field" value={form.campaign_name} onChange={e => setForm(f => ({ ...f, campaign_name: e.target.value }))} placeholder="π.χ. Facebook Ads" />
             </Field>
           </div>
+          <ProviderProgramPicker
+            provider={form.provider}
+            program={form.program}
+            service={form.service_category}
+            customerType={form.lead_type === 'B2B' ? 'B2B' : 'B2C'}
+            onChange={next => setForm(f => ({ ...f, provider: next.provider, program: next.program }))}
+            labels={{ provider: 'Πάροχος ενδιαφέροντος', program: 'Πρόγραμμα' }}
+          />
           <Field label="Σχόλια">
             <textarea className="field" rows={2} value={form.comments} onChange={e => setForm(f => ({ ...f, comments: e.target.value }))} placeholder="Λεπτομέρειες ενδιαφέροντος…" />
           </Field>

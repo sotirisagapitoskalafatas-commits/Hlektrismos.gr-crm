@@ -177,6 +177,8 @@ export type Lead = {
   location_source: string | null;
   location_confidence: string | null;
   address: string | null;
+  company: string | null;
+  lead_type: string | null;
   campaign_id: string | null;
   campaign_name: string | null;
   source_label: string | null;
@@ -1170,6 +1172,7 @@ export type LeadInput = {
   property_type?: string | null;
   service_category?: string | null;
   source?: string;
+  source_label?: string | null;
   status?: string;
   comments?: string | null;
   campaign_id?: string | null;
@@ -1177,6 +1180,12 @@ export type LeadInput = {
   assigned_to_user_id?: string | null;
   provider?: string | null;
   program?: string | null;
+  company?: string | null;
+  address?: string | null;
+  lead_type?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  location_source?: string | null;
 };
 
 /* Staff-managed lead entry. Public intake stays on insert_website_lead(). */
@@ -1203,8 +1212,15 @@ export async function createLead(input: LeadInput): Promise<Lead | null> {
       property_type: input.property_type ?? null,
       service_category: input.service_category ?? null,
       source: input.source ?? 'inside_sales',
+      source_label: input.source_label ?? null,
       status: input.status ?? 'new',
       comments: input.comments ?? null,
+      company: input.company ?? null,
+      address: input.address ?? null,
+      lead_type: input.lead_type ?? null,
+      lat: input.lat ?? null,
+      lng: input.lng ?? null,
+      location_source: input.location_source ?? null,
       campaign_id: input.campaign_id ?? null,
       campaign_name: input.campaign_name ?? null,
       provider: input.provider ?? null,

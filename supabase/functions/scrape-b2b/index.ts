@@ -136,7 +136,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: false,
           error:
-            "SerpApi key not found. Please add your key in Settings → B2B Scraper → Integrations.",
+            "SerpApi key not found. Add it in the CRM under Διαχείριση → B2B Scraper.",
           businesses: [],
         }),
         {
@@ -159,7 +159,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "SerpApi key is empty. Please configure it in Settings.",
+          error: "SerpApi key is empty. Add it in the CRM under Διαχείριση → B2B Scraper.",
           businesses: [],
         }),
         {
@@ -203,40 +203,49 @@ Deno.serve(async (req: Request) => {
       rating: r.rating || null,
       totalReviews: r.reviews || null,
       placeId: r.place_id || null,
+      lat: r.gps_coordinates?.latitude ?? null,
+      lng: r.gps_coordinates?.longitude ?? null,
     }));
 
     // ── Import to database if requested ──
+    // The CRM UI imports client-side through createLead() so leads keep
+    // their attribution; this path serves callers without a session
+    // (e.g. the orchestrator function).
     let imported = 0;
     if (importToDb && businesses.length > 0) {
       for (const biz of businesses) {
-        // Split company name into first/last for compatibility
         const nameParts = biz.company.split(" ");
         const firstName = nameParts[0] || biz.company;
         const lastName = nameParts.slice(1).join(" ") || "";
 
-        const { error } = await supabase.from("hlektrismos_leads").insert({
+        const { error } = await supabase.from("leads").insert({
+          full_name: biz.company,
+          client_name: biz.company,
+          client_contact: biz.phone || "",
           first_name: firstName,
           last_name: lastName,
-          email: "",
+          company: biz.company,
           phone: biz.phone,
+          address: biz.address || null,
           region: region,
-          customer_type: "B2B",
-          provider: "B2B Scraper",
-          status: "Νέο Lead",
-          lawful_basis: "Legitimate_Interest",
-          customer_category: "B2B_Corporate",
+          lead_type: "B2B",
+          service_category: "energy",
+          status: "new",
+          source: "import",
+          source_label: "B2B Scraper · Google Maps",
           comments: [
-            `Source: SerpApi Google Maps`,
-            `Category: ${biz.category}`,
-            `Address: ${biz.address}`,
-            `Website: ${biz.website}`,
-            biz.rating ? `Rating: ${biz.rating} (${biz.totalReviews || 0} reviews)` : null,
+            `Πηγή: SerpApi Google Maps`,
+            `Κατηγορία: ${biz.category}`,
+            biz.address ? `Διεύθυνση: ${biz.address}` : null,
+            biz.website ? `Ιστοσελίδα: ${biz.website}` : null,
+            biz.rating ? `Αξιολόγηση: ${biz.rating} (${biz.totalReviews || 0} κριτικές)` : null,
           ]
             .filter(Boolean)
             .join(" | "),
         });
 
         if (!error) imported++;
+        else console.error("lead insert failed:", error);
       }
     }
 

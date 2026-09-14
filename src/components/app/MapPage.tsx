@@ -8,6 +8,11 @@ import { Btn, Card, Micro, Spinner, StagePill, fmtTime, isToday } from '@/lib/ui
 import { createMap } from '@/lib/maps/map-provider';
 import type { MapCoordinate, MapProvider, MapMarkerData } from '@/lib/maps/types';
 import { GEO_ERRORS, getCurrentLocation } from '@/lib/geo/location';
+import type { GeoErrorCode, UserLocation } from '@/lib/geo/location';
+import { geocodeAddress } from '@/lib/geo/geocoder';
+import { distanceKm, formatDistance, formatDuration } from '@/lib/geo/distance';
+import { planRoute } from '@/lib/routing/routing-provider';
+import type { RoutePlan } from '@/lib/routing/types';
 import { useToast } from '@/lib/toast';
 import RoutePanel from '@/components/field-sales/RoutePanel';
 import type { RouteStopInput } from '@/components/field-sales/RoutePanel';

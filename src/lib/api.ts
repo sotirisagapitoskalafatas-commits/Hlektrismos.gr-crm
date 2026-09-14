@@ -851,6 +851,72 @@ export async function fetchOffers(caseId: string): Promise<CaseOffer[]> {
   return (data ?? []) as CaseOffer[];
 }
 
+/* ---------------- Provider catalog usage (Providers & Programs) ----------------
+   Live CRM usage per provider/program, aggregated from the leads pipeline and
+   from cases. Keyed by the canonical provider/program labels so the page can
+   merge it onto the static energy catalog. */
+export type ProviderUsageRow = {
+  leads: number;
+  cases: number;
+  activeCases: number;
+  pipelineValue: number;
+  programs: Record<string, { leads: number; cases: number; activeCases: number; pipelineValue: number }>;
+};
+
+export type ProviderUsage = {
+  byProvider: Record<string, ProviderUsageRow>;
+  totalLeads: number;
+  totalCases: number;
+  totalPipeline: number;
+};
+
+const ACTIVE_CASE_STAGES = new Set<Stage>([
+  'new', 'contacted', 'offer', 'application', 'signed', 'document_check', 'submitted', 'activation',
+]);
+
+export async function fetchProviderUsage(): Promise<ProviderUsage> {
+  const usage: ProviderUsage = { byProvider: {}, totalLeads: 0, totalCases: 0, totalPipeline: 0 };
+  if (!supabase) return usage;
+
+  const row = (provider: string): ProviderUsageRow => {
+    if (!usage.byProvider[provider]) {
+      usage.byProvider[provider] = { leads: 0, cases: 0, activeCases: 0, pipelineValue: 0, programs: {} };
+    }
+    return usage.byProvider[provider];
+  };
+  const prog = (r: ProviderUsageRow, program: string) => {
+    if (!r.programs[program]) r.programs[program] = { leads: 0, cases: 0, activeCases: 0, pipelineValue: 0 };
+    return r.programs[program];
+  };
+
+  const [leads, cases] = await Promise.all([fetchLeads(), fetchCases({ includeDone: true })]);
+
+  for (const l of leads) {
+    if (!l.provider) continue;
+    const r = row(l.provider);
+    r.leads++;
+    usage.totalLeads++;
+    if (l.program) prog(r, l.program).leads++;
+  }
+
+  for (const c of cases) {
+    if (!c.provider) continue;
+    const r = row(c.provider);
+    const active = ACTIVE_CASE_STAGES.has(c.current_stage);
+    const value = c.value ?? 0;
+    r.cases++;
+    usage.totalCases++;
+    if (active) { r.activeCases++; r.pipelineValue += value; usage.totalPipeline += value; }
+    if (c.program) {
+      const p = prog(r, c.program);
+      p.cases++;
+      if (active) { p.activeCases++; p.pipelineValue += value; }
+    }
+  }
+
+  return usage;
+}
+
 /* All offers with case + customer joined (Revenue control center). */
 export type RevenueOffer = {
   id: string;

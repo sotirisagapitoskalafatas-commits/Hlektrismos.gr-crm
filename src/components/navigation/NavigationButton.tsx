@@ -17,7 +17,7 @@ import {
   resolveNavigationApp,
   setNavigationPreference,
 } from '@/lib/navigation/external-maps';
-import type { LocationCoords, NavigationApp } from '@/lib/navigation/external-maps';
+import type { LocationCoords, NavigationApp, NavigationTravelMode } from '@/lib/navigation/external-maps';
 
 type Props = {
   destination: LocationCoords;
@@ -28,6 +28,7 @@ type Props = {
   variant?: 'primary' | 'outline' | 'ghost' | 'brand' | 'ok' | 'stop';
   className?: string;
   showSelector?: boolean;
+  travelMode?: NavigationTravelMode;
 };
 
 /* Hand-off button: Πλοήγηση → native Google/Apple/Waze.
@@ -43,6 +44,7 @@ export default function NavigationButton({
   variant = 'outline',
   className = '',
   showSelector = true,
+  travelMode,
 }: Props) {
   const { role } = useAuth();
   const { toast } = useToast();
@@ -75,7 +77,7 @@ export default function NavigationButton({
       }
     }
 
-    const request = { destination, origin: useOrigin, waypoints, app };
+    const request = { destination, origin: useOrigin, waypoints, app, travelMode };
     try {
       buildNavigationUrl(request);
     } catch (e) {

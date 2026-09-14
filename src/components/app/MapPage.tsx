@@ -19,7 +19,7 @@ import type { RouteStopInput } from '@/components/field-sales/RoutePanel';
 import NavigationButton from '@/components/navigation/NavigationButton';
 import type { NavigationTravelMode } from '@/lib/navigation/external-maps';
 import {
-  ArrowDownUp, Bike, Car, Crosshair, Footprints, LogIn, MapPin,
+  ArrowDownUp, Bike, Car, ChevronDown, ChevronUp, Crosshair, Footprints, LogIn, MapPin,
   Route as RouteIcon, Search, Sun, X,
 } from 'lucide-react';
 
@@ -122,6 +122,9 @@ export default function MapPage() {
   const [originResults, setOriginResults] = useState<DestSuggestion[]>([]);
   const [originSearching, setOriginSearching] = useState(false);
   const [travelMode, setTravelMode] = useState<TravelMode>('driving');
+  /* Mobile bottom-sheet / directions collapse. On sm+ both are always open. */
+  const [dirOpen, setDirOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const origin = useMemo(
     () => (originPlace ? originPlace.position : myLoc ? { lat: myLoc.lat, lng: myLoc.lng } : null),
@@ -293,7 +296,7 @@ export default function MapPage() {
       const [crm, geo] = await Promise.all([fetchFieldTargets(qq), geocodeAddress(qq, origin ?? undefined)]);
       if (!alive) return;
       const crmRes: DestSuggestion[] = crm.map(x => ({ id: `crm-${x.entity_type}-${x.id}`, label: x.label, sublabel: x.sublabel || x.address, position: x.position, kind: 'crm' }));
-      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, position: g.position, kind: 'geocoder' }));
+      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, sublabel: g.sublabel, position: g.position, kind: 'geocoder' }));
       setOriginResults([...crmRes.slice(0, 5), ...geoRes.slice(0, 5)]);
       setOriginSearching(false);
     }, 350);
@@ -477,7 +480,7 @@ export default function MapPage() {
       const [crm, geo] = await Promise.all([fetchFieldTargets(qq), geocodeAddress(qq, origin ?? undefined)]);
       if (!alive) return;
       const crmRes: DestSuggestion[] = crm.map(t => ({ id: `crm-${t.entity_type}-${t.id}`, label: t.label, sublabel: t.sublabel || t.address, position: t.position, kind: 'crm' }));
-      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, position: g.position, kind: 'geocoder' }));
+      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, sublabel: g.sublabel, position: g.position, kind: 'geocoder' }));
       setDestResults([...crmRes.slice(0, 5), ...geoRes.slice(0, 5)]);
       setDestSearching(false);
     }, 350);
@@ -596,63 +599,80 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Floating directions box (top) */}
+        {/* Floating directions box (top) — collapses to just the destination
+            search on phones; full origin/modes/reverse on tap or sm+. */}
         <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-[380px] z-20 card p-3 bg-white/95 backdrop-blur-md shadow-cardlg space-y-2">
-          {/* Travel modes */}
-          <div className="flex items-center gap-1 border-b border-line pb-2">
-            {TRAVEL_MODES.map(m => (
-              <button key={m.id} onClick={() => setTravelMode(m.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors ${travelMode === m.id ? 'bg-brand-100 text-brand-600' : 'text-ink/50 hover:text-ink hover:bg-ink/5'}`}
-                title={m.label}>
-                <m.icon className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{m.label}</span>
-              </button>
-            ))}
-          </div>
+          {/* Mobile expand/collapse toggle */}
+          <button onClick={() => setDirOpen(o => !o)}
+            className="sm:hidden w-full flex items-center justify-between text-[11px] font-medium text-ink/55 -mb-1"
+            aria-expanded={dirOpen}>
+            <span className="inline-flex items-center gap-1.5">
+              <Car className="w-3.5 h-3.5" /> Αφετηρία & τρόπος
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${dirOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-          {/* Origin */}
-          <div className="relative">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-brand-500 ring-2 ring-brand-200 shrink-0" aria-hidden="true" />
-              <input className="field !py-1.5 !text-[13px] flex-1" value={originQuery}
-                onChange={e => setOriginQuery(e.target.value)}
-                placeholder={originLabel} aria-label="Αφετηρία" />
-              <button onClick={locateMe} disabled={locating} title="Χρήση της τοποθεσίας μου"
-                className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-brand-50 text-brand-600 text-[11px] font-medium hover:bg-brand-100 disabled:opacity-50">
-                {locating ? <Spinner /> : <Crosshair className="w-3.5 h-3.5" />}<span className="hidden sm:inline">GPS</span>
-              </button>
+          {/* Collapsible section: travel modes + origin + reverse */}
+          <div className={`${dirOpen ? '' : 'hidden'} sm:block space-y-2`}>
+            {/* Travel modes */}
+            <div className="flex items-center gap-1 border-b border-line pb-2">
+              {TRAVEL_MODES.map(m => (
+                <button key={m.id} onClick={() => setTravelMode(m.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors ${travelMode === m.id ? 'bg-brand-100 text-brand-600' : 'text-ink/50 hover:text-ink hover:bg-ink/5'}`}
+                  title={m.label}>
+                  <m.icon className="w-3.5 h-3.5" /> <span>{m.label}</span>
+                </button>
+              ))}
             </div>
-            {originQuery && originResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 max-h-60 overflow-y-auto">
-                {originSearching && <div className="px-4 py-3"><Spinner /></div>}
-                {originResults.map(r => (
-                  <button key={r.id} className="w-full text-left px-3 py-2 hover:bg-ink/5 flex items-center gap-2" onClick={() => pickOrigin(r)}>
-                    <span className={`pill text-[9px] shrink-0 ${r.kind === 'crm' ? 'bg-brand-100 text-brand-600' : 'bg-ink/10 text-ink/60'}`}>{r.kind === 'crm' ? 'CRM' : 'Χάρτης'}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-medium text-ink truncate">{r.label}</span>
-                      {r.sublabel && <span className="block text-[11px] text-ink/45 truncate">{r.sublabel}</span>}
-                    </span>
-                  </button>
-                ))}
+
+            {/* Origin */}
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-brand-500 ring-2 ring-brand-200 shrink-0" aria-hidden="true" />
+                <input className="field !py-1.5 !text-[13px] flex-1" value={originQuery}
+                  onChange={e => setOriginQuery(e.target.value)}
+                  placeholder={originLabel} aria-label="Αφετηρία" />
+                <button onClick={locateMe} disabled={locating} title="Χρήση της τοποθεσίας μου"
+                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-brand-50 text-brand-600 text-[11px] font-medium hover:bg-brand-100 disabled:opacity-50">
+                  {locating ? <Spinner /> : <Crosshair className="w-3.5 h-3.5" />}<span>GPS</span>
+                </button>
               </div>
-            )}
-            {originPlace && (
-              <button onClick={() => setOriginPlace(null)} className="mt-1 text-[11px] text-ink/45 hover:text-ink inline-flex items-center gap-1">
-                <X className="w-3 h-3" /> Επαναφορά σε «Η τοποθεσία μου»
+              {originQuery && originResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 max-h-60 overflow-y-auto">
+                  {originSearching && <div className="px-4 py-3"><Spinner /></div>}
+                  {originResults.map(r => (
+                    <button key={r.id} className="w-full text-left px-3 py-2 hover:bg-ink/5 flex items-center gap-2" onClick={() => pickOrigin(r)}>
+                      <span className={`pill text-[9px] shrink-0 ${r.kind === 'crm' ? 'bg-brand-100 text-brand-600' : 'bg-ink/10 text-ink/60'}`}>{r.kind === 'crm' ? 'CRM' : 'Χάρτης'}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13px] font-medium text-ink truncate">{r.label}</span>
+                        {r.sublabel && <span className="block text-[11px] text-ink/45 truncate">{r.sublabel}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {originQuery.trim().length >= 3 && !originSearching && originResults.length === 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 px-4 py-2.5 text-[12px] text-ink/45">Καμία τοποθεσία.</div>
+              )}
+              {originPlace && (
+                <button onClick={() => setOriginPlace(null)} className="mt-1 text-[11px] text-ink/45 hover:text-ink inline-flex items-center gap-1">
+                  <X className="w-3 h-3" /> Επαναφορά σε «Η τοποθεσία μου»
+                </button>
+              )}
+            </div>
+
+            {/* Reverse */}
+            <div className="flex items-center">
+              <div className="flex-1 border-t border-dashed border-line" />
+              <button onClick={swapEnds} title="Αντιστροφή αφετηρίας/προορισμού"
+                className="mx-2 w-7 h-7 rounded-full border border-line bg-white flex items-center justify-center text-ink/55 hover:text-brand-600 hover:border-brand-300">
+                <ArrowDownUp className="w-3.5 h-3.5" />
               </button>
-            )}
+              <div className="flex-1 border-t border-dashed border-line" />
+            </div>
           </div>
 
-          {/* Reverse */}
-          <div className="flex items-center">
-            <div className="flex-1 border-t border-dashed border-line" />
-            <button onClick={swapEnds} title="Αντιστροφή αφετηρίας/προορισμού"
-              className="mx-2 w-7 h-7 rounded-full border border-line bg-white flex items-center justify-center text-ink/55 hover:text-brand-600 hover:border-brand-300">
-              <ArrowDownUp className="w-3.5 h-3.5" />
-            </button>
-            <div className="flex-1 border-t border-dashed border-line" />
-          </div>
-
-          {/* Destination */}
+          {/* Destination (always visible) */}
           <div className="relative">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-bad-600 shrink-0" aria-hidden="true" />
@@ -677,6 +697,11 @@ export default function MapPage() {
                     </span>
                   </button>
                 ))}
+              </div>
+            )}
+            {destQuery.trim().length >= 3 && !dest && !destSearching && destResults.length === 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 px-4 py-2.5 text-[12px] text-ink/45">
+                Καμία τοποθεσία ή CRM εγγραφή. Δοκιμάστε διαφορετική αναζήτηση ή «Σημείο» στον χάρτη.
               </div>
             )}
           </div>
@@ -811,11 +836,19 @@ export default function MapPage() {
               </div>
             </div>
           ) : dest ? (
-            <div className="card p-4 bg-white/97 backdrop-blur-md shadow-cardlg animate-fadein">
-              <div className="flex items-start justify-between gap-2">
+            <div className="card p-4 pt-2 bg-white/97 backdrop-blur-md shadow-cardlg animate-fadein">
+              {/* Mobile drag/tap handle — collapse to essentials, expand for details */}
+              <button onClick={() => setSheetOpen(o => !o)} aria-expanded={sheetOpen}
+                className="sm:hidden w-full flex flex-col items-center pb-1.5 -mt-0.5" aria-label={sheetOpen ? 'Σύμπτυξη' : 'Ανάπτυξη'}>
+                <span className="w-9 h-1 rounded-full bg-ink/15" />
+                {sheetOpen ? <ChevronDown className="w-4 h-4 text-ink/30 mt-0.5" /> : <ChevronUp className="w-4 h-4 text-ink/30 mt-0.5" />}
+              </button>
+
+              <div className="flex items-start justify-between gap-2 pt-1 sm:pt-0">
                 <div className="min-w-0">
                   <Micro tone="brand">Προορισμός</Micro>
                   <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{dest.label}</h3>
+                  {dest.sublabel && <p className="text-[11px] text-ink/45 truncate">{dest.sublabel}</p>}
                 </div>
                 <button onClick={() => { setDest(null); setEta(null); mapRef.current?.clearRoute(); }}
                   className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5 shrink-0" aria-label="Καθαρισμός προορισμού">
@@ -823,33 +856,37 @@ export default function MapPage() {
                 </button>
               </div>
 
+              {/* Essentials — always visible: ETA + distance */}
               {etaBusy && (
                 <div className="mt-2 flex items-center gap-2"><Spinner /><span className="text-xs text-ink/45">Υπολογισμός διαδρομής…</span></div>
               )}
               {eta && !etaBusy && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[15px] font-bold text-ink tabular-nums">{formatDuration(eta.totalDurationSeconds)}</span>
-                    <span className="text-[13px] text-ink/55">· {formatDistance(eta.totalDistanceMeters / 1000)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                    <span className={`pill ${eta.estimated ? 'bg-warn-100 text-warn-600' : 'bg-ok-100 text-ok-600'}`}>
-                      {eta.source === 'osrm' ? 'OSRM' : eta.source === 'ors' ? 'openrouteservice' : 'εκτίμηση ευθείας'}
-                    </span>
-                    {!origin && <span className="text-warn-600">Χωρίς αφετηρία — πατήστε GPS για ΕΚΑ</span>}
-                    {eta.error && <span className="text-warn-600 truncate">{eta.error}</span>}
-                  </div>
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                  <span className="text-[15px] font-bold text-ink tabular-nums">{formatDuration(eta.totalDurationSeconds)}</span>
+                  <span className="text-[13px] text-ink/55">· {formatDistance(eta.totalDistanceMeters / 1000)}</span>
+                  <span className={`pill text-[10px] ${eta.estimated ? 'bg-warn-100 text-warn-600' : 'bg-ok-100 text-ok-600'}`}>
+                    {eta.source === 'osrm' ? 'OSRM' : eta.source === 'ors' ? 'ORS' : 'εκτίμηση'}
+                  </span>
                 </div>
               )}
-              {!origin && !etaBusy && (
-                <p className="mt-2 text-[11px] text-warn-600">Δεν υπάρχει αφετηρία. Πατήστε «GPS» ή ορίστε σημείο εκκίνησης.</p>
-              )}
 
+              {/* Details — collapsible on mobile, always shown on sm+ */}
+              <div className={`${sheetOpen ? '' : 'hidden'} sm:block`}>
+                {eta && !etaBusy && eta.error && (
+                  <p className="mt-1.5 text-[11px] text-warn-600">{eta.error}</p>
+                )}
+                {!origin && !etaBusy && (
+                  <p className="mt-2 text-[11px] text-warn-600">Δεν υπάρχει αφετηρία. Πατήστε «GPS» ή ορίστε σημείο εκκίνησης.</p>
+                )}
+              </div>
+
+              {/* Actions — Navigate always reachable; Preview in the expanded area */}
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <Btn variant="outline" onClick={() => origin && runEta(origin, dest.position, dest.label)} disabled={!origin || etaBusy}>
+                <Btn variant="outline" onClick={() => origin && runEta(origin, dest.position, dest.label)} disabled={!origin || etaBusy}
+                  className={`${sheetOpen ? '' : 'hidden'} sm:flex`}>
                   <RouteIcon className="w-3.5 h-3.5" /> Προεπισκόπηση
                 </Btn>
-                <NavigationButton destination={{ ...dest.position, label: dest.label }} origin={origin} label="Πλοήγηση" showSelector={false} travelMode={travelMode} className="w-full justify-center" />
+                <NavigationButton destination={{ ...dest.position, label: dest.label }} origin={origin} label="Πλοήγηση" showSelector={false} travelMode={travelMode} className={`w-full justify-center ${sheetOpen ? '' : 'col-span-2 sm:col-span-1'}`} />
               </div>
             </div>
           ) : (

@@ -31,6 +31,7 @@ import LeadsPage from './LeadsPage';
 
 const MyWorkPage = lazy(() => import('./MyWorkPage'));
 const ProspectingPage = lazy(() => import('./ProspectingPage'));
+const ProvidersPage = lazy(() => import('./ProvidersPage'));
 const RevenuePage = lazy(() => import('./RevenuePage'));
 
 const CustomersPage = lazy(() => import('./CustomersPage'));
@@ -456,6 +457,7 @@ export default function AppShell() {
       case 'followups': return <FollowUpsPage />;
       case 'leads': return <LeadsPage />;
       case 'prospecting': return <ProspectingPage />;
+      case 'providers': return <ProvidersPage />;
       case 'myday': return <MyDayPage />;
       case 'field': return can(role, 'check_in') ? <FieldModePage /> : <HomePage />;
       case 'map': return <MapPage />;

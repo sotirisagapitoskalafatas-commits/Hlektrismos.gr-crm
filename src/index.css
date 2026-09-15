@@ -2823,7 +2823,6 @@ body {
    on ancestors is safe for position:sticky (no scroll container),
    unlike `overflow-x: hidden`.
    ============================================================ */
-html { overflow-x: clip; }
 .app-shell { overflow-x: clip; }
 
 .l-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(16px, 3vw, 48px); align-items: center; }

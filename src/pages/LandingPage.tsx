@@ -174,6 +174,7 @@ type LeadForm = {
 function CinematicTour() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const frameRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
   const captionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const hintRef = useRef<HTMLDivElement>(null);
 
@@ -197,6 +198,19 @@ function CinematicTour() {
     });
     shown.add(0);
 
+    /* Frames stay src-less until their turn comes up. All 12 cover the same
+       inset:0 spot, so loading="lazy" can't defer them — that pulled every
+       full-screen PNG on first paint and froze low-end phones. Only the
+       current + next frames get their src attached, as the scrubbed
+       position advances. */
+    const imgs = imgRefs.current;
+    const load = (i: number) => {
+      const im = imgs[i];
+      if (im && !im.dataset.loaded) { im.src = FRAMES[i]; im.dataset.loaded = '1'; }
+    };
+    load(0);
+    load(1);
+
     const apply = (p: number) => {
       const sp = p * (N - 1);
       const base = Math.min(Math.floor(sp), N - 2);
@@ -216,6 +230,8 @@ function CinematicTour() {
       ];
       for (const [i, op, sc] of pairs) {
         if (i >= N) continue;
+        load(i);
+        load(i + 1);
         const f = frameRefs.current[i];
         if (!f) continue;
         if (!shown.has(i)) { f.style.visibility = 'visible'; shown.add(i); }
@@ -231,6 +247,7 @@ function CinematicTour() {
         let o = 0;
         if (p >= s - m && p <= e + m) o = Math.max(0, Math.min((p - (s - m)) / m, ((e + m) - p) / m, 1));
         c.style.opacity = o.toFixed(3);
+        c.style.visibility = o > 0 ? 'visible' : 'hidden';
         c.style.pointerEvents = o > 0.5 ? 'auto' : 'none';
       });
 
@@ -317,8 +334,8 @@ function CinematicTour() {
             style={{ position: 'absolute', inset: 0, opacity: i === 0 ? 1 : 0, transform: 'scale(1.06)', willChange: 'transform,opacity' }}
           >
             {i === 0
-              ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" />
-              : <img src={src} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" decoding="async" />
+              : <img ref={(el) => { imgRefs.current[i] = el; }} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             }
           </div>
         ))}

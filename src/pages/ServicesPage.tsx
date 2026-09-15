@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Phone, Menu, X } from 'lucide-react';
 import CinematicSkyBackground from '@/components/CinematicSkyBackground';
+import { footerWaveTopMask } from '@/lib/waveDivider';
 
 const services = [
   {
@@ -124,7 +125,7 @@ export default function ServicesPage() {
             <p style={{ fontSize: 'clamp(16px,1.4vw,19px)', lineHeight: 1.6, color: '#b0c4cc', margin: '20px 0 0', maxWidth: 560 }}>Ρεύμα, αέριο, φωτοβολταϊκά, ηλεκτροκίνηση — και ένας σύμβουλος που τις συνδυάζει όλες για σένα.</p>
           </section>
 
-          <section style={{ padding: '0 clamp(20px,5vw,70px) clamp(60px,8vh,100px)' }}>
+          <section style={{ padding: '0 clamp(20px,5vw,70px) calc(clamp(60px,8vh,100px) + 70px)' }}>
             <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {services.map((s) => <ServiceCard key={s.num} service={s} />)}
@@ -141,7 +142,7 @@ export default function ServicesPage() {
           </section>
         </main>
 
-        <footer style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px' }}>
+        <footer style={{ position: 'relative', overflow: 'hidden', marginTop: -110, padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px', paddingTop: 'calc(clamp(56px,7vh,80px) + 110px)', ...footerWaveTopMask }}>
           <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(4,7,10,.94) 0%,rgba(4,7,10,.90) 55%,rgba(4,7,10,.96) 100%)' }} />
           <div className="l-footer-grid" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>

@@ -41,6 +41,7 @@ const AccountPage = lazy(() => import('./AccountPage'));
 const PreferencesPage = lazy(() => import('./PreferencesPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const AutomationBuilderPage = lazy(() => import('./AutomationBuilderPage'));
+const AIWorkforcePage = lazy(() => import('./AIWorkforcePage'));
 const MyDayPage = lazy(() => import('./MyDayPage'));
 const MapPage = lazy(() => import('./MapPage'));
 const BackOfficePage = lazy(() => import('./BackOfficePage'));
@@ -586,6 +587,7 @@ export default function AppShell() {
       case 'preferences': return <PreferencesPage />;
       case 'admin': return <SettingsPage />;
       case 'automations': return <AutomationBuilderPage />;
+      case 'aiworkforce': return <AIWorkforcePage />;
       default: return <HomePage />;
     }
   })();

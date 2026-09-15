@@ -2813,3 +2813,54 @@ body {
   color: rgba(255,255,255,0.7); font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
   transition: opacity 0.4s;
 }
+
+/* ============================================================
+   Landing page — mobile responsive system.
+   The landing is styled with inline styles, which beat stylesheet
+   media queries, so its responsive-critical layouts (the contact
+   split, the form pairs, the footer grid, the cinematic viewport)
+   are expressed through these classes instead. `overflow-x: clip`
+   on ancestors is safe for position:sticky (no scroll container),
+   unlike `overflow-x: hidden`.
+   ============================================================ */
+html { overflow-x: clip; }
+.app-shell { overflow-x: clip; }
+
+.l-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(16px, 3vw, 48px); align-items: center; }
+.l-split.is-1to1 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(24px, 5vw, 56px); }
+.l-split > * { min-width: 0; width: 100%; }
+
+.l-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.l-form-row > * { min-width: 0; }
+
+.l-footer-grid { display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(140px, 1fr)); gap: clamp(20px, 3vw, 40px); }
+.l-footer-grid > * { min-width: 0; }
+
+/* Cinematic sticky viewport — dynamic viewport units for iOS/Android */
+.cine-sticky { position: sticky; top: 0; width: 100%; height: 100vh; height: 100svh; overflow: hidden; }
+
+@media (max-width: 900px) {
+  .l-split, .l-split.is-1to1 { align-items: stretch; }
+}
+
+@media (max-width: 767px) {
+  /* Core stacking — the actual mobile fix */
+  .l-split, .l-split.is-1to1 { grid-template-columns: 1fr; gap: 20px; }
+  .l-form-row { grid-template-columns: 1fr; }
+  .l-footer-grid { grid-template-columns: 1fr; gap: 28px; }
+  .app-shell footer { padding-bottom: max(28px, env(safe-area-inset-bottom)) !important; }
+
+  /* Contact micro-tune */
+  #contact .l-split { gap: 16px; }
+  #contact input, #contact select, #contact textarea { font-size: 16px; }
+
+  /* Cinematic captions — force-fit into the phone viewport.
+     Their sizes/edges are held by inline styles, so these need
+     !important to win inside this one scoped block. */
+  .cap-box { max-width: calc(100vw - 36px) !important; padding: 18px !important; border-radius: 18px !important; }
+  .cap-right { text-align: left !important; }
+  .cap-title { font-size: clamp(26px, 9vw, 38px) !important; line-height: 1.05 !important; }
+  .cap-body { font-size: 15.5px !important; max-width: 100% !important; }
+  .cap-eyebrow { font-size: 11.5px !important; }
+  .cine-cta { padding: 13px 20px !important; font-size: 14px !important; }
+}

@@ -1,6 +1,6 @@
 /* Draggable posture for the JARVIS dock — pointer drag + localStorage. */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface DockPos { x: number; y: number }
 
@@ -24,17 +24,22 @@ export function useJarvisPosition(size: { w: number; h: number }, bottomOffset: 
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch { /* ignore */ }
   }, []);
 
+  const clampToViewport = useCallback((p: DockPos): DockPos => {
+    const vp = viewport();
+    return {
+      x: Math.max(0, Math.min(vp.w - size.w - 12, p.x)),
+      y: Math.max(0, Math.min(vp.h - size.h - bottomOffset, p.y)),
+    };
+  }, [size.w, size.h, bottomOffset]);
+
   const start = useCallback(() => {
     drag.current.on = true;
   }, []);
 
   const move = useCallback((clientX: number, clientY: number) => {
     if (!drag.current.on) return;
-    const { w, h } = size;
-    const x = Math.max(0, Math.min(window.innerWidth - w, clientX - w / 2));
-    const y = Math.max(0, Math.min(window.innerHeight - h, clientY - h / 2));
-    setPos({ x, y });
-  }, [size]);
+    setPos(clampToViewport({ x: clientX - size.w / 2, y: clientY - size.h / 2 }));
+  }, [clampToViewport, size.w, size.h]);
 
   const end = useCallback(() => {
     if (!drag.current.on) return;
@@ -42,7 +47,43 @@ export function useJarvisPosition(size: { w: number; h: number }, bottomOffset: 
     save(posRef.current);
   }, [save]);
 
+  /* Re-clamp the dock into the visible viewport whenever the browser UI,
+     on-screen keyboard, or orientation changes the usable area. */
+  useEffect(() => {
+    let raf = 0;
+    const clamp = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const next = clampToViewport(posRef.current);
+        if (next.x !== posRef.current.x || next.y !== posRef.current.y) {
+          setPos(next);
+          save(next);
+        }
+      });
+    };
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', clamp);
+    vv?.addEventListener('scroll', clamp);
+    window.addEventListener('resize', clamp);
+    window.addEventListener('orientationchange', clamp);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv?.removeEventListener('resize', clamp);
+      vv?.removeEventListener('scroll', clamp);
+      window.removeEventListener('resize', clamp);
+      window.removeEventListener('orientationchange', clamp);
+    };
+  }, [clampToViewport, save]);
+
   return [pos, { dragging: drag.current.on, start, move, end }];
+}
+
+function viewport(): { w: number; h: number } {
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    if (vv.width && vv.height) return { w: vv.width, h: vv.height };
+  }
+  return { w: window.innerWidth, h: window.innerHeight };
 }
 
 function loadDock(size: { w: number; h: number }, bottomOffset: number): DockPos {
@@ -53,5 +94,6 @@ function loadDock(size: { w: number; h: number }, bottomOffset: number): DockPos
       if (typeof p.x === 'number' && typeof p.y === 'number') return p;
     }
   } catch { /* ignore */ }
-  return { x: window.innerWidth - size.w - 16, y: window.innerHeight - size.h - bottomOffset };
+  const vp = viewport();
+  return { x: vp.w - size.w - 12, y: vp.h - size.h - bottomOffset };
 }

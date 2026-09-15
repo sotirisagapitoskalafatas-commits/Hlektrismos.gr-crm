@@ -89,7 +89,7 @@ export default function ContactPage() {
               ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 32, maxWidth: 900 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 32, maxWidth: 900 }}>
               <div className="advantage-card" style={{ padding: 32, borderRadius: 16 }}>
                 <h3 style={{ margin: '0 0 24px', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Στείλε μας μήνυμα</h3>
                 {submitted ? (

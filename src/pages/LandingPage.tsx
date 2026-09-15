@@ -309,7 +309,7 @@ function CinematicTour() {
 
   return (
     <section ref={sectionRef} data-cine-section style={{ position: 'relative', width: '100%', height: '1180vh' }}>
-      <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100%', overflow: 'hidden', background: '#102033' }}>
+      <div className="cine-sticky" style={{ background: '#102033' }}>
         {FRAMES.map((src, i) => (
           <div
             key={i}
@@ -332,26 +332,27 @@ function CinematicTour() {
             ref={(el) => { captionRefs.current[i] = el; }}
             data-start={c.start}
             data-end={c.end}
+            className={c.pos === 'right' ? 'cap-box cap-right' : 'cap-box'}
             style={capStyle(c)}
           >
             {c.hero && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(59,130,246,.38)', background: 'rgba(59,130,246,.10)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
+              <span className="cap-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(59,130,246,.38)', background: 'rgba(59,130,246,.10)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
                 {c.eyebrow}
               </span>
             )}
             {!c.hero && (
-              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
+              <span className="cap-eyebrow" style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
                 {c.eyebrow}
               </span>
             )}
-            <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: c.hero ? 800 : 700, fontSize: c.hero ? 'clamp(38px,5.4vw,74px)' : 'clamp(28px,3.6vw,48px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC', textShadow: '0 4px 30px rgba(0,0,0,.55)' }}>
+            <h2 className="cap-title" style={{ fontFamily: 'var(--font-cinematic)', fontWeight: c.hero ? 800 : 700, fontSize: c.hero ? 'clamp(38px,5.4vw,74px)' : 'clamp(28px,3.6vw,48px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC', textShadow: '0 4px 30px rgba(0,0,0,.55)' }}>
               {c.hero ? (
                 c.title.includes(' ενέργειας')
                   ? <>{c.title.split(' ενέργειας')[0]}{' '}<span style={{ color: '#3B82F6' }}>ενέργειας</span></>
                   : c.title
               ) : c.title}
             </h2>
-            <p style={{ fontSize: c.hero ? 'clamp(16px,1.5vw,20px)' : 17, lineHeight: 1.55, color: '#D7DDE5', marginTop: 14, maxWidth: c.hero ? 520 : undefined, textWrap: 'pretty' as const }}>
+            <p className="cap-body" style={{ fontSize: c.hero ? 'clamp(16px,1.5vw,20px)' : 17, lineHeight: 1.55, color: '#D7DDE5', marginTop: 14, maxWidth: c.hero ? 520 : undefined, textWrap: 'pretty' as const }}>
               {c.text}
             </p>
             {c.hero && (
@@ -392,9 +393,9 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const headerRef = useRef<HTMLElement>(null);
-  const fTilts = features.map(() => useTilt());
-  const gTilts = galleryCards.map(() => useTilt<HTMLAnchorElement>());
-  const sTilts = serviceCards.map(() => useTilt());
+  const fTilts = [useTilt(), useTilt(), useTilt()];
+  const gTilts = [useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>()];
+  const sTilts = [useTilt(), useTilt(), useTilt(), useTilt(), useTilt(), useTilt()];
   const cTilt = useTilt();
 
   useLenis();
@@ -601,7 +602,7 @@ export default function LandingPage() {
 
         {/* ── About ── */}
         <section id="about" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#0d1b2d' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 56, alignItems: 'center' }}>
+          <div className="l-split is-1to1" style={{ maxWidth: 1200, margin: '0 auto' }}>
             <div>
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Ποιοι Είμαστε</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', lineHeight: 1.06, color: '#F8FAFC' }}>Ο προσωπικός σου<br />σύμβουλος ενέργειας!</h2>
@@ -643,7 +644,7 @@ export default function LandingPage() {
         <section id="contact" style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)' }}>
           <img src="/images/house-tour/10-terrace-lounge-b.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(16,32,51,.96) 0%,rgba(16,32,51,.86) 42%,rgba(16,32,51,.55) 100%)' }} />
-          <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.15fr)', gap: 48 }}>
+          <div className="l-split" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
             <div style={{ background: 'rgba(16,32,51,.74)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 24px 60px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07)' }}>
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Ζητήστε να σας καλέσουμε!</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC' }}>Έτοιμος να εξοικονομήσεις χρήματα;</h2>
@@ -670,7 +671,7 @@ export default function LandingPage() {
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ζητήστε να σας καλέσουμε</h3>
                   <p style={{ fontSize: 14, color: '#a9bcc6', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε άμεσα. 100% δωρεάν.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="l-form-row">
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Όνομα
                         <input required type="text" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
                       </label>
@@ -678,7 +679,7 @@ export default function LandingPage() {
                         <input required type="text" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
                       </label>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="l-form-row">
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Email (προαιρετικό)
                         <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
                       </label>
@@ -686,7 +687,7 @@ export default function LandingPage() {
                         <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
                       </label>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="l-form-row">
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Τύπος Ακινήτου *
                         <select required className="lead-select" value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
                           <option value="" disabled>Επιλέξτε τύπο...</option>
@@ -763,7 +764,7 @@ export default function LandingPage() {
       <footer style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px' }}>
         <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(9,17,28,.94) 0%,rgba(9,17,28,.90) 55%,rgba(9,17,28,.96) 100%)' }} />
-        <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(220px,1.4fr) repeat(3,minmax(140px,1fr))', gap: 40 }}>
+        <div className="l-footer-grid" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
           <div>
             <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 70, width: 'auto', filter: 'brightness(0) invert(1)' }} />
             <p style={{ fontSize: 14, lineHeight: 1.6, color: '#D7DDE5', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>

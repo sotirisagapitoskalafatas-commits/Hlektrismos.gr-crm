@@ -1,8 +1,8 @@
 {
   "phase": "1.1",
-  "task": "Post-merge production verification of org/team/role model (Phase 1.1) at 98cad15",
-  "status": "BLOCKED",
-  "commit": "98cad15",
+  "task": "Post-merge production verification of org/team/role model (Phase 1.1) at ebbab28",
+  "status": "PARTIAL",
+  "commit": "ebbab28",
   "branch": "main",
   "tests": {
     "typecheck": "PASS",
@@ -14,20 +14,20 @@
     "rls": "BLOCKED"
   },
   "deployment": {
-    "local": "PASS (build only)",
+    "local": "PASS (build only; dist/ freshly rebuilt at ebbab28: index-cSPHWeRJ.js)",
     "preview": "NOT_TESTED",
-    "production": "NOT_TESTED (hlektrismos-crm.vercel.app serves index-C35snZ3H.js; local HEAD build is index-8T6nNq9g.js — not current)"
+    "production": "NOT_TESTED (served build hash unknown; ebbab28 dist/ rebuilt locally — external deploy required)"
   },
   "production": {
-    "db": "BLOCKED",
-    "migration_state": "BLOCKED",
-    "harness": "BLOCKED",
+    "db": "PASS (7 pending migrations applied to nonaymiwdayfuulccxrl via supabase db push — foundation phase1, phase12 FK, phase11 org/team/role model, field-sales geofence, anon RPC revocation, field metrics, b2b scraper/catalog; all map-critical REST paths return 200 with repo .env anon key)",
+    "migration_state": "PASS (migration list local == remote, none pending)",
+    "harness": "PASS (read-only REST probes via anon key; exact fetchFieldTargets queries from api.ts:1166-1184 verified 200)",
     "rls": "BLOCKED",
     "multi_role": "BLOCKED",
     "org_isolation": "BLOCKED",
     "phase_12_regression": "BLOCKED (live); code-level PASS",
     "browser": "NOT_TESTED",
-    "map": "NOT_TESTED",
+    "map": "NOT_TESTED (Photon geocoder fixed on main c2d4e1d: lang=el removed, live-verified 200; browser PASS pending deploy)",
     "navigation": "NOT_TESTED",
     "security": "FAIL"
   },
@@ -35,12 +35,14 @@
     "Merged OpenCode Phase 1.1 additions with remote foundation: src/lib/roles.ts (catalog + predicates), src/types/crm.ts, migration 20260910103000 (role RPCs + user_roles_audit), scripts/verify_phase11.sql",
     "Confirmed single mounted AuthProvider (src/lib/auth.tsx); legacy src/hooks/useAuth.tsx present only in unreferenced files",
     "docs/PHASE-1-PRODUCTION-VERIFICATION.md: evidence-based production verification report",
+    "Geocoder fix on main c2d4e1d (cherry-pick): drop lang=el — public Photon returns HTTP 400 for it; live-verified: q=γλυφάδα returns Γλυφάδα suburb at 37.8615966/23.7545902, q=glyfada returns 6 features, reverse geocode 200",
+    "Migration-file fixes committed ebbab28: phase1 BOM stripped, update_updated_at() helper hoisted before trigger loop, phase11 partial unique constraint converted to filtered unique index, departments.division_id added before dependent index",
+    "Prod db verified: user_roles/providers/products/leads-lat-lng/field_checkins all HTTP 200; no pending migrations",
     "qa-status.json: this file"
   ],
   "blockers": [
-    "No SUPABASE_ACCESS_TOKEN, no DB password, no psql; Supabase CLI not authenticated; MCP bound to jbmccmokfvyvijmumuzn (not used as substitute).",
-    "SECURITY=FAIL: production pooler connection string with embedded password committed under supabase/.temp/ (origin/main, since b387df6); 5 test scripts embed full JWT tokens. See docs/PHASE-1-PRODUCTION-VERIFICATION.md §4. Values never printed.",
-    "Committed/compromised password deliberately NOT used for verification; requires rotation + removal from history."
+    "SECURITY=FAIL: prior finding — production pooler connection string with embedded password historically committed under supabase/.temp/ (origin/main history, since b387df6) + 5 test scripts embed full JWT tokens. supabase/.temp/ is now gitignored (nothing tracked there at HEAD); rotation + history removal of any previously committed credentials still required. Values never printed.",
+    "Committing/compromised password deliberately NOT used for verification; requires rotation + removal from history"
   ],
-  "next_action": "After credential rotation and provisioning of an authorized access path (SUPABASE_ACCESS_TOKEN or new DB password) for nonaymiwdayfuulccxrl: inspect live migration state, apply only required Phase 1.1 migration(s), run scripts/verify_phase11.sql, verify RLS / multi-role / org isolation / audit, confirm Phase 1.2 regression-free, deploy 98cad15, then browser-test production role flows."
+  "next_action": "Deploy ebbab28 to the external host and hard-refresh; run the real-browser PASS (place search Greek/Latin, select→lat/lng, reverse geocode, routing, zero-CRM-marker map). Then, with an authorized admin/service path to nonaymiwdayfuulccxrl: run scripts/verify_phase11.sql, verify RLS / multi-role / org isolation / audit, confirm Phase 1.2 regression-free on live data, and rotate/remove any committed credentials."
 }

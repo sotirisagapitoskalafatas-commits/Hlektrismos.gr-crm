@@ -51,9 +51,10 @@ function msgTone(text: string, tone: 'ok' | 'bad' = 'bad'): { tone: 'ok' | 'bad'
   return { tone, text };
 }
 
-type TabId = 'policy' | 'evaluate' | 'events' | 'tools' | 'consent';
+type TabId = 'overview' | 'policy' | 'evaluate' | 'events' | 'tools' | 'consent';
 
 const TABS: { id: TabId; label: string; icon: typeof ShieldCheck }[] = [
+  { id: 'overview', label: 'Κέντρο Ελέγχου', icon: Gauge },
   { id: 'policy', label: 'Πολιτική', icon: ShieldCheck },
   { id: 'evaluate', label: 'Δοκιμή Αποφάσεων', icon: Play },
   { id: 'events', label: 'Γεγονότα', icon: Activity },
@@ -65,7 +66,7 @@ const TABS: { id: TabId; label: string; icon: typeof ShieldCheck }[] = [
 
 export default function AutomationPage() {
   const { role } = useAuth();
-  const [tab, setTab] = useState<TabId>('policy');
+  const [tab, setTab] = useState<TabId>('overview');
 
   const canWrite = role === 'admin' || role === 'manager';
   const canConsentWrite = canWrite || role === 'back_office';
@@ -100,11 +101,12 @@ export default function AutomationPage() {
       </div>
 
       <div className="anim-fadein">
+        {tab === 'overview' && <OverviewPanel />}
         {tab === 'policy' && <PolicyPanel canWrite={canWrite} />}
         {tab === 'evaluate' && <EvaluatePanel />}
         {tab === 'events' && <EventsPanel canWrite={canWrite} />}
         {tab === 'tools' && <ToolsPanel />}
-        {tab === 'consent' && <ConsentPanel canWrite={canConsentWrite} />}
+        {tab === 'consent' && <ConsentPanel canConsentWrite={canConsentWrite} />}
       </div>
     </div>
   );
@@ -125,6 +127,154 @@ function StatCard({ icon: Icon, label, value, color }: {
         </div>
       </div>
     </Card>
+  );
+}
+
+/* ======================= Command Center (overview) ======================= */
+
+function OverviewPanel() {
+  const [rules, setRules] = useState<PolicyRule[]>([]);
+  const [tools, setTools] = useState<ToolInfo[]>([]);
+  const [calls, setCalls] = useState<ToolCallLogRow[]>([]);
+  const [events, setEvents] = useState<BusinessEvent[]>([]);
+  const [consents, setConsents] = useState<ConsentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const [arules, atools, acalls, allevents, aconsents] = await Promise.all([
+      fetchPolicyRules(), fetchTools(), fetchToolCallLogs(80), fetchRecentEvents(40), fetchConsentRecords(),
+    ]);
+    setRules(arules); setTools(atools); setCalls(acalls); setEvents(allevents); setConsents(aconsents);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const kpi = useMemo(() => ({
+    total: rules.length,
+    active: rules.filter(r => r.is_active).length,
+    approval: rules.filter(r => r.effect === 'require_approval').length,
+    deny: rules.filter(r => r.effect === 'deny').length,
+    granted: consents.filter(c => c.status === 'granted').length,
+    eventsToday: events.filter(e => e.created_at?.startsWith(today)).length,
+  }), [rules, consents, events, today]);
+
+  const toolStats = useMemo(() => {
+    const byKey = new Map<string, { calls: number; errors: number }>();
+    for (const c of calls) {
+      const s = byKey.get(c.tool_key) ?? { calls: 0, errors: 0 };
+      s.calls += 1;
+      if (c.status === 'error' || c.status === 'denied') s.errors += 1;
+      byKey.set(c.tool_key, s);
+    }
+    return tools.map(t => ({ tool: t, stats: byKey.get(t.key) ?? { calls: 0, errors: 0 } }));
+  }, [tools, calls]);
+
+  const attention = useMemo(() => {
+    const items: { id: string; kind: string; detail: string; tone: 'red' | 'amber'; at: string }[] = [];
+    for (const c of calls) {
+      if (c.status === 'error') items.push({ id: c.id, kind: 'Αποτυχία εργαλείου', detail: `${c.tool_key}${c.error ? ` · ${c.error}` : ''}`, tone: 'red', at: c.created_at });
+      if (c.status === 'denied') items.push({ id: c.id, kind: 'Κλήση απορρίφθηκε', detail: c.tool_key, tone: 'amber', at: c.created_at });
+    }
+    for (const co of consents) {
+      if (co.status === 'revoked') items.push({ id: co.id, kind: 'Ανάκληση συναίνεσης', detail: `${co.channel} · ${co.consent_type}`, tone: 'amber', at: co.created_at });
+    }
+    return items.slice(0, 8);
+  }, [calls, consents]);
+
+  if (loading) return <div className="flex justify-center py-16"><Spinner /></div>;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard icon={Gauge} label="Κανόνες" value={kpi.total} color="#475569" />
+        <StatCard icon={Zap} label="Ενεργοί" value={kpi.active} color="#16a34a" />
+        <StatCard icon={ShieldCheck} label="Χρ. Έγκρισης" value={kpi.approval} color="#d97706" />
+        <StatCard icon={X} label="Αποκλεισμοί" value={kpi.deny} color="#dc2626" />
+        <StatCard icon={Fingerprint} label="Συναινέσεις" value={kpi.granted} color="#0066cc" />
+        <StatCard icon={Activity} label="Γεγονότα σήμερα" value={kpi.eventsToday} color="#7c5cfc" />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-3 items-start">
+        <Card>
+          <CardHeader micro="AI workforce" title="AI Εργατικό Δυναμικό" />
+          {toolStats.length === 0 ? (
+            <EmptyState icon={Bot} title="Δεν έχουν καταγραφεί εργαλεία" hint="Τα εργαλεία της AI workforce δεν έχουν ρυθμιστεί ακόμα." />
+          ) : (
+            <div className="divide-y divide-line">
+              {toolStats.map(({ tool, stats }) => (
+                <div key={tool.id} className="flex items-center gap-3 px-5 py-3">
+                  <span className="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-ink/[0.05] text-ink/60">
+                    <Bot className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-ink">{tool.name}</span>
+                      <Pill tone={tool.is_active ? 'green' : 'gray'}>{tool.is_active ? 'ενεργό' : 'απενεργό'}</Pill>
+                    </div>
+                    <Micro className="mt-0.5 block truncate">{tool.category} · {tool.description || tool.key}</Micro>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Pill tone="blue">{stats.calls} κλήσεις</Pill>
+                    {stats.errors > 0 && <Pill tone="red">{stats.errors} σφάλματα</Pill>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <div className="space-y-3">
+          <Card>
+            <CardHeader micro="needs attention" title="Χρειάζονται προσοχή" action={
+              attention.length > 0 ? <Pill tone="red">{attention.length}</Pill> : undefined
+            } />
+            {attention.length === 0 ? (
+              <EmptyState icon={CheckCircle2} title="Όλα υγιή" hint="Χωρίς αποτυχίες εργαλείων, απορρίψεις ή ανακαλέσεις προς το παρόν." />
+            ) : (
+              <div className="divide-y divide-line">
+                {attention.map(item => (
+                  <div key={item.id} className="flex items-start gap-3 px-5 py-2.5">
+                    <Pill tone={item.tone}>{item.kind}</Pill>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12.5px] text-ink truncate">{item.detail}</div>
+                      <Micro className="mt-0.5">{fmtDateTime(item.at)}</Micro>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader micro="recent activity" title="Πρόσφατη Δραστηριότητα" />
+            {events.length === 0 ? (
+              <EmptyState icon={Activity} title="Καμία δραστηριότητα ακόμα" hint="Τα νέα επιχειρηματικά γεγονότα εμφανίζονται εδώ." />
+            ) : (
+              <div className="divide-y divide-line">
+                {events.slice(0, 8).map(ev => (
+                  <div key={ev.id} className="flex items-center gap-3 px-5 py-2.5">
+                    <span className="w-1.5 h-6 rounded-full shrink-0" style={{ background: rgbaOf('#0066cc', 0.35) }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="text-[13px] font-medium text-ink font-mono">{ev.event_type}</span>
+                        <Pill tone="blue">{ev.source}</Pill>
+                      </div>
+                      <div className="text-[11.5px] text-ink/45 mt-0.5 truncate">
+                        {ev.entity_type ? `${ev.entity_type} ${shortId(ev.entity_id)} · ` : ''}
+                        {ev.actor_type} {shortId(ev.actor_id || ev.agent_id)} · {fmtDateTime(ev.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }
 

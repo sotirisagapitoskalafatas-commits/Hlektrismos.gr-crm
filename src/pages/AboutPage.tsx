@@ -1,4 +1,5 @@
-import { ArrowRight, ShieldCheck, TrendingUp, Users, Phone, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, ShieldCheck, TrendingUp, Users, Phone, Zap, Menu, X } from 'lucide-react';
 
 const values = [
   { icon: Users, title: 'Εξατομικευμένη Φροντίδα', text: 'Κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, με υπηρεσίες προσαρμοσμένες στις δικές του ανάγκες.' },
@@ -7,20 +8,22 @@ const values = [
 ];
 
 export default function AboutPage() {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-shell">
       <header className="site-header scrolled">
         <div className="container nav-wrap">
           <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
-          <nav className="main-nav open">
-            <a href="#/">Αρχική</a>
-            <a href="#/about">Σχετικά</a>
-            <a href="#/services">Υπηρεσίες</a>
-            <a href="#/energy">Ενέργεια</a>
-            <a href="#/faq">Συχνές Ερωτήσεις</a>
-            <a href="#/contact">Επικοινωνία</a>
-            <a href="#/login" className="nav-dashboard">Σύνδεση</a>
+          <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
+            <a href="#/" onClick={() => setMenuOpen(false)}>Αρχική</a>
+            <a href="#/about" onClick={() => setMenuOpen(false)}>Σχετικά</a>
+            <a href="#/services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
+            <a href="#/energy" onClick={() => setMenuOpen(false)}>Ενέργεια</a>
+            <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
+            <a href="#/contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
+            <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
           </nav>
+          <button className="menu-button" aria-label="Μενού" aria-expanded={menuOpen} onClick={() => setMenuOpen(o => !o)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
         </div>
       </header>
 

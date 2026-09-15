@@ -1,4 +1,4 @@
-﻿-- =============================================================================
+-- =============================================================================
 -- CRM OS — Phase 1 Foundation
 -- -----------------------------------------------------------------------------
 -- Highest-priority missing foundation for the CRM OS build out:
@@ -392,6 +392,15 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 16. updated_at triggers for the new tables
 -- ---------------------------------------------------------------------------
+-- Generic updated_at helper used by the BEFORE UPDATE triggers below (also
+-- re-declared idempotently by the phase11 migration).
+create or replace function public.update_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = timezone('utc', now());
+  return new;
+end $$;
+
 do $$
 declare t text;
 begin

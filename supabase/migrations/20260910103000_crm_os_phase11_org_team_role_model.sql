@@ -105,9 +105,10 @@ create table if not exists public.business_events (
   actor_type       text,
   actor_id         uuid,
   payload          jsonb not null default '{}'::jsonb,
-  created_at       timestamptz not null default now(),
-  constraint business_events_idem_uq unique (idempotency_key) where (idempotency_key is not null)
+  created_at       timestamptz not null default now()
 );
+
+create unique index if not exists business_events_idem_uq on public.business_events (idempotency_key) where (idempotency_key is not null);
 
 alter table public.profiles add column if not exists organization_id uuid references public.organizations(id);
 alter table public.profiles add column if not exists department_id uuid references public.departments(id);
@@ -137,6 +138,7 @@ alter table public.business_events enable row level security;
 create index if not exists divisions_org_idx        on public.divisions (organization_id);
 create index if not exists divisions_parent_idx     on public.divisions (parent_id);
 create unique index if not exists divisions_org_code_uq on public.divisions (organization_id, code) where (code is not null);
+alter table public.departments add column if not exists division_id uuid references public.divisions(id);
 create index if not exists departments_org_idx      on public.departments (organization_id);
 create index if not exists departments_division_idx on public.departments (division_id);
 create index if not exists territories_org_idx      on public.territories (organization_id);

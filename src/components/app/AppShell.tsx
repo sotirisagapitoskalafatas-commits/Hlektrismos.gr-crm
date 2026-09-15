@@ -5,16 +5,17 @@ import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, ROLES, can,
-  findNav, flattenNav, navForRole, roleLabel, sectionColor,
+  findNav, flattenNav, leadStatusInfo, navForRole, roleLabel, sectionColor, stageLabel,
 } from '@/lib/roles';
-import type { NavLeaf, ShellCounts, Stage } from '@/lib/roles';
-import { Btn, IconBtn, Logo, Micro, Modal, Spinner, rgbaOf, timeUntil } from '@/lib/ui';
+import type { NavLeaf, PageKey, ShellCounts, Stage } from '@/lib/roles';
+import { Btn, IconBtn, Logo, Micro, Modal, Spinner, fmtMoney, rgbaOf, timeUntil } from '@/lib/ui';
+import type { Customer, Lead } from '@/lib/api';
 import {
   AppNotification, Case, fetchCases, fetchCustomers, fetchFollowUps, fetchLeads,
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, Briefcase, CalendarClock, ChevronDown, ChevronRight, CircleHelp, Download, LogOut,
+  Bell, Briefcase, CalendarClock, ChevronDown, ChevronRight, CircleHelp, Download, FileText, LogOut,
   Menu, Plus, Search, SlidersHorizontal, UserCircle, UserPlus, UsersRound, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';
@@ -380,24 +381,48 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { role } = useAuth();
   const { go, openCase } = useNav();
   const [q, setQ] = useState('');
-  const [hits, setHits] = useState<Case[]>([]);
+  const [caseHits, setCaseHits] = useState<Case[]>([]);
+  const [leadHits, setLeadHits] = useState<Lead[]>([]);
+  const [customerHits, setCustomerHits] = useState<Customer[]>([]);
 
-  const items = flattenNav(navForRole(role));
+  const nav = navForRole(role);
+  const items = flattenNav(nav);
   const hay = q.toLowerCase().trim();
 
-  useEffect(() => { if (open) { setQ(''); setHits([]); } }, [open]);
+  useEffect(() => {
+    if (open) { setQ(''); setCaseHits([]); setLeadHits([]); setCustomerHits([]); }
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return;
-    if (hay.length < 2) { setHits([]); return; }
+    if (!open || hay.length < 2) { setCaseHits([]); setLeadHits([]); setCustomerHits([]); return; }
     const t = setTimeout(async () => {
-      setHits((await fetchCases({ search: hay })).slice(0, 5));
-    }, 180);
+      const [cs, ls, customers] = await Promise.all([fetchCases({ search: hay }), fetchLeads(), fetchCustomers()]);
+      setCaseHits(cs.slice(0, 5));
+      setLeadHits(ls.filter(l =>
+        (l.full_name ?? '').toLowerCase().includes(hay) ||
+        (l.phone ?? '').toLowerCase().includes(hay)
+      ).slice(0, 5));
+      setCustomerHits(customers.filter(c =>
+        (c.full_name ?? '').toLowerCase().includes(hay) ||
+        (c.phone ?? '').toLowerCase().includes(hay) ||
+        (c.company ?? '').toLowerCase().includes(hay)
+      ).slice(0, 5));
+    }, 200);
     return () => clearTimeout(t);
   }, [hay, open]);
 
   const modules = items.filter(i => !hay || i.item.label.toLowerCase().includes(hay) || i.item.key.includes(hay));
-  const canCreate = can(role, 'create_case');
+
+  const commands = [
+    { id: 'case', label: 'Νέο Case', page: 'cases' as PageKey, gate: can(role, 'create_case') },
+    { id: 'lead', label: 'Νέο Lead', page: 'leads' as PageKey, gate: items.some(x => x.item.page === 'leads') },
+    { id: 'customer', label: 'Νέος Πελάτης', page: 'customers' as PageKey, gate: items.some(x => x.item.page === 'customers') },
+    { id: 'followup', label: 'Νέο Follow Up', page: 'followups' as PageKey, gate: can(role, 'create_followup') },
+  ].filter(c => c.gate && (!hay || c.label.toLowerCase().includes(hay)));
+
+  const offerHits = caseHits.filter(c => c.current_stage === 'offer');
+  const searching = hay.length >= 2;
+  const hasResults = caseHits.length > 0 || offerHits.length > 0 || leadHits.length > 0 || customerHits.length > 0;
 
   return (
     <Modal open={open} onClose={onClose} title="Command Center" micro={`⌘K — Search`}>
@@ -405,43 +430,101 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
         <Search className="w-4 h-4 text-ink/40" />
         <input autoFocus value={q} onChange={e => setQ(e.target.value)}
           className="flex-1 bg-transparent outline-none text-sm text-ink placeholder:text-ink/35"
-          placeholder="Πληκτρολογήστε για να πλοηγηθείτε ή αναζητήστε case…" />
+          placeholder="Πληκτρολογήστε για να πλοηγηθείτε ή αναζητήστε…" />
         <button onClick={onClose} className="text-ink/40 hover:text-ink"><X className="w-4 h-4" /></button>
       </div>
 
       <div className="mt-3 max-h-80 overflow-y-auto -mx-1">
-        {!hay && canCreate && (
+        {commands.length > 0 && (
           <>
-            <button onClick={() => { go('cases'); onClose(); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
-              <Plus className="w-4 h-4 text-ink/40" /> <span className="font-medium">Νέο Case</span>
-            </button>
-            <div className="micro text-ink/30 px-3 pt-2 pb-1">Μονάδες</div>
+            <div className="micro text-ink/30 px-3 pt-1 pb-1">Μεταβάσεις</div>
+            <div className="grid grid-cols-2 gap-1 px-1">
+              {commands.map(c => (
+                <button key={c.id} onClick={() => { go(c.page); onClose(); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-line bg-white hover:bg-ink/5 text-[13px] font-medium text-ink/80 text-left">
+                  <Plus className="w-4 h-4 text-ink/40 shrink-0" /> <span className="truncate">{c.label}</span>
+                </button>
+              ))}
+            </div>
           </>
         )}
 
-        {modules.length > 0 && modules.map(({ item }) => (
+        <div className="micro text-ink/30 px-3 pt-3 pb-1">Μονάδες</div>
+        {modules.length > 0 ? modules.map(({ item }) => (
           <button key={item.key} onClick={() => { go(item.page); onClose(); }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
             <item.icon className="w-4 h-4 text-ink/40" /> <span className="font-medium">{item.label}</span>
           </button>
-        ))}
-
-        {hay.length >= 2 && (
-          <>
-            <div className="micro text-ink/30 px-3 pt-3 pb-1">Cases</div>
-            {hits.map(c => (
-              <button key={c.id} onClick={() => { openCase(c.id); onClose(); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
-                <span className="font-mono text-[11px] text-ink/45 w-20 truncate">{c.case_no}</span>
-                <span className="font-medium truncate">{c.customer?.full_name ?? c.title}</span>
-              </button>
-            ))}
-            {hits.length === 0 && <div className="px-3 py-2 text-xs text-ink/40">Κανένα case δεν ταιριάζει.</div>}
-          </>
+        )) : (
+          <div className="px-3 py-2 text-xs text-ink/40">Καμία ενότητα δεν ταιριάζει.</div>
         )}
 
-        {!hay && modules.length === 0 && <div className="text-center text-xs text-ink/40 py-4">Δεν υπάρχουν διαθέσιμες ενότητες για τον ρόλο σας.</div>}
+        {searching && (
+          <>
+            {(caseHits.length > 0 || offerHits.length > 0) && (
+              <>
+                <div className="micro text-ink/30 px-3 pt-3 pb-1">Cases</div>
+                {caseHits.map(c => (
+                  <button key={c.id} onClick={() => { openCase(c.id); onClose(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
+                    <span className="font-mono text-[11px] text-ink/45 w-20 truncate">{c.case_no}</span>
+                    <span className="font-medium truncate flex-1">{c.customer?.full_name ?? c.title}</span>
+                    <span className="pill" style={{ background: rgbaOf('#0066cc', 0.12), color: '#0066cc' }}>{stageLabel(c.current_stage)}</span>
+                  </button>
+                ))}
+                {offerHits.length > 0 && (
+                  <>
+                    <div className="micro text-ink/30 px-3 pt-2 pb-1">Προσφορές</div>
+                    {offerHits.map(c => (
+                      <button key={c.id} onClick={() => { openCase(c.id); onClose(); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
+                        <FileText className="w-4 h-4 text-ink/40" />
+                        <span className="font-mono text-[11px] text-ink/45 w-20 truncate">{c.case_no}</span>
+                        <span className="font-medium truncate flex-1">{c.customer?.full_name ?? c.title}</span>
+                        <span className="micro text-ink/35">{fmtMoney(c.value)}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+
+            {leadHits.length > 0 && (
+              <>
+                <div className="micro text-ink/30 px-3 pt-3 pb-1">Leads</div>
+                {leadHits.map(l => {
+                  const st = leadStatusInfo(l.status);
+                  return (
+                    <button key={l.id} onClick={() => { go('leads'); onClose(); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
+                      <span className="text-sm" aria-hidden="true">{st.emoji}</span>
+                      <span className="font-medium truncate flex-1">{l.full_name ?? l.phone ?? 'Ανώνυμος'}</span>
+                      <span className="pill" style={{ background: rgbaOf('#0066cc', 0.1), color: '#0066cc' }}>{st.label}</span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+
+            {customerHits.length > 0 && (
+              <>
+                <div className="micro text-ink/30 px-3 pt-3 pb-1">Πελάτες</div>
+                {customerHits.map(c => (
+                  <button key={c.id} onClick={() => { go('customers'); onClose(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-ink/5 text-[13px] text-ink/80">
+                    <UsersRound className="w-4 h-4 text-ink/40 shrink-0" />
+                    <span className="font-medium truncate flex-1">{c.full_name}</span>
+                    <span className="micro text-ink/35 truncate max-w-[120px]">{c.company ?? c.city ?? c.phone}</span>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {searching && !hasResults && modules.length > 0 && (
+              <div className="px-3 py-2 text-xs text-ink/40">Κανένα αποτέλεσμα για «{hay}».</div>
+            )}
+          </>
+        )}
       </div>
     </Modal>
   );

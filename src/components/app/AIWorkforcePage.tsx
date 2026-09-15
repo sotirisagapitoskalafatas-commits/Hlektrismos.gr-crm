@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Bot, BotMessages, Activity, Users, ShieldCheck, Gauge, Crown, Clock,
+  Bot, Activity, Users, ShieldCheck, Gauge, Crown, Clock,
   CheckCircle2, AlertTriangle, Ban, PauseCircle, ChevronRight, ChevronDown,
   Building2, Layers, KeyRound, XCircle, Sparkles, Search, HeartPulse, Minus,
 } from 'lucide-react';
@@ -27,7 +27,7 @@ const PERM_LABEL: Record<string, string> = {
 };
 
 const DEPT_ICON: Record<string, any> = {
-  crm_read: Search, crm_write: KeyRound, communication: BotMessages,
+  crm_read: Search, crm_write: KeyRound, communication: Bot,
   analytics: Gauge, admin: ShieldCheck,
 };
 
@@ -149,7 +149,7 @@ export default function AIWorkforcePage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ToolInfo | null>(null);
   const [tab, setTab] = useState('overview');
-  const [why, setWhy] = useState<ToolCallLogRow | null>(null在想);
+  const [why, setWhy] = useState<ToolCallLogRow | null>(null);
   const [expandedCat, setExpandedCat] = useState<string | null>('crm_read');
 
   useEffect(() => {
@@ -314,9 +314,9 @@ export default function AIWorkforcePage() {
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard label="Συνολικές κλήσεις" value={String(totalCalls)} sub="Από tool_call_log" hint="Ολόκληρο το ημερολόγιο" />
-            <StatCard label="Επιτυχία" value={successes} sub={`${Math.round((successes / Math.max(totalCalls, 1)) * 100)}%`} hint="status = success" />
-            <StatCard label="Έγκριση" value={approved} sub="Δεν απαιτεί ανθρώπινη έγκριση ακόμα" hint="status = approved" />
-            <StatCard label="Σφάλματα" value={errors} sub="Απαιτούν προσοχή" hint="status = error" />
+            <StatCard label="Επιτυχία" value={String(successes)} sub={`${Math.round((successes / Math.max(totalCalls, 1)) * 100)}%`} hint="status = success" />
+            <StatCard label="Έγκριση" value={String(approved)} sub="Δεν απαιτεί ανθρώπινη έγκριση ακόμα" hint="status = approved" />
+            <StatCard label="Σφάλματα" value={String(errors)} sub="Απαιτούν προσοχή" hint="status = error" />
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
@@ -345,7 +345,7 @@ export default function AIWorkforcePage() {
                 ))}
               </div>
             ) : (
-              <EmptyState icon={<BotMessages className="h-6 w-6" />} title="Καμία κλήση ακόμα" hint="DESIGNED / NO DATA — δεν έχει εκτελεστεί κανένα εργαλείο." />
+              <EmptyState icon={Bot} title="Καμία κλήση ακόμα" hint="DESIGNED / NO DATA — δεν έχει εκτελεστεί κανένα εργαλείο." />
             )}
           </div>
         </>
@@ -435,13 +435,13 @@ export default function AIWorkforcePage() {
                     ))}
                   </div>
                 ) : (
-                  <EmptyState icon={<BotMessages className="h-6 w-6" />} title="Καμία κλήση" hint="DESIGNED / NO DATA" />
+                  <EmptyState icon={Bot} title="Καμία κλήση" hint="DESIGNED / NO DATA" />
                 );
               })()
             )}
             {['skills', 'memory', 'activity', 'versions'].includes(tab) && (
               <EmptyState
-                icon={tab === 'memory' ? <HeartPulse className="h-6 w-6" /> : <Layers className="h-6 w-6" />}
+                icon={tab === 'memory' ? HeartPulse : Layers}
                 title={tab === 'skills' ? 'Δεξιότητες' : tab === 'memory' ? 'Memory' : tab === 'activity' ? 'Δραστηριότητα' : 'Έκδοση'}
                 hint="DESIGNED / NOT CONNECTED — δεν υπάρχει ακόμα backend για αυτή την προβολή."
               />

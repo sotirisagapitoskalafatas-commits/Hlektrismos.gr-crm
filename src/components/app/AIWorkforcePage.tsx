@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Bot, Activity, Users, ShieldCheck, Gauge, Crown, Clock,
   CheckCircle2, AlertTriangle, Ban, PauseCircle, ChevronRight, ChevronDown,
-  Building2, Layers, KeyRound, XCircle, Sparkles, Search, HeartPulse, Minus,
+  Building2, Layers, KeyRound, XCircle, Sparkles, Search, HeartPulse, Minus, CircleDot,
 } from 'lucide-react';
 import type {
   ToolInfo, PolicyRule, PolicyEffect, ToolCallLogRow,
@@ -10,9 +10,10 @@ import type {
 import { fetchTools, fetchPolicyRules, fetchToolCallLogs } from '@/lib/api';
 import { Card, Pill, Btn, Modal, EmptyState, Spinner, Micro } from '@/lib/ui';
 
-type Autonomy = 1 | 2 | 3 | 4 | 51;
+type Autonomy = 1 | 2 | 3 | 4 | 5;
+type Status = 'ACTIVE' | 'SHADOW' | 'PAUSED' | 'NEEDS_ATTENTION' | 'SUSPENDED' | 'OFFLINE';
 
-const AUTONOMY_LABEL: Record<string, string> = {
+const AUTONOMY_LABEL: Record<number, string> = {
   1: 'Πρόταση', 2: 'Πρόταση + Έγκριση', 3: 'Εκτέλεση με Έλεγχο',
   4: 'Εκτέλεση', 5: 'Προσαρμοστική Εκτέλεση',
 };
@@ -23,15 +24,8 @@ const EFFECT_LABEL: Record<PolicyEffect, string> = {
 
 const PERM_LABEL: Record<string, string> = {
   crm_read: 'Ανάγνωση CRM', crm_write: 'Εγγραφή CRM', communication: 'Επικοινωνία',
-  analytics: 'Αναλυτική', admin: 'Διαχείριση',
+  analytics: 'Αναλυτικά', admin: 'Διαχείριση',
 };
-
-const DEPT_ICON: Record<string, any> = {
-  crm_read: Search, crm_write: KeyRound, communication: Bot,
-  analytics: Gauge, admin: ShieldCheck,
-};
-
-type Status = 'ACTIVE' | 'SHADOW' | 'PAUSED' | 'NEEDS_ATTENTION' | 'SUSPENDED' | 'OFFLINE';
 
 const STATUS_META: Record<Status, { label: string; cls: string; icon: any }> = {
   ACTIVE: { label: 'Ενεργό', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', icon: CheckCircle2 },
@@ -106,7 +100,7 @@ const OVERVIEW_TABS = [
   { id: 'skills', label: 'Δεξιότητες' },
   { id: 'memory', label: 'Memory' },
   { id: 'activity', label: 'Δραστηριότητα' },
-  { id: 'versions', label: 'Έκδοση' },
+  { id: 'versions', label: 'Εκδοση' },
 ];
 
 function WhyModal({ log, onClose }: { log: ToolCallLogRow | null; onClose: () => void }) {
@@ -115,26 +109,14 @@ function WhyModal({ log, onClose }: { log: ToolCallLogRow | null; onClose: () =>
       {log && (
         <div className="flex flex-col gap-3">
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-slate-500">ΤΙ ΣΥΝΕΒΗ</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">ΤΙΒ ΕΞΟΔΟΣ</div>
             <div className="mt-1 text-sm text-slate-200">{log.tool_key} · {log.status}</div>
             <div className="mt-1 font-mono text-[11px] text-slate-500">{typeof log.request === 'string' ? log.request.slice(0, 160) : JSON.stringify(log.request ?? {}).slice(0, 160)}</div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-slate-500">ΓΙΑΤΙ</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">ΑΠΟΤΕΛΕΣΜΑ</div>
             <div className="mt-1 text-sm text-slate-200">{log.error ?? 'Εκτελέστηκε σύμφωνα με την πολιτική'}</div>
-            <div className="mt-1 text-[11px] text-slate-500">ΑΝΑΛΥΣΗ ΑΠΟΦΑΣΗΣ: DESIGNED / NOT CONNECTED</div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-              <div className="text-[11px] uppercase tracking-wider text-slate-500">ΑΠΟΤΕΛΕΣΜΑ</div>
-              <div className="mt-1 text-sm text-slate-200">{log.status}{log.latency_ms != null ? ` · ${log.latency_ms}ms` : ''}</div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-              <div className="text-[11px] uppercase tracking-wider text-slate-500">ΕΠΙΒΕΒΑΙΩΣΗ / ΕΓΚΡΙΣΗ</div>
-              <div className="mt-1 text-sm text-slate-200">{log.caller_type}{log.caller_id ? ` · ${log.caller_id}` : ''}</div>
-            </div>
-          </div>
-          <Btn onClick={onClose} className="w-full">Κλείσιμο</Btn>
         </div>
       )}
     </Modal>
@@ -146,10 +128,10 @@ export default function AIWorkforcePage() {
   const [rules, setRules] = useState<PolicyRule[]>([]);
   const [logs, setLogs] = useState<ToolCallLogRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<ToolInfo | null>(null);
   const [tab, setTab] = useState('overview');
+  const [selected, setSelected] = useState<ToolInfo | null>(null);
   const [why, setWhy] = useState<ToolCallLogRow | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<string | null>('crm_read');
 
   useEffect(() => {
@@ -162,7 +144,7 @@ export default function AIWorkforcePage() {
         setRules(r ?? []);
         setLogs(l ?? []);
       } catch (e) {
-        if (mounted) setError(e instanceof Error ? e.message : 'Αδυναμία φόρτωσης');
+        if (mounted) setError(e instanceof Error ? e.message : 'Σφάλμα φόρτωσης');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -173,18 +155,14 @@ export default function AIWorkforcePage() {
   const agents: AgentMeta[] = useMemo(() => {
     return tools.map((tool) => {
       const { effect, policy } = effectFor(tool, rules);
-      const ll = logs.filter((l) => l.tool_key === tool.key);
-      return { tool, effect, policy, logs: ll };
+      return { tool, effect, policy, logs: logs.filter((l) => l.tool_key === tool.key) };
     });
   }, [tools, rules, logs]);
 
-  const totalCalls = logs.length;
-  const successes = logs.filter((l) => l.status === 'success').length;
-  const denied = logs.filter((l) => l.status === 'denied').length;
-  const approved = logs.filter((l) => l.status === 'approved').length;
-  const errors = logs.filter((l) => l.status === 'error').length;
   const activeCount = agents.filter((a) => statusFrom(a.tool, a.logs, a.effect) === 'ACTIVE').length;
   const attentionCount = agents.filter((a) => statusFrom(a.tool, a.logs, a.effect) === 'NEEDS_ATTENTION').length;
+  const totalCalls = logs.length;
+  const errors = logs.filter((l) => l.status === 'error').length-1;
 
   const tree = useMemo(() => {
     const m: Record<string, AgentMeta[]> = {};
@@ -200,253 +178,177 @@ export default function AIWorkforcePage() {
     const Icon = meta.icon;
     const autonomy = autonomyFromEffect(a.effect);
     const dept = deptOf(a.tool);
-    const done = doneToday(a.logs);
-    const rate = successRate(a.logs);
     return (
-      <button
-        key={a.tool.key}
-        onClick={() => { setSelected(a.tool); setTab('overview'); }}
-        className="group flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-left transition-colors hover:border-slate-600"
-      >
+      <Btn key={a.tool.key} onClick={() => { setSelected(a.tool); setTab('overview'); }} className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-white p-4 text-left hover:border-slate-400">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800/60">
-              <Bot className="h-5 w-5 text-slate-300" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+              <Bot className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-slate-100">{a.tool.name}</div>
+              <div className="text-sm font-semibold text-navy-900">{a.tool.name}</div>
               <div className="text-xs text-slate-500">{dept} · {a.tool.key}</div>
             </div>
           </div>
-          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${meta.cls}`}>
+          <span className={`inline-flex items-center gap-2 rounded-full border px-2 py-0.5 text-[11px] ${meta.cls}`}>
             <Icon className="h-3 w-3" /> {meta.label}
           </span>
         </div>
-        <p className="text-xs text-slate-400 line-clamp-2">{a.tool.description}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill className="bg-slate-800/60 text-slate-300 border-slate-700">L{autonomy} · {AUTONOMY_LABEL[autonomy]}</Pill>
-          <Pill className="bg-slate-800/60 text-slate-300 border-slate-700">{EFFECT_LABEL[a.effect]}</Pill>
-          <Pill className="bg-slate-800/60 text-slate-300 border-slate-700">{a.logs.length} κλήσεις</Pill>
-        </div>
-        <div className="grid grid-cols-3 gap-2 border-t border-slate-800 pt-3 text-center">
-          <div>
-            <div className="text-sm font-semibold text-emerald-300">{done}</div>
-            <div className="text-[10px] text-slate-500">Σήμερα</div>
+        <p className="text-xs leading-5 text-slate-600 line-clamp-2">{a.tool.description}</p>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-1 text-xs text-slate-600">
+            <Gauge className="h-3.5 w-3.5 text-sky-600" /> L{autonomy} · {AUTONOMY_LABEL[autonomy]}
           </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-100">{rate === null ? '—' : `${rate}%`}</div>
-            <div className="text-[10px] text-slate-500">Επιτυχία</div>
+          <div className="flex items-center gap-1 text-xs text-slate-600">
+            <ShieldCheck className="h-3.5 w-3.5 text-sky-600" /> {EFFECT_LABEL[a.effect]}
           </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-100">
-              {a.logs.length ? new Date(a.logs[a.logs.length - 1].created_at).toLocaleDateString('el-GR') : '—'}
-            </div>
-            <div className="text-[10px] text-slate-500">Τελευταία</div>
+          <div className="flex items-center gap-1 text-xs text-slate-600">
+            <Activity className="h-3.5 w-3.5 text-slate-400" /> {a.logs.length} κλήσεις
           </div>
         </div>
-      </button>
+      </Btn>
     );
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Micro className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-semibold text-slate-100">ΑΙ Εργατικό Δυναμικό</div>
-          <div className="text-xs text-slate-400">Οι AI εργαζόμενοι είναι τα πραγματικά εργαλεία, οι πολιτικές αυτονομίας και το ημερολόγιο κλήσεων του CRM.</div>
+          <div className="flex items-center gap-2 text-xl font-semibold text-navy-900">
+            <Bot className="h-5 w-5 text-sky-600" /> AI Εργατικό Δυναμικό
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Τα πραγματικά εργαλεία και οι πολιτικές αυτονομίας που εκτελούν εργασία στο CRM.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill className="bg-emerald-500/15 text-emerald-300 border-emerald-500/40"><CheckCircle2 className="h-3 w-3" /> {activeCount} ενεργά</Pill>
-          <Pill className="bg-slate-800/60 text-slate-300 border-slate-700"><Users className="h-3 w-3" /> {tools.length} εργαλεία</Pill>
-          <Pill className="bg-slate-800/60 text-slate-300 border-slate-700"><Activity className="h-3 w-3" /> {totalCalls} κλήσεις</Pill>
-          {attentionCount > 0 && (
-            <Pill className="bg-amber-500/15 text-amber-300 border-amber-500/40"><AlertTriangle className="h-3 w-3" /> {attentionCount} προσοχή</Pill>
-          )}
-        </div>
-      </Micro>
+        <Pill className="hidden items-center gap-1.5 border border-slate-200 bg-white text-slate-600 sm:inline-flex">
+          <CircleDot className="h-3 w-3 text-emerald-600" /> {activeCount} ενεργά
+        </Pill>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Σύνολο εργαλείων" value={String(tools.length)} sub={`${activeCount} ενεργά`} hint="Μετρημένο από policy_rules" />
+        <StatCard label="Κλήσεις σήμερα" value={String(doneToday(logs))} sub={`${successRate(logs) ?? 0}% επιτυχία`} hint="status = success" />
+        <StatCard label="Χρειάζονται προσοχή" value={String(attentionCount)} sub="status = needs_attention" hint="Από tool_call_log" />
+        <StatCard label="Λάθη" value={String(errors)} sub="status = error" hint="Από tool_call_log" />
+      </div>
 
       {loading && <div className="flex justify-center py-16"><Spinner /></div>}
 
       {error && !loading && (
-        <Card className="p-5 border-rose-500/40 bg-rose-500/5">
-          <div className="text-sm text-rose-300">{error}</div>
-        </Card>
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-5">
+          <div className="text-sm text-rose-600">{error}</div>
+        </div>
       )}
 
       {!loading && !error && (
-        <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {agents.map(renderAgentCard)}
-          </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {agents.map(renderAgentCard)}
+        </div>
+      )}
 
-          <Card className="p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-100">
-              <Layers className="h-4 w-4 text-slate-400" /> Ιεραρχία ΑΙ (JARVIS)
-            </div>
-            <div className="flex flex-col gap-2">
-              {Object.entries(tree).map(([cat, list]) => (
-                <div key={cat}>
+      <Card className="p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-navy-900">
+          <Layers className="h-4 w-4 text-sky-600" /> Ιεραρχία ΑΒ (JARVIS)
+        </div>
+        <div className="flex flex-col gap-2">{(Object.entries(tree) ?? []).map(([cat, list]) => (
+          <div key={cat}>
+            <button
+              onClick={() => setExpandedCat(expandedCat === cat ? null : cat)}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs font-medium text-navy-900 hover:bg-slate-50"
+            >
+              {expandedCat === cat ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Building2 className="h-3 w-3 text-slate-400" /> {PERM_LABEL[cat] ?? cat} <span className="text-slate-400">({list.length})</span>
+            </button>
+            {expandedCat === cat && (
+              <div className="mt-1 ml-6 flex flex-col gap-1 border-l border-slate-200 pl-3">
+                {list.map((a) => (
                   <button
-                    onClick={() => setExpandedCat(expandedCat === cat ? null : cat)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs font-medium text-slate-300 hover:bg-slate-800/50"
+                    key={a.tool.key}
+                    onClick={() => { setSelected(a.tool); setTab('overview'); }}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-xs text-navy-900 hover:border-slate-400"
                   >
-                    {expandedCat === cat ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                    <Building2 className="h-3 w-3 text-slate-500" /> {PERM_LABEL[cat] ?? cat} <span className="text-slate-500">({list.length})</span>
-                  </button>
-                  {expandedCat === cat && (
-                    <div className="mt-1 ml-6 flex flex-col gap-1 border-l border-slate-800 pl-3">
-                      {list.map((a) => (
-                        <button
-                          key={a.tool.key}
-                          onClick={() => { setSelected(a.tool); setTab('overview'); }}
-                          className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-2 py-1.5 text-left text-xs text-slate-300 hover:border-slate-600"
-                        >
-                          <Bot className="h-3 w-3 text-slate-500" /> {a.tool.name}
-                          <Pill className="ml-auto bg-slate-800/60 text-slate-400 border-slate-700">{EFFECT_LABEL[a.effect]}</Pill>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard label="Συνολικές κλήσεις" value={String(totalCalls)} sub="Από tool_call_log" hint="Ολόκληρο το ημερολόγιο" />
-            <StatCard label="Επιτυχία" value={String(successes)} sub={`${Math.round((successes / Math.max(totalCalls, 1)) * 100)}%`} hint="status = success" />
-            <StatCard label="Έγκριση" value={String(approved)} sub="Δεν απαιτεί ανθρώπινη έγκριση ακόμα" hint="status = approved" />
-            <StatCard label="Σφάλματα" value={String(errors)} sub="Απαιτούν προσοχή" hint="status = error" />
-          </div>
-
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-              <Activity className="h-4 w-4 text-slate-400" /> Ροή Δραστηριότητας
-            </div>
-            <div className="mt-2 text-[11px] text-slate-500">Πατήστε μία κλήση για να δείτε «Γιατί;» — DESIGNED / NO DATA όταν δεν υπάρχουν κλήσεις.</div>
-            {logs.length ? (
-              <div className="mt-3 flex flex-col gap-2">
-                {logs.slice(0, 10).map((l, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setWhy(l)}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-left hover:border-slate-600"
-                  >
-                    <div>
-                      <div className="text-xs text-slate-200">{l.tool_key} · {l.caller_type}</div>
-                      <div className="mt-0.5 font-mono text-[11px] text-slate-500">{typeof l.request === 'string' ? l.request.slice(0, 120) : '{}'}</div>
-                    </div>
-                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
-                      l.status === 'success' ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                      : l.status === 'error' ? 'border-rose-500/40 bg-rose-500/15 text-rose-300'
-                      : 'border-amber-500/40 bg-amber-500/15 text-amber-300'
-                    }`}>{l.status}</span>
+                    <Bot className="h-3 w-3 text-slate-400" /> {a.tool.name}
+                    <Pill className="ml-auto bg-slate-50 text-slate-500 border-slate-200">{EFFECT_LABEL[a.effect]}</Pill>
                   </button>
                 ))}
               </div>
-            ) : (
-              <EmptyState icon={Bot} title="Καμία κλήση ακόμα" hint="DESIGNED / NO DATA — δεν έχει εκτελεστεί κανένα εργαλείο." />
             )}
           </div>
-        </>
-      )}
+        ))}</div>
+      </Card>
 
       {selected && (
-        <Modal
-          open={!!selected}
-          onClose={() => setSelected(null)}
-          title={selected.name}
-          micro={`${deptOf(selected)} · ${selected.key}`}
-        >
-          <div className="flex flex-wrap gap-1">
+        <Modal open={!!selected} onClose={() => setSelected(null)} title={selected.name} micro={selected.key}>
+          <div className="flex flex-wrap gap-2">
             {OVERVIEW_TABS.map((t) => (
-              <Btn key={t.id} variant={tab === t.id ? 'primary' : 'ghost'} onClick={() => setTab(t.id)} className="text-xs">{t.label}</Btn>
+              <Btn key={t.id} variant={tab === t.id ? 'primary' : 'ghost'} onClick={() => setTab(t.id)} className="text-xs">
+                {t.label}
+              </Btn>
             ))}
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col gap-4">
             {tab === 'overview' && (
               (() => {
                 const a = agents.find((x) => x.tool.key === selected.key);
-                if (!a) return null;
+                if (!a) return <EmptyState icon={Bot} title="Δεν υπάρχουν δεδομένα" hint="Δεν βρέθηκε εργαλείο." />;
                 const st = statusFrom(a.tool, a.logs, a.effect);
                 const meta = STATUS_META[st];
                 const autonomy = autonomyFromEffect(a.effect);
                 return (
                   <div className="flex flex-col gap-3">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-                      <div className="text-xs text-slate-400">Περιγραφή</div>
-                      <div className="mt-1 text-sm text-slate-200">{a.tool.description}</div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-slate-500">Περιγραφή</div>
+                      <div className="mt-1 text-sm text-slate-700">{a.tool.description}</div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <StatCard label="Αυτονομία" value={`L${autonomy}`} sub={AUTONOMY_LABEL[autonomy]} hint="Από πολιτική" />
                       <StatCard label="Αποτέλεσμα Πολιτικής" value={EFFECT_LABEL[a.effect]} sub={a.policy ? `Κανόνας ${a.policy.id}` : 'Προεπιλεγμένο'} hint="Από policy_rules" />
                       <StatCard label="Κλήσεις" value={String(a.logs.length)} sub={`${doneToday(a.logs)} σήμερα`} hint="Από tool_call_log" />
-                      <StatCard label="Επιτυχία" value={successRate(a.logs) === null ? '—' : `${successRate(a.logs)}%`} sub={st === 'SHADOW' ? 'Καμία δραστηριότητα' : meta.label} hint="Από tool_call_log" />
+                      <StatCard label="Ποσοστό επιτυχίας" value={successRate(a.logs) === null ? '—' : `${successRate(a.logs)}%`} sub={meta.label} hint="Από tool_call_log" />
                     </div>
                   </div>
                 );
               })()
             )}
-            {tab === 'permissions' && (
+            {tab === 'activity' && (
               (() => {
                 const a = agents.find((x) => x.tool.key === selected.key);
-                if (!a) return null;
-                const deptIcon = DEPT_ICON[a.tool.category] ?? Bot;
-                const DeptIcon = deptIcon;
-                return (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-xs text-slate-300">
-                      <DeptIcon className="h-4 w-4 text-slate-400" /> {PERM_LABEL[a.tool.category] ?? a.tool.category}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <StatCard label="Αποτέλεσμα" value={EFFECT_LABEL[a.effect]} sub={a.policy ? `Κανόνας πολιτικής` : 'Προεπιλεγμένο'} hint="Από policy_rules" />
-                      <StatCard label="Εμβέλεια" value={a.policy?.scope ?? 'all'} sub={a.policy?.subject_key ?? 'συνολικό'} hint="Από policy_rules" />
-                    </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-                      <div className="text-[11px] text-slate-500">ΑΥΤΟΝΟΜΙΑ L1–L5</div>
-                      <div className="mt-1 text-sm text-slate-200">L{autonomyFromEffect(a.effect)} — {AUTONOMY_LABEL[autonomyFromEffect(a.effect)]}</div>
-                      <div className="mt-1 text-[11px] text-slate-500">Προαγωγή σε L4/L5: DESIGNED / NOT CONNECTED — δεν υπάρχει ακόμα ροή προαγωγής.</div>
-                    </div>
-                  </div>
-                );
-              })()
-            )}
-            {tab === 'queue' && (
-              (() => {
-                const a = agents.find((x) => x.tool.key === selected.key);
-                if (!a) return null;
+                if (!a) return <EmptyState icon={Bot} title="Καμία κλήση" hint="Δεν υπάρχουν καταγραφές για αυτό το εργαλείο." />;
                 return a.logs.length ? (
-                  <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-                    {a.logs.map((l, i) => (
-                      <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs text-slate-200">{l.caller_type}{l.caller_id ? ` · ${l.caller_id}` : ''}</div>
-                          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                            l.status === 'success' ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                            : l.status === 'error' ? 'border-rose-500/40 bg-rose-500/15 text-rose-300'
-                            : 'border-amber-500/40 bg-amber-500/15 text-amber-300'
-                          }`}>{l.status}</span>
+                  <div className="flex flex-col gap-2">
+                    {a.logs.slice(0, 10).map((l, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setWhy(l)}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-slate-400"
+                      >
+                        <div>
+                          <div className="text-xs text-slate-700">{l.caller_type} {l.caller_id ? ` · ${l.caller_id}` : ''}</div>
+                          <div className="mt-0.5 font-mono text-[11px] text-slate-500">{typeof l.request === 'string' ? l.request.slice(0, 120) : '{}'}</div>
                         </div>
-                        <div className="mt-1 font-mono text-[11px] text-slate-500">{typeof l.request === 'string' ? l.request.slice(0, 100) : '{}'}</div>
-                        <button onClick={() => setWhy(l)} className="mt-2 flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300">
-                          <ChevronRight className="h-3 w-3" /> Γιατί;
-                        </button>
-                      </div>
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
+                          l.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                          : l.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-600'
+                          : 'border-amber-200 bg-amber-50 text-amber-600'
+                        }`}>{l.status}</span>
+                      </button>
                     ))}
                   </div>
                 ) : (
-                  <EmptyState icon={Bot} title="Καμία κλήση" hint="DESIGNED / NO DATA" />
+                  <EmptyState icon={Bot} title="Καμία κλήση" hint="DESIGNED / NO DATA — δεν έχει υπάρξει ακόμη κλήση προς αυτό το εργαλείο." />
                 );
               })()
             )}
-            {['skills', 'memory', 'activity', 'versions'].includes(tab) && (
+            {['permissions', 'queue', 'skills', 'memory', 'versions'].includes(tab) && (
               <EmptyState
                 icon={tab === 'memory' ? HeartPulse : Layers}
-                title={tab === 'skills' ? 'Δεξιότητες' : tab === 'memory' ? 'Memory' : tab === 'activity' ? 'Δραστηριότητα' : 'Έκδοση'}
-                hint="DESIGNED / NOT CONNECTED — δεν υπάρχει ακόμα backend για αυτή την προβολή."
+                title={tab === 'permissions' ? 'Δικαιώματα' : tab === 'queue' ? 'Work Queue' : tab === 'skills' ? 'Δεξιότητες' : tab === 'memory' ? 'Memory' : 'Εκδόσεις'}
+                hint="Δεν υπάρχουν ακόμη δεδομένα για αυτή την ενότητα."
               />
             )}
           </div>
+          <Btn onClick={() => setSelected(null)} className="mt-4 w-full">Κλείσιμο</Btn>
         </Modal>
       )}
 

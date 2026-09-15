@@ -396,6 +396,21 @@ function CinematicTour() {
   );
 }
 
+/* ─── Wave divider mask (contact section → footer) ───────────── */
+const WAVE_DIVIDER_SVG =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' width='100%25' height='100%25' preserveAspectRatio='none'%3E%3Cpath d='M0,0 H1440 V60 C1340,60 1250,104 1120,100 C960,95 860,44 700,50 C560,55 460,102 320,92 C220,85 110,60 0,60 Z' fill='%23ffffff'/%3E%3C/svg%3E";
+
+const waveDividerMask: React.CSSProperties = {
+  WebkitMaskImage: `url("${WAVE_DIVIDER_SVG}"), linear-gradient(#fff,#fff)`,
+  maskImage: `url("${WAVE_DIVIDER_SVG}"), linear-gradient(#fff,#fff)`,
+  WebkitMaskSize: '105% 112px, 105% calc(100% - 110px)',
+  maskSize: '105% 112px, 105% calc(100% - 110px)',
+  WebkitMaskPosition: 'center bottom, center top',
+  maskPosition: 'center bottom, center top',
+  WebkitMaskRepeat: 'no-repeat',
+  maskRepeat: 'no-repeat',
+};
+
 /* ─── Main landing page ─────────────────────────────────────── */
 export default function LandingPage() {
   const [form, setForm] = useState<LeadForm>({
@@ -658,7 +673,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── Contact ── */}
-        <section id="contact" style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)' }}>
+        <section id="contact" style={{ position: 'relative', overflow: 'hidden', zIndex: 1, padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px) calc(clamp(70px,10vh,130px) + 70px)', ...waveDividerMask }}>
           <img src="/images/house-tour/10-terrace-lounge-b.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(16,32,51,.96) 0%,rgba(16,32,51,.86) 42%,rgba(16,32,51,.55) 100%)' }} />
           <div className="l-split" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
@@ -778,7 +793,7 @@ export default function LandingPage() {
       </main>
 
       {/* ── Footer ── */}
-      <footer style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px' }}>
+      <footer style={{ position: 'relative', overflow: 'hidden', marginTop: -110, padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px', paddingTop: 'calc(clamp(56px,7vh,80px) + 110px)' }}>
         <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(9,17,28,.94) 0%,rgba(9,17,28,.90) 55%,rgba(9,17,28,.96) 100%)' }} />
         <div className="l-footer-grid" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>

@@ -17,9 +17,30 @@ import { useToast } from '@/lib/toast';
 import RoutePanel from '@/components/field-sales/RoutePanel';
 import type { RouteStopInput } from '@/components/field-sales/RoutePanel';
 import NavigationButton from '@/components/navigation/NavigationButton';
-import { Crosshair, LogIn, MapPin, Navigation, Route as RouteIcon, Search, Sun, X } from 'lucide-react';
+import type { NavigationTravelMode } from '@/lib/navigation/external-maps';
+import {
+  ArrowDownUp, Bike, Car, ChevronDown, ChevronUp, Crosshair, Footprints, LogIn, MapPin,
+  Route as RouteIcon, Search, Sun, X,
+} from 'lucide-react';
 
 type FilterId = 'all' | 'active' | 'leads' | 'today' | 'followups' | 'pending_sig' | 'backoffice' | 'completed';
+
+type TravelMode = NavigationTravelMode;
+const TRAVEL_MODES: { id: TravelMode; label: string; icon: typeof Car }[] = [
+  { id: 'driving', label: 'Οδήγηση', icon: Car },
+  { id: 'walking', label: 'Πεζή', icon: Footprints },
+  { id: 'bicycling', label: 'Ποδήλατο', icon: Bike },
+];
+
+/* Marker legend — colours mirror CASE_COLORS / marker builders below. */
+const LEGEND: { label: string; color: string }[] = [
+  { label: 'Εδώ είμαι', color: '#1c6f52' },
+  { label: 'Ενεργό case', color: '#2f5fd8' },
+  { label: 'Προς υπογραφή', color: '#d99b28' },
+  { label: 'Επίσκεψη', color: '#7c3aed' },
+  { label: 'Lead', color: '#15803d' },
+  { label: 'Νέο / εκτός', color: '#b45309' },
+];
 
 const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'all', label: 'Όλα' },
@@ -61,6 +82,8 @@ export default function MapPage() {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapProvider | null>(null);
   const pickDestRef = useRef<((d: DestSuggestion) => void) | null>(null);
+  const setOriginFromRef = useRef<((d: DestSuggestion) => void) | null>(null);
+  const pickModeRef = useRef<null | 'origin' | 'dest'>(null);
   const [ready, setReady] = useState(false);
 
   const [cases, setCases] = useState<Case[]>([]);
@@ -88,10 +111,25 @@ export default function MapPage() {
   const [dest, setDest] = useState<DestSuggestion | null>(null);
   const [eta, setEta] = useState<RoutePlan | null>(null);
   const [etaBusy, setEtaBusy] = useState(false);
-  const [pickMode, setPickMode] = useState(false);
+  const [pickMode, setPickMode] = useState<null | 'origin' | 'dest'>(null);
   const [checkInBusy, setCheckInBusy] = useState<string | null>(null);
 
-  const origin = useMemo(() => (myLoc ? { lat: myLoc.lat, lng: myLoc.lng } : null), [myLoc]);
+  /* Explicit origin (a searched place / CRM point). When null the origin is
+     the device GPS ("Η τοποθεσία μου"). Kept separate so the reverse button
+     can swap the two ends like Google Maps. */
+  const [originPlace, setOriginPlace] = useState<DestSuggestion | null>(null);
+  const [originQuery, setOriginQuery] = useState('');
+  const [originResults, setOriginResults] = useState<DestSuggestion[]>([]);
+  const [originSearching, setOriginSearching] = useState(false);
+  const [travelMode, setTravelMode] = useState<TravelMode>('driving');
+  /* Mobile bottom-sheet / directions collapse. On sm+ both are always open. */
+  const [dirOpen, setDirOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const origin = useMemo(
+    () => (originPlace ? originPlace.position : myLoc ? { lat: myLoc.lat, lng: myLoc.lng } : null),
+    [originPlace, myLoc],
+  );
 
   const reload = useCallback(async () => {
     const [c, v, f, l] = await Promise.all([
@@ -138,9 +176,12 @@ export default function MapPage() {
           onMarkerClick: id => setSelectedId(id),
           onMapClick: coord => {
             setSelectedId(null);
-            if (pickMode) {
-              setPickMode(false);
-              pickDestRef.current?.({ id: `pin-${coord.lat}-${coord.lng}`, label: 'Σημείο στο χάρτη', position: coord, kind: 'geocoder' });
+            if (pickModeRef.current) {
+              const which = pickModeRef.current;
+              setPickMode(null);
+              const sug: DestSuggestion = { id: `pin-${coord.lat}-${coord.lng}`, label: 'Σημείο στο χάρτη', position: coord, kind: 'geocoder' };
+              if (which === 'origin') setOriginFromRef.current?.(sug);
+              else pickDestRef.current?.(sug);
             }
           },
         });
@@ -160,7 +201,7 @@ export default function MapPage() {
       mapRef.current = null;
       setReady(false);
     };
-  }, [mapRetry, pickMode]);
+  }, [mapRetry]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -217,11 +258,50 @@ export default function MapPage() {
 
   const pickDest = useCallback((d: DestSuggestion) => {
     setDest(d);
-    setDestQuery(''); setDestResults([]); setPickMode(false);
+    setDestQuery(''); setDestResults([]); setPickMode(null);
     if (mapRef.current?.isReady()) mapRef.current.setViewport(d.position, 14);
-    if (origin) void runEta(origin, d.position, d.label);
-  }, [origin, runEta]);
+  }, []);
   useEffect(() => { pickDestRef.current = pickDest; }, [pickDest]);
+
+  const pickOrigin = useCallback((d: DestSuggestion) => {
+    setOriginPlace(d);
+    setOriginQuery(''); setOriginResults([]); setPickMode(null);
+  }, []);
+  useEffect(() => { setOriginFromRef.current = pickOrigin; }, [pickOrigin]);
+  useEffect(() => { pickModeRef.current = pickMode; }, [pickMode]);
+
+  /* Reverse origin ⇄ destination, like Google Maps. GPS origin becomes an
+     explicit "Η τοποθεσία μου" point so it can live in the destination slot. */
+  const swapEnds = useCallback(() => {
+    const originSug: DestSuggestion | null = originPlace
+      ?? (myLoc ? { id: 'me', label: 'Η τοποθεσία μου', position: { lat: myLoc.lat, lng: myLoc.lng }, kind: 'geocoder' } : null);
+    setOriginPlace(dest);
+    setDest(originSug);
+  }, [originPlace, myLoc, dest]);
+
+  /* Single source of truth for the route/ETA: recompute whenever either end
+     changes and both are known; clear it otherwise. */
+  useEffect(() => {
+    if (!dest || !origin) { setEta(null); return; }
+    void runEta(origin, dest.position, dest.label);
+  }, [origin, dest, runEta]);
+
+  /* Origin typeahead (CRM targets + geocoder), mirrors the destination search. */
+  useEffect(() => {
+    const qq = originQuery.trim();
+    if (qq.length < 2) { setOriginResults([]); return; }
+    let alive = true;
+    setOriginSearching(true);
+    const t = window.setTimeout(async () => {
+      const [crm, geo] = await Promise.all([fetchFieldTargets(qq), geocodeAddress(qq, origin ?? undefined)]);
+      if (!alive) return;
+      const crmRes: DestSuggestion[] = crm.map(x => ({ id: `crm-${x.entity_type}-${x.id}`, label: x.label, sublabel: x.sublabel || x.address, position: x.position, kind: 'crm' }));
+      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, sublabel: g.sublabel, position: g.position, kind: 'geocoder' }));
+      setOriginResults([...crmRes.slice(0, 5), ...geoRes.slice(0, 5)]);
+      setOriginSearching(false);
+    }, 350);
+    return () => { alive = false; window.clearTimeout(t); };
+  }, [originQuery, origin]);
 
   const markers: MapMarkerData[] = useMemo(() => {
     const out: MapMarkerData[] = [];
@@ -350,10 +430,10 @@ export default function MapPage() {
     try {
       const l = await getCurrentLocation();
       setMyLoc(l);
+      setOriginPlace(null); // GPS becomes the origin; the ETA effect recomputes.
       const m = mapRef.current;
       if (m?.isReady()) m.fitBounds([{ lat: l.lat, lng: l.lng }], { padding: 100, maxZoom: 15 });
       toast(`Η θέση σας ενημερώθηκε${l.accuracy != null ? ` (ακρίβεια ±${l.accuracy} μ)` : ''}.`, 'ok');
-      if (dest) await runEta({ lat: l.lat, lng: l.lng }, dest.position, dest.label);
     } catch (e) {
       setMyLoc(null);
       const code = (e as Error).message as GeoErrorCode;
@@ -400,7 +480,7 @@ export default function MapPage() {
       const [crm, geo] = await Promise.all([fetchFieldTargets(qq), geocodeAddress(qq, origin ?? undefined)]);
       if (!alive) return;
       const crmRes: DestSuggestion[] = crm.map(t => ({ id: `crm-${t.entity_type}-${t.id}`, label: t.label, sublabel: t.sublabel || t.address, position: t.position, kind: 'crm' }));
-      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, position: g.position, kind: 'geocoder' }));
+      const geoRes: DestSuggestion[] = geo.map((g, i) => ({ id: `geo-${i}`, label: g.label, sublabel: g.sublabel, position: g.position, kind: 'geocoder' }));
       setDestResults([...crmRes.slice(0, 5), ...geoRes.slice(0, 5)]);
       setDestSearching(false);
     }, 350);
@@ -475,47 +555,141 @@ export default function MapPage() {
       .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
   }, [markers, myLoc]);
 
+  const originLabel = originPlace ? originPlace.label : (myLoc ? 'Η τοποθεσία μου' : 'Επιλέξτε αφετηρία…');
+
   return (
-    <div className="max-w-6xl space-y-4">
+    <div className="max-w-6xl space-y-3">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <Micro tone="brand">Field sales</Micro>
           <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Χάρτης · Πωλήσεις πεδίου</h2>
         </div>
-        <div className="flex gap-2">
-          <Btn variant="ghost" onClick={() => go('myday')}><Sun className="w-3.5 h-3.5" /> Ημέρα μου</Btn>
-          <Btn variant="outline" onClick={locateMe} disabled={locating}>
-            {locating ? <Spinner /> : <Crosshair className="w-3.5 h-3.5" />} Θέση μου
-          </Btn>
-        </div>
+        <Btn variant="ghost" onClick={() => go('myday')}><Sun className="w-3.5 h-3.5" /> Ημέρα μου</Btn>
       </div>
 
-      {locErr && !myLoc && (
-        <Card className="!p-3 border-bad-200 !bg-bad-100/30">
-          <div className="text-[13px] font-medium text-bad-600">LOCATION UNAVAILABLE — {GEO_ERRORS[locErr]}</div>
-        </Card>
-      )}
-
+      {/* Layer filters + text search of CRM points on the map */}
       <div className="flex items-center gap-2 flex-wrap">
         {FILTERS.map(f => (
           <button key={f.id} onClick={() => { setFilter(f.id); setSelectedId(null); setQ(''); }}
-            className={`pill px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${filter === f.id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+            className={`px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${filter === f.id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
             {f.label}
           </button>
         ))}
       </div>
-
       <div className="relative">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/35 z-10" />
-            <input className="field !pl-10" value={destQuery} onChange={e => setDestQuery(e.target.value)}
-              placeholder="Προορισμός (πελάτης, case, lead, διεύθυνση)…" />
-            {destQuery && destResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-20 max-h-64 overflow-y-auto">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/35 z-10" />
+        <input className="field !pl-10" value={q} onChange={e => setQ(e.target.value)}
+          placeholder="Φιλτράρισμα σημείων: πελάτης, case, διεύθυνση ή πόλη…" />
+      </div>
+
+      {/* ============ MAP + floating navigation overlays ============ */}
+      <div className="relative">
+        <div ref={mapEl} className="h-[68vh] min-h-[460px] rounded-xl overflow-hidden border border-line bg-paper/40" />
+
+        {!ready && mapError == null && (
+          <div className="absolute inset-0 flex items-center justify-center"><Spinner /></div>
+        )}
+        {mapError != null && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center">
+            <Card className="max-w-sm w-full m-4 text-center">
+              <p className="text-sm font-semibold text-ink">Χάρτης μη διαθέσιμος</p>
+              <p className="text-xs text-ink/45 mt-1 break-words">{mapError}</p>
+              <div className="mt-3"><Btn onClick={() => setMapRetry(r => r + 1)}>Επανάληψη</Btn></div>
+            </Card>
+          </div>
+        )}
+
+        {/* Floating directions box (top) — collapses to just the destination
+            search on phones; full origin/modes/reverse on tap or sm+. */}
+        <div className="absolute top-3 left-3 right-3 sm:right-auto sm:w-[380px] z-20 card p-3 bg-white/95 backdrop-blur-md shadow-cardlg space-y-2">
+          {/* Mobile expand/collapse toggle */}
+          <button onClick={() => setDirOpen(o => !o)}
+            className="sm:hidden w-full flex items-center justify-between text-[11px] font-medium text-ink/55 -mb-1"
+            aria-expanded={dirOpen}>
+            <span className="inline-flex items-center gap-1.5">
+              <Car className="w-3.5 h-3.5" /> Αφετηρία & τρόπος
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${dirOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Collapsible section: travel modes + origin + reverse */}
+          <div className={`${dirOpen ? '' : 'hidden'} sm:block space-y-2`}>
+            {/* Travel modes */}
+            <div className="flex items-center gap-1 border-b border-line pb-2">
+              {TRAVEL_MODES.map(m => (
+                <button key={m.id} onClick={() => setTravelMode(m.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors ${travelMode === m.id ? 'bg-brand-100 text-brand-600' : 'text-ink/50 hover:text-ink hover:bg-ink/5'}`}
+                  title={m.label}>
+                  <m.icon className="w-3.5 h-3.5" /> <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Origin */}
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-brand-500 ring-2 ring-brand-200 shrink-0" aria-hidden="true" />
+                <input className="field !py-1.5 !text-[13px] flex-1" value={originQuery}
+                  onChange={e => setOriginQuery(e.target.value)}
+                  placeholder={originLabel} aria-label="Αφετηρία" />
+                <button onClick={locateMe} disabled={locating} title="Χρήση της τοποθεσίας μου"
+                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-brand-50 text-brand-600 text-[11px] font-medium hover:bg-brand-100 disabled:opacity-50">
+                  {locating ? <Spinner /> : <Crosshair className="w-3.5 h-3.5" />}<span>GPS</span>
+                </button>
+              </div>
+              {originQuery && originResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 max-h-60 overflow-y-auto">
+                  {originSearching && <div className="px-4 py-3"><Spinner /></div>}
+                  {originResults.map(r => (
+                    <button key={r.id} className="w-full text-left px-3 py-2 hover:bg-ink/5 flex items-center gap-2" onClick={() => pickOrigin(r)}>
+                      <span className={`pill text-[9px] shrink-0 ${r.kind === 'crm' ? 'bg-brand-100 text-brand-600' : 'bg-ink/10 text-ink/60'}`}>{r.kind === 'crm' ? 'CRM' : 'Χάρτης'}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13px] font-medium text-ink truncate">{r.label}</span>
+                        {r.sublabel && <span className="block text-[11px] text-ink/45 truncate">{r.sublabel}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {originQuery.trim().length >= 3 && !originSearching && originResults.length === 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 px-4 py-2.5 text-[12px] text-ink/45">Καμία τοποθεσία.</div>
+              )}
+              {originPlace && (
+                <button onClick={() => setOriginPlace(null)} className="mt-1 text-[11px] text-ink/45 hover:text-ink inline-flex items-center gap-1">
+                  <X className="w-3 h-3" /> Επαναφορά σε «Η τοποθεσία μου»
+                </button>
+              )}
+            </div>
+
+            {/* Reverse */}
+            <div className="flex items-center">
+              <div className="flex-1 border-t border-dashed border-line" />
+              <button onClick={swapEnds} title="Αντιστροφή αφετηρίας/προορισμού"
+                className="mx-2 w-7 h-7 rounded-full border border-line bg-white flex items-center justify-center text-ink/55 hover:text-brand-600 hover:border-brand-300">
+                <ArrowDownUp className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex-1 border-t border-dashed border-line" />
+            </div>
+          </div>
+
+          {/* Destination (always visible) */}
+          <div className="relative">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-bad-600 shrink-0" aria-hidden="true" />
+              <input className="field !py-1.5 !text-[13px] flex-1" value={dest ? dest.label : destQuery}
+                onChange={e => { if (dest) { setDest(null); } setDestQuery(e.target.value); }}
+                placeholder="Αναζήτηση πελάτη, case, lead ή διεύθυνσης…" aria-label="Προορισμός" />
+              <button onClick={() => { setPickMode(m => m === 'dest' ? null : 'dest'); toast('Πατήστε ένα σημείο στον χάρτη για προορισμό.'); }}
+                title="Επιλογή σημείου στον χάρτη"
+                className={`shrink-0 px-2 py-1.5 rounded-lg text-[11px] font-medium ${pickMode === 'dest' ? 'bg-brand-500 text-white' : 'bg-ink/5 text-ink/60 hover:bg-ink/10'}`}>
+                Σημείο
+              </button>
+            </div>
+            {destQuery && destResults.length > 0 && !dest && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 max-h-60 overflow-y-auto">
                 {destSearching && <div className="px-4 py-3"><Spinner /></div>}
                 {destResults.map(r => (
-                  <button key={r.id} className="w-full text-left px-4 py-2.5 hover:bg-ink/5 flex items-center gap-2.5" onClick={() => pickDest(r)}>
+                  <button key={r.id} className="w-full text-left px-3 py-2 hover:bg-ink/5 flex items-center gap-2" onClick={() => pickDest(r)}>
                     <span className={`pill text-[9px] shrink-0 ${r.kind === 'crm' ? 'bg-brand-100 text-brand-600' : 'bg-ink/10 text-ink/60'}`}>{r.kind === 'crm' ? 'CRM' : 'Χάρτης'}</span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-[13px] font-medium text-ink truncate">{r.label}</span>
@@ -525,210 +699,229 @@ export default function MapPage() {
                 ))}
               </div>
             )}
-          </div>
-          <Btn variant={pickMode ? 'brand' : 'outline'} onClick={() => { setPickMode(p => !p); if (!pickMode) toast('Πατήστε ένα σημείο στον χάρτη για προορισμό.'); }}>
-            Σημείο
-          </Btn>
-        </div>
-        {pickMode && <p className="text-[11px] text-ink/45 mt-1">Κάντε κλικ στον χάρτη…</p>}
-        {dest && (
-          <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3 flex items-center gap-3">
-            <MapPin className="w-4 h-4 text-brand-600 shrink-0" />
-            <span className="flex-1 min-w-0">
-              <span className="block text-[13px] font-medium text-ink truncate">{dest.label}</span>
-              <span className="block text-[11px] text-ink/45">Προορισμός</span>
-            </span>
-            <button onClick={() => { setDest(null); setEta(null); mapRef.current?.clearRoute(); }}
-              className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5 shrink-0" aria-label="Καθαρισμός προορισμού">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-        {etaBusy && (
-          <div className="mt-2 flex items-center gap-2"><Spinner /><span className="text-xs text-ink/45">Υπολογισμός διαδρομής…</span></div>
-        )}
-        {eta && !etaBusy && (
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className="pill bg-ok-100 text-ok-600">{formatDistance(eta.totalDistanceMeters / 1000)}</span>
-            <span className="pill bg-brand-100 text-brand-600">{formatDuration(eta.totalDurationSeconds)}</span>
-            <span className="pill bg-ink/10 text-ink/70">{eta.source === 'osrm' ? 'OSRM' : eta.source === 'ors' ? 'openrouteservice' : 'εκτίμηση ευθείας'}</span>
-            {eta.error && <span className="text-[11px] text-warn-600">{eta.error}</span>}
-            {!origin && <span className="pill bg-warn-100 text-warn-600">Εκτίμηση — πατήστε «Θέση μου» για ΕΚΑ</span>}
-          </div>
-        )}
-        {dest && !etaBusy && !eta && (
-          <div className="mt-2 flex items-center gap-2">
-            {origin ? (
-              <Btn variant="brand" onClick={() => runEta(origin, dest.position, dest.label)}>
-                <Navigation className="w-3.5 h-3.5" /> ΕΚΑ Διαδρομής
-              </Btn>
-            ) : (
-              <Btn variant="outline" onClick={locateMe}>
-                <Crosshair className="w-3.5 h-3.5" /> Θέση μου για διαδρομή
-              </Btn>
+            {destQuery.trim().length >= 3 && !dest && !destSearching && destResults.length === 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-cardlg z-30 px-4 py-2.5 text-[12px] text-ink/45">
+                Καμία τοποθεσία ή CRM εγγραφή. Δοκιμάστε διαφορετική αναζήτηση ή «Σημείο» στον χάρτη.
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/35 z-10" />
-        <input className="field !pl-10" value={q} onChange={e => setQ(e.target.value)}
-          placeholder="Αναζήτηση πελάτη, case, διεύθυνση ή πόλη…" />
-      </div>
-
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
-        <div className="hidden md:block order-2 md:order-1 min-w-0">
-          <Card className="!p-0" pad={false}>
-            <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <Micro tone="brand">Χάρτης · αποτελέσματα</Micro>
-              <span className="pill bg-ink/10 text-ink/70">{results.length}</span>
-            </div>
-            <div className="max-h-[52vh] overflow-y-auto divide-y divide-line">
-              {results.map(r => (
-                <button key={r.id} onClick={() => setSelectedId(r.id)}
-                  className={`w-full text-left px-4 py-2.5 transition-colors flex items-center gap-2.5 ${selectedId === r.id ? 'bg-brand-50' : 'hover:bg-ink/[0.03]'}`}>
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-medium text-ink truncate">{r.title}</span>
-                    {r.subtitle && <span className="block text-xs text-ink/45 truncate">{r.subtitle}</span>}
-                  </span>
-                  {r.distance != null && <span className="text-[11px] text-ink/45 shrink-0">{formatDistance(r.distance)}</span>}
-                </button>
-              ))}
-              {results.length === 0 && (
-                <p className="px-4 py-4 text-xs text-ink/40">Δεν βρέθηκαν σημεία για τη συγκεκριμένη κατηγορία.</p>
-              )}
-            </div>
-          </Card>
+          {routeStops.length >= 2 && (
+            <button onClick={() => setRouteOpen(o => !o)}
+              className={`w-full mt-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[12px] font-medium ${routeOpen ? 'bg-brand-100 text-brand-600' : 'bg-ink/5 text-ink/60 hover:bg-ink/10'}`}>
+              <RouteIcon className="w-3.5 h-3.5" /> Δρομολόγιο ημέρας ({routeStops.length} στάσεις)
+            </button>
+          )}
         </div>
 
-        <div className="order-1 md:order-2 min-w-0">
-      <Card className="!p-0 !border-0 !shadow-none relative" pad={false}>
-        <div ref={mapEl} className="h-[56vh] min-h-[380px] sm:min-h-[500px] rounded-[10px] overflow-hidden border border-line bg-paper/40" />
-        {!ready && mapError == null && (
-          <div className="absolute inset-0 flex items-center justify-center"><Spinner /></div>
-        )}
-        {mapError != null && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <Card className="max-w-sm w-full m-4 text-center">
-              <p className="text-sm font-semibold text-ink">Χάρτης μη διαθέσιμος</p>
-              <p className="text-xs text-ink/45 mt-1 break-words">{mapError}</p>
-              <div className="mt-3"><Btn onClick={() => setMapRetry(r => r + 1)}>Επανάληψη</Btn></div>
-            </Card>
+        {pickMode && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 hidden lg:block bg-ink text-paper text-[12px] px-3 py-1.5 rounded-full shadow-lg">
+            Κάντε κλικ στον χάρτη για {pickMode === 'origin' ? 'αφετηρία' : 'προορισμό'}…
           </div>
         )}
 
-        {routeStops.length < 2 && (
-          <div className="absolute top-3 right-3">
-            <Btn variant="ghost" className="!bg-white/90" onClick={() => setRouteOpen(true)} disabled>
-              <RouteIcon className="w-3.5 h-3.5" /> Δρομολόγιο
-            </Btn>
-          </div>
-        )}
-        {routeStops.length >= 2 && (
-          <div className="absolute top-3 right-3">
-            <Btn variant={routeOpen ? 'brand' : 'outline'} className={routeOpen ? '' : '!bg-white/95'} onClick={() => setRouteOpen(o => !o)}>
-              <RouteIcon className="w-3.5 h-3.5" /> Δρομολόγιο
-            </Btn>
+        {/* Legend (desktop) */}
+        <div className="hidden md:flex absolute bottom-3 left-3 z-10 card !py-2 !px-2.5 bg-white/90 backdrop-blur flex-col gap-1">
+          {LEGEND.map(l => (
+            <span key={l.label} className="flex items-center gap-1.5 text-[11px] text-ink/60">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: l.color }} /> {l.label}
+            </span>
+          ))}
+        </div>
+
+        {/* Locate-me FAB */}
+        <button onClick={locateMe} disabled={locating} aria-label="Η τοποθεσία μου"
+          className="absolute right-3 bottom-28 sm:bottom-3 z-10 w-11 h-11 rounded-full bg-white shadow-cardlg border border-line flex items-center justify-center text-brand-600 hover:bg-brand-50 disabled:opacity-60">
+          {locating ? <Spinner /> : <Crosshair className="w-5 h-5" />}
+        </button>
+
+        {locErr && !myLoc && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-3 sm:bottom-auto sm:top-3 z-10 bg-bad-600 text-white text-[12px] px-3 py-1.5 rounded-full shadow-lg max-w-[90%] text-center">
+            {GEO_ERRORS[locErr]}
           </div>
         )}
 
-        {preview && (
-          <div className="absolute left-3 right-3 bottom-3 sm:left-auto sm:right-3 sm:w-80 card p-4 shadow-cardlg z-10 animate-fadein">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+        {/* ---- Bottom floating card: selection preview OR route summary OR hint ---- */}
+        <div className="absolute left-3 right-3 bottom-3 sm:left-auto sm:right-3 sm:w-[380px] z-20">
+          {preview ? (
+            <div className="card p-4 bg-white/97 backdrop-blur-md shadow-cardlg animate-fadein">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  {preview.kind === 'case' && (
+                    <>
+                      <Micro tone="brand">{preview.c.case_no}</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.c.customer?.full_name ?? preview.c.title}</h3>
+                      <p className="text-xs text-ink/45 truncate">{SERVICES[preview.c.service_type] ?? preview.c.service_type}{preview.c.address ? ` · ${preview.c.address}` : ''}</p>
+                      <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                        <StagePill stage={preview.c.current_stage} />
+                        {myLoc && previewPos && <span className="text-[11px] text-ink/45">{formatDistance(distanceKm(myLoc, previewPos))} από εσάς</span>}
+                      </div>
+                    </>
+                  )}
+                  {preview.kind === 'visit' && (
+                    <>
+                      <Micro tone="brand">Επίσκεψη</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">
+                        {preview.v.case?.customer?.full_name ?? caseById.get(preview.v.case_id)?.customer?.full_name ?? preview.v.purpose ?? 'Επίσκεψη'}
+                      </h3>
+                      <p className="text-xs text-ink/45 truncate">{preview.v.purpose}{preview.v.scheduled_at ? ` · ${fmtTime(preview.v.scheduled_at)}` : ''} · {preview.v.status === 'in_progress' ? 'σε εξέλιξη' : preview.v.status}</p>
+                    </>
+                  )}
+                  {preview.kind === 'fu' && (
+                    <>
+                      <Micro tone="brand">Follow up</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.c.customer?.full_name ?? preview.c.title}</h3>
+                      <p className="text-xs text-ink/45 truncate">{preview.f.reason} · {new Date(preview.f.due_at).toLocaleString('el-GR')}</p>
+                    </>
+                  )}
+                  {preview.kind === 'lead' && (
+                    <>
+                      <Micro tone="ok">Lead</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.l.name}</h3>
+                      <p className="text-xs text-ink/45 truncate">{preview.l.status ?? 'νέο'}{preview.l.address ? ` · ${preview.l.address}` : ''}</p>
+                    </>
+                  )}
+                  {preview.kind === 'me' && (
+                    <>
+                      <Micro tone="brand">GPS</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink mt-0.5">Εδώ είμαι</h3>
+                      <p className="text-xs text-ink/45">
+                        {myLoc ? `${myLoc.lat.toFixed(5)}, ${myLoc.lng.toFixed(5)}${myLoc.accuracy != null ? ` · ±${myLoc.accuracy} μ` : ''}` : ''}
+                      </p>
+                    </>
+                  )}
+                </div>
+                <button onClick={() => setSelectedId(null)} aria-label="Κλείσιμο προεπισκόπησης"
+                  className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5 shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="mt-3 flex gap-2 flex-wrap">
                 {preview.kind === 'case' && (
                   <>
-                    <Micro tone="brand">{preview.c.case_no}</Micro>
-                    <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.c.customer?.full_name ?? preview.c.title}</h3>
-                    <p className="text-xs text-ink/45 truncate">{SERVICES[preview.c.service_type] ?? preview.c.service_type}{preview.c.address ? ` · ${preview.c.address}` : ''}</p>
-                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                      <StagePill stage={preview.c.current_stage} />
-                      {myLoc && previewPos && <span className="text-[11px] text-ink/45">{formatDistance(distanceKm(myLoc, previewPos))} από εσάς</span>}
-                    </div>
+                    <Btn onClick={() => openCase(preview.c.id)}><MapPin className="w-3.5 h-3.5" /> Άνοιγμα Case</Btn>
+                    {previewPos && <Btn variant="outline" onClick={() => pickDest({ id: `case-${preview.c.id}`, label: preview.c.customer?.full_name ?? preview.c.title, position: previewPos, kind: 'crm' })}><RouteIcon className="w-3.5 h-3.5" /> Διαδρομή</Btn>}
+                    {previewPos && <NavigationButton destination={previewPos} origin={origin} caseId={preview.c.id} label="Πλοήγηση" showSelector={false} travelMode={travelMode} />}
                   </>
                 )}
                 {preview.kind === 'visit' && (
                   <>
-                    <Micro tone="brand">Επίσκεψη</Micro>
-                    <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">
-                      {preview.v.case?.customer?.full_name ?? caseById.get(preview.v.case_id)?.customer?.full_name ?? preview.v.purpose ?? 'Επίσκεψη'}
-                    </h3>
-                    <p className="text-xs text-ink/45 truncate">{preview.v.purpose}{preview.v.scheduled_at ? ` · ${fmtTime(preview.v.scheduled_at)}` : ''} · {preview.v.status === 'in_progress' ? 'σε εξέλιξη' : preview.v.status}</p>
+                    <Btn onClick={() => preview.v.case_id && openCase(preview.v.case_id)}>Άνοιγμα Case</Btn>
+                    {previewPos && <NavigationButton destination={previewPos} origin={origin} caseId={preview.v.case_id ?? undefined} label="Πλοήγηση" showSelector={false} travelMode={travelMode} />}
+                    {preview.v.status === 'planned' && fieldAllowed(role, 'check_in') && (
+                      <Btn variant="ok" onClick={() => doFieldCheckIn(preview.v)} disabled={checkInBusy === preview.v.id}>
+                        {checkInBusy === preview.v.id ? <Spinner /> : <LogIn className="w-3.5 h-3.5" />} Check In
+                      </Btn>
+                    )}
                   </>
                 )}
                 {preview.kind === 'fu' && (
-                  <>
-                    <Micro tone="brand">Follow up</Micro>
-                    <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.c.customer?.full_name ?? preview.c.title}</h3>
-                    <p className="text-xs text-ink/45 truncate">{preview.f.reason} · {new Date(preview.f.due_at).toLocaleString('el-GR')}</p>
-                  </>
+                  <Btn onClick={() => openCase(preview.c.id)}>Άνοιγμα Case</Btn>
                 )}
                 {preview.kind === 'lead' && (
                   <>
-                    <Micro tone="ok">Lead</Micro>
-                    <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.l.name}</h3>
-                    <p className="text-xs text-ink/45 truncate">{preview.l.status ?? 'νέο'}{preview.l.address ? ` · ${preview.l.address}` : ''}</p>
+                    {preview.l.lat != null && preview.l.lng != null && (
+                      <NavigationButton destination={{ lat: preview.l.lat, lng: preview.l.lng, label: preview.l.name }} origin={origin} label="Πλοήγηση" showSelector={false} travelMode={travelMode} />
+                    )}
+                    {preview.l.lat == null && preview.l.address && (
+                      <Btn variant="brand" onClick={() => locateLead(preview.l)}>
+                        <MapPin className="w-3.5 h-3.5" /> Καταχώρηση στον χάρτη
+                      </Btn>
+                    )}
                   </>
                 )}
                 {preview.kind === 'me' && (
-                  <>
-                    <Micro tone="brand">GPS</Micro>
-                    <h3 className="text-[14px] font-semibold text-ink mt-0.5">Εδώ είμαι</h3>
-                    <p className="text-xs text-ink/45">
-                      {myLoc ? `${myLoc.lat.toFixed(5)}, ${myLoc.lng.toFixed(5)}${myLoc.accuracy != null ? ` · ±${myLoc.accuracy} μ` : ''}` : ''}
-                    </p>
-                  </>
+                  <Btn variant="outline" onClick={() => setMyLoc(null)}>Απόκρυψη θέσης</Btn>
                 )}
               </div>
-              <button onClick={() => setSelectedId(null)} aria-label="Κλείσιμο προεπισκόπησης"
-                className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5 shrink-0">
-                <X className="w-4 h-4" />
+            </div>
+          ) : dest ? (
+            <div className="card p-4 pt-2 bg-white/97 backdrop-blur-md shadow-cardlg animate-fadein">
+              {/* Mobile drag/tap handle — collapse to essentials, expand for details */}
+              <button onClick={() => setSheetOpen(o => !o)} aria-expanded={sheetOpen}
+                className="sm:hidden w-full flex flex-col items-center pb-1.5 -mt-0.5" aria-label={sheetOpen ? 'Σύμπτυξη' : 'Ανάπτυξη'}>
+                <span className="w-9 h-1 rounded-full bg-ink/15" />
+                {sheetOpen ? <ChevronDown className="w-4 h-4 text-ink/30 mt-0.5" /> : <ChevronUp className="w-4 h-4 text-ink/30 mt-0.5" />}
               </button>
+
+              <div className="flex items-start justify-between gap-2 pt-1 sm:pt-0">
+                <div className="min-w-0">
+                  <Micro tone="brand">Προορισμός</Micro>
+                  <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{dest.label}</h3>
+                  {dest.sublabel && <p className="text-[11px] text-ink/45 truncate">{dest.sublabel}</p>}
+                </div>
+                <button onClick={() => { setDest(null); setEta(null); mapRef.current?.clearRoute(); }}
+                  className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5 shrink-0" aria-label="Καθαρισμός προορισμού">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Essentials — always visible: ETA + distance */}
+              {etaBusy && (
+                <div className="mt-2 flex items-center gap-2"><Spinner /><span className="text-xs text-ink/45">Υπολογισμός διαδρομής…</span></div>
+              )}
+              {eta && !etaBusy && (
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                  <span className="text-[15px] font-bold text-ink tabular-nums">{formatDuration(eta.totalDurationSeconds)}</span>
+                  <span className="text-[13px] text-ink/55">· {formatDistance(eta.totalDistanceMeters / 1000)}</span>
+                  <span className={`pill text-[10px] ${eta.estimated ? 'bg-warn-100 text-warn-600' : 'bg-ok-100 text-ok-600'}`}>
+                    {eta.source === 'osrm' ? 'OSRM' : eta.source === 'ors' ? 'ORS' : 'εκτίμηση'}
+                  </span>
+                </div>
+              )}
+
+              {/* Details — collapsible on mobile, always shown on sm+ */}
+              <div className={`${sheetOpen ? '' : 'hidden'} sm:block`}>
+                {eta && !etaBusy && eta.error && (
+                  <p className="mt-1.5 text-[11px] text-warn-600">{eta.error}</p>
+                )}
+                {!origin && !etaBusy && (
+                  <p className="mt-2 text-[11px] text-warn-600">Δεν υπάρχει αφετηρία. Πατήστε «GPS» ή ορίστε σημείο εκκίνησης.</p>
+                )}
+              </div>
+
+              {/* Actions — Navigate always reachable; Preview in the expanded area */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Btn variant="outline" onClick={() => origin && runEta(origin, dest.position, dest.label)} disabled={!origin || etaBusy}
+                  className={`${sheetOpen ? '' : 'hidden'} sm:flex`}>
+                  <RouteIcon className="w-3.5 h-3.5" /> Προεπισκόπηση
+                </Btn>
+                <NavigationButton destination={{ ...dest.position, label: dest.label }} origin={origin} label="Πλοήγηση" showSelector={false} travelMode={travelMode} className={`w-full justify-center ${sheetOpen ? '' : 'col-span-2 sm:col-span-1'}`} />
+              </div>
             </div>
-            <div className="mt-3 flex gap-2 flex-wrap">
-              {preview.kind === 'case' && (
-                <>
-                  <Btn onClick={() => openCase(preview.c.id)}><MapPin className="w-3.5 h-3.5" /> Άνοιγμα Case</Btn>
-                  {previewPos && <NavigationButton destination={previewPos} origin={origin} caseId={preview.c.id} label="Πλοήγηση" showSelector={false} />}
-                </>
-              )}
-              {preview.kind === 'visit' && (
-                <>
-                  <Btn onClick={() => preview.v.case_id && openCase(preview.v.case_id)}>Άνοιγμα Case</Btn>
-                  {previewPos && <NavigationButton destination={previewPos} origin={origin} caseId={preview.v.case_id ?? undefined} label="Πλοήγηση" showSelector={false} />}
-                  {preview.v.status === 'planned' && fieldAllowed(role, 'check_in') && (
-                    <Btn variant="ok" onClick={() => doFieldCheckIn(preview.v)} disabled={checkInBusy === preview.v.id}>
-                      {checkInBusy === preview.v.id ? <Spinner /> : <LogIn className="w-3.5 h-3.5" />} Check In
-                    </Btn>
-                  )}
-                </>
-              )}
-              {preview.kind === 'fu' && (
-                <Btn onClick={() => openCase(preview.c.id)}>Άνοιγμα Case</Btn>
-              )}
-              {preview.kind === 'lead' && (
-                <>
-                  {preview.l.lat != null && preview.l.lng != null && (
-                      <NavigationButton destination={{ lat: preview.l.lat, lng: preview.l.lng, label: preview.l.name }} origin={origin} label="Πλοήγηση" showSelector={false} />
-                    )}
-                  {preview.l.lat == null && preview.l.address && (
-                    <Btn variant="brand" onClick={() => locateLead(preview.l)}>
-                      <MapPin className="w-3.5 h-3.5" /> Καταχώρηση στον χάρτη
-                    </Btn>
-                  )}
-                </>
-              )}
-              {preview.kind === 'me' && (
-                <Btn variant="outline" onClick={() => setMyLoc(null)}>Απόκρυψη θέσης</Btn>
-              )}
+          ) : (
+            <div className="card !py-2.5 !px-3 bg-white/90 backdrop-blur text-center text-[12px] text-ink/50">
+              {results.length > 0
+                ? 'Επιλέξτε σημείο στον χάρτη ή αναζητήστε προορισμό για διαδρομή.'
+                : 'Δεν υπάρχουν CRM σημεία σε αυτό το φίλτρο. Αναζητήστε πελάτη, διεύθυνση ή σημείο.'}
             </div>
-          </div>
-        )}
-      </Card>
+          )}
         </div>
       </div>
+
+      {/* Results list (below the map — the map stays primary) */}
+      <Card className="!p-0" pad={false}>
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <Micro tone="brand">Σημεία στον χάρτη</Micro>
+          <span className="pill bg-ink/10 text-ink/70">{results.length}</span>
+        </div>
+        <div className="max-h-[40vh] overflow-y-auto divide-y divide-line">
+          {results.map(r => (
+            <button key={r.id} onClick={() => setSelectedId(r.id)}
+              className={`w-full text-left px-4 py-2.5 transition-colors flex items-center gap-2.5 ${selectedId === r.id ? 'bg-brand-50' : 'hover:bg-ink/[0.03]'}`}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-medium text-ink truncate">{r.title}</span>
+                {r.subtitle && <span className="block text-xs text-ink/45 truncate">{r.subtitle}</span>}
+              </span>
+              {r.distance != null && <span className="text-[11px] text-ink/45 shrink-0">{formatDistance(r.distance)}</span>}
+            </button>
+          ))}
+          {results.length === 0 && (
+            <p className="px-4 py-4 text-xs text-ink/40">Δεν βρέθηκαν σημεία για το επιλεγμένο φίλτρο. Προσθέστε lat/lng στο case ή χρησιμοποιήστε το Check In για GPS.</p>
+          )}
+        </div>
+      </Card>
 
       {filter === 'leads' && (
         <Card className="!p-0" pad={false}>
@@ -764,12 +957,6 @@ export default function MapPage() {
             {leads.length === 0 && <p className="px-5 py-4 text-xs text-ink/40">Δεν υπάρχουν leads.</p>}
           </div>
         </Card>
-      )}
-
-      {markers.length === 0 && filter !== 'leads' && (
-        <p className="text-center text-xs text-ink/40 py-3">
-          Δεν βρέθηκαν σημεία για τη συγκεκριμένη κατηγορία. Προσθέστε lat/lng στο case ή χρησιμοποιήστε το Check In για GPS.
-        </p>
       )}
 
       {routeOpen && (

@@ -287,7 +287,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
       { key: 'automations', label: 'AI & Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
-      { key: 'aiworkforce', label: 'AI Workforce', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
       { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true, badge: 'beta' },
       { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager'], maturity: 'live' },
     ],

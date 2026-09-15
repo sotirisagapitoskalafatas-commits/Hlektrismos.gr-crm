@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { MATURITY_LABEL, ROLE_COLOR, ROLES, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
-import type { NavLeaf } from '@/lib/roles';
+import type { NavLeaf, ShellCounts } from '@/lib/roles';
 import { Logo, Micro, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 
@@ -23,8 +23,8 @@ function LeafButton({ item, active, compact, badge, color, onClick }: {
   ].join(' ');
 
   const activeStyle: React.CSSProperties = item.accent
-    ? { background: rgbaOf('#0e7490', 0.14), color: '#0e7490', boxShadow: 'inset 0 0 0 1px rgba(8,145,178,0.3)' }
-    : { background: rgbaOf(color, 0.16), color, boxShadow: 'inset 2px 0 0 0 ' + color };
+    ? { background: 'rgba(34,211,238,0.16)', color: '#22d3ee', boxShadow: 'inset 0 0 0 1px rgba(34,211,238,0.3)' }
+    : { background: rgbaOf(color, 0.22), color: '#fff', boxShadow: 'inset 2px 0 0 0 ' + color };
 
   return (
     <button key={item.key} onClick={onClick}
@@ -34,12 +34,12 @@ function LeafButton({ item, active, compact, badge, color, onClick }: {
       style={active ? activeStyle : undefined}
       className={cls}>
       <item.icon className={compact ? 'w-[20px] h-[20px]' : 'nav-ico w-[18px] h-[18px]'}
-        style={active ? { color } : undefined} aria-hidden="true" />
+        style={active ? { color: '#fff' } : undefined} aria-hidden="true" />
       {!compact && <span className="flex-1 text-left truncate">{label}</span>}
       {!compact && item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
       {b > 0 && (
         <span className={`nav-badge ${compact ? 'absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 !min-w-4 !h-4 !px-1 text-[8px]' : ''}`}
-          style={{ background: rgbaOf(color, 0.14), color }}>
+          style={{ background: rgbaOf(color, 0.32), color: '#fff' }}>
           {b > 9 ? '9+' : b}
         </span>
       )}
@@ -49,7 +49,7 @@ function LeafButton({ item, active, compact, badge, color, onClick }: {
 }
 
 interface DesktopShellProps {
-  counts: { leads: number; followups: number; backoffice: number };
+  counts: ShellCounts;
 }
 
 export default function DesktopShell({ counts }: DesktopShellProps) {
@@ -71,23 +71,23 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
   return (
     <aside id="shell-rail" className={`glass-nav hidden lg:flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-[246px]'}`}>
       {/* Brand */}
-      <div className={`flex items-center gap-2.5 h-[60px] shrink-0 border-b border-ink/[0.06] sticky top-0 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
+      <div className={`flex items-center gap-2.5 h-[60px] shrink-0 border-b border-white/10 sticky top-0 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
         <Logo size={collapsed ? 'sm' : 'md'} />
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-bold tracking-tight text-ink leading-none font-[var(--font-display)]">ATLAS CRM</div>
-              <div className="micro text-ink/35 mt-1">Ηlektrismos.gr</div>
+              <div className="text-[13px] font-bold tracking-tight text-white leading-none font-[var(--font-display)]">ATLAS CRM</div>
+              <div className="micro text-white/45 mt-1">Ηlektrismos.gr</div>
             </div>
             <button onClick={toggleCollapsed} title="Σύμπτυξη sidebar" aria-label="Σύμπτυξη sidebar"
-              className="text-ink/35 hover:text-ink p-1 rounded-md hover:bg-ink/5">
+              className="text-white/45 hover:text-white p-1 rounded-md hover:bg-white/10">
               <ChevronsLeft className="w-4 h-4" />
             </button>
           </>
         )}
         {collapsed && (
           <button onClick={toggleCollapsed} title="Ανάπτυξη sidebar" aria-label="Ανάπτυξη sidebar"
-            className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5">
+            className="text-white/50 hover:text-white p-1 rounded-md hover:bg-white/10">
             <ChevronsRight className="w-4 h-4" />
           </button>
         )}
@@ -102,10 +102,10 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
               return (
                 <div key={s.id}>
                   <div className="flex items-center gap-1.5 px-2 mb-1.5">
-                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.12) }}>
-                      <s.icon className="w-3.5 h-3.5" style={{ color: c }} aria-hidden="true" />
+                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.2) }}>
+                      <s.icon className="w-3.5 h-3.5" style={{ color: '#fff' }} aria-hidden="true" />
                     </span>
-                    <span className="micro" style={{ color: c }}>{s.label}</span>
+                    <span className="micro text-white/60">{s.label}</span>
                   </div>
                   <div className="space-y-0.5">
                     {s.children.map((item: NavLeaf) => (
@@ -128,24 +128,24 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
       </nav>
 
       {/* User footer */}
-      <div className={`shrink-0 border-t border-ink/[0.06] py-3 ${collapsed ? 'flex justify-center px-0' : 'px-4'}`}>
+      <div className={`shrink-0 border-t border-white/10 py-3 ${collapsed ? 'flex justify-center px-0' : 'px-4'}`}>
         {collapsed ? (
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold" aria-hidden="true"
-            style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
+            style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </div>
         ) : (
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-              style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
+              style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
               {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
+              <div className="text-[13px] font-semibold text-white truncate">{profile?.full_name ?? 'Χρήστης'}</div>
               <div className="flex items-center gap-1.5">
                 <Micro>{roleLabel(role)}</Micro>
                 <span className="pill !text-[9px] !py-0 !px-1"
-                  style={{ background: rgbaOf(ROLE_COLOR[role], 0.12), color: ROLE_COLOR[role] }}>
+                  style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
                   {ROLES.find(r => r.id === role)?.short}
                 </span>
               </div>

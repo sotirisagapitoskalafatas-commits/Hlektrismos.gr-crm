@@ -4,18 +4,18 @@ import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
-  BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, ROLES, can,
+  ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, ROLES, can,
   findNav, flattenNav, navForRole, roleLabel, sectionColor,
 } from '@/lib/roles';
-import type { NavLeaf } from '@/lib/roles';
+import type { NavLeaf, ShellCounts, Stage } from '@/lib/roles';
 import { Btn, IconBtn, Logo, Micro, Modal, Spinner, rgbaOf, timeUntil } from '@/lib/ui';
 import {
-  AppNotification, Case, fetchCases, fetchFollowUps, fetchLeads,
+  AppNotification, Case, fetchCases, fetchCustomers, fetchFollowUps, fetchLeads,
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, ChevronDown, ChevronRight, CircleHelp, Download, LogOut, Menu, Plus, Search,
-  SlidersHorizontal, UserCircle, X,
+  Bell, Briefcase, CalendarClock, ChevronDown, ChevronRight, CircleHelp, Download, LogOut,
+  Menu, Plus, Search, SlidersHorizontal, UserCircle, UserPlus, UsersRound, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';
 import TabletShell from '@/components/shells/TabletShell';
@@ -49,16 +49,17 @@ const FieldModePage = lazy(() => import('@/components/field-sales/FieldModePage'
    here as shared chrome across all shells. */
 
 /* ---------------- Shell-wide counts (nav badges) ---------------- */
-type ShellCounts = { leads: number; followups: number; backoffice: number };
 
 function useShellCounts(): ShellCounts {
   const { role } = useAuth();
-  const [counts, setCounts] = useState<ShellCounts>({ leads: 0, followups: 0, backoffice: 0 });
+  const [counts, setCounts] = useState<ShellCounts>({ leads: 0, followups: 0, backoffice: 0, cases: 0, customers: 0 });
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [leads, fus, cases] = await Promise.all([fetchLeads(), fetchFollowUps({ status: 'all' }), fetchCases()]);
+      const [leads, fus, cases, customers] = await Promise.all([
+        fetchLeads(), fetchFollowUps({ status: 'all' }), fetchCases(), fetchCustomers(),
+      ]);
       if (!alive) return;
       const endOfToday = new Date();
       endOfToday.setHours(23, 59, 59, 999);
@@ -68,7 +69,14 @@ function useShellCounts(): ShellCounts {
         return new Date(f.due_at).getTime() <= endOfToday.getTime();
       }).length;
       const backoffice = cases.filter(c => BACK_OFFICE_STAGES.includes(c.current_stage)).length;
-      setCounts({ leads: leads.length, followups, backoffice: Math.max(0, backoffice) });
+      const activeCases = cases.filter(c => ACTIVE_STAGES.includes(c.current_stage as Stage)).length;
+      setCounts({
+        leads: leads.length,
+        followups,
+        backoffice: Math.max(0, backoffice),
+        cases: activeCases,
+        customers: customers.length,
+      });
     })();
     return () => { alive = false; };
   }, [role]);
@@ -111,13 +119,13 @@ function Drawer({ open, onClose }: {
     <div className={`fixed inset-0 z-50 lg:hidden ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
       <div className={`absolute inset-0 bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
       <aside className={`glass-drawer absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] flex flex-col transition-transform duration-250 ${open ? 'translate-x-0' : '-translate-x-full'}`} aria-label="Πλοήγηση">
-        <div className="flex items-center gap-2.5 h-[60px] shrink-0 px-4 border-b border-ink/[0.06]">
+        <div className="flex items-center gap-2.5 h-[60px] shrink-0 px-4 border-b border-white/10">
           <Logo size="md" />
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-bold tracking-tight text-ink leading-none font-[var(--font-display)]">ATLAS CRM</div>
-            <div className="micro text-ink/35 mt-1">Ηlektrismos.gr</div>
+            <div className="text-[13px] font-bold tracking-tight text-white leading-none font-[var(--font-display)]">ATLAS CRM</div>
+            <div className="micro text-white/45 mt-1">Ηlektrismos.gr</div>
           </div>
-          <button onClick={onClose} aria-label="Κλείσιμο μενού" className="text-ink/45 hover:text-ink p-1 rounded-md hover:bg-ink/5">
+          <button onClick={onClose} aria-label="Κλείσιμο μενού" className="text-white/50 hover:text-white p-1 rounded-md hover:bg-white/10">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -128,19 +136,19 @@ function Drawer({ open, onClose }: {
             return (
               <div key={s.id}>
                 <div className="flex items-center gap-1.5 px-2 mb-1.5">
-                  <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.12) }}>
-                    <s.icon className="w-3.5 h-3.5" style={{ color: c }} aria-hidden="true" />
+                  <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.2) }}>
+                    <s.icon className="w-3.5 h-3.5" style={{ color: '#fff' }} aria-hidden="true" />
                   </span>
-                  <span className="micro" style={{ color: c }}>{s.label}</span>
+                  <span className="micro text-white/60">{s.label}</span>
                 </div>
                 <div className="space-y-0.5">
                   {s.children.map((item: NavLeaf) => (
                     <button key={item.key} onClick={() => { go(item.page); onClose(); }}
                       style={view.page === item.page ? (item.accent
-                        ? { background: 'rgba(8,145,178,0.14)', color: '#0e7490', boxShadow: 'inset 0 0 0 1px rgba(8,145,178,0.3)' }
-                        : { background: rgbaOf(c, 0.16), color: c, boxShadow: `inset 2px 0 0 0 ${c}` }) : undefined}
+                        ? { background: 'rgba(34,211,238,0.16)', color: '#22d3ee', boxShadow: 'inset 0 0 0 1px rgba(34,211,238,0.3)' }
+                        : { background: rgbaOf(c, 0.22), color: '#fff', boxShadow: `inset 2px 0 0 0 ${c}` }) : undefined}
                       className={`nav-leaf w-full ${view.page === item.page ? (item.accent ? 'nav-atlas-active' : 'nav-active') : item.accent ? 'nav-atlas nav-atlas-pulse' : ''}`}>
-                      <item.icon className="w-[18px] h-[18px] nav-ico" style={view.page === item.page ? { color: c } : undefined} aria-hidden="true" />
+                      <item.icon className="w-[18px] h-[18px] nav-ico" style={view.page === item.page ? { color: '#fff' } : undefined} aria-hidden="true" />
                       <span className="flex-1 text-left truncate">{item.label}</span>
                       {item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
                     </button>
@@ -151,20 +159,22 @@ function Drawer({ open, onClose }: {
           })}
         </nav>
 
-<div className="shrink-0 border-t border-ink/5 px-4 py-4 space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
-                {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
+<div className="shrink-0 border-t border-white/10 px-4 py-4">
+            <div className="card p-3 space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold shrink-0">
+                  {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
+                  <Micro>{roleLabel(role)}{role !== profile?.role ? ' · sim' : ''}</Micro>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-                <Micro>{roleLabel(role)}{role !== profile?.role ? ' · sim' : ''}</Micro>
-              </div>
+              <RoleSwitcher />
+              <Btn variant="danger" onClick={() => { signOut(); window.location.hash = '/'; onClose(); }} className="w-full justify-center">
+                <LogOut className="w-3.5 h-3.5" /> Αποσύνδεση
+              </Btn>
             </div>
-            <RoleSwitcher />
-            <Btn variant="danger" onClick={() => { signOut(); window.location.hash = '/'; onClose(); }} className="w-full justify-center">
-              <LogOut className="w-3.5 h-3.5" /> Αποσύνδεση
-            </Btn>
           </div>
       </aside>
     </div>
@@ -172,8 +182,8 @@ function Drawer({ open, onClose }: {
 }
 
 /* ---------------- Header (shared across shells) ---------------- */
-function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
-  onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void;
+function Header({ onOpenPalette, onOpenDrawer, onSignOut, counts }: {
+  onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void; counts: ShellCounts;
 }) {
   const { role, profile, user } = useAuth();
   const { view, openCase, go } = useNav();
@@ -217,6 +227,29 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
           <h1 className="text-[17px] font-bold text-ink tracking-tight truncate leading-tight font-[var(--font-display)]">{title}</h1>
           {sim && <span className="pill text-[11px]" style={{ background: rgbaOf(ROLE_COLOR[role], 0.12), color: ROLE_COLOR[role] }}>sim {roleLabel(role)}</span>}
         </div>
+      </div>
+
+      {/* Top-bar shortcuts (desktop only) — Leads · Πελάτες · Cases · Follow Ups */}
+      <div className="hidden xl:flex items-center gap-0.5 mr-1">
+        {([
+          { key: 'leads' as const, label: 'Leads', page: 'leads' as const, icon: UserPlus, color: '#087CF5' },
+          { key: 'customers' as const, label: 'Πελάτες', page: 'customers' as const, icon: UsersRound, color: '#15803d' },
+          { key: 'cases' as const, label: 'Cases', page: 'cases' as const, icon: Briefcase, color: '#7c3aed' },
+          { key: 'followups' as const, label: 'Follow Ups', page: 'followups' as const, icon: CalendarClock, color: '#b45309' },
+        ]).map(q => {
+          const n = counts[q.key];
+          return (
+            <button key={q.key} onClick={() => go(q.page)} title={q.label}
+              className="flex items-center gap-1.5 h-9 px-2.5 rounded-[9px] bg-ink/[0.03] hover:bg-ink/[0.07] text-ink/65 hover:text-ink text-[12.5px] font-medium transition-colors">
+              <q.icon className="w-4 h-4" style={{ color: q.color }} aria-hidden="true" />
+              <span className="hidden 2xl:inline">{q.label}</span>
+              {n > 0 && (
+                <span className="min-w-[16px] h-4 px-1 rounded-full inline-flex items-center justify-center text-[9px] font-bold font-[var(--font-mono)]"
+                  style={{ background: rgbaOf(q.color, 0.12), color: q.color }}>{n > 9 ? '9+' : n}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <button onClick={onOpenPalette}
@@ -478,7 +511,7 @@ export default function AppShell() {
       {isDesktop && <DesktopShell counts={counts} />}
       {isTablet && <TabletShell counts={counts} />}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
-        <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} />
+        <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} counts={counts} />
         <main className={`flex-1 overflow-y-auto px-4 sm:px-7 pt-6 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-10'}`}>
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>

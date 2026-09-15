@@ -181,7 +181,16 @@ export type PageKey =
   | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
   | 'account' | 'preferences';
 
-export type NavBadge = 'leads' | 'followups' | 'backoffice';
+export type NavBadge = 'leads' | 'followups' | 'backoffice' | 'cases' | 'customers';
+
+/* Shell-wide count feed: nav badges + top-bar quick-action counts. */
+export type ShellCounts = {
+  leads: number;
+  followups: number;
+  backoffice: number;
+  cases: number;
+  customers: number;
+};
 
 export type NavLeaf = {
   key: string;
@@ -223,54 +232,47 @@ const ALL: Role[] = ['admin', 'manager', 'inside_sales', 'field_sales', 'back_of
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: 'home',
-    label: 'Home',
+    label: 'Αρχική',
     icon: Home,
     children: [
-      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, page: 'home', roles: ALL, maturity: 'live' },
+      { key: 'dashboard', label: 'Πίνακας Ελέγχου', icon: LayoutDashboard, page: 'home', roles: ALL, maturity: 'live' },
       { key: 'mywork', label: 'My Work', icon: Inbox, page: 'mywork', roles: ALL, maturity: 'live' },
     ],
   },
   {
     id: 'sales',
-    label: 'Sales',
+    label: 'Πωλήσεις',
     icon: ShoppingBag,
     children: [
       { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live', badge: 'leads' },
+      { key: 'customers', label: 'Πελάτες', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live', badge: 'customers' },
       { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live' },
       { key: 'providers', label: 'Πάροχοι & Προγράμματα', icon: Boxes, page: 'providers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
-      { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live' },
+      { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
       { key: 'followups', label: 'Follow Ups', icon: CalendarClock, page: 'followups', roles: ALL, maturity: 'live', badge: 'followups' },
     ],
   },
   {
     id: 'field',
-    label: 'Field Sales',
+    label: 'Πεδίο',
     icon: Navigation,
     children: [
+      { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
       { key: 'myday', label: 'Ημέρα μου', icon: Sun, page: 'myday', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
       { key: 'fieldmode', label: 'Λειτουργία Πεδίου', icon: Smartphone, page: 'field', roles: ['admin', 'manager', 'field_sales'], maturity: 'beta' },
-      { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
     ],
   },
   {
     id: 'operations',
-    label: 'Operations',
+    label: 'Λειτουργία',
     icon: Cog,
     children: [
       { key: 'backoffice', label: 'Back Office', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
     ],
   },
   {
-    id: 'customers',
-    label: 'Customers',
-    icon: Users,
-    children: [
-      { key: 'customers', label: 'Customers', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
-    ],
-  },
-  {
     id: 'analytics',
-    label: 'Analytics',
+    label: 'Αναλυτικά',
     icon: BarChart3,
     children: [
       { key: 'reports', label: 'Reports', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
@@ -279,7 +281,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: 'system',
-    label: 'System',
+    label: 'Σύστημα',
     icon: Settings,
     children: [
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },

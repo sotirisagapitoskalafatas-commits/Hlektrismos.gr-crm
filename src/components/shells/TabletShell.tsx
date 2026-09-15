@@ -6,9 +6,9 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
-import type { NavLeaf } from '@/lib/roles';
-import { Logo, Micro, rgbaOf } from '@/lib/ui';
+import { MATURITY_LABEL, ROLE_COLOR, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
+import type { NavLeaf, ShellCounts } from '@/lib/roles';
+import { Logo, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 function LeafButton({ item, active, badge, color, onClick }: {
@@ -19,20 +19,20 @@ function LeafButton({ item, active, badge, color, onClick }: {
     <button key={item.key} onClick={onClick}
       aria-current={active ? 'page' : undefined}
       style={active ? (item.accent
-        ? { background: rgbaOf('#0e7490', 0.14), color: '#0e7490', boxShadow: 'inset 0 0 0 1px rgba(8,145,178,0.3)' }
-        : { background: rgbaOf(color, 0.16), color, boxShadow: 'inset 2px 0 0 0 ' + color }) : undefined}
+        ? { background: 'rgba(34,211,238,0.16)', color: '#22d3ee', boxShadow: 'inset 0 0 0 1px rgba(34,211,238,0.3)' }
+        : { background: rgbaOf(color, 0.22), color: '#fff', boxShadow: 'inset 2px 0 0 0 ' + color }) : undefined}
       className={`nav-leaf ${active ? (item.accent ? 'nav-atlas-active' : 'nav-active') : item.accent ? 'nav-atlas nav-atlas-pulse' : ''}`}>
-      <item.icon className="w-[18px] h-[18px] nav-ico" style={active ? { color } : undefined} aria-hidden="true" />
+      <item.icon className="w-[18px] h-[18px] nav-ico" style={active ? { color: '#fff' } : undefined} aria-hidden="true" />
       <span className="flex-1 text-left truncate">{item.label}</span>
       {item.maturity && <span className={`dot ${MATURITY_LABEL[item.maturity].dot}`} title={MATURITY_LABEL[item.maturity].label} />}
-      {b > 0 && <span className="nav-badge" style={{ background: rgbaOf(color, 0.14), color }}>{b > 9 ? '9+' : b}</span>}
+      {b > 0 && <span className="nav-badge" style={{ background: rgbaOf(color, 0.32), color: '#fff' }}>{b > 9 ? '9+' : b}</span>}
       {active && <span className="nav-dot" style={{ background: color }} aria-hidden="true" />}
     </button>
   );
 }
 
 interface TabletShellProps {
-  counts: { leads: number; followups: number; backoffice: number };
+  counts: ShellCounts;
 }
 
 export default function TabletShell({ counts }: TabletShellProps) {
@@ -51,20 +51,20 @@ export default function TabletShell({ counts }: TabletShellProps) {
   return (
     <aside className={`glass-nav flex flex-col shrink-0 z-20 transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-[220px]'}`}>
       {/* Brand */}
-      <div className={`flex items-center gap-2 h-[60px] shrink-0 border-b border-ink/[0.06] ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
+      <div className={`flex items-center gap-2 h-[60px] shrink-0 border-b border-white/10 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
         <Logo size={collapsed ? 'sm' : 'md'} />
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-bold tracking-tight text-ink leading-none font-[var(--font-display)]">ATLAS</div>
+              <div className="text-[13px] font-bold tracking-tight text-white leading-none font-[var(--font-display)]">ATLAS</div>
             </div>
-            <button onClick={toggleCollapsed} aria-label="Σύμπτυξη" className="text-ink/35 hover:text-ink p-1 rounded-md hover:bg-ink/5">
+            <button onClick={toggleCollapsed} aria-label="Σύμπτυξη" className="text-white/45 hover:text-white p-1 rounded-md hover:bg-white/10">
               <ChevronsLeft className="w-4 h-4" />
             </button>
           </>
         )}
         {collapsed && (
-          <button onClick={toggleCollapsed} aria-label="Ανάπτυξη" className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5">
+          <button onClick={toggleCollapsed} aria-label="Ανάπτυξη" className="text-white/50 hover:text-white p-1 rounded-md hover:bg-white/10">
             <ChevronsRight className="w-4 h-4" />
           </button>
         )}
@@ -86,10 +86,10 @@ export default function TabletShell({ counts }: TabletShellProps) {
               return (
                 <div key={s.id}>
                   <div className="flex items-center gap-1.5 px-2 mb-1">
-                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.12) }}>
-                      <s.icon className="w-3.5 h-3.5" style={{ color: c }} aria-hidden="true" />
+                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.2) }}>
+                      <s.icon className="w-3.5 h-3.5" style={{ color: '#fff' }} aria-hidden="true" />
                     </span>
-                    <span className="micro" style={{ color: c }}>{s.label}</span>
+                    <span className="micro text-white/60">{s.label}</span>
                   </div>
                   <div className="space-y-0.5">
                     {s.children.map((item: NavLeaf) => (
@@ -105,19 +105,21 @@ export default function TabletShell({ counts }: TabletShellProps) {
       </nav>
 
       {/* User */}
-      <div className={`shrink-0 border-t border-ink/[0.06] py-3 ${collapsed ? 'flex justify-center' : 'px-3'}`}>
+      <div className={`shrink-0 border-t border-white/10 py-3 ${collapsed ? 'flex justify-center' : 'px-3'}`}>
         {collapsed ? (
-          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold" aria-hidden="true"
+            style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center text-[11px] font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+              style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
               {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-              <Micro>{roleLabel(role)}</Micro>
+              <div className="text-[13px] font-semibold text-white truncate">{profile?.full_name ?? 'Χρήστης'}</div>
+              <span className="micro text-white/55">{roleLabel(role)}</span>
             </div>
           </div>
         )}

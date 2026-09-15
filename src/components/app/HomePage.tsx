@@ -5,6 +5,7 @@ import { Micro, Btn } from '@/lib/ui';
 import { ArrowUpRight, Briefcase, CalendarClock, Compass, LayoutDashboard, Map } from 'lucide-react';
 import type { IconType } from '@/lib/ui';
 import { DashboardLoader } from '@/components/dashboards/shared';
+import { OperationalStrip } from '@/components/dashboards/OperationalStrip';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import ManagerDashboard from '@/components/dashboards/ManagerDashboard';
 import InsideSalesDashboard from '@/components/dashboards/InsideSalesDashboard';
@@ -58,15 +59,20 @@ export default function HomePage() {
       </div>
 
       <DashboardLoader>
-        {d => role === 'admin'
-          ? <AdminDashboard d={d} />
-          : role === 'manager'
-            ? <ManagerDashboard d={d} />
-            : role === 'inside_sales'
-              ? <InsideSalesDashboard d={d} />
-              : role === 'field_sales'
-                ? <FieldSalesDashboard d={d} />
-                : <BackOfficeDashboard d={d} />}
+        {d => (
+          <>
+            <OperationalStrip d={d} />
+            {role === 'admin'
+              ? <AdminDashboard d={d} />
+              : role === 'manager'
+                ? <ManagerDashboard d={d} />
+                : role === 'inside_sales'
+                  ? <InsideSalesDashboard d={d} />
+                  : role === 'field_sales'
+                    ? <FieldSalesDashboard d={d} />
+                    : <BackOfficeDashboard d={d} />}
+          </>
+        )}
       </DashboardLoader>
     </div>
   );

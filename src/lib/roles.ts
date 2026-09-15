@@ -179,7 +179,7 @@ export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
   | 'home' | 'mywork' | 'leads' | 'prospecting' | 'providers' | 'cases' | 'followups' | 'customers'
   | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
-  | 'automations' | 'account' | 'preferences';
+  | 'automations' | 'aiworkforce' | 'account' | 'preferences';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice' | 'cases' | 'customers';
 
@@ -287,6 +287,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
       { key: 'automations', label: 'AI & Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
+      { key: 'aiworkforce', label: 'AI Workforce', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
+      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true, badge: 'beta' },
       { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
@@ -337,6 +339,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   revenue: 'Έσοδα',
   admin: 'Διαχείριση',
   automations: 'AI & Αυτοματισμοί',
+  aiworkforce: 'AI Workforce',
   account: 'Λογαριασμός',
   preferences: 'Προτιμήσεις',
 };

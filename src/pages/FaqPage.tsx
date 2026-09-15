@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, Menu, Phone, X } from 'lucide-react';
 import CinematicSkyBackground from '@/components/CinematicSkyBackground';
+import { footerWaveTopMask } from '@/lib/waveDivider';
 
 interface FaqItem {
   id: number;
@@ -176,7 +177,7 @@ export default function FaqPage() {
             </div>
           </section>
 
-          <section style={{ padding: 'clamp(48px,6vh,80px) clamp(20px,5vw,70px) clamp(64px,9vh,110px)' }}>
+          <section style={{ padding: 'clamp(48px,6vh,80px) clamp(20px,5vw,70px) calc(clamp(64px,9vh,110px) + 70px)' }}>
             <div style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(32px,4vw,48px)', borderRadius: 22, background: CARD_BG, border: '1px solid rgba(255,255,255,.1)', backdropFilter: 'blur(10px)', textAlign: 'center' as const }}>
               <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 'clamp(22px,2.6vw,30px)', color: '#fff' }}>Δεν βρήκατε την απάντηση;</h3>
               <p style={{ fontSize: 15.5, color: '#b0c4cc', margin: '12px 0 0' }}>Επικοινωνήστε με έναν εξειδικευμένο σύμβουλο ενέργειας — δωρεάν και χωρίς υποχρέωση.</p>
@@ -192,7 +193,7 @@ export default function FaqPage() {
           </section>
         </main>
 
-        <footer style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px' }}>
+        <footer style={{ position: 'relative', overflow: 'hidden', marginTop: -110, padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px', paddingTop: 'calc(clamp(56px,7vh,80px) + 110px)', ...footerWaveTopMask }}>
           <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(4,7,10,.94) 0%,rgba(4,7,10,.90) 55%,rgba(4,7,10,.96) 100%)' }} />
           <div className="l-footer-grid" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>

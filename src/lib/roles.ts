@@ -179,7 +179,7 @@ export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
   | 'home' | 'mywork' | 'leads' | 'prospecting' | 'providers' | 'cases' | 'followups' | 'customers'
   | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
-  | 'account' | 'preferences';
+  | 'automations' | 'account' | 'preferences';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice' | 'cases' | 'customers';
 
@@ -286,6 +286,7 @@ export const NAV_SECTIONS: NavSection[] = [
     children: [
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
+      { key: 'automations', label: 'AI & Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
       { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
@@ -335,6 +336,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   reports: 'Reports',
   revenue: 'Έσοδα',
   admin: 'Διαχείριση',
+  automations: 'AI & Αυτοματισμοί',
   account: 'Λογαριασμός',
   preferences: 'Προτιμήσεις',
 };

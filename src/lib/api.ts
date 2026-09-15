@@ -1430,3 +1430,284 @@ export async function logAudit(entity_type: string, entity_id: string, action: s
     await supabase.from('activity_log').insert({ entity_type, entity_id, action, details });
   } catch { /* non-fatal */ }
 }
+
+/* ================= AI Event Bus & Policy Engine (M1 / M2) ================= */
+
+export type PolicyEffect = 'allow' | 'require_approval' | 'deny';
+export type PolicyRule = {
+  id: string;
+  organization_id: string | null;
+  scope: 'all' | 'role' | 'agent';
+  subject_key: string | null;
+  resource: string;
+  effect: PolicyEffect;
+  priority: number;
+  conditions: Record<string, unknown>;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function fetchPolicyRules(): Promise<PolicyRule[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('policy_rules')
+    .select('*')
+    .order('priority', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (error) { logError('fetchPolicyRules', error); return []; }
+  return (data ?? []) as PolicyRule[];
+}
+
+export async function savePolicyRule(rule: {
+  id?: string;
+  resource: string;
+  scope: 'all' | 'role' | 'agent';
+  subject_key?: string | null;
+  effect: PolicyEffect;
+  priority: number;
+  conditions: Record<string, unknown>;
+  notes?: string | null;
+}): Promise<{ ok: boolean; message?: string }> {
+  if (!supabase) return { ok: false, message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  const row = {
+    resource: rule.resource,
+    scope: rule.scope,
+    subject_key: rule.scope === 'all' ? null : rule.subject_key || null,
+    effect: rule.effect,
+    priority: rule.priority,
+    conditions: (rule.conditions ?? {}) as object,
+    notes: rule.notes || null,
+  };
+  if (rule.id) {
+    const { error } = await supabase.from('policy_rules').update(row).eq('id', rule.id);
+    if (error) { logError('savePolicyRule', error); return { ok: false, message: error.message }; }
+    return { ok: true };
+  }
+  const { error } = await supabase.from('policy_rules').insert(row);
+  if (error) { logError('savePolicyRule', error); return { ok: false, message: error.message }; }
+  return { ok: true };
+}
+
+export async function setPolicyRuleActive(id: string, is_active: boolean): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('policy_rules').update({ is_active }).eq('id', id);
+  if (error) { logError('setPolicyRuleActive', error); return false; }
+  return true;
+}
+
+export async function deletePolicyRule(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('policy_rules').delete().eq('id', id);
+  if (error) { logError('deletePolicyRule', error); return false; }
+  return true;
+}
+
+export type EvaluateDecision = {
+  effect: PolicyEffect;
+  risk: 'low' | 'medium' | 'high' | 'critical';
+  effective_autonomy: number;
+  reasons: string[];
+  rule_id: string | null;
+  matched_rule: { resource: string; scope: string; subject_key: string | null; effect: string } | null;
+  evaluated_at: string;
+};
+
+export async function evaluateAction(params: {
+  subject_type: string;
+  subject_key?: string;
+  action: string;
+  target?: string;
+  context: Record<string, unknown>;
+}): Promise<{ ok: true; decision: EvaluateDecision } | { ok: false; message: string }> {
+  if (!supabase) return { ok: false, message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.rpc('evaluate_policy', {
+    p_subject_type: params.subject_type,
+    p_subject_key: params.subject_key || null,
+    p_action: params.action,
+    p_target: params.target || null,
+    p_context: params.context as object,
+  });
+  if (error) { logError('evaluateAction', error); return { ok: false, message: error.message }; }
+  return { ok: true, decision: (data as EvaluateDecision) ?? { effect: 'deny', risk: 'low', effective_autonomy: 0, reasons: ['empty decision'], rule_id: null, matched_rule: null, evaluated_at: new Date().toISOString() } };
+}
+
+export type EventTypeInfo = {
+  id: string;
+  key: string;
+  version: number;
+  applies_to: string | null;
+  description: string | null;
+  is_active: boolean;
+};
+
+export async function fetchEventTypes(): Promise<EventTypeInfo[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('event_types')
+    .select('*')
+    .order('key', { ascending: true });
+  if (error) { logError('fetchEventTypes', error); return []; }
+  return (data ?? []) as EventTypeInfo[];
+}
+
+export type BusinessEvent = {
+  id: string;
+  idempotency_key: string | null;
+  event_type: string;
+  event_version: number;
+  entity_type: string | null;
+  entity_id: string | null;
+  actor_type: string | null;
+  actor_id: string | null;
+  agent_id: string | null;
+  organization_id: string | null;
+  correlation_id: string | null;
+  causation_id: string | null;
+  source: string;
+  payload: unknown;
+  created_at: string;
+};
+
+export async function fetchRecentEvents(limit = 50): Promise<BusinessEvent[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('business_events')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) { logError('fetchRecentEvents', error); return []; }
+  return (data ?? []) as BusinessEvent[];
+}
+
+export async function emitTestEvent(params: {
+  event_type: string;
+  entity_type?: string;
+  payload?: object;
+  source?: string;
+}): Promise<{ ok: boolean; id?: string; message?: string }> {
+  if (!supabase) return { ok: false, message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.rpc('emit_business_event', {
+    p_event_type: params.event_type,
+    p_entity_type: params.entity_type || null,
+    p_entity_id: null,
+    p_payload: (params.payload ?? {}) as object,
+    p_source: params.source || 'ai',
+    p_actor_type: 'user',
+  });
+  if (error) { logError('emitTestEvent', error); return { ok: false, message: error.message }; }
+  return { ok: true, id: (data as string) ?? undefined };
+}
+
+export type ToolInfo = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  handler: string;
+  required_permission: string | null;
+  is_active: boolean;
+};
+
+export async function fetchTools(): Promise<ToolInfo[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('tools')
+    .select('*')
+    .order('key', { ascending: true });
+  if (error) { logError('fetchTools', error); return []; }
+  return (data ?? []) as ToolInfo[];
+}
+
+export type ToolCallLogRow = {
+  id: string;
+  tool_key: string;
+  caller_type: string;
+  caller_id: string | null;
+  organization_id: string | null;
+  request: unknown;
+  status: 'success' | 'error' | 'denied' | 'approved';
+  error: string | null;
+  latency_ms: number | null;
+  created_at: string;
+};
+
+export async function fetchToolCallLogs(limit = 50): Promise<ToolCallLogRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('tool_call_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) { logError('fetchToolCallLogs', error); return []; }
+  return (data ?? []) as ToolCallLogRow[];
+}
+
+export type ConsentRecord = {
+  id: string;
+  customer_id: string;
+  channel: 'email' | 'sms' | 'phone' | 'letter' | 'all';
+  consent_type: string;
+  status: 'granted' | 'revoked';
+  consent_granted_at: string | null;
+  consent_revoked_at: string | null;
+  source: string | null;
+  created_at: string;
+};
+
+export async function fetchConsentRecords(): Promise<ConsentRecord[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('consent_records')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { logError('fetchConsentRecords', error); return []; }
+  return (data ?? []) as ConsentRecord[];
+}
+
+export async function addConsent(params: {
+  customer_id: string;
+  channel: ConsentRecord['channel'];
+  consent_type: string;
+  source?: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  if (!supabase) return { ok: false, message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  const { data: existing, error: qErr } = await supabase
+    .from('consent_records')
+    .select('id')
+    .eq('customer_id', params.customer_id)
+    .eq('channel', params.channel)
+    .eq('consent_type', params.consent_type)
+    .maybeSingle();
+  if (qErr) { logError('addConsent', qErr); return { ok: false, message: qErr.message }; }
+  if (existing) {
+    const { error } = await supabase
+      .from('consent_records')
+      .update({ status: 'granted', consent_granted_at: new Date().toISOString(), consent_revoked_at: null, source: params.source || 'crm' })
+      .eq('id', existing.id);
+    if (error) { logError('addConsent', error); return { ok: false, message: error.message }; }
+    return { ok: true };
+  }
+  const { error } = await supabase.from('consent_records').insert({
+    customer_id: params.customer_id,
+    channel: params.channel,
+    consent_type: params.consent_type,
+    status: 'granted',
+    consent_granted_at: new Date().toISOString(),
+    source: params.source || 'crm',
+  });
+  if (error) { logError('addConsent', error); return { ok: false, message: error.message }; }
+  return { ok: true };
+}
+
+export async function revokeConsent(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('consent_records')
+    .update({ status: 'revoked', consent_revoked_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { logError('revokeConsent', error); return false; }
+  return true;
+}

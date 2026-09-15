@@ -4,11 +4,13 @@ import type { MapCoordinate } from '../maps/types';
  *  Geocoding provider (place / address search + reverse geocoding).   *
  *                                                                     *
  *  Backed by Photon (Komoot) — an OpenStreetMap geocoder that needs   *
- *  no API key and returns streets, businesses, landmarks and places,  *
- *  in Greek (lang=el). This is a distinct capability from CRM search  *
- *  (fetchFieldTargets) and from routing (planRoute); the map's search  *
- *  box combines CRM results with these place results, each tagged by   *
- *  source.                                                            *
+ *  no API key and returns streets, businesses, landmarks and places.  *
+ *  NOTE: the public Photon server only accepts lang de|en|fr|it (else *
+ *  HTTP 400), so we send NO lang param — Photon then returns names in  *
+ *  the local OSM language, which for Greece is Greek. This is a        *
+ *  distinct capability from CRM search (fetchFieldTargets) and from    *
+ *  routing (planRoute); the map's search box combines CRM results with *
+ *  these place results, each tagged by source.                        *
  * ------------------------------------------------------------------ */
 
 export type GeocodeResult = {
@@ -57,7 +59,7 @@ export async function reverseGeocode(
   lng: number,
 ): Promise<GeocodeLookupResult | null> {
   try {
-    const res = await fetch(`${PHOTON_REVERSE_URL}?lat=${lat}&lon=${lng}&lang=el`, {
+    const res = await fetch(`${PHOTON_REVERSE_URL}?lat=${lat}&lon=${lng}`, {
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) return null;
@@ -85,10 +87,10 @@ export async function geocodeAddress(
   try {
     const bias = origin ?? DEFAULT_BIAS;
     /* Photon biases toward lat/lon params (NOT a "bias=proximity" string). */
+    /* No lang param — the public Photon server rejects lang=el with HTTP 400. */
     const params = new URLSearchParams({
       q,
       limit: '6',
-      lang: 'el',
       lat: String(bias.lat),
       lon: String(bias.lng),
     });

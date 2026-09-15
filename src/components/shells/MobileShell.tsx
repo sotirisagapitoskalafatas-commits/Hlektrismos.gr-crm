@@ -8,31 +8,49 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { categoryColor } from '@/lib/roles';
-import type { PageKey } from '@/lib/roles';
+import type { PageKey, Role } from '@/lib/roles';
 import {
-  Briefcase, Compass, Home, Map, MoreHorizontal, Plus, Route, X,
+  Briefcase, CalendarClock, Compass, Home, Map, MonitorCog, MoreHorizontal, Plus, Route,
+  UserPlus, UsersRound, X,
 } from 'lucide-react';
 
 type Counts = { leads: number; followups: number; backoffice: number };
 
-const TABS: { page: PageKey; label: string; icon: typeof Home; badge?: keyof Counts }[] = [
-  { page: 'home',      label: 'Αρχική',     icon: Home },
-  { page: 'cases',     label: 'Cases',      icon: Briefcase },
-  { page: 'myday',     label: 'Ημέρα μου',  icon: Compass, badge: 'followups' },
-  { page: 'map',       label: 'Χάρτης',     icon: Map },
-];
+type Tab = { page: PageKey; label: string; icon: typeof Home; badge?: keyof Counts };
+
+/* Master-prompt mobile nav: role-aware 5-tab bar. Sales → Leads/Πελάτες;
+   Field → Ημέρα μου/Χάρτης; Back Office → Operations/Follow Ups. */
+function tabsForRole(role: Role): Tab[] {
+  const tabs: Tab[] = [
+    { page: 'home', label: 'Αρχική', icon: Home },
+    { page: 'cases', label: 'Cases', icon: Briefcase },
+  ];
+  if (role === 'admin' || role === 'manager' || role === 'inside_sales') {
+    tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
+    tabs.push({ page: 'customers', label: 'Πελάτες', icon: UsersRound });
+  } else if (role === 'field_sales') {
+    tabs.push({ page: 'myday', label: 'Ημέρα μου', icon: Compass, badge: 'followups' });
+    tabs.push({ page: 'map', label: 'Χάρτης', icon: Map });
+  } else {
+    tabs.push({ page: 'backoffice', label: 'Operations', icon: MonitorCog });
+    tabs.push({ page: 'followups', label: 'Follow Ups', icon: CalendarClock, badge: 'followups' });
+  }
+  return tabs.slice(0, 4);
+}
 
 function BottomTabBar({ current, counts, onMore }: {
   current: string; counts: Counts; onMore: () => void;
 }) {
+  const { role } = useAuth();
   const { go } = useNav();
+  const tabs = tabsForRole(role);
 
   return (
     <nav aria-label="Γρήγορη πλοήγηση"
       className="fixed inset-x-0 bottom-0 z-40 bg-white/90 backdrop-blur-xl backdrop-saturate-150 border-t border-ink/[0.08]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="grid grid-cols-5">
-        {TABS.map(t => {
+        {tabs.map(t => {
           const active = current === t.page;
           const b = t.badge ? counts[t.badge] : 0;
           const c = categoryColor(t.page);

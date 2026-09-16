@@ -392,6 +392,19 @@ function CinematicTour() {
           </div>
         </div>
       </div>
+
+      {/* animated multi-layer wave divider → hands off to the Features band */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 'clamp(80px,9vw,130px)', overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
+        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 0.4, willChange: 'transform', animation: 'wv-right 19s linear infinite' }}>
+          <path fill="#102033" d="M0,50 C240,16 480,16 720,50 C960,84 1200,84 1440,50 C1680,16 1920,16 2160,50 C2400,84 2640,84 2880,50 L2880,120 L0,120 Z" />
+        </svg>
+        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 0.7, willChange: 'transform', animation: 'wv-left 13s linear infinite' }}>
+          <path fill="#102033" d="M0,60 C240,86 480,86 720,60 C960,34 1200,34 1440,60 C1680,86 1920,86 2160,60 C2400,34 2640,34 2880,60 L2880,120 L0,120 Z" />
+        </svg>
+        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 1, willChange: 'transform', animation: 'wv-right 9s linear infinite' }}>
+          <path fill="#102033" d="M0,66 C240,46 480,46 720,66 C960,86 1200,86 1440,66 C1680,46 1920,46 2160,66 C2400,86 2640,86 2880,66 L2880,120 L0,120 Z" />
+        </svg>
+      </div>
     </section>
   );
 }
@@ -565,8 +578,8 @@ export default function LandingPage() {
         <CinematicTour />
 
         {/* ── Features band ── */}
-        <section style={{ padding: '56px clamp(20px,5vw,70px)', background: '#102033', borderTop: '1px solid rgba(255,255,255,.06)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
+        <section style={{ padding: '0 clamp(20px,5vw,70px) 56px', background: '#102033', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+          <div style={{ maxWidth: 1200, margin: '-70px auto 0', position: 'relative', zIndex: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
             {features.map((f, fi) => (
               <div key={f.num} ref={fTilts[fi].ref} className="tilt-card" onMouseMove={fTilts[fi].onMove} onMouseLeave={fTilts[fi].onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
                 <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid rgba(255,255,255,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: '#fff' }}>{f.num}</span>

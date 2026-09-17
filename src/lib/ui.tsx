@@ -1,4 +1,5 @@
 import { ComponentType, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Zap } from 'lucide-react';
 import { stageLabel } from './roles';
 
@@ -110,7 +111,11 @@ export function Modal({ open, onClose, title, micro, children, wide }: {
   open: boolean; onClose: () => void; title: string; micro?: string; children: ReactNode; wide?: boolean;
 }) {
   if (!open) return null;
-  return (
+  // Portal to <body>: the app content is wrapped in a `.animate-fadein` div
+  // whose fill-mode leaves a `transform` applied, which would otherwise make
+  // that wrapper the containing block for this `position: fixed` overlay and
+  // clip the modal inside the content pane instead of the full viewport.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 backdrop-blur-[2px] p-4 sm:p-8"
       onClick={onClose}>
       <div className={`card w-full ${wide ? 'max-w-2xl' : 'max-w-md'} p-6 animate-fadein my-4 sm:my-8`}
@@ -127,7 +132,8 @@ export function Modal({ open, onClose, title, micro, children, wide }: {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

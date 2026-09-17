@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Check, RefreshCcw, Upload, X } from 'lucide-react';
 import { Btn, Micro } from '@/lib/ui';
 import { prepareCaptureFile } from '@/lib/api';
@@ -16,6 +17,7 @@ export default function CaptureModal({ open, title, onClose, onCapture }: {
   const [mode, setMode] = useState<Mode>('camera');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [ready, setReady] = useState(false); // flips when the stream is live, to (re)attach it to <video>
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const shotRef = useRef<Blob | null>(null);
@@ -42,6 +44,7 @@ export default function CaptureModal({ open, title, onClose, onCapture }: {
     if (!open) { stopStream(); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setMode('fallback'); return; }
     let alive = true;
+    setReady(false);
     (async () => {
       try {
         const s = await navigator.mediaDevices.getUserMedia({
@@ -51,18 +54,22 @@ export default function CaptureModal({ open, title, onClose, onCapture }: {
         if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = s;
         setMode('camera');
+        setReady(true); // trigger the attach effect even though mode was already 'camera'
       } catch {
         if (alive) setMode('fallback');
       }
     })();
-    return () => { alive = false; stopStream(); };
+    return () => { alive = false; setReady(false); stopStream(); };
   }, [open, stopStream]);
 
+  // Attach the live stream once it (or the mode) is ready. Keyed on `ready` too,
+  // because on first open `mode` is already 'camera' so setMode('camera') is a
+  // no-op and would never re-run this effect after getUserMedia resolves.
   useEffect(() => {
     if (mode !== 'camera' || !videoRef.current || !streamRef.current) return;
     videoRef.current.srcObject = streamRef.current;
     videoRef.current.play().catch(() => {});
-  }, [mode]);
+  }, [mode, ready]);
 
   const capture = () => {
     const v = videoRef.current;
@@ -110,7 +117,7 @@ export default function CaptureModal({ open, title, onClose, onCapture }: {
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-[2px] p-4 sm:p-8" onClick={onClose}>
       <div className="card w-full max-w-lg p-5 animate-fadein my-4 sm:my-8" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -164,6 +171,7 @@ export default function CaptureModal({ open, title, onClose, onCapture }: {
 
         {err && <p className="text-xs text-bad-600 mt-3">{err}</p>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff } from "../_shared/guard.ts";
+import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
+
+// MARKETING EMAIL: every message goes through prepareMarketingEmail()
+// (suppression check, unsubscribe link, postal address, List-Unsubscribe).
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +15,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const { campaign_id, leads, subject, html_body, from_name } = await req.json();
@@ -58,6 +67,13 @@ serve(async (req) => {
           .replace(/\{\{region\}\}/g, lead.region || "")
           .replace(/\{\{current_provider\}\}/g, lead.current_provider || "");
 
+        const prepared = await prepareMarketingEmail(supabase, lead.email, { html: personalizedHtml });
+        if (prepared.suppressed) {
+          results.failed++;
+          results.errors.push(`${lead.email}: unsubscribed (suppression list)`);
+          continue;
+        }
+
         const resendRes = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -65,10 +81,12 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: `${from_name || "Αλέξης - Hlektrismos.gr"} <onboarding@resend.dev>`,
+            // Must be a sender on your own verified domain (accurate header info).
+            from: `${from_name || "Hlektrismos.gr"} <${Deno.env.get("MARKETING_FROM_EMAIL") ?? "onboarding@resend.dev"}>`,
             to: [lead.email],
             subject,
-            html: personalizedHtml,
+            html: prepared.html,
+            headers: prepared.headers,
             tags: [
               { name: "campaign_id", value: campaign_id || "direct" },
               { name: "lead_id", value: lead.id || "" },

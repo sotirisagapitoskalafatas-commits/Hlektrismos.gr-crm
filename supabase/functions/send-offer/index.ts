@@ -1,5 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff } from "../_shared/guard.ts";
+import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
+
+// COMMERCIAL EMAIL (a sales offer): the email goes through
+// prepareMarketingEmail() — suppression check, unsubscribe link, postal
+// address and List-Unsubscribe headers.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +16,10 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const body = await req.json();
@@ -118,7 +128,10 @@ ${savings > 0 ? `✅ Εξοικονόμηση: €${savings.toFixed(2)}/μήνα
       try {
         const resendApiKey = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "RESEND_API_KEY").single()).data?.setting_value;
 
-        if (resendApiKey) {
+        const prepared = await prepareMarketingEmail(supabase, customer_email, { text: message });
+        if (prepared.suppressed) {
+          console.warn("[send-offer] Email skipped: recipient unsubscribed");
+        } else if (resendApiKey) {
           emailResult = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
@@ -129,7 +142,8 @@ ${savings > 0 ? `✅ Εξοικονόμηση: €${savings.toFixed(2)}/μήνα
               from: "Hlektrismos.gr <offers@hlektrismos.gr>",
               to: [customer_email],
               subject: `⚡ Νέα Προσφορά Ενέργειας — ${provider_name} ${program_name}`,
-              text: message,
+              text: prepared.text,
+              headers: prepared.headers,
             }),
           });
           console.log(`[send-offer] Email: ${emailResult.status}`);

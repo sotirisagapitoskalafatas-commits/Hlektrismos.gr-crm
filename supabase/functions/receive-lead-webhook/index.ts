@@ -11,6 +11,16 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Shared-secret auth: ad platforms / Zapier must send
+  //   x-webhook-secret: <LEAD_WEBHOOK_SECRET>
+  // Fails closed when the secret is not configured.
+  const expected = Deno.env.get("LEAD_WEBHOOK_SECRET") ?? "";
+  if (!expected || req.headers.get("x-webhook-secret") !== expected) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -112,6 +122,18 @@ serve(async (req) => {
         };
     }
 
+    // Age gate: the source form must ask "I am 18 or older" and pass it as
+    // age_confirmed (true / "yes" / "ναι"). Without it nothing is stored.
+    const ageRaw = body.age_confirmed ?? body.custom_questions?.age_confirmed;
+    const adult = ageRaw === true || /^(true|yes|ναι|1)$/i.test(String(ageRaw ?? "").trim());
+    if (!adult) {
+      return new Response(
+        JSON.stringify({ error: "age_confirmed (18+) is required; lead not stored" }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    leadData.age_confirmed = true;
+
     // Validate required fields
     if (!leadData.email && !leadData.phone) {
       return new Response(
@@ -139,8 +161,11 @@ serve(async (req) => {
       note_type: "system",
     });
 
-    // Auto-trigger AI call for high-priority sources
-    const autoCallSources = ["facebook", "google", "linkedin", "fb"];
+    // Automated (AI) calls need the person's PRIOR consent to automated calls
+    // (Greek law 3471/2006 art. 11, ePrivacy Directive art. 13). A lead-form
+    // consent to "be contacted" is not that, so auto-calling is OFF unless
+    // AUTO_VOICE_CALLS=on is set deliberately after a legal review.
+    const autoCallSources = Deno.env.get("AUTO_VOICE_CALLS") === "on" ? ["facebook", "google", "linkedin", "fb"] : [];
     if (autoCallSources.includes(source)) {
       try {
         await supabase.functions.invoke("make-voice-call", {

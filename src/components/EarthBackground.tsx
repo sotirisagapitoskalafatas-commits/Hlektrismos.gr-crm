@@ -106,7 +106,7 @@ export default function EarthBackground({ mode = 'ambient', keyframes, className
 
         const distFactor = () => Math.max(0.42, Math.min(1.2, window.innerHeight / 1800))
 
-        /* ── Textures (CDN) with instant 1×1 fallbacks so failures never blank the globe ── */
+        /* ── Textures (self-hosted) with instant 1×1 fallbacks so failures never blank the globe ── */
         const flatTex = (hex: number) => {
           const t = new THREE.DataTexture(new Uint8Array([(hex >> 16) & 255, (hex >> 8) & 255, hex & 255, 255]), 1, 1)
           t.needsUpdate = true
@@ -114,7 +114,8 @@ export default function EarthBackground({ mode = 'ambient', keyframes, className
         }
         const loader = new THREE.TextureLoader()
         loader.setCrossOrigin('anonymous')
-        const CDN = 'https://unpkg.com/three-globe@2.31.0/example/img/'
+        // Self-hosted (from three-globe@2.31.0, NASA imagery) — no third-party request on load.
+        const CDN = '/textures/globe/'
         const created: import('three').Texture[] = []
         const loadTex = (url: string, srgb: boolean, fallbackHex: number) => {
           // Uniform holder starts on a flat 1×1 colour; swaps to the CDN image on success.

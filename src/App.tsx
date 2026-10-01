@@ -1,4 +1,3 @@
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { DeviceProvider } from '@/lib/device-context';
 import { useRoute } from '@/lib/router';
@@ -16,6 +15,9 @@ import ContactPage from '@/pages/ContactPage';
 import TermsOfUse from '@/pages/TermsOfUse';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import Cookies from '@/pages/Cookies';
+import CopyrightPolicy from '@/pages/CopyrightPolicy';
+import Unsubscribed from '@/pages/Unsubscribed';
+import ConsentBanner from '@/components/ConsentBanner';
 
 function AppContent() {
   const [route, navigate] = useRoute();
@@ -62,6 +64,10 @@ function AppContent() {
       return <PrivacyPolicy />;
     case 'cookies':
       return <Cookies />;
+    case 'copyright':
+      return <CopyrightPolicy />;
+    case 'unsubscribed':
+      return <Unsubscribed />;
     default:
       return <LandingPage />;
   }
@@ -78,7 +84,7 @@ export default function App() {
           </ToastProvider>
         </NavProvider>
       </AuthProvider>
-      <SpeedInsights />
+      <ConsentBanner />
     </DeviceProvider>
   );
 }

@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff } from "../_shared/guard.ts";
+
+// SMS. Promotional SMS to individuals needs PRIOR opt-in consent under Greek
+// law 3471/2006 art. 11 (ePrivacy). Use this only for messages the recipient
+// asked for (e.g. callback confirmations) unless the lead gave SMS consent.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +15,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const { campaign_id, leads, message, channel } = await req.json();

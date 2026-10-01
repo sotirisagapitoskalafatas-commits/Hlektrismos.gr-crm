@@ -35,3 +35,4 @@ test-invoke.mjs
 test-invoke.cjs
 test-chat.mjs
 seed-agents.mjs
+!.env.example

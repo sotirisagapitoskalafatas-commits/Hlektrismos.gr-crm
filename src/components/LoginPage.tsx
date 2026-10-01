@@ -6,8 +6,8 @@ import { useRoute } from '@/lib/router';
 export default function LoginPage() {
   const { signIn } = useAuth();
   const [, navigate] = useRoute();
-  const [email, setEmail] = useState('demo@hlektrismos.gr');
-  const [password, setPassword] = useState('hlektrismos2025');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -61,7 +61,7 @@ export default function LoginPage() {
               <label className="block text-sm text-slate-600 mb-2 font-medium">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                <input type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/60 border border-slate-200 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all text-slate-900"
                   placeholder="email@example.com" />
               </div>
@@ -70,7 +70,7 @@ export default function LoginPage() {
               <label className="block text-sm text-slate-600 mb-2 font-medium">Κωδικός</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-                <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                <input type={showPass ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
                   className="w-full pl-11 pr-11 py-3 rounded-xl bg-white/60 border border-slate-200 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all text-slate-900"
                   placeholder="••••••••" />
                 <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600">
@@ -86,11 +86,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 p-4 rounded-xl bg-sky-50/60 border border-sky-200/50 text-sm">
-            <p className="text-sky-700 font-semibold mb-1">Demo Στοιχεία:</p>
-            <p className="text-slate-600">Email: <span className="text-sky-600 font-mono">demo@hlektrismos.gr</span></p>
-            <p className="text-slate-600">Κωδικός: <span className="text-sky-600 font-mono">hlektrismos2025</span></p>
-          </div>
+          <p className="mt-6 text-center text-xs text-slate-500">Πρόσβαση μόνο για εξουσιοδοτημένο προσωπικό. Οι λογαριασμοί δημιουργούνται από τον διαχειριστή.{' '}<a href="#/privacy" className="text-sky-600 underline">Πολιτική Απορρήτου</a> · <a href="#/terms" className="text-sky-600 underline">Όροι Χρήσης</a></p>
         </div>
       </div>
     </div>

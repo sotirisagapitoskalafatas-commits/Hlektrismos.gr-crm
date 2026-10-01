@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ExternalLink, Zap, Menu, X } from 'lucide-react';
+import LegalLinks from '@/components/LegalLinks';
 
 const commodities = [
   { name: 'Dutch TTF Gas', source: 'Barchart', desc: 'Τιμές futures για το φυσικό αέριο TTF, βασικός δείκτης της ευρωπαϊκής αγοράς αερίου.', url: 'https://www.barchart.com/futures/quotes/NYMEX-TTFG1' },
@@ -89,11 +90,7 @@ export default function EnergyPage() {
         <div className="container">
           <div className="footer-bottom">
             <span>© 2026 hlektrismos.gr</span>
-            <div className="footer-legal-links">
-              <a href="https://hlektrismos.gr/politiki-aporritou/" target="_blank" rel="noopener noreferrer">Πολιτική Απορρήτου</a>
-              <span>·</span>
-              <a href="https://hlektrismos.gr/oroi-chrisis/" target="_blank" rel="noopener noreferrer">Όροι Χρήσης</a>
-            </div>
+            <LegalLinks className="footer-legal-links" color="inherit" />
           </div>
         </div>
       </footer>

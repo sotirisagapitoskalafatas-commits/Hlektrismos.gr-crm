@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 
 // ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────
 class SmtpClient {
@@ -111,13 +112,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Staff-composed emails from the CRM. Treated as COMMERCIAL by default
+// (suppression check, unsubscribe footer, postal address, List-Unsubscribe).
+// Pass `transactional: true` ONLY for pure service messages (e.g. documents
+// the customer asked for, appointment logistics) — never for promotions.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { to, subject, html, text, from_name } = await req.json();
+    const { to, subject, html, text, from_name, transactional } = await req.json();
 
     if (!to || !subject || (!html && !text)) {
       return new Response(JSON.stringify({ error: "Missing required fields: to, subject, and html or text" }), {
@@ -177,10 +182,35 @@ Deno.serve(async (req) => {
     const fromLabel = from_name || cfg.from_name || "Hlektrismos.gr";
     const useTls = smtpPort === 465;
 
+    // Commercial-email compliance (skipped only for explicit transactional mail).
+    const recipientList: string[] = Array.isArray(to) ? to : [to];
+    let outHtml: string | undefined = html;
+    let outText: string | undefined = text;
+    const extraHeaders: string[] = [];
+    if (transactional !== true) {
+      if (recipientList.length !== 1) {
+        return new Response(JSON.stringify({ error: "Commercial emails must be sent to one recipient at a time (per-recipient unsubscribe link)." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const prepared = await prepareMarketingEmail(adminClient, recipientList[0], {
+        html: html ?? undefined,
+        text: text ?? html?.replace(/<[^>]*>/g, "") ?? "",
+      });
+      if (prepared.suppressed) {
+        return new Response(JSON.stringify({ error: "Recipient has unsubscribed from commercial emails." }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      outHtml = prepared.html;
+      outText = prepared.text;
+      for (const [k, v] of Object.entries(prepared.headers)) extraHeaders.push(`${k}: ${v}`);
+    }
+
     // Build MIME message
     const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const mimeText = text || html?.replace(/<[^>]*>/g, "") || "";
-    const mimeHtml = html || `<p>${text}</p>`;
+    const mimeText = outText || outHtml?.replace(/<[^>]*>/g, "") || "";
+    const mimeHtml = outHtml || `<p>${outText}</p>`;
 
     const headers = [
       `From: ${fromLabel} <${fromEmail}>`,
@@ -189,6 +219,7 @@ Deno.serve(async (req) => {
       `MIME-Version: 1.0`,
       `Date: ${new Date().toUTCString()}`,
       `X-Mailer: Hlektrismos-CRM/1.0`,
+      ...extraHeaders,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
     ].join("\r\n");
 

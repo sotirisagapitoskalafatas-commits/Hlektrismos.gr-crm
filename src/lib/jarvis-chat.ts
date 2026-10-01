@@ -11,11 +11,15 @@ import { supabase } from './supabase';
 export type JarvisMessage = { id: number; from: 'jarvis' | 'user'; text: string };
 export type JarvisVisitor = { name?: string; phone?: string; email?: string; needs?: string };
 
-type CallbackStep = 'idle' | 'name' | 'phone' | 'email' | 'confirm' | 'done';
+type CallbackStep = 'idle' | 'age' | 'name' | 'phone' | 'email' | 'confirm' | 'done';
 
 const GREETING = 'Γεια σας! Είμαι ο JARVIS. Πώς μπορώ να σας βοηθήσω σήμερα; ⚡';
 const EMAIL_RE = /[\w.'+-]+@[\w-]+\.\w{2,}/;
 const PHONE_RE = /(?:\+?30[ -]?)?(69\d[ -]?\d{3}[ -]?\d{4}|2\d{2}[ -]?\d{3}[ -]?\d{4}|[2-69]\d{3}[ -]?\d{4})/;
+const AGE_CONSENT_PROMPT =
+  'Πριν σας ζητήσω στοιχεία: είστε 18 ετών και άνω και συμφωνείτε να επικοινωνήσουμε μαζί σας για αυτό το αίτημα, ' +
+  'σύμφωνα με την Πολιτική Απορρήτου (hlektrismos.gr/#/privacy); (ναι/όχι)';
+const YES_RE = /^(ναι|ναί|ok|οκ|ωραία|συμφωνώ|βεβα[ίι]α|yes|y)(?=$|[\s.,!;])/i;
 const CALLBACK_INTENT =
   /(ζητ[ώάω] κλ[ήη]ση|κλ[ήη]ση (?:από )?σ[ύυ]μβουλο|call(?:back)?|callback|τηλεφων[ήη]στε με|πάρτε με τηλέφωνο|να με καλ[έε]σετε|να με π[άα]ρετε)/i;
 
@@ -60,6 +64,22 @@ export function useJarvisChat() {
     if (!cbMode.current || cbStep.current === 'done') return null;
 
     const step = cbStep.current;
+
+    // Age + consent gate BEFORE any contact detail is collected. A "no"
+    // aborts the flow and discards everything gathered in this chat, so no
+    // data from an under-18 (or non-consenting) attempt is stored or sent.
+    if (step === 'age') {
+      if (!YES_RE.test(text.trim())) {
+        cbMode.current = false;
+        cbStep.current = 'idle';
+        cbDraft.current = {};
+        visitorRef.current = {};
+        return 'Κατανοητό. Η υπηρεσία κλήσης απευθύνεται μόνο σε ενήλικες και δεν κρατήσαμε κανένα στοιχείο σας. Μπορείτε να μας καλέσετε στο +30 210 22 55 000.';
+      }
+      cbStep.current = 'name';
+      return 'Ευχαριστώ! Πώς σας λένε;';
+    }
+
     absorbVisitor(text, step);
 
     if (step === 'name') {
@@ -99,7 +119,7 @@ export function useJarvisChat() {
           body: {
             messages: [{ role: 'user', content: 'Επιβεβαίωση κλήσης' }],
             visitorInfo: cbDraft.current,
-            callbackRequest: cbDraft.current,
+            callbackRequest: { ...cbDraft.current, age_confirmed: true, consent: true },
           },
         });
         if (error) throw error;
@@ -119,9 +139,8 @@ export function useJarvisChat() {
 
     if (!cbMode.current && CALLBACK_INTENT.test(trimmed)) {
       cbMode.current = true;
-      cbStep.current = 'name';
-      absorbVisitor(trimmed, 'name');
-      return 'Τέλεια! Ένας εξειδικευμένος σύμβουλος θα σας καλέσει. Πώς σας λένε;';
+      cbStep.current = 'age';
+      return `Τέλεια! Ένας εξειδικευμένος σύμβουλος θα σας καλέσει. ${AGE_CONSENT_PROMPT}`;
     }
 
     const memoReply = await runCallbackFlow(trimmed);

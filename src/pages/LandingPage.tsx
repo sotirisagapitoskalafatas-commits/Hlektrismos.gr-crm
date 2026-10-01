@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
+import LegalLinks from '@/components/LegalLinks';
 
 /* ─── 3D tilt cursor hook ─────────────────────────────────────── */
 function useTilt<T extends HTMLElement = HTMLDivElement>() {
@@ -168,6 +169,7 @@ type LeadForm = {
   message: string;
   billFiles: File[];
   consent: boolean;
+  adult: boolean;
 };
 
 /* ─── Cinematic tour (scroll-scrubbed 12-frame sequence) ────── */
@@ -428,7 +430,7 @@ const waveDividerMask: React.CSSProperties = {
 export default function LandingPage() {
   const [form, setForm] = useState<LeadForm>({
     firstName: '', lastName: '', email: '', phone: '',
-    region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false,
+    region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false, adult: false,
   });
   const [submitted, setSubmitted] = useState(false);
   const [leadEmailSent, setLeadEmailSent] = useState(false);
@@ -495,6 +497,9 @@ export default function LandingPage() {
   const submitLead = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
+    // Age gate runs BEFORE any upload or insert, so nothing from an under-18
+    // attempt is stored. The database enforces the same rule (age_confirmed).
+    if (!form.adult) { setFormError('Η φόρμα απευθύνεται μόνο σε ενήλικες (18+).'); return; }
     setSubmitting(true);
 
     const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
@@ -508,7 +513,7 @@ export default function LandingPage() {
       } catch { fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`; }
     }
 
-    const { data: leadId, error } = await supabase.rpc('insert_website_lead', {
+    const { error } = await supabase.rpc('insert_website_lead', {
       p_source: 'website',
       p_payload: {
         first_name: form.firstName || null,
@@ -521,6 +526,7 @@ export default function LandingPage() {
         service_category: SERVICE_KEYS[form.service] ?? form.service,
         comments: form.message || null,
         gdpr_consent: form.consent,
+        age_confirmed: form.adult,
         attached_files: uploadedFiles.length > 0 ? uploadedFiles : null,
       },
     });
@@ -528,11 +534,8 @@ export default function LandingPage() {
     setSubmitting(false);
     if (error) { setFormError(`Σφάλμα καταχώρησης: ${error.message || 'Παρακαλώ δοκιμάστε ξανά.'}`); return; }
 
-    if (uploadedFiles.length > 0 && leadId) {
-      for (const file of uploadedFiles) {
-        supabase.functions.invoke('billing-ocr', { body: { lead_id: leadId, file_url: file.path, file_type: file.type } }).catch(() => {});
-      }
-    }
+    // Bill OCR (billing-ocr) is staff-only and runs from the lead view in the
+    // CRM; the public form never triggers it.
 
     // Send a confirmation email to the lead (fire-and-forget; skipped when no email given)
     const leadEmail = form.email.trim().toLowerCase();
@@ -549,7 +552,7 @@ export default function LandingPage() {
 
     if (fileWarning) setFormError(fileWarning);
     setSubmitted(true);
-    setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false });
+    setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false, adult: false });
   };
 
   return (
@@ -793,6 +796,10 @@ export default function LandingPage() {
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
                       Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.
                     </label>
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
+                      <input required type="checkbox" checked={form.adult} onChange={(e) => update('adult', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
+                      Δηλώνω ότι είμαι ενήλικας (18 ετών και άνω).
+                    </label>
                     {formError && <p style={{ color: '#f87171', fontSize: 14 }}>{formError}</p>}
                     <button type="submit" disabled={submitting} className="cine-cta" style={{ marginTop: 6, fontFamily: 'var(--font-body)', justifyContent: 'center', width: '100%' }}>
                       {submitting ? 'Αποστολή...' : 'Ζητήστε κλήση'}
@@ -851,11 +858,7 @@ export default function LandingPage() {
         </div>
         <div style={{ position: 'relative', maxWidth: 1200, margin: '44px auto 0', paddingTop: 24, borderTop: '1px solid rgba(255,255,255,.15)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, fontSize: 13, color: '#9fb0b7' }}>
           <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
-          <span style={{ display: 'flex', gap: 16 }}>
-            <a href="#/privacy" className="footer-link" style={{ color: '#9fb0b7' }}>Πολιτική Απορρήτου</a>
-            <a href="#/terms" className="footer-link" style={{ color: '#9fb0b7' }}>Όροι Χρήσης</a>
-            <a href="#/cookies" className="footer-link" style={{ color: '#9fb0b7' }}>Cookies</a>
-          </span>
+          <LegalLinks />
         </div>
       </footer>
     </div>

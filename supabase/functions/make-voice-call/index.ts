@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff } from "../_shared/guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +11,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const { lead_id, phone, first_name, last_name, region, company_name, current_provider } = await req.json();
@@ -97,7 +102,8 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `Είσαι ο Αλέξης, ενεργειακός σύμβουλος της Hlektrismos.gr. Μιλάς ελληνικά.
+                content: `Είσαι ο Αλέξης, ψηφιακός βοηθός τεχνητής νοημοσύνης (AI) της Hlektrismos.gr. Μιλάς ελληνικά.
+ΥΠΟΧΡΕΩΤΙΚΑ: Αν σε ρωτήσουν, λες πάντα ότι είσαι AI και ότι η κλήση καταγράφεται. Αν ο συνομιλητής αρνηθεί την καταγραφή, ζητήσει άνθρωπο ή πει ότι δεν θέλει άλλες κλήσεις, ευχαρίστησε, πες ότι θα τον καλέσει άνθρωπος (ή ότι δεν θα ξανακληθεί) και τερμάτισε την κλήση.
 
 ΣΤΟΧΟΣ ΤΗΣ ΚΛΗΣΗΣ: Να κατανοήσεις τον τρέχοντα πάροχο ρεύματος του πελάτη, την κατανάλωση, και να ενδείξεις ενδιαφέρον για εξοικονόμηση.
 
@@ -122,7 +128,9 @@ serve(async (req) => {
             voiceId: "el-GR-NestorasNeural",
           },
           language: "el",
-          firstMessage: `Γεια σας, ${leadName}! Εδώ ο Αλέξης από την Hlektrismos.gr. Σας ενοχλώ για λίγο; Θα ήθελα να σας ρωτήσω για το ρεύμα σας.`,
+          // Disclosure up front: the caller is an AI (EU AI Act art. 50(1)) and
+          // the call is recorded/transcribed. Do not remove or move later.
+          firstMessage: `Γεια σας, ${leadName}! Είμαι ο Αλέξης, ψηφιακός βοηθός τεχνητής νοημοσύνης της Hlektrismos.gr. Η κλήση καταγράφεται και απομαγνητοφωνείται για να καταχωρήσουμε σωστά το αίτημά σας. Αν προτιμάτε να μιλήσετε με άνθρωπο ή δεν θέλετε καταγραφή, πείτε το μου και θα κλείσω. Σας ενοχλώ για λίγο;`,
           endCallMessage: "Σας ευχαριστώ πολύ για τον χρόνο σας. Καλή συνέχεια!",
           endCallPhrases: ["αντίο", "γεια σας", "δεν με ενδιαφέρει", "μη με ξαναπαρείτε", "τέλος"],
         },

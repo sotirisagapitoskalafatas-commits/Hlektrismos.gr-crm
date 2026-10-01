@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff } from "../_shared/guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -61,6 +66,12 @@ serve(async (req) => {
             (Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24)
           );
           channel = daysSinceCreation >= 7 ? "voice" : "email";
+        }
+
+        // Automated AI calls require prior consent to automated calling
+        // (Greek law 3471/2006 art. 11). Off unless AUTO_VOICE_CALLS=on.
+        if (channel === "voice" && Deno.env.get("AUTO_VOICE_CALLS") !== "on") {
+          channel = "email";
         }
 
         if (channel === "voice" && lead.phone) {

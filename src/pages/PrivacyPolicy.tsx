@@ -1,63 +1,56 @@
-import { useEffect } from 'react';
+import LegalLayout, { a, h2, ul } from '@/components/LegalLayout';
+import { COMPANY, PROCESSORS } from '@/lib/legal';
 
 export default function PrivacyPolicy() {
-  useEffect(() => { window.scrollTo(0, 0); }, []);
-
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', color: '#1a1a2e', fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid #e8ecf1', padding: '16px 0' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <a href="#/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #00c878, #0066cc)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>⚡</span>
-            <span style={{ fontWeight: 700, fontSize: 18, color: '#1a1a2e' }}>Hlektrismos<span style={{ color: '#00c878' }}>.gr</span></span>
-          </a>
-          <a href="#/" style={{ textDecoration: 'none', color: '#0066cc', fontWeight: 500, fontSize: 14 }}>← Επιστροφή</a>
-        </div>
-      </nav>
+    <LegalLayout title="Πολιτική Απορρήτου">
+      <h2 style={h2}>1. Υπεύθυνος επεξεργασίας</h2>
+      <p>{COMPANY.legalName} ({COMPANY.brand}), {COMPANY.address}. {COMPANY.vatId}. {COMPANY.gemi}.<br />
+        Επικοινωνία για προσωπικά δεδομένα: <a href={`mailto:${COMPANY.privacyEmail}`} style={a}>{COMPANY.privacyEmail}</a> · {COMPANY.phone}</p>
 
-      <main style={{ maxWidth: 800, margin: '0 auto', padding: '60px 24px 80px' }}>
-        <h1 style={{ fontSize: 36, fontWeight: 800, marginBottom: 8, color: '#1a1a2e' }}>Πολιτική Απορρήτου</h1>
-        <p style={{ color: '#888', fontSize: 14, marginBottom: 40 }}>Τελευταία ενημέρωση: Αύγουστος 2026</p>
+      <h2 style={h2}>2. Ποια δεδομένα συλλέγουμε</h2>
+      <ul style={ul}>
+        <li><strong>Φόρμα αιτήματος και φόρμα επικοινωνίας:</strong> ονοματεπώνυμο, τηλέφωνο, email, περιοχή, τύπος ακινήτου, υπηρεσία, σχόλια, προαιρετικά αρχεία λογαριασμών ρεύματος, και η δήλωση ότι είστε ενήλικας.</li>
+        <li><strong>Chatbot JARVIS:</strong> τα μηνύματά σας και ό,τι στοιχεία δώσετε (όνομα, τηλέφωνο, email). Αποθηκεύουμε στοιχεία μόνο αν ζητήσετε κλήση και επιβεβαιώσετε ότι είστε ενήλικας.</li>
+        <li><strong>Πελάτες σε εξέλιξη υπόθεσης:</strong> στοιχεία παροχής, λογαριασμοί, έγγραφα ταυτοποίησης, υπογραφές, φωτογραφίες, ιστορικό επικοινωνίας, καταγραφές/απομαγνητοφωνήσεις κλήσεων.</li>
+        <li><strong>Προσωπικό (χρήστες CRM):</strong> email, όνομα, ρόλος και, στις επισκέψεις πεδίου, θέση GPS κατά το check-in/check-out.</li>
+        <li><strong>Τεχνικά:</strong> διεύθυνση IP και User-Agent (καταγραφές του server). Μετρήσεις απόδοσης σελίδας μόνο με τη συγκατάθεσή σας.</li>
+      </ul>
+      <p>Οι υπηρεσίες απευθύνονται αποκλειστικά σε ενήλικες. Δεν συλλέγουμε εν γνώσει μας δεδομένα παιδιών. Οι φόρμες και το chatbot δεν αποθηκεύουν τίποτα χωρίς δήλωση ενηλικότητας.</p>
 
-        <div style={{ lineHeight: 1.8, fontSize: 15, color: '#444' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>1. Εισαγωγή</h2>
-          <p>Η Hlektrismos.gr λαμβάνει πολύ σοβαρά το απόρρητο των δεδομένων σας. Η παρούσα Πολιτική Απορρήτου περιγράφει πώς συλλέγουμε, χρησιμοποιούμε, αποθηκεύουμε και προστατεύουμε τα προσωπικά σας δεδομένα, σύμφωνα με τον Κανονισμό (EU) 2016/679 (GDPR) και τον ελληνικό Νόμο 4624/2019.</p>
+      <h2 style={h2}>3. Σκοποί και νομική βάση</h2>
+      <ul style={ul}>
+        <li>Απάντηση στο αίτημά σας και προετοιμασία προσφοράς: προσυμβατικά μέτρα κατόπιν αιτήματός σας (άρθρο 6(1)(β) ΓΚΠΔ) και συγκατάθεση (6(1)(α)).</li>
+        <li>Εκτέλεση της σύμβασης προμήθειας με τον πάροχο που επιλέγετε: 6(1)(β) και νομικές υποχρεώσεις (6(1)(γ)).</li>
+        <li>Email προσφορών/ενημερώσεων: μόνο με συγκατάθεση ή σε υφιστάμενους πελάτες για παρόμοιες υπηρεσίες (ν. 3471/2006 άρθρο 11). Κάθε τέτοιο email έχει σύνδεσμο απεγγραφής με ένα κλικ, που ισχύει άμεσα.</li>
+        <li>Αυτοματοποιημένες κλήσεις και διαφημιστικά SMS: μόνο με προηγούμενη ρητή συγκατάθεση. Οι αυτόματες κλήσεις AI είναι απενεργοποιημένες. Όταν σας καλεί ο φωνητικός βοηθός, σας ενημερώνει από την αρχή ότι είναι AI και ότι η κλήση καταγράφεται.</li>
+        <li>Μετρήσεις απόδοσης ιστοσελίδας: μόνο με συγκατάθεση (6(1)(α)), που ανακαλείται οποτεδήποτε.</li>
+      </ul>
 
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>2. Τύποι Δεδομένων που Συλλέγουμε</h2>
-          <p><strong>Δεδομένα ταυτότητας:</strong> Όνομα, επώνυμο, email, τηλέφωνο, εταιρεία.</p>
-          <p><strong>Δεδομένα χρήσης:</strong> IP, τύπος browser, συσκευή, σελίδες που επισκεφθήκατε.</p>
-          <p><strong>Δεδομένα ενεργείας:</strong> Τιμολόγια ενέργειας, λογαριασμοί ρεύματος, κατανάλωση.</p>
-          <p><strong>AI Interactions:</strong> Συνομιλίες με AI agents, αιτήματα callback, δεδομένα που παρέχετε στο chatbot.</p>
+      <h2 style={h2}>4. Σε ποιους στέλνονται τα δεδομένα</h2>
+      <p>Δεν πουλάμε δεδομένα. Τα δεδομένα αποστέλλονται μόνο στους παρακάτω παρόχους, που ενεργούν για λογαριασμό μας, και στον πάροχο ενέργειας που εσείς επιλέγετε:</p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, lineHeight: 1.5 }}>
+          <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+            <th style={{ padding: 8 }}>Πάροχος</th><th style={{ padding: 8 }}>Σκοπός</th><th style={{ padding: 8 }}>Δεδομένα</th><th style={{ padding: 8 }}>Πότε</th>
+          </tr></thead>
+          <tbody>{PROCESSORS.map(p => (
+            <tr key={p.name} style={{ borderTop: '1px solid #e8ecf1', verticalAlign: 'top' }}>
+              <td style={{ padding: 8, fontWeight: 600 }}>{p.name}</td><td style={{ padding: 8 }}>{p.purpose}</td><td style={{ padding: 8 }}>{p.data}</td><td style={{ padding: 8 }}>{p.where}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <p>Όπου ένας πάροχος βρίσκεται εκτός ΕΟΧ, η διαβίβαση γίνεται βάσει του EU-US Data Privacy Framework ή Τυποποιημένων Συμβατικών Ρητρών. Δεν χρησιμοποιούμε καταγραφή συνεδρίας (session replay), heatmaps ή διαφημιστικά cookies.</p>
 
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>3. Σκοπός Επεξεργασίας</h2>
-          <ul style={{ paddingLeft: 24, margin: '12px 0' }}>
-            <li>Παροχή υπηρεσιών CRM και AI επικοινωνίας</li>
-            <li>Βελτίωση της εμπειρίας χρήστη</li>
-            <li>Αποστολή marketing communications (μόνο με συγκατάθεση)</li>
-            <li>Πλήρωση νομικών υποχρεώσεων</li>
-            <li>Ανάλυση και βελτίωση υπηρεσιών</li>
-          </ul>
+      <h2 style={h2}>5. Διάρκεια διατήρησης</h2>
+      <p>TODO(owner): Αιτήματα που δεν κατέληξαν σε σύμβαση διαγράφονται μετά από [__] μήνες. Φάκελοι πελατών διατηρούνται για [__] έτη, όπως απαιτεί η φορολογική/εμπορική νομοθεσία. Καταγραφές κλήσεων διατηρούνται [__] ημέρες.</p>
 
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>4. Νομική Βάση Επεξεργασίας</h2>
-          <p>Επεξεργαζόμαστε τα δεδομένα σας με βάση: (α) τη συγκατάθεσή σας, (β) την εκτέλεση συμβολαίου, (γ) το νόμιμο συμφέρον, ή (δ) την τήρηση νομικής υποχρέωσης.</p>
+      <h2 style={h2}>6. Τα δικαιώματά σας</h2>
+      <p>Πρόσβαση, διόρθωση, διαγραφή, περιορισμός, φορητότητα, εναντίωση, και ανάκληση συγκατάθεσης οποτεδήποτε. Γράψτε στο <a href={`mailto:${COMPANY.privacyEmail}`} style={a}>{COMPANY.privacyEmail}</a>. Μπορείτε να υποβάλετε καταγγελία στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (<a href="https://www.dpa.gr" target="_blank" rel="noopener noreferrer" style={a}>www.dpa.gr</a>).</p>
 
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>5. Κοινοποίηση Δεδομένων</h2>
-          <p>Δεν πωλούμε τα δεδομένα σας. Μπορεί να τα κοινοποιήσουμε σε: (α) προμηθευτές υπηρεσιών cloud (Supabase, Vercel), (β) εξυπηρετητές email, (γ) αρμόδιες αρχές όπως απαιτεί ο νόμος.</p>
-
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>6. Ασφάλεια Δεδομένων</h2>
-          <p>Εφαρμόζουμε τεχνικές και οργανωτικές μέτρα ασφαλείας, συμπεριλαμβανομένου: κρυπτογράφηση SSL/TLS, έλεγχος πρόσβασης, RLS (Row Level Security) στη βάση δεδομένων, και τακτικές ασφάλειας audit.</p>
-
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>7. Δικαιώματά σας</h2>
-          <p>Σύμφωνα με το GDPR, έχετε δικαίωμα: πρόσβασης, διόρθωσης, διαγραφής, περιορισμού, φορητότητας, και αντίρρησης στην επεξεργασία των δεδομένων σας. Για να ασκήσετε τα δικαιώματά σας, επικοινωνήστε στο <a href="mailto:privacy@hlektrismos.gr" style={{ color: '#0066cc' }}>privacy@hlektrismos.gr</a>.</p>
-
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>8. Cookies</h2>
-          <p>Χρησιμοποιούμε cookies για τη βελτίωση της εμπειρίας σας. Για περισσότερες πληροφορίες, ανατρέξτε στη <a href="#/cookies" style={{ color: '#0066cc' }}>Πολιτική Cookies</a> μας.</p>
-
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', marginTop: 40, marginBottom: 16 }}>9. Επικοινωνία</h2>
-          <p>Για ερωτήματα σχετικά με το απόρρητο: <a href="mailto:privacy@hlektrismos.gr" style={{ color: '#0066cc' }}>privacy@hlektrismos.gr</a> | <strong>+30 210 1234567</strong></p>
-          <p>Αρμόδια Αρχή: Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (αρχηγείο.gr)</p>
-        </div>
-      </main>
-    </div>
+      <h2 style={h2}>7. Cookies</h2>
+      <p>Δείτε την <a href="#/cookies" style={a}>Πολιτική Cookies</a>.</p>
+    </LegalLayout>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type Route = 'landing' | 'login' | 'app' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies';
+export type Route = 'landing' | 'login' | 'app' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies' | 'copyright' | 'unsubscribed';
 
 const PAGE_HASHES: Record<string, Route> = {
   '/login': 'login',
@@ -14,17 +14,19 @@ const PAGE_HASHES: Record<string, Route> = {
   '/terms': 'terms',
   '/privacy': 'privacy',
   '/cookies': 'cookies',
+  '/copyright': 'copyright',
+  '/unsubscribed': 'unsubscribed',
 };
 
 export function useRoute(): [Route, (r: Route) => void] {
   const [route, setRoute] = useState<Route>(() => {
     const hash = window.location.hash.slice(1);
-    return PAGE_HASHES[hash] ?? 'landing';
+    return PAGE_HASHES[hash.split('?')[0]] ?? 'landing';
   });
 
   useEffect(() => {
     const handler = () => {
-      const next = PAGE_HASHES[window.location.hash.slice(1)];
+      const next = PAGE_HASHES[window.location.hash.slice(1).split('?')[0]];
       if (next) {
         setRoute(next);
         // Page swaps must jump instantly (Lenis drives smooth scrolling elsewhere).

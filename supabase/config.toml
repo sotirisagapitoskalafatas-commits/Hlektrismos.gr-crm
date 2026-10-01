@@ -12,3 +12,7 @@ verify_jwt = false
 
 [functions.scrape-b2b]
 verify_jwt = false
+
+# Public one-click unsubscribe link in marketing emails (HMAC-signed, no login).
+[functions.unsubscribe]
+verify_jwt = false

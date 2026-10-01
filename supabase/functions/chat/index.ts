@@ -26,6 +26,15 @@ serve(async (req: any) => {
     // Handle callback request — store as lead
     if (callbackRequest) {
       const { name, phone, email, message, billAmount, currentProvider, consumption } = callbackRequest;
+
+      // Server-side gate: no lead is stored unless the visitor confirmed they
+      // are 18+ and consented to be contacted (asked in lib/jarvis-chat.ts).
+      if (callbackRequest.age_confirmed !== true || callbackRequest.consent !== true) {
+        return new Response(JSON.stringify({
+          reply: 'Για να καταχωρήσουμε αίτημα κλήσης χρειάζεται επιβεβαίωση ότι είστε ενήλικας και συγκατάθεση επικοινωνίας. Δεν αποθηκεύτηκε κανένα στοιχείο.',
+          callbackConfirmed: false,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+      }
       
       const { error: insertError } = await supabaseClient
         .from('hlektrismos_leads')
@@ -38,6 +47,7 @@ serve(async (req: any) => {
           region: 'Αττική',
           status: 'new',
           consent: true,
+          age_confirmed: true,
           lawful_basis: 'consent',
           customer_category: 'b2c',
           property_type: 'apartment',

@@ -1,4 +1,11 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+
+// ════════════════════════════════════════════════════════════════════════════
+// TRANSACTIONAL EMAIL — confirms a form submission the recipient just made.
+// Exempt from CAN-SPAM marketing rules ONLY while it stays purely
+// transactional: no offers, prices, promotions, newsletters or cross-sell.
+// Any commercial content must go through _shared/email-compliance.ts instead.
+// ════════════════════════════════════════════════════════════════════════════
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────

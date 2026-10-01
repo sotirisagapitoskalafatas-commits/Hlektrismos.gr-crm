@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, Zap, ExternalLink, Menu, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import LegalLinks from '@/components/LegalLinks';
 
 const contactCards = [
   { icon: MapPin, label: 'Διεύθυνση', value: 'Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671', link: null },
@@ -17,14 +18,17 @@ const hours = [
 export default function ContactPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
+  const [adult, setAdult] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSending(true);
     setError(null);
+    // Age gate before anything is sent; insert_website_lead enforces it too.
+    if (!adult) { setError('Η φόρμα απευθύνεται μόνο σε ενήλικες (18+).'); return; }
+    setSending(true);
     const parts = form.name.trim().split(/\s+/);
     const { error } = await supabase.rpc('insert_website_lead', {
       p_source: 'contact',
@@ -35,6 +39,7 @@ export default function ContactPage() {
         email: form.email || null,
         phone: form.phone || null,
         comments: form.message || null,
+        age_confirmed: adult,
       },
     });
     setSending(false);
@@ -133,6 +138,10 @@ export default function ContactPage() {
                       onChange={(e) => setForm({ ...form, message: e.target.value })}
                       style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, outline: 'none', resize: 'vertical' }}
                     />
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.5, color: 'var(--text)' }}>
+                      <input type="checkbox" required checked={adult} onChange={(e) => setAdult(e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
+                      Δηλώνω ότι είμαι ενήλικας (18+). Θα χρησιμοποιήσουμε τα στοιχεία μου μόνο για να απαντήσετε στο μήνυμά μου, σύμφωνα με την <a href="#/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Πολιτική Απορρήτου</a>.
+                    </label>
                     {error && <div style={{ fontSize: 13, color: '#e11d48', background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.2)', borderRadius: 10, padding: '12px 16px' }}>{error}</div>}
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={sending}>
                       <Send size={16} /> {sending ? 'Αποστολή…' : 'Αποστολή'}
@@ -207,11 +216,7 @@ export default function ContactPage() {
         <div className="container">
           <div className="footer-bottom">
             <span>© 2026 hlektrismos.gr</span>
-            <div className="footer-legal-links">
-              <a href="https://hlektrismos.gr/politiki-aporritou/" target="_blank" rel="noopener noreferrer">Πολιτική Απορρήτου</a>
-              <span>·</span>
-              <a href="https://hlektrismos.gr/oroi-chrisis/" target="_blank" rel="noopener noreferrer">Όροι Χρήσης</a>
-            </div>
+            <LegalLinks className="footer-legal-links" color="inherit" />
           </div>
         </div>
       </footer>

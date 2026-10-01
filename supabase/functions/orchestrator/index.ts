@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { requireStaff } from "../_shared/guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -415,7 +416,9 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
           note_type: 'calendar_event',
         })
 
-        // 5. Send confirmation email if requested
+        // 5. Send confirmation email if requested.
+        // TRANSACTIONAL: appointment logistics only. No offers, prices or
+        // promotions here; commercial mail must use _shared/email-compliance.ts.
         if (args.send_confirmation !== false && lead.email) {
           try {
             const { data: emailConfig } = await supabaseAdmin.from('crm_settings').select('setting_value').eq('setting_key', 'email_config').single()
@@ -486,6 +489,10 @@ serve(async (req: any) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const url = new URL(req.url)

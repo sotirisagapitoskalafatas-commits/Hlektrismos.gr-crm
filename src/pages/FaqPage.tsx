@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, Menu, Phone, X } from 'lucide-react';
 import CinematicSkyBackground from '@/components/CinematicSkyBackground';
 import { footerWaveTopMask } from '@/lib/waveDivider';
+import LegalLinks from '@/components/LegalLinks';
 
 interface FaqItem {
   id: number;
@@ -237,11 +238,7 @@ export default function FaqPage() {
           </div>
           <div style={{ position: 'relative', maxWidth: 1200, margin: '44px auto 0', paddingTop: 24, borderTop: '1px solid rgba(255,255,255,.15)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, fontSize: 13, color: '#9fb0b7' }}>
             <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
-            <span style={{ display: 'flex', gap: 16 }}>
-              <a href="#/privacy" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Πολιτική Απορρήτου</a>
-              <a href="#/terms" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Όροι Χρήσης</a>
-              <a href="#/cookies" style={{ color: '#9fb0b7', textDecoration: 'none' }}>Cookies</a>
-            </span>
+            <LegalLinks />
           </div>
         </footer>
 

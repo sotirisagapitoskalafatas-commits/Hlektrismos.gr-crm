@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, ShieldCheck, TrendingUp, Users, Phone, Zap, Menu, X } from 'lucide-react';
+import LegalLinks from '@/components/LegalLinks';
 
 const values = [
   { icon: Users, title: 'Εξατομικευμένη Φροντίδα', text: 'Κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, με υπηρεσίες προσαρμοσμένες στις δικές του ανάγκες.' },
@@ -93,11 +94,7 @@ export default function AboutPage() {
         <div className="container">
           <div className="footer-bottom">
             <span>© 2026 hlektrismos.gr</span>
-            <div className="footer-legal-links">
-              <a href="https://hlektrismos.gr/politiki-aporritou/" target="_blank" rel="noopener noreferrer">Πολιτική Απορρήτου</a>
-              <span>·</span>
-              <a href="https://hlektrismos.gr/oroi-chrisis/" target="_blank" rel="noopener noreferrer">Όροι Χρήσης</a>
-            </div>
+            <LegalLinks className="footer-legal-links" color="inherit" />
           </div>
         </div>
       </footer>

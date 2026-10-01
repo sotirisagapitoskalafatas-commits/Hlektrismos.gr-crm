@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { requireStaff } from "../_shared/guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,10 @@ serve(async (req: any) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const supabaseAdmin = createClient(

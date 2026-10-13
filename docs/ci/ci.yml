@@ -1,0 +1,35 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Unit + local RLS tests
+        run: npm test
+      - name: Type/lint baseline gate (no NEW failures)
+        run: node scripts/quality-gate.mjs
+      - name: Edge function syntax check
+        run: |
+          for f in supabase/functions/*/index.ts supabase/functions/_shared/*.ts; do
+            npx esbuild "$f" --loader:.ts=ts --log-level=error > /dev/null || { echo "syntax error: $f"; exit 1; }
+          done
+      - name: Build
+        run: npm run build
+      - name: Dependency audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Secret pattern scan (tracked files)
+        run: |
+          if git grep -nIE "(sk_live_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{32,}|AIza[0-9A-Za-z_-]{35}|ghp_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)" -- . ':!package-lock.json'; then
+            echo "Possible secret committed"; exit 1; fi

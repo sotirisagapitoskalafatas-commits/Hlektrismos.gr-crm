@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireStaff } from "../_shared/guard.ts";
+import { gateRecipients } from "../_shared/outreach-gate.ts";
+import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +24,16 @@ serve(async (req) => {
     const channelFilter = body.channel_filter || null;
     const maxCalls = body.max_calls || 5;
 
+    // FAIL CLOSED: unattended outreach stays off unless the owner has explicitly enabled it AND recorded
+    // written legal approval (env OUTREACH_ENABLED=on, LEGAL_APPROVAL_RECORDED=yes). Checked before any query.
+    const cfg = outreachConfigFromEnv();
+    if (!cfg.outreachEnabled || !cfg.legalApprovalRecorded) {
+      return new Response(
+        JSON.stringify({ message: "Outreach automation is disabled", processed: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -33,7 +45,7 @@ serve(async (req) => {
       .select("*")
       .eq("pipeline_status", "new")
       .gt("lead_score", 0)
-      .eq("deleted_at", null)
+      .is("deleted_at", null)
       .order("lead_score", { ascending: false })
       .limit(channelFilter === "voice" ? maxCalls : 20);
 
@@ -70,8 +82,15 @@ serve(async (req) => {
 
         // Automated AI calls require prior consent to automated calling
         // (Greek law 3471/2006 art. 11). Off unless AUTO_VOICE_CALLS=on.
-        if (channel === "voice" && Deno.env.get("AUTO_VOICE_CALLS") !== "on") {
-          channel = "email";
+        if (channel === "voice" && !cfg.voiceEnabled) {
+          continue; // never downgrade a voice job into an email send
+        }
+
+        // Central eligibility gate for this recipient and channel (re-reads the lead; fails closed).
+        const gate = await gateRecipients([lead.id], channel as "email" | "sms" | "voice", "promotional",
+          supabaseLoaders(supabase), cfg);
+        if (gate.allowed.length === 0) {
+          continue;
         }
 
         if (channel === "voice" && lead.phone) {
@@ -108,10 +127,12 @@ serve(async (req) => {
       }
     }
 
-    // Update lead scores
-    await supabase.rpc("exec_sql", {
-      sql: `UPDATE hlektrismos_leads SET lead_score = GREATEST(lead_score - 5, 0) WHERE id IN (${leads.map(l => `'${l.id}'`).join(",")})`,
-    }).catch(() => {});
+    // Update lead scores (direct, parameterised update; no raw SQL execution)
+    const ids = leads.map((l: { id: string }) => l.id);
+    await supabase.from("hlektrismos_leads").update({ lead_score: 0 }).in("id", ids).lt("lead_score", 5);
+    for (const l of leads as { id: string; lead_score?: number }[]) {
+      if ((l.lead_score ?? 0) >= 5) await supabase.from("hlektrismos_leads").update({ lead_score: (l.lead_score ?? 0) - 5 }).eq("id", l.id);
+    }
 
     return new Response(
       JSON.stringify({ message: `Scheduler completed: ${processed} processed, ${errors} errors`, processed, errors }),

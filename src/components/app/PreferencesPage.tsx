@@ -75,7 +75,8 @@ export default function PreferencesPage() {
         </div>
       </Card>
 
-      {/* Role simulator */}
+      {/* Role simulator — real admins only (UI view-as; never changes authorization) */}
+      {realRole === 'admin' && (
       <Card>
         <CardHeader micro="Επίδειξη" title="Προσομοίωση ρόλου" className="mb-3" />
         <div className="flex items-center gap-2 mb-3">
@@ -102,6 +103,7 @@ export default function PreferencesPage() {
           Η προσομοίωση είναι προσωρινή και βοηθά στην επίδειξη των ρόλων. Ο φυσικός ρόλος προέρχεται από τον λογαριασμό σας.
         </div>
       </Card>
+      )}
 
       {/* History */}
       <Card>

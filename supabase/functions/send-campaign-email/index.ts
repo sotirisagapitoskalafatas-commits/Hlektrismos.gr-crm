@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { requirePermission } from "../_shared/guard.ts";
+import { gateRecipients } from "../_shared/outreach-gate.ts";
+import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 
 // MARKETING EMAIL: every message goes through prepareMarketingEmail()
@@ -17,7 +19,7 @@ serve(async (req) => {
   }
 
   // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
+  const denied = await requirePermission(req, "campaign.send");
   if (denied) return denied;
 
   try {
@@ -45,7 +47,20 @@ serve(async (req) => {
 
     const results = { sent: 0, failed: 0, errors: [] as string[] };
 
-    for (const lead of leads) {
+    // Recipients are selected server-side: only lead IDs are read from the request; addresses and every other
+    // attribute come from the database, and each recipient must pass the central eligibility gate.
+    if (!Array.isArray(leads)) {
+      return new Response(JSON.stringify({ error: "leads must be an array" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), "email", "promotional",
+      supabaseLoaders(supabase), outreachConfigFromEnv());
+    for (const d of gate.denied) {
+      results.failed++;
+      results.errors.push(`${d.id}: not eligible (${d.reasons.join(",")})`);
+    }
+
+    for (const lead of gate.allowed) {
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;

@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "qa": "playwright test -c qa/playwright.config.ts",
     "qa:install": "playwright install chromium",
-    "test": "node --test src/lib/__tests__/*.test.mjs"
+    "test": "node --test src/lib/__tests__/*.test.mjs supabase/functions/_shared/__tests__/*.test.mjs supabase/tests/*.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -30,6 +30,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.9",
     "@eslint/js": "^9.9.1",
     "@playwright/test": "^1.47.2",
     "@types/leaflet": "^1.9.21",

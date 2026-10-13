@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { requirePermission } from "../_shared/guard.ts";
+import { gateRecipients } from "../_shared/outreach-gate.ts";
+import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,31 +15,33 @@ serve(async (req) => {
   }
 
   // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
+  const denied = await requirePermission(req, "communications.voice.initiate");
   if (denied) return denied;
 
   try {
-    const { lead_id, phone, first_name, last_name, region, company_name, current_provider } = await req.json();
+    // Only the lead id is trusted from the request; the phone number and lead details come from the database.
+    const { lead_id } = await req.json();
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Kill Switch: check if AI is paused for this lead
-    if (lead_id) {
-      const { data: leadCheck } = await supabase
-        .from("hlektrismos_leads")
-        .select("ai_paused")
-        .eq("id", lead_id)
-        .single();
-      if (leadCheck?.ai_paused) {
-        return new Response(
-          JSON.stringify({ error: "AI is paused for this lead (Kill Switch active)" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    // Central eligibility gate: AI voice prospecting is disabled by default and needs consent evidence,
+    // a fresh opt-out register screening, contact hours, frequency limits and recorded legal approval.
+    // Includes the per-lead AI kill switch. Fails closed if any check cannot be completed.
+    if (typeof lead_id !== "string") {
+      return new Response(JSON.stringify({ error: "lead_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const gate = await gateRecipients([lead_id], "voice", "promotional", supabaseLoaders(supabase), outreachConfigFromEnv());
+    if (gate.allowed.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Call not permitted", reasons: gate.denied[0]?.reasons ?? ["LEAD_NOT_FOUND"] }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const { phone, first_name, last_name, region, company_name, current_provider } = gate.allowed[0];
 
     // Fetch Vapi credentials from crm_settings
     const { data: settings } = await supabase

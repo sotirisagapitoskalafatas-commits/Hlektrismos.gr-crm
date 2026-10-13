@@ -42,3 +42,5 @@ Legend: ✅ done in this branch (not deployed) · 🔲 to do · 🔐 needs owner
 
 ## Rollback
 Edge functions: redeploy previous version from Git tag/`supabase functions deploy <name>` of the prior commit. Proposed SQL: rollback block at the bottom of the file. Front-end: Vercel "Instant Rollback". Headers: delete `vercel.json` entries.
+
+> **Phase 1 update (2026-10-14):** see `PHASE1_RESULTS.md` for what is fixed in code (not deployed), what SQL is staged (not applied) in `supabase/staged-migrations/phase1/`, and the remaining blockers. UX plan: `docs/product/ATLAS_UX_BLUEPRINT.md`.

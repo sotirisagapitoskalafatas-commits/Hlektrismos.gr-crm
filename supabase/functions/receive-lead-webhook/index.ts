@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { timingSafeEqual } from "../_shared/signed-link.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +16,7 @@ serve(async (req) => {
   //   x-webhook-secret: <LEAD_WEBHOOK_SECRET>
   // Fails closed when the secret is not configured.
   const expected = Deno.env.get("LEAD_WEBHOOK_SECRET") ?? "";
-  if (!expected || req.headers.get("x-webhook-secret") !== expected) {
+  if (!expected || !timingSafeEqual(req.headers.get("x-webhook-secret") ?? "", expected)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

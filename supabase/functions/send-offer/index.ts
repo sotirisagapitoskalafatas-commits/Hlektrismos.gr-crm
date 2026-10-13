@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireStaff } from "../_shared/guard.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
+import { signLink } from "../_shared/signed-link.ts";
 
 // COMMERCIAL EMAIL (a sales offer): the email goes through
 // prepareMarketingEmail() — suppression check, unsubscribe link, postal
@@ -48,7 +49,8 @@ Deno.serve(async (req: Request) => {
     );
 
     // 1. Generate acceptance link
-    const acceptUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/accept-offer?lead_id=${lead_id}&tariff_id=${tariff_id}`;
+    const acceptToken = await signLink("accept-offer", String(lead_id), String(tariff_id));
+    const acceptUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/accept-offer?lead_id=${lead_id}&tariff_id=${tariff_id}&t=${acceptToken}`;
 
     // 2. Compose Greek savings message
     const message = `⚡ Hlektrismos.gr — Νέα Προσφορά για εσάς!

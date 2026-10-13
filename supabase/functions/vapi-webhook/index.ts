@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { timingSafeEqual } from "../_shared/signed-link.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +11,15 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  // Audit fix: previously unauthenticated. Configure the same value as the
+  // "Server URL secret" in Vapi (sent as the x-vapi-secret header). Fails closed.
+  const expected = Deno.env.get("VAPI_WEBHOOK_SECRET") ?? "";
+  if (expected.length < 16 || !timingSafeEqual(req.headers.get("x-vapi-secret") ?? "", expected)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {

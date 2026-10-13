@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
+import { requireStaff } from "../_shared/guard.ts";
 
 // ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────
 class SmtpClient {
@@ -120,6 +121,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Staff-only (audit fix): the public anon key must not be able to trigger this.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   try {
     const { to, subject, html, text, from_name, transactional } = await req.json();

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Download, Loader2, Eye } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { escapeHtml } from '@/lib/escape-html';
 
 interface OfferModalProps {
   lead: any;
@@ -113,19 +114,19 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
 
   const replacePlaceholders = (html: string): string => {
     return html
-      .replace(/\{\{logo_url\}\}/g, logoUrl || DEFAULT_LOGO)
-      .replace(/\{\{customer_name\}\}/g, `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim() || 'Πελάτης')
-      .replace(/\{\{company_name\}\}/g, lead?.company_name || lead?.company || '')
+      .replace(/\{\{logo_url\}\}/g, escapeHtml(logoUrl || DEFAULT_LOGO))
+      .replace(/\{\{customer_name\}\}/g, escapeHtml(`${lead?.first_name || ''} ${lead?.last_name || ''}`.trim() || 'Πελάτης'))
+      .replace(/\{\{company_name\}\}/g, escapeHtml(lead?.company_name || lead?.company || ''))
       .replace(/\{\{monthly_kwh\}\}/g, monthlyKwh.toString())
-      .replace(/\{\{provider_name\}\}/g, tariff?.provider_name || '-')
-      .replace(/\{\{tariff_name\}\}/g, tariff?.program_name || tariff?.tariff_name || '-')
+      .replace(/\{\{provider_name\}\}/g, escapeHtml(tariff?.provider_name || '-'))
+      .replace(/\{\{tariff_name\}\}/g, escapeHtml(tariff?.program_name || tariff?.tariff_name || '-'))
       .replace(/\{\{price_kwh\}\}/g, unitRate.toFixed(4))
       .replace(/\{\{price_night\}\}/g, tariff?.base_price_night ? tariff.base_price_night.toFixed(4) : '—')
       .replace(/\{\{monthly_fixed_fee\}\}/g, fixedFee.toFixed(2))
-      .replace(/\{\{discount_conditions\}\}/g, tariff?.discount_conditions || '—')
+      .replace(/\{\{discount_conditions\}\}/g, escapeHtml(tariff?.discount_conditions || '—'))
       .replace(/\{\{monthly_estimate\}\}/g, estimatedMonthly.toFixed(2))
       .replace(/\{\{yearly_estimate\}\}/g, estimatedYearly.toFixed(2))
-      .replace(/\{\{current_provider\}\}/g, lead?.current_provider || 'Άγνωστος')
+      .replace(/\{\{current_provider\}\}/g, escapeHtml(lead?.current_provider || 'Άγνωστος'))
       .replace(/\{\{current_monthly_cost\}\}/g, currentCost?.toFixed(2) || '—')
       .replace(/\{\{savings_amount\}\}/g, savingsMonthly > 0 ? savingsMonthly.toFixed(2) : '')
       .replace(/\{\{savings_yearly\}\}/g, savingsYearly > 0 ? savingsYearly.toFixed(2) : '')
@@ -147,7 +148,7 @@ export default function OfferModal({ lead, tariff, logoUrl, onClose }: OfferModa
 
     printWindow.document.write(`<!DOCTYPE html>
       <html><head>
-        <title>Προσφορά - ${lead?.first_name || ''} ${lead?.last_name || ''}</title>
+        <title>Προσφορά - ${escapeHtml(lead?.first_name)} ${escapeHtml(lead?.last_name)}</title>
         <style>@media print { body { margin: 0; } }</style>
       </head><body>${container.innerHTML}</body></html>`);
     printWindow.document.close();

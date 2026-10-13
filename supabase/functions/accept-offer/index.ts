@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { verifyLink } from "../_shared/signed-link.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,20 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const lead_id = url.searchParams.get("lead_id");
     const tariff_id = url.searchParams.get("tariff_id");
+    const token = url.searchParams.get("t");
+    const html = (status: number, body: string) =>
+      new Response(`<html><body style="font-family:sans-serif;text-align:center;padding:50px">${body}</body></html>`,
+        { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+
+    // Audit fix: the link must be HMAC-signed (see send-offer) and acceptance needs an
+    // explicit POST, so mail scanners / link previews that GET the URL cannot convert a lead.
+    if (lead_id && tariff_id && !(await verifyLink(token, "accept-offer", lead_id, tariff_id))) {
+      return html(403, "<h2>❌ Μη έγκυρος ή ληγμένος σύνδεσμος</h2><p>Παρακαλώ ζητήστε νέα προσφορά από τον σύμβουλό σας.</p>");
+    }
+    if (lead_id && tariff_id && req.method !== "POST") {
+      const action = new URL(req.url).pathname + new URL(req.url).search;
+      return html(200, `<h2>Επιβεβαίωση αποδοχής προσφοράς</h2><form method="POST" action="${action.replace(/"/g, "&quot;")}"><button type="submit" style="padding:12px 28px;font-size:16px">Αποδέχομαι την προσφορά</button></form>`);
+    }
 
     if (!lead_id || !tariff_id) {
       return new Response(

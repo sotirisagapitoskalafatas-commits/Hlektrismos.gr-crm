@@ -97,8 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoleOverrideState(null);
   };
 
-  // Effective role = simulator override (if any) else profile role.
-  const role: Role = roleOverride ?? profile?.role ?? DEFAULT_ROLE;
+  // Effective role = admin-only simulator override, else the real profile role.
+  // Security: the override is a UI-only "view as" aid and is honoured ONLY for a real admin.
+  // For everyone else any stored override is ignored (real data access is enforced by the database and
+  // edge functions, never by this value).
+  const physicalRole: Role = profile?.role ?? DEFAULT_ROLE;
+  const role: Role = physicalRole === 'admin' && roleOverride ? roleOverride : physicalRole;
 
   // Canonical role set: prefer user_roles; fall back to the single profile role
   // so existing single-role installs behave identically.

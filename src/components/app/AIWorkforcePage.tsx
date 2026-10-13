@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { countByStatus } from '@/lib/ai-metrics';
 import {
   Bot, Activity, Users, ShieldCheck, Gauge, Crown, Clock,
   CheckCircle2, AlertTriangle, Ban, PauseCircle, ChevronRight, ChevronDown,
@@ -162,7 +163,7 @@ export default function AIWorkforcePage() {
   const activeCount = agents.filter((a) => statusFrom(a.tool, a.logs, a.effect) === 'ACTIVE').length;
   const attentionCount = agents.filter((a) => statusFrom(a.tool, a.logs, a.effect) === 'NEEDS_ATTENTION').length;
   const totalCalls = logs.length;
-  const errors = logs.filter((l) => l.status === 'error').length-1;
+  const errors = countByStatus(logs, 'error');
 
   const tree = useMemo(() => {
     const m: Record<string, AgentMeta[]> = {};

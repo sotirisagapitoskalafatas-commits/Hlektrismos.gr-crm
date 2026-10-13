@@ -14,6 +14,9 @@ export default function RoleSwitcher() {
   const physical = profile?.role ?? DEFAULT_ROLE;
   const sim = role !== physical;
 
+  // Security: view-as is for real admins only (see auth.tsx).
+  if (physical !== 'admin') return null;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">

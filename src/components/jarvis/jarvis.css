@@ -1,0 +1,440 @@
+/* ============================================================
+   Hlektrismos AI — 3D energy assistant (launcher + chat panel)
+   Everything is scoped under .jv-root / .jv-* so nothing leaks
+   into the rest of the site. Palette:
+   navy #071A2B · blue #1769FF · cyan #35DFFF · white #F8FBFF · green #49E59B
+   ============================================================ */
+
+.jv-root {
+  --jv-navy: #071A2B;
+  --jv-blue: #1769FF;
+  --jv-cyan: #35DFFF;
+  --jv-white: #F8FBFF;
+  --jv-green: #49E59B;
+  --jv-amber: #FFB02E;
+  --jv-size: 78px;
+  --jv-edge: 28px;
+  --jv-gap: 14px;
+}
+
+.jv-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ------------------------------------------------------------
+   Launcher
+   ------------------------------------------------------------ */
+.jv-launcher {
+  position: fixed;
+  z-index: 80;
+  right: calc(var(--jv-edge) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--jv-edge) + env(safe-area-inset-bottom, 0px));
+  width: var(--jv-size);
+  height: var(--jv-size);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s ease, visibility 0s linear 0s;
+}
+@media (hover: hover) {
+  .jv-launcher:hover { transform: scale(1.06); }
+}
+.jv-launcher:focus-visible { outline: 2px solid var(--jv-cyan); outline-offset: 6px; }
+.jv-launcher[data-open='true'] {
+  transform: scale(0.5);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.3s ease, opacity 0.22s ease, visibility 0s linear 0.3s;
+}
+
+.jv-tip {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translate(6px, -50%);
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: rgba(7, 26, 43, 0.94);
+  border: 1px solid rgba(53, 223, 255, 0.4);
+  box-shadow: 0 8px 24px rgba(2, 10, 20, 0.55), 0 0 14px rgba(53, 223, 255, 0.18);
+  color: var(--jv-white);
+  font-weight: 600; font-size: 12.5px; line-height: 1;
+  font-family: inherit;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+@media (hover: hover) {
+  .jv-launcher:hover .jv-tip,
+  .jv-launcher:focus-visible .jv-tip { opacity: 1; transform: translate(0, -50%); }
+}
+
+/* ------------------------------------------------------------
+   Orb (shared by launcher and panel avatar)
+   ------------------------------------------------------------ */
+.jv-orb { position: relative; width: 100%; height: 100%; display: block; }
+.jv-orb-avatar { width: 46px; height: 46px; }
+
+.jv-float { position: absolute; inset: 0; }
+.jv-orb-launcher .jv-float { animation: jv-float 6s ease-in-out infinite; }
+@keyframes jv-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.jv-tilt {
+  position: absolute;
+  inset: 0;
+  transform: perspective(260px)
+    translate3d(var(--jv-tx, 0px), var(--jv-ty, 0px), 0)
+    rotateX(var(--jv-rx, 0deg)) rotateY(var(--jv-ry, 0deg))
+    rotate(var(--jv-roll, 0deg));
+  will-change: transform;
+}
+
+.jv-aura {
+  position: absolute;
+  inset: -17px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(53, 223, 255, 0.4) 0%, rgba(23, 105, 255, 0.24) 46%, rgba(23, 105, 255, 0) 70%);
+  pointer-events: none;
+  animation: jv-breathe 4.2s ease-in-out infinite;
+}
+.jv-orb-avatar .jv-aura { inset: -9px; animation: none; opacity: 0.75; }
+@keyframes jv-breathe {
+  0%, 100% { opacity: 0.62; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+.jv-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from 0deg,
+    rgba(53, 223, 255, 0) 0deg, rgba(53, 223, 255, 0.95) 70deg, rgba(53, 223, 255, 0) 150deg,
+    rgba(53, 223, 255, 0) 205deg, rgba(73, 229, 155, 0.85) 255deg, rgba(73, 229, 155, 0) 305deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+
+/* Deep-blue glass disc with a chrome rim; the mascot sits on top so the leaf can overhang it. */
+.jv-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 120% at 28% 14%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(100% 100% at 50% 62%, #0E3A6B 0%, #0A2A4E 46%, #061B30 100%);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(215, 235, 255, 0.6),
+    inset 0 0 0 3.5px rgba(53, 223, 255, 0.2),
+    inset 0 -9px 16px rgba(0, 0, 0, 0.45),
+    inset 0 7px 10px rgba(255, 255, 255, 0.12),
+    0 10px 26px rgba(4, 14, 26, 0.55),
+    0 0 18px rgba(53, 223, 255, 0.28);
+  transition: box-shadow 0.3s ease;
+}
+.jv-glass::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 38%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: skewX(-18deg);
+  animation: jv-sheen 7.5s ease-in-out infinite;
+}
+@keyframes jv-sheen {
+  0%, 62% { left: -60%; }
+  80%, 100% { left: 135%; }
+}
+@media (hover: hover) {
+  .jv-launcher:hover .jv-glass {
+    box-shadow:
+      inset 0 0 0 1.5px rgba(235, 247, 255, 0.85),
+      inset 0 0 0 3.5px rgba(53, 223, 255, 0.45),
+      inset 0 -9px 16px rgba(0, 0, 0, 0.4),
+      inset 0 7px 10px rgba(255, 255, 255, 0.16),
+      0 12px 30px rgba(4, 14, 26, 0.55),
+      0 0 28px rgba(53, 223, 255, 0.55);
+  }
+}
+
+.jv-mascot {
+  position: absolute;
+  width: 112%;
+  aspect-ratio: 1;
+  left: -6%;
+  top: -12%;
+  pointer-events: none;
+}
+.jv-img { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.jv-eyes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.jv-fallback {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--jv-cyan); font-size: 30px; text-shadow: 0 0 12px rgba(53, 223, 255, 0.8);
+}
+
+/* ---- expression-driven ambience (the eyes/brows themselves are driven from JS) ---- */
+.jv-orb[data-expr='thinking'] .jv-aura { animation-duration: 2s; }
+.jv-orb[data-expr='thinking'] .jv-glass::after { animation: jv-sheen 1.9s linear infinite; }
+.jv-orb[data-expr='error'] .jv-aura {
+  background: radial-gradient(circle, rgba(255, 176, 46, 0.3) 0%, rgba(23, 105, 255, 0.16) 46%, rgba(23, 105, 255, 0) 70%);
+  animation-duration: 7s;
+}
+.jv-orb[data-expr='success'] .jv-aura {
+  background: radial-gradient(circle, rgba(73, 229, 155, 0.35) 0%, rgba(53, 223, 255, 0.22) 46%, rgba(23, 105, 255, 0) 70%);
+}
+.jv-orb[data-expr='empathetic'] .jv-aura { animation-duration: 7s; opacity: 0.8; }
+.jv-orb[data-expr='inactive'] .jv-aura { animation-duration: 10s; opacity: 0.35; }
+.jv-orb[data-expr='inactive'] .jv-float { animation-play-state: paused; }
+.jv-orb[data-expr='inactive'] .jv-glass::after { animation: none; }
+
+/* ------------------------------------------------------------
+   Panel
+   ------------------------------------------------------------ */
+.jv-panel {
+  position: fixed;
+  z-index: 99;
+  right: calc(var(--jv-edge) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--jv-edge) + var(--jv-size) + var(--jv-gap) + env(safe-area-inset-bottom, 0px));
+  width: min(400px, calc(100vw - 32px));
+  height: min(600px, calc(100dvh - 150px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 22px;
+  color: var(--jv-white);
+  font-family: inherit;
+  background: linear-gradient(180deg, rgba(10, 34, 60, 0.96), rgba(7, 26, 43, 0.97));
+  border: 1px solid rgba(53, 223, 255, 0.3);
+  box-shadow:
+    0 32px 70px -22px rgba(2, 10, 20, 0.8),
+    0 0 0 1px rgba(23, 105, 255, 0.12),
+    0 0 44px -12px rgba(53, 223, 255, 0.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  /* grows out of (and shrinks back into) the launcher */
+  transform-origin: calc(100% - var(--jv-size) / 2) calc(100% + var(--jv-gap) + var(--jv-size) / 2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.6, 1), opacity 0.22s ease, visibility 0s linear 0.3s;
+}
+.jv-panel[data-open='false'] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.25);
+}
+.jv-panel[data-open='true'] {
+  opacity: 1;
+  transform: none;
+  transition: none;
+  animation: jv-panel-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+@keyframes jv-panel-in {
+  from { opacity: 0; transform: scale(0.25); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+.jv-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 16px;
+  background:
+    linear-gradient(180deg, rgba(23, 105, 255, 0.24), rgba(23, 105, 255, 0)),
+    rgba(9, 32, 56, 0.9);
+  border-bottom: 1px solid rgba(53, 223, 255, 0.22);
+  box-shadow: 0 10px 26px -18px rgba(53, 223, 255, 0.5);
+}
+.jv-avatar { width: 46px; height: 46px; flex: none; }
+.jv-title { min-width: 0; flex: 1; }
+.jv-brand { display: flex; align-items: center; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.jv-sub { margin-top: 2px; font-size: 12px; line-height: 1.3; color: rgba(248, 251, 255, 0.68); }
+.jv-status {
+  width: 8px; height: 8px; margin-left: 8px; flex: none; border-radius: 50%;
+  background: var(--jv-cyan);
+  box-shadow: 0 0 8px var(--jv-cyan);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.jv-status[data-expr='thinking'] { animation: jv-status-pulse 1.1s ease-in-out infinite; }
+.jv-status[data-expr='error'] { background: var(--jv-amber); box-shadow: 0 0 8px var(--jv-amber); }
+.jv-status[data-expr='inactive'] { background: #6C8CAE; box-shadow: none; }
+@keyframes jv-status-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.jv-hbtn {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  border: 0; border-radius: 10px; cursor: pointer;
+  color: rgba(248, 251, 255, 0.78); background: rgba(255, 255, 255, 0.07);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.jv-hbtn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+
+.jv-panel button:focus-visible,
+.jv-panel input:focus-visible { outline: 2px solid var(--jv-cyan); outline-offset: 2px; }
+
+.jv-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(53, 223, 255, 0.35) transparent;
+}
+
+.jv-row { display: flex; flex-direction: column; max-width: 88%; animation: jv-in 0.28s ease-out both; }
+.jv-row-bot { align-self: flex-start; align-items: flex-start; }
+.jv-row-user { align-self: flex-end; align-items: flex-end; }
+@keyframes jv-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.jv-msg {
+  padding: 10px 13px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 16px;
+}
+.jv-msg-bot {
+  color: var(--jv-white);
+  background: rgba(23, 105, 255, 0.17);
+  border: 1px solid rgba(53, 223, 255, 0.22);
+  border-bottom-left-radius: 5px;
+}
+.jv-msg-user {
+  color: #fff;
+  background: linear-gradient(135deg, #1769FF 0%, #0D4BD4 100%);
+  border-bottom-right-radius: 5px;
+  box-shadow: 0 8px 18px -10px rgba(23, 105, 255, 0.9);
+}
+.jv-time { margin: 3px 4px 0; font-size: 10.5px; color: rgba(248, 251, 255, 0.55); }
+
+.jv-typing { display: inline-flex; gap: 5px; align-items: center; padding: 13px 14px; }
+.jv-typing i {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--jv-cyan);
+  animation: jv-dot 1s ease-in-out infinite;
+}
+.jv-typing i:nth-child(2) { animation-delay: 0.15s; }
+.jv-typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes jv-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.jv-quick { display: grid; gap: 8px; margin-top: 4px; animation: jv-in 0.35s ease-out 0.1s both; }
+.jv-quick-btn {
+  display: flex; align-items: center; gap: 11px; min-height: 46px; padding: 8px 12px;
+  text-align: left; font-weight: 500; font-size: 13.5px; line-height: 1.35; font-family: inherit; color: var(--jv-white);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(53, 223, 255, 0.24);
+  border-radius: 14px; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.jv-quick-btn:hover {
+  background: rgba(23, 105, 255, 0.2);
+  border-color: rgba(53, 223, 255, 0.55);
+  box-shadow: 0 0 20px -6px rgba(53, 223, 255, 0.55);
+  transform: translateY(-1px);
+}
+.jv-quick-ico {
+  width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 50%;
+  color: var(--jv-cyan); background: rgba(53, 223, 255, 0.12);
+}
+.jv-quick-btn:nth-child(2) .jv-quick-ico { color: #FFC85A; background: rgba(255, 200, 90, 0.12); }
+.jv-quick-btn:nth-child(3) .jv-quick-ico { color: #5AA8FF; background: rgba(90, 168, 255, 0.14); }
+.jv-quick-btn:nth-child(4) .jv-quick-ico { color: var(--jv-green); background: rgba(73, 229, 155, 0.12); }
+
+.jv-next { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.jv-next-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 13px;
+  font-weight: 600; font-size: 12.5px; line-height: 1; font-family: inherit; color: var(--jv-white);
+  background: rgba(53, 223, 255, 0.09); border: 1px solid rgba(53, 223, 255, 0.4);
+  border-radius: 999px; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.jv-next-btn:hover { background: rgba(53, 223, 255, 0.2); border-color: rgba(53, 223, 255, 0.75); }
+
+.jv-form {
+  display: flex; gap: 8px; padding: 10px 12px 6px;
+  border-top: 1px solid rgba(53, 223, 255, 0.18);
+  background: rgba(5, 20, 34, 0.65);
+}
+.jv-form input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 14px;
+  font-weight: 400; font-size: 14px; line-height: 1; font-family: inherit; color: var(--jv-white);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(53, 223, 255, 0.26);
+  border-radius: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.2s ease, background 0.15s ease;
+}
+.jv-form input::placeholder { color: rgba(248, 251, 255, 0.55); }
+.jv-form input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--jv-cyan);
+  box-shadow: 0 0 0 3px rgba(53, 223, 255, 0.2), 0 0 20px -2px rgba(53, 223, 255, 0.5);
+}
+.jv-send {
+  width: 44px; height: 44px; flex: none; display: grid; place-items: center;
+  color: #fff; border: 0; border-radius: 14px; cursor: pointer;
+  background: linear-gradient(135deg, #1769FF, #1E8CFF);
+  box-shadow: 0 8px 18px -8px rgba(23, 105, 255, 0.95);
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+.jv-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(53, 223, 255, 0.8); }
+.jv-send:disabled { opacity: 0.4; cursor: default; }
+.jv-note {
+  margin: 0; padding: 0 14px 10px; text-align: center;
+  font-size: 10.5px; line-height: 1.35; color: rgba(248, 251, 255, 0.55);
+  background: rgba(5, 20, 34, 0.65);
+}
+
+/* ------------------------------------------------------------
+   Mobile — smaller launcher, near-full-width bottom sheet
+   ------------------------------------------------------------ */
+@media (max-width: 640px) {
+  .jv-root { --jv-size: 64px; --jv-edge: 16px; --jv-gap: 12px; }
+  .jv-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: calc(8px + var(--jv-kb, 0px) + env(safe-area-inset-bottom, 0px));
+    height: min(680px, calc(var(--jv-vh, 100dvh) - 24px - env(safe-area-inset-top, 0px)));
+    border-radius: 20px;
+    transform-origin: calc(100% - 32px) 100%;
+  }
+  .jv-form input { font-size: 16px; } /* prevents iOS focus zoom */
+  .jv-note { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+}
+/* CRM shell has a bottom tab bar on phones — stay clear of it. */
+@media (max-width: 767px) {
+  .jv-root[data-route='app'] .jv-launcher { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .jv-panel { height: calc(100dvh - 24px); bottom: 12px; }
+}
+
+/* ------------------------------------------------------------
+   Reduced motion — clean static alternative
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .jv-root *, .jv-root *::before, .jv-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .jv-glass::after { display: none; }
+  .jv-aura { opacity: 0.8; }
+  .jv-launcher:hover { transform: none; }
+}

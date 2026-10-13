@@ -1,17 +1,15 @@
-export type JarvisState =
-  | 'idle' | 'hover' | 'dragging' | 'opening' | 'open'
-  | 'typing' | 'thinking' | 'responding' | 'success' | 'error' | 'offline';
+/** Signals the chat hook raises at real points of the conversation lifecycle. */
+export type ChatSignal =
+  /** A network call to the `chat` edge function is actually starting. */
+  | { type: 'request-start'; purpose: 'chat' | 'callback' }
+  /** The visitor asked for a callback and the consent/contact flow began. */
+  | { type: 'callback-open' }
+  /** The assistant needs the visitor to correct or complete something. */
+  | { type: 'clarify' }
+  /** The backend confirmed the callback lead was stored. */
+  | { type: 'callback-success' }
+  /** The callback request did not get a confirmation from the backend. */
+  | { type: 'callback-unconfirmed' };
 
-/** Normalized gaze direction in widget-local space, x,y ∈ [-1,1]. */
-export interface Gaze { x: number; y: number }
-
-export const JARVIS_COLORS = {
-  navy: '#102033',
-  blue: '#3B82F6',
-  cyan: '#67E8FF',
-  white: '#F8FAFC',
-  body: '#D7DDE5',
-  green: '#22C55E',
-  red: '#EF4444',
-  amber: '#F59E0B',
-} as const;
+export const JARVIS_BODY_SRC = '/images/jarvis/mascot-body.webp';
+export const JARVIS_FULL_SRC = '/images/jarvis/mascot-full.webp';

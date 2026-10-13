@@ -1,19 +1,22 @@
 /* ------------------------------------------------------------------ */
-/*  JarvisWidget — floating AI assistant dock.                         */
-/*  Layer 1: ALIVE (ring + mascot + drag + persistence + panel).       */
-/*  Layer 2: USEFUL — real chat via useJarvisChat → `chat` edge        */
-/*           function (Gemini + tariff RAG), visitor memory, leads.    */
-/*  Layer 3: ACTION — explicit nav commands («άνοιξε τις υποθέσεις»)   */
-/*           navigate the CRM via useNav/useRoute; still asks login    */
-/*           when signed out. `onSend` remains an override seam.       */
+/*  JarvisWidget — "Hlektrismos AI" floating energy assistant.         */
+/*  Visual layer: 3D mascot launcher + glass chat panel (jarvis.css).  */
+/*  Logic is unchanged and still goes through the existing seams:      */
+/*   • useJarvisChat → `chat` edge function (Gemini + tariff RAG),     */
+/*     visitor memory, age/consent-gated callback leads               */
+/*   • detectNavIntent / field-sales tools for signed-in CRM users     */
+/*   • `onSend` stays as an override seam for tests/previews           */
+/*  The mascot's expression is driven only by real events: see        */
+/*  `mascot.signal(...)` calls below and ChatSignal in the chat hook.  */
 /* ------------------------------------------------------------------ */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+import { ArrowRight, Flame, Minus, PhoneCall, PiggyBank, SendHorizontal, Sun, X, Zap } from 'lucide-react';
 import { JarvisMascot } from './JarvisMascot';
-import { JarvisRing } from './JarvisRing';
-import { useJarvisGaze } from './useJarvisGaze';
-import { useJarvisBlink } from './useJarvisBlink';
-import { useJarvisPosition } from './useJarvisPosition';
+import { mascot } from './mascotController';
+import type { Expression } from './mascotController';
+import { detectDifficulty, detectTopic } from './emotion';
+import type { ChatSignal } from './types';
 import { useJarvisChat } from '@/lib/jarvis-chat';
 import { detectNavIntent } from '@/lib/jarvis-actions';
 import { detectFieldSalesIntent, resumeFieldSales, runFieldSalesIntent } from '@/lib/field-sales/jarvis-tools';
@@ -21,84 +24,149 @@ import type { FieldSalesCtx, FieldSalesFlow, FieldSalesResult } from '@/lib/fiel
 import { useNav } from '@/lib/nav';
 import { useRoute } from '@/lib/router';
 import { useAuth } from '@/lib/auth';
-import type { JarvisState } from './types';
+import './jarvis.css';
 
-const FAB = { w: 96, h: 96 };
+const QUICK_ACTIONS = [
+  { text: 'Θέλω φθηνότερο πρόγραμμα ρεύματος', Icon: Zap },
+  { text: 'Με ενδιαφέρουν τα φωτοβολταϊκά', Icon: Sun },
+  { text: 'Θέλω πληροφορίες για φυσικό αέριο', Icon: Flame },
+  { text: 'Πώς μπορώ να μειώσω τον λογαριασμό μου;', Icon: PiggyBank },
+] as const;
 
-const QUICK_STARTERS = ['Ρεύμα', 'Αέριο', 'Φωτοβολταϊκά', 'Ζητώ κλήση'];
+/** Canonical phrase that the chat hook's callback intent recognises (keeps the age/consent gate). */
+const CALLBACK_PHRASE = 'Ζητώ κλήση';
 
-export function JarvisWidget({ bottomOffset = 88, onSend }: {
-  bottomOffset?: number;
-  onSend?: (text: string) => Promise<string>;
-}) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState<JarvisState>('idle');
+interface Outcome {
+  requested?: 'chat' | 'callback';
+  clarify?: boolean;
+  callbackOk?: boolean;
+  callbackFail?: boolean;
+}
+
+function statusText(expr: Expression): string {
+  switch (expr) {
+    case 'thinking': return 'Σκέφτεται…';
+    case 'answering': return 'Απαντά';
+    case 'error': return 'Πρόβλημα σύνδεσης';
+    case 'inactive': return 'Σε αναμονή';
+    default: return 'Online';
+  }
+}
+
+export function JarvisWidget({ onSend }: { onSend?: (text: string) => Promise<string> }) {
   const [open, setOpen] = useState(false);
-  const chat = useJarvisChat();
+  const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
-  const [pulse, setPulse] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const outcome = useRef<Outcome>({});
+  const fieldFlowRef = useRef<FieldSalesFlow | null>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const panelId = useId();
 
   const { go, openCase } = useNav();
   const [route, navigate] = useRoute();
   const { session, role } = useAuth();
-  const [pos, drag] = useJarvisPosition(FAB, bottomOffset);
-  const gaze = useJarvisGaze(wrapRef, state);
-  const { blink, doBlink } = useJarvisBlink();
+  const expr = useSyncExternalStore(mascot.subscribe, mascot.getExpression, () => 'idle' as Expression);
 
-  const moved = useRef(false);
-  const lastPtr = useRef<{ x: number; y: number } | null>(null);
-  const fieldFlowRef = useRef<FieldSalesFlow | null>(null);
+  const onSignal = useCallback((s: ChatSignal) => {
+    switch (s.type) {
+      case 'request-start':
+        outcome.current.requested = s.purpose;
+        mascot.signal({ type: 'request-start' });
+        break;
+      case 'callback-open': mascot.signal({ type: 'callback', active: true }); break;
+      case 'clarify': outcome.current.clarify = true; break;
+      case 'callback-success':
+        outcome.current.callbackOk = true;
+        mascot.signal({ type: 'callback', active: false });
+        break;
+      case 'callback-unconfirmed':
+        outcome.current.callbackFail = true;
+        mascot.signal({ type: 'callback', active: false });
+        break;
+    }
+  }, []);
+  const chat = useJarvisChat(onSignal);
+
+  /* ---------- open / minimize / close ---------- */
+
+  const openPanel = () => {
+    setMounted(true);
+    setOpen(true);
+    mascot.signal({ type: 'panel', open: true });
+  };
+
+  /** keepChat=true → minimize. false → end the chat (unless a callback is mid-way). */
+  const closePanel = (keepChat: boolean) => {
+    setOpen(false);
+    mascot.signal({ type: 'panel', open: false });
+    if (!keepChat && !chat.inCallback() && !busyRef.current) {
+      chat.reset();
+      fieldFlowRef.current = null;
+      setInput('');
+    }
+    window.setTimeout(() => launcherRef.current?.focus({ preventScroll: true }), 0);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    // Don't pop the on-screen keyboard on touch devices; desktop gets the caret straight away.
+    if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus({ preventScroll: true });
+  }, [open]);
+
+  /* Keep the sheet above the on-screen keyboard (visualViewport shrinks when it opens). */
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    const el = panelRef.current;
+    if (!vv || !el) return;
+    const update = () => {
+      el.style.setProperty('--jv-vh', `${Math.round(vv.height)}px`);
+      el.style.setProperty('--jv-kb', `${Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))}px`);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      el.style.removeProperty('--jv-vh');
+      el.style.removeProperty('--jv-kb');
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    body.scrollTo({ top: body.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
+  }, [chat.messages.length, busy, open]);
+
+  /* ---------- sending ---------- */
 
   const applyFieldResult = (res: FieldSalesResult) => {
     fieldFlowRef.current = res.type === 'flow' ? res.flow : null;
     if (res.nav) {
-      if (res.nav.page === 'case' && res.nav.caseId) openCase(res.nav.caseId);
+      if ((res.nav.page as string) === 'case' && res.nav.caseId) openCase(res.nav.caseId);
       else go(res.nav.page, res.nav.filters);
     }
     chat.push('jarvis', res.text);
-    transition('success');
+    // 'done' = the tool really ran; 'flow' = it is waiting for more details from the visitor.
+    if (res.type === 'done') mascot.signal({ type: 'action-success' });
+    else mascot.signal({ type: 'reply', clarify: true });
   };
 
-  /* Keep pulse going while idle; slow down once open. */
-  useEffect(() => {
-    if (!open) return;
-    const stop = window.setTimeout(() => setPulse(false), 1500);
-    return () => window.clearTimeout(stop);
-  }, [open]);
-
-  const transition = (s: JarvisState) => {
-    setState(s);
-    if (['responding', 'thinking', 'opening'].includes(s)) doBlink();
-  };
-
-  const toggle = () => {
-    if (drag.dragging || moved.current) return;
-    setOpen(o => {
-      const next = !o;
-      if (next) {
-        transition('opening');
-        window.setTimeout(() => transition('open'), 280);
-      } else {
-        transition('idle');
-      }
-      return next;
-    });
-  };
-
-  const submit = async (raw: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed) return;
-    setInput('');
-    transition('typing');
-    await new Promise(r => window.setTimeout(r, 380));
-    transition('thinking');
-
+  const run = async (trimmed: string) => {
     if (!onSend && (session || route === 'app')) {
       const ctx: FieldSalesCtx = { role: role ?? null };
       if (fieldFlowRef.current) {
         chat.push('user', trimmed);
-        const res = await resumeFieldSales(trimmed, fieldFlowRef.current, ctx);
-        applyFieldResult(res);
+        mascot.signal({ type: 'request-start' });
+        applyFieldResult(await resumeFieldSales(trimmed, fieldFlowRef.current, ctx));
         return;
       }
     }
@@ -111,11 +179,12 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
           if (route !== 'app') navigate('app');
           go(nav.page);
           chat.push('jarvis', nav.reply);
+          mascot.signal({ type: 'action-success' }); // navigation really happened
         } else {
           navigate('login');
           chat.push('jarvis', nav.noAuthReply);
+          mascot.signal({ type: 'reply' });
         }
-        transition('success');
         return;
       }
     }
@@ -125,178 +194,169 @@ export function JarvisWidget({ bottomOffset = 88, onSend }: {
       const fi = detectFieldSalesIntent(trimmed);
       if (fi) {
         chat.push('user', trimmed);
-        const res = await runFieldSalesIntent(fi, ctx);
-        applyFieldResult(res);
+        mascot.signal({ type: 'request-start' });
+        applyFieldResult(await runFieldSalesIntent(fi, ctx));
         return;
       }
     }
 
     try {
+      let reply: string;
       if (onSend) {
         chat.push('user', trimmed);
-        chat.push('jarvis', await onSend(trimmed));
+        mascot.signal({ type: 'request-start' });
+        outcome.current.requested = 'chat';
+        reply = await onSend(trimmed);
       } else {
-        chat.push('jarvis', await chat.send(trimmed));
+        reply = await chat.send(trimmed);
       }
-      transition('success');
+      const o = outcome.current;
+      chat.push('jarvis', reply, o.requested === 'chat' && !o.clarify ? 'answer' : undefined);
+      if (o.callbackOk) mascot.signal({ type: 'action-success' });
+      else if (o.callbackFail) mascot.signal({ type: 'failure' });
+      else mascot.signal({ type: 'reply', clarify: o.clarify });
     } catch {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         chat.push('jarvis', 'Φαίνεται πως είστε εκτός σύνδεσης. Θα απαντήσω μόλις επανέλθει το δίκτυο. 📡');
-        transition('offline');
       } else {
         chat.push('jarvis', 'Συγγνώμη, παρουσιάστηκε μια διακοπή. Δοκιμάστε ξανά σε λίγο. 🔄');
-        transition('error');
       }
+      mascot.signal({ type: 'failure' });
     }
-    window.setTimeout(() => setState(s => (['success', 'error', 'offline'].includes(s) ? 'open' : s)), 900);
   };
 
+  const submit = async (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setInput('');
+    outcome.current = {};
+    mascot.signal({ type: 'submit', difficulty: detectDifficulty(trimmed), topic: detectTopic(trimmed) });
+    try {
+      await run(trimmed);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const showSolutions = () => {
+    navigate('services');
+    closePanel(true);
+  };
+
+  /* ---------- render ---------- */
+
+  const msgs = chat.messages;
+  const lastIdx = msgs.length - 1;
+  const showQuick = msgs.length <= 1 && !busy;
+  const fmt = (t: number) => new Date(t).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+
   return (
-    <>
-      <div ref={wrapRef} className="jv-dock"
-        style={{ left: pos.x, top: pos.y }}
-        onPointerDown={e => {
-          drag.start();
-          moved.current = false;
-          lastPtr.current = { x: e.clientX, y: e.clientY };
-          transition('dragging');
-        }}
-        onPointerMove={e => {
-          if (drag.dragging) {
-            const p = lastPtr.current;
-            if (p && (Math.abs(e.clientX - p.x) > 4 || Math.abs(e.clientY - p.y) > 4)) moved.current = true;
-            drag.move(e.clientX, e.clientY);
-          }
-        }}
-        onPointerUp={() => { drag.end(); transition(open ? 'open' : 'idle'); }}
-        onPointerLeave={() => { drag.end(); if (!open) transition('idle'); }}
-        data-state={state}>
-        {/* FAB (ring + mascot) — NOT the panel; dragging can't fight the chat. */}
-        <button
-          className={`jv-fab ${open ? 'jv-fab-open' : ''}`}
-          aria-label={open ? 'Κλείσιμο JARVIS' : 'Άνοιγμα JARVIS'}
-          aria-expanded={open}
-          onMouseEnter={() => { if (!open && !drag.dragging) transition('hover'); }}
-          onMouseLeave={() => { if (!open && !drag.dragging) transition('idle'); }}
-          onClick={toggle}
-          style={{ cursor: drag.dragging ? 'grabbing' : 'grab' }}>
-          <JarvisRing state={state} pulse={pulse} />
-          <div className="jv-fab-inner">
-            <JarvisMascot gaze={gaze} blink={blink} state={state} />
-          </div>
-        </button>
-      </div>
+    <div className="jv-root" data-route={route} data-expr={expr}>
+      <button
+        ref={launcherRef}
+        type="button"
+        className="jv-launcher"
+        aria-label="Άνοιγμα AI ενεργειακού συμβούλου"
+        aria-expanded={open}
+        aria-controls={mounted ? panelId : undefined}
+        data-open={open}
+        tabIndex={open ? -1 : 0}
+        onClick={openPanel}
+        onPointerDown={() => mascot.signal({ type: 'press' })}
+        onPointerEnter={e => { if (e.pointerType !== 'touch') mascot.signal({ type: 'hover', on: true }); }}
+        onPointerLeave={() => mascot.signal({ type: 'hover', on: false })}
+        onFocus={e => { if (e.currentTarget.matches(':focus-visible')) mascot.signal({ type: 'hover', on: true }); }}
+        onBlur={() => mascot.signal({ type: 'hover', on: false })}
+      >
+        <JarvisMascot role="launcher" />
+        <span className="jv-tip" aria-hidden="true">Ρώτησε τον AI Σύμβουλο</span>
+      </button>
 
-      {/* Panel — sibling of the dock, always clamped inside the viewport. */}
-      {open && (
-        <div className="jv-panel" role="dialog" aria-label="JARVIS βοηθός"
-          style={panelStyle(pos, FAB.w, FAB.h)}>
-          <div className="jv-panel-head">
-            <div className="jv-panel-avatar">
-              <JarvisMascot gaze={{ x: 0, y: -0.1 }} blink={false} state={state} />
+      {mounted && (
+        <div
+          ref={panelRef}
+          id={panelId}
+          className="jv-panel"
+          role="dialog"
+          aria-label="Hlektrismos AI — ενεργειακός σύμβουλος"
+          aria-hidden={!open}
+          data-open={open}
+          onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); closePanel(true); } }}
+        >
+          <header className="jv-head">
+            <div className="jv-avatar"><JarvisMascot role="avatar" /></div>
+            <div className="jv-title">
+              <div className="jv-brand">
+                Hlektrismos AI
+                <span className="jv-status" data-expr={expr} title={statusText(expr)} />
+                <span className="jv-sr" role="status">{statusText(expr)}</span>
+              </div>
+              <div className="jv-sub">Ο ενεργειακός σου σύμβουλος</div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-bold text-white tracking-tight">JARVIS</div>
-              <div className="text-[11px] text-white/50 capitalize">{statusLabel(state)}</div>
-            </div>
-            <button className="jv-close" onClick={toggle} aria-label="Κλείσιμο">
-              ✕
+            <button type="button" className="jv-hbtn" onClick={() => closePanel(true)} aria-label="Ελαχιστοποίηση" title="Ελαχιστοποίηση">
+              <Minus size={16} aria-hidden="true" />
             </button>
-          </div>
+            <button type="button" className="jv-hbtn" onClick={() => closePanel(false)} aria-label="Κλείσιμο συνομιλίας" title="Κλείσιμο και νέα συνομιλία">
+              <X size={16} aria-hidden="true" />
+            </button>
+          </header>
 
-          <div className="jv-panel-body">
-            {chat.messages.map(m => (
-              <div key={m.id} className={`jv-msg ${m.from === 'user' ? 'jv-msg-user' : 'jv-msg-jarvis'}`}>
-                {m.text}
+          <div className="jv-scroll" ref={bodyRef} role="log" aria-live="polite" aria-relevant="additions" data-lenis-prevent>
+            {msgs.map((m, i) => (
+              <div key={m.id} className={`jv-row jv-row-${m.from === 'user' ? 'user' : 'bot'}`}>
+                <div className={`jv-msg ${m.from === 'user' ? 'jv-msg-user' : 'jv-msg-bot'}`}>{m.text}</div>
+                <time className="jv-time" dateTime={new Date(m.at).toISOString()}>{fmt(m.at)}</time>
+                {m.kind === 'answer' && i === lastIdx && !busy && !chat.inCallback() && (
+                  <div className="jv-next">
+                    <button type="button" className="jv-next-btn" onClick={() => submit(CALLBACK_PHRASE)}>
+                      <PhoneCall size={14} aria-hidden="true" /> Ζήτησε να σε καλέσουμε
+                    </button>
+                    <button type="button" className="jv-next-btn" onClick={showSolutions}>
+                      Δες τις λύσεις μας <ArrowRight size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
-            {(state === 'thinking' || state === 'typing') && (
-              <div className="jv-msg jv-msg-jarvis">
-                <span className="jv-typing"><i /><i /><i /></span>
+            {busy && (
+              <div className="jv-row jv-row-bot" aria-label="Ο σύμβουλος γράφει">
+                <div className="jv-msg jv-msg-bot jv-typing" aria-hidden="true"><i /><i /><i /></div>
+              </div>
+            )}
+            {showQuick && (
+              <div className="jv-quick">
+                {QUICK_ACTIONS.map(({ text, Icon }) => (
+                  <button key={text} type="button" className="jv-quick-btn" onClick={() => submit(text)}>
+                    <span className="jv-quick-ico"><Icon size={16} aria-hidden="true" /></span>
+                    <span>{text}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          {chat.messages.length <= 1 && (
-            <div className="jv-chips">
-              {QUICK_STARTERS.map(q => (
-                <button key={q} type="button" className="jv-chip" onClick={() => submit(q)}>
-                  {q === 'Ζητώ κλήση' ? '📞' : q === 'Ρεύμα' ? '⚡' : q === 'Αέριο' ? '🔥' : '☀️'} {q}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <form className="jv-panel-input" onSubmit={e => { e.preventDefault(); submit(input); }}>
+          <form className="jv-form" onSubmit={e => { e.preventDefault(); submit(input); }}>
             <input
+              ref={inputRef}
               value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Γράψτε μήνυμα…"
-              aria-label="Μήνυμα προς JARVIS"
+              onChange={e => { setInput(e.target.value); mascot.signal({ type: 'typing' }); }}
+              onFocus={() => mascot.signal({ type: 'input-focus', on: true })}
+              onBlur={() => mascot.signal({ type: 'input-focus', on: false })}
+              placeholder="Γράψε την ερώτησή σου…"
+              aria-label="Μήνυμα προς τον AI σύμβουλο"
+              autoComplete="off"
+              enterKeyHint="send"
             />
-            <button type="submit" aria-label="Αποστολή" disabled={!input.trim()}>➤</button>
+            <button type="submit" className="jv-send" aria-label="Αποστολή" disabled={!input.trim() || busy}>
+              <SendHorizontal size={18} aria-hidden="true" />
+            </button>
           </form>
+          <p className="jv-note">Ενδεικτικές πληροφορίες· τιμές και εξοικονόμηση επιβεβαιώνονται από σύμβουλο.</p>
         </div>
       )}
-    </>
+    </div>
   );
-}
-
-const PANEL_W = 320;
-const PANEL_H = 440;
-const PANEL_GAP = 12;
-
-/* The panel is always fully inside the viewport. Horizontal: open on the
-   side of the FAB with room (otherwise pin to the edge). Vertical: open
-   below the FAB when there is room, above it otherwise, clamped top/bottom. */
-function panelStyle(pos: { x: number; y: number }, fabW: number, fabH: number): React.CSSProperties {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const pw = Math.min(PANEL_W, vw - 24);
-  const ph = Math.min(PANEL_H, vh - 140);
-  const fabRight = pos.x + fabW;
-  const fabBottom = pos.y + fabH;
-
-  const fitsLeft = pos.x - PANEL_GAP - pw >= 8;
-  const fitsRight = fabRight + PANEL_GAP + pw <= vw - 8;
-  let left: number;
-  if (fitsLeft && fitsRight) left = pos.x > vw / 2 ? pos.x - PANEL_GAP - pw : fabRight + PANEL_GAP;
-  else if (fitsRight) left = fabRight + PANEL_GAP;
-  else if (fitsLeft) left = pos.x - PANEL_GAP - pw;
-  else left = vw - pw - 8;
-  left = Math.max(8, Math.min(left, vw - pw - 8));
-
-  const fitsAbove = pos.y - PANEL_GAP - ph >= 8;
-  const fitsBelow = fabBottom + PANEL_GAP + ph <= vh - 8;
-  let top: number;
-  if (fitsAbove && fitsBelow) top = pos.y > vh / 2 ? pos.y - PANEL_GAP - ph : fabBottom + PANEL_GAP;
-  else if (fitsAbove) top = pos.y - PANEL_GAP - ph;
-  else if (fitsBelow) top = fabBottom + PANEL_GAP;
-  else top = vh - ph - 8;
-  top = Math.max(8, Math.min(top, vh - ph - 8));
-
-  return {
-    position: 'fixed',
-    left,
-    top,
-    width: pw,
-    height: ph,
-    zIndex: 99,
-  };
-}
-
-function statusLabel(s: JarvisState): string {
-  switch (s) {
-    case 'idle': return 'σε ετοιμότητα';
-    case 'hover': return 'σε ετοιμότητα';
-    case 'dragging': return 'μετακίνηση';
-    case 'opening': return 'ενεργοποίηση…';
-    case 'open': return 'online';
-    case 'typing': return 'γράφει…';
-    case 'thinking': return 'σκέφτεται…';
-    case 'responding': return 'απαντά';
-    case 'success': return 'ολοκληρώθηκε';
-    case 'error': return 'σφάλμα';
-    case 'offline': return 'offline';
-  }
 }

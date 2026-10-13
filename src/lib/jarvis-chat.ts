@@ -7,13 +7,17 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from './supabase';
+import type { ChatSignal } from '@/components/jarvis/types';
 
-export type JarvisMessage = { id: number; from: 'jarvis' | 'user'; text: string };
+/** kind: 'answer' marks a reply that came from the AI backend (vs. scripted flow steps). */
+export type JarvisMessage = { id: number; from: 'jarvis' | 'user'; text: string; at: number; kind?: 'answer' };
 export type JarvisVisitor = { name?: string; phone?: string; email?: string; needs?: string };
 
 type CallbackStep = 'idle' | 'age' | 'name' | 'phone' | 'email' | 'confirm' | 'done';
 
-const GREETING = 'Γεια σας! Είμαι ο JARVIS. Πώς μπορώ να σας βοηθήσω σήμερα; ⚡';
+const GREETING =
+  'Γεια σου! ⚡ Είμαι ο AI ενεργειακός σου σύμβουλος.\n' +
+  'Πώς μπορώ να σε βοηθήσω να βρεις την κατάλληλη ενεργειακή λύση και να εξοικονομήσεις χρήματα;';
 const EMAIL_RE = /[\w.'+-]+@[\w-]+\.\w{2,}/;
 const PHONE_RE = /(?:\+?30[ -]?)?(69\d[ -]?\d{3}[ -]?\d{4}|2\d{2}[ -]?\d{3}[ -]?\d{4}|[2-69]\d{3}[ -]?\d{4})/;
 const AGE_CONSENT_PROMPT =
@@ -23,10 +27,13 @@ const YES_RE = /^(ναι|ναί|ok|οκ|ωραία|συμφωνώ|βεβα[ίι]
 const CALLBACK_INTENT =
   /(ζητ[ώάω] κλ[ήη]ση|κλ[ήη]ση (?:από )?σ[ύυ]μβουλο|call(?:back)?|callback|τηλεφων[ήη]στε με|πάρτε με τηλέφωνο|να με καλ[έε]σετε|να με π[άα]ρετε)/i;
 
-export function useJarvisChat() {
-  const [messages, setMessages] = useState<JarvisMessage[]>([
-    { id: 0, from: 'jarvis', text: GREETING },
+export function useJarvisChat(onSignal?: (s: ChatSignal) => void) {
+  const [messages, setMessages] = useState<JarvisMessage[]>(() => [
+    { id: 0, from: 'jarvis', text: GREETING, at: Date.now() },
   ]);
+  const signalRef = useRef(onSignal);
+  signalRef.current = onSignal;
+  const emit = useCallback((s: ChatSignal) => signalRef.current?.(s), []);
   const msgRef = useRef<JarvisMessage[]>(messages);
   const idRef = useRef(1);
   const visitorRef = useRef<JarvisVisitor>({});
@@ -34,8 +41,8 @@ export function useJarvisChat() {
   const cbStep = useRef<CallbackStep>('idle');
   const cbDraft = useRef<JarvisVisitor>({});
 
-  const push = useCallback((from: JarvisMessage['from'], text: string) => {
-    const next: JarvisMessage = { id: idRef.current++, from, text };
+  const push = useCallback((from: JarvisMessage['from'], text: string, kind?: JarvisMessage['kind']) => {
+    const next: JarvisMessage = { id: idRef.current++, from, text, at: Date.now(), ...(kind ? { kind } : {}) };
     msgRef.current = [...msgRef.current, next];
     setMessages(msgRef.current);
   }, []);
@@ -90,7 +97,7 @@ export function useJarvisChat() {
 
     if (step === 'phone') {
       const phone = text.match(PHONE_RE);
-      if (!phone) return 'Μπορείτε να μου δώσετε έναν έγκυρο αριθμό τηλεφώνου;';
+      if (!phone) { emit({ type: 'clarify' }); return 'Μπορείτε να μου δώσετε έναν έγκυρο αριθμό τηλεφώνου;'; }
       cbDraft.current = { ...cbDraft.current, phone: phone[1] };
       cbStep.current = 'email';
       return 'Τέλεια! Και ένα email για επιβεβαίωση;';
@@ -98,7 +105,7 @@ export function useJarvisChat() {
 
     if (step === 'email') {
       const email = text.match(EMAIL_RE);
-      if (!email) return 'Μπορείτε να μου δώσετε ένα έγκυρο email (π.χ. name@email.com);';
+      if (!email) { emit({ type: 'clarify' }); return 'Μπορείτε να μου δώσετε ένα έγκυρο email (π.χ. name@email.com);'; }
       cbDraft.current = { ...cbDraft.current, email: email[0] };
       cbStep.current = 'confirm';
       return `Έτσι θα σας καλέσουμε:\n👤 ${cbDraft.current.name}\n📞 ${cbDraft.current.phone}\n📧 ${email[0]}\n\nΘέλετε να συνεχίσουμε;`;
@@ -115,6 +122,7 @@ export function useJarvisChat() {
       visitorRef.current = { ...visitorRef.current, ...cbDraft.current };
       const { name, phone, email } = cbDraft.current;
       try {
+        emit({ type: 'request-start', purpose: 'callback' });
         const { data, error } = await supabase.functions.invoke('chat', {
           body: {
             messages: [{ role: 'user', content: 'Επιβεβαίωση κλήσης' }],
@@ -123,14 +131,17 @@ export function useJarvisChat() {
           },
         });
         if (error) throw error;
+        // Success is only what the backend says: it replies callbackConfirmed:true once the lead is stored.
+        emit({ type: data?.callbackConfirmed === true ? 'callback-success' : 'callback-unconfirmed' });
         return data?.reply || `Καταχωρήθηκε! Θα σας καλέσουμε στο ${phone} σύντομα. Ευχαριστούμε!`;
       } catch {
+        emit({ type: 'callback-unconfirmed' });
         return `Καταχωρήθηκε! Ένας σύμβουλος θα σας καλέσει στο ${phone} (${name || 'φίλε μου'}${email ? ` · ${email}` : ''}) το συντομότερο δυνατό. Ευχαριστούμε!`;
       }
     }
 
     return null;
-  }, [absorbVisitor]);
+  }, [absorbVisitor, emit]);
 
   const send = useCallback(async (text: string): Promise<string> => {
     const trimmed = text.trim();
@@ -140,6 +151,7 @@ export function useJarvisChat() {
     if (!cbMode.current && CALLBACK_INTENT.test(trimmed)) {
       cbMode.current = true;
       cbStep.current = 'age';
+      emit({ type: 'callback-open' });
       return `Τέλεια! Ένας εξειδικευμένος σύμβουλος θα σας καλέσει. ${AGE_CONSENT_PROMPT}`;
     }
 
@@ -153,6 +165,7 @@ export function useJarvisChat() {
       content: m.text,
     }));
 
+    emit({ type: 'request-start', purpose: 'chat' });
     const { data, error } = await supabase.functions.invoke('chat', {
       body: { messages: conv, visitorInfo: visitorRef.current },
     });
@@ -160,7 +173,7 @@ export function useJarvisChat() {
     const reply = typeof data?.reply === 'string' && data.reply.trim() ? data.reply : null;
     if (!reply) throw new Error('Empty reply from chat service');
     return reply;
-  }, [absorbVisitor, push, runCallbackFlow]);
+  }, [absorbVisitor, emit, push, runCallbackFlow]);
 
   const reset = useCallback(() => {
     msgRef.current = [];
@@ -169,10 +182,13 @@ export function useJarvisChat() {
     cbStep.current = 'idle';
     cbDraft.current = {};
     visitorRef.current = {};
-    const next: JarvisMessage = { id: idRef.current++, from: 'jarvis', text: GREETING };
+    const next: JarvisMessage = { id: idRef.current++, from: 'jarvis', text: GREETING, at: Date.now() };
     msgRef.current = [next];
     setMessages(msgRef.current);
   }, []);
 
-  return { messages, push, send, reset, visitor: visitorRef };
+  /** True while the callback (age → name → phone → email → confirm) flow is mid-way. */
+  const inCallback = useCallback(() => cbMode.current && cbStep.current !== 'done', []);
+
+  return { messages, push, send, reset, inCallback, visitor: visitorRef };
 }

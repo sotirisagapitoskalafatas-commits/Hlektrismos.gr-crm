@@ -58,7 +58,7 @@ Severity: Critical / High / Medium / Low / Info. Status: confirmed, suspected-li
 | `accept-offer`, `send-offer` | Signed `t=` token; GET shows confirm page, POST performs the action | S-06 |
 | `vapi-webhook` | Requires `x-vapi-secret` = `VAPI_WEBHOOK_SECRET` (fails closed) | S-03 |
 | `receive-lead-webhook` | Constant-time secret compare | S-03 |
-| `send-email`, `fetch-emails`, `autonomous-tariff-scraper`, `scrape-program-details`, `sync-market-tariffs`, `sync-green-tariffs`, `generate-embedding`, `ask-market-rag` | `requireStaff(req)` after CORS preflight. pg_cron still works (guard accepts the service-role key) | S-03, S-04 |
+| `send-email`, `fetch-emails`, `autonomous-tariff-scraper`, `scrape-program-details`, `sync-market-tariffs`, `sync-green-tariffs`, `generate-embedding`, `ask-market-rag` | `requireStaff(req)` after CORS preflight. **ERRATUM (2026-10-14): not true for `sync-green-tariffs`** — the `monthly-tariff-sync` cron authenticates with the anon key, which the guard rejects, so the monthly sync would stop once deployed. Re-point the cron first: `docs/audit/proposed/PROPOSED_cron_repoint_and_pause.sql`. The other cron jobs use the service-role key and are unaffected | S-03, S-04 |
 | `send-lead-confirmation` | Escapes/limits `first_name`, `service` | S-07 |
 | `src/lib/escape-html.ts` (new), `OfferModal.tsx`, `DocumentGenerator.tsx` | Escape all lead/tariff values before HTML rendering | S-05 |
 | `src/lib/__tests__/escape-html.test.mjs` (new) | Regression test (2 passing) | S-05 |

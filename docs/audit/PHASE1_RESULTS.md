@@ -18,7 +18,7 @@ No claim in this document means "production is secure".
 | `npm run build` | passes |
 | `npm audit --omit=dev --audit-level=high` | **0 vulnerabilities** (after `npm audit fix`: the lockfile changed broadly — ~900 lines of transitive bumps; build, tests and gate re-verified after it) |
 | Edge function syntax (esbuild) | all edited functions parse; **not runtime-tested** (no Deno) |
-| CI | workflow added (`.github/workflows/ci.yml`); **has not run on GitHub yet** — first run happens on the PR |
+| CI | workflow written and parked at `docs/ci/ci.yml` — the push was rejected because the GitHub token here lacks the `workflow` scope. **CI is NOT active yet.** To enable: `gh auth refresh -s workflow`, then `mkdir -p .github/workflows && git mv docs/ci/ci.yml .github/workflows/ci.yml`, commit, push. Its steps were each run locally (tests, gate, syntax, build, audit) with the results above |
 
 ## Findings and what was done
 | ID | Sev | Finding | Status after Phase 1 | How verified |

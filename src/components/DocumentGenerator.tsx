@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, Download, Eye, Plus, Trash2, Pencil, FileDown, Save, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { escapeHtml } from '@/lib/escape-html';
 
 type DocTemplate = {
   id: string;
@@ -350,7 +351,7 @@ export default function DocumentGenerator({ lead, toast, setToast }: {
 
     let result = rawBody;
     for (const [key, value] of Object.entries(replacements)) {
-      result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
+      result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), () => escapeHtml(value));
     }
     return result;
   };
@@ -486,7 +487,7 @@ ${filledBody}
       <html lang="el">
       <head>
         <meta charset="UTF-8">
-        <title>${subject}</title>
+        <title>${escapeHtml(subject)}</title>
         <style>
           body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 20mm 18mm 25mm 18mm; color: #1f2937; font-size: 12px; line-height: 1.5; }
           ${docStyles}

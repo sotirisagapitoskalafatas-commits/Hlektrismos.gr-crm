@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff } from "../_shared/guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,6 +69,10 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Staff-only (audit fix): the public anon key must not be able to trigger this.
+  const denied = await requireStaff(req);
+  if (denied) return denied;
 
   const startTime = Date.now();
 

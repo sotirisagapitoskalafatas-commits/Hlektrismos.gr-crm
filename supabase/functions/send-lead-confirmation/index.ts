@@ -115,7 +115,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, first_name, service } = await req.json();
+    const { email, first_name, service: rawService } = await req.json();
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       return new Response(JSON.stringify({ ok: false, error: "Invalid email" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -162,7 +162,12 @@ serve(async (req) => {
     const fromLabel = cfg.from_name || "Hlektrismos.gr";
     const useTls = smtpPort === 465;
 
-    const name = (first_name || lead.first_name || email.split("@")[0]).toString().slice(0, 60);
+    // Audit fix: user-supplied values are escaped (HTML injection / phishing via our domain) and
+    // stripped of CR/LF; `service` is also length-limited.
+    const esc = (v: unknown) => String(v ?? "").replace(/[\r\n]+/g, " ").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+    const name = esc((first_name || lead.first_name || email.split("@")[0]).toString().slice(0, 60));
+    const service = esc(rawService).slice(0, 60);
     const serviceLine = service ? ` για την υπηρεσία <strong>${service}</strong>` : "";
 
     const subject = "Λάβαμε το αίτημά σου — Hlektrismos.gr";

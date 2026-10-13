@@ -34,3 +34,12 @@ select p.id, p.is_active, p.role from public.profiles p order by p.role;
 
 -- 8) Auth hardening hints
 select count(*) filter (where email_confirmed_at is null) as unconfirmed_users, count(*) as users from auth.users;
+
+-- 9) (added 2026-10-14) Generic SQL-execution RPC outside Git? campaign-scheduler calls rpc(exec_sql) but no migration defines it.
+select p.proname, pg_get_function_identity_arguments(p.oid) args, p.prosecdef as security_definer, has_function_privilege('anon', p.oid, 'execute') as anon_can_execute, has_function_privilege('authenticated', p.oid, 'execute') as authenticated_can_execute from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname ~* '(exec|run).*sql|sql.*exec';
+
+-- 10) Active scheduled jobs (names and schedules only)
+select jobid, jobname, schedule, active from cron.job order by jobname;
+
+-- 11) RPCs the anonymous role can execute
+select p.proname, pg_get_function_identity_arguments(p.oid) args, p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') order by 1;

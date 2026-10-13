@@ -1,10 +1,10 @@
--- AUDIT HARDENING (2026-10-13) — NOT YET APPLIED. Review, test on a staging copy, then apply.
--- Rollback: see the "ROLLBACK" block at the bottom (re-creates the previous permissive policies).
--- Scope: only objects whose permissive policies were confirmed in migration source and never
--- replaced by a later migration. Idempotent and safe to re-run.
+-- PROPOSED (revision 2, 2026-10-14) — NOT APPLIED. Staging first; owner approval required for production.
+-- Changes vs revision 1: crm_integrations is now ADMIN-ONLY (revision 1 allowed every active staff member);
+-- non-admins get a safe status view with no config/secret column. crm_emails keeps staff-wide access ONLY as an
+-- interim step: it must be scoped by lead ownership/team once the ownership model is agreed (Phase 1/2).
+-- Idempotent. Verify with docs/audit/audit-rls-readonly.sql before and after.
 
--- 1) crm_emails — customer correspondence was readable by the anonymous role (the public anon key
---    ships in every browser bundle) and writable by any signed-in user.
+-- 1) crm_emails: remove anonymous read and the "any authenticated user" policies.
 do $$ begin
   if to_regclass('public.crm_emails') is not null then
     drop policy if exists "crm_emails_select_anon" on public.crm_emails;
@@ -14,24 +14,33 @@ do $$ begin
     drop policy if exists "crm_emails_delete" on public.crm_emails;
     drop policy if exists "staff read crm_emails" on public.crm_emails;
     drop policy if exists "staff write crm_emails" on public.crm_emails;
+    -- INTERIM: active staff. TODO(Phase 2): restrict to owner/team of the linked lead; admin/manager all.
     create policy "staff read crm_emails" on public.crm_emails for select to authenticated using (public.is_staff());
     create policy "staff write crm_emails" on public.crm_emails for all to authenticated
       using (public.is_staff()) with check (public.is_staff());
   end if;
 end $$;
 
--- 2) crm_integrations — was `FOR ALL TO public USING (true)`: anonymous read AND write of integration config.
+-- 2) crm_integrations: ADMIN ONLY (config jsonb may hold tokens).
 do $$ begin
   if to_regclass('public.crm_integrations') is not null then
     drop policy if exists "authenticated can manage integrations" on public.crm_integrations;
     drop policy if exists "staff manage crm_integrations" on public.crm_integrations;
-    create policy "staff manage crm_integrations" on public.crm_integrations for all to authenticated
-      using (public.is_staff()) with check (public.is_staff());
+    drop policy if exists "admin manage crm_integrations" on public.crm_integrations;
+    create policy "admin manage crm_integrations" on public.crm_integrations for all to authenticated
+      using (public.is_role('admin')) with check (public.is_role('admin'));
   end if;
 end $$;
 
--- 3) Defense in depth: the anonymous role never needs to read, change or delete these tables
---    (public form submissions go through insert_website_lead / the `chat` edge function).
+-- Safe status for everyone else: no config column. The view runs with owner rights by design and exposes
+-- only non-secret columns. CHECK FIRST that non-admin screens read this view, not the table, or they will show empty lists.
+create or replace view public.crm_integrations_status as
+  select id, name, connected, updated_at from public.crm_integrations;
+revoke all on public.crm_integrations_status from anon, public;
+grant select on public.crm_integrations_status to authenticated;
+
+-- 3) Defense in depth: the anonymous role never needs read/update/delete on these tables
+--    (public intake goes through insert_website_lead / the `chat` function).
 do $$
 declare t text;
 begin
@@ -48,6 +57,7 @@ begin
 end $$;
 
 -- ROLLBACK (manual, only if a legitimate workflow breaks):
+--   drop view if exists public.crm_integrations_status;
 --   create policy "crm_emails_select_anon" on public.crm_emails for select to anon using (true);
 --   create policy "authenticated can manage integrations" on public.crm_integrations for all to public using (true) with check (true);
 --   grant select on public.campaigns, public.campaign_sends, public.voice_calls, public.contact_consent to anon;

@@ -49,7 +49,7 @@ export const SOURCE_FINDINGS: CheckResult[] = [
   { id: 'crm-settings', label: 'Κλειδιά/διαπιστευτήρια στο crm_settings', status: 'action',
     detail: 'Ο Διευθυντής μπορεί να διαβάσει το κλειδί SerpApi και να αλλάξει τα role_permissions απευθείας από τον πίνακα. Διόρθωση: phase2/05 §6. Οι διαχειριστές εξακολουθούν να τα διαβάζουν λόγω του παλιού SettingsPanel.' },
   { id: 'doc-blockers', label: 'Έλεγχος εγγράφων πριν την αλλαγή σταδίου', status: 'action',
-    detail: 'Σήμερα είναι μόνο καθοδήγηση στην εφαρμογή· ο server δεν μπλοκάρει τη μετάβαση. Προγραμματισμένο για το επόμενο PR.' },
+    detail: 'Σήμερα είναι μόνο καθοδήγηση στην εφαρμογή· ο server δεν μπλοκάρει ακόμη τη μετάβαση. Διόρθωση: staged-migrations/phase2/07 (δεν έχει εφαρμοστεί).' },
   { id: 'phase1', label: 'RLS hardening (staged-migrations/phase1)', status: 'unverified',
     detail: 'Γραμμένο και ελεγμένο τοπικά· η εφαρμογή στο staging/production δεν έχει επιβεβαιωθεί. Οι έλεγχοι ανώνυμου επισκέπτη παραπάνω δείχνουν την πραγματική κατάσταση για email/ενσωματώσεις.' },
 ];

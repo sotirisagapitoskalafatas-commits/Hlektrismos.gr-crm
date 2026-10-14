@@ -34,3 +34,18 @@
 - The trash columns can only be changed through these functions (trigger). Every action is written to `activity_log` with the actor; the purge entry keeps ids only, no personal data.
 - Local evidence: `node --test supabase/tests/trash.test.mjs` — 6/6.
 - Apply after 05 (independent, but same review). Rollback: drop the two restrictive policies, the triggers and functions; the added columns can stay (null).
+
+---
+
+# 07 — Server-enforced case workflow (NOT applied)
+
+`07_case_return_and_document_gates.sql` — owner decisions A/B/C of the role addendum.
+
+- **Document gates (trigger on `cases.current_stage`):** a browser write is refused when required documents are missing/rejected (entering «Έλεγχος εγγράφων») or not verified (entering «Καταχώρηση παρόχου», «Ενεργοποίηση», «Ολοκληρώθηκε»). The error carries the list (`hint = document_blockers`, `detail` = JSON) and the app shows it. Requirements and gate levels live in `document_requirements` / `stage_document_gates` (admin-editable), seeded from the app's indicative checklist — **needs business confirmation per provider/service before production**.
+- **Allowed transitions** (`case_stage_transitions`) = the app's matrix, enforced for browser writes.
+- **Override:** `change_case_stage_override` — admin/manager, reason ≥ 10 characters, transition must still be allowed; recorded on the timeline (with the blockers that were skipped) and in `activity_log`.
+- **Επιστροφή για διόρθωση:** `return_case_for_correction` — Back Office/admin/manager, only in Back Office stages, reason ≥ 10 + at least one item, to Inside or Field Sales. Same case and stage; responsibility moves to the team owner (managers notified when nobody is assigned); timeline + `app_notifications` + `activity_log`. **Επανυποβολή:** `resubmit_returned_case` by the receiving team/person or admin/manager → back to the Back Office owner, notified. Return columns are writable only through these functions.
+- Edge functions using the service role are not affected by the trigger (trusted server paths).
+- Local evidence: `node --test supabase/tests/case-workflow.test.mjs` — 8/8.
+- **Impact when applied:** cases currently moved forward without uploaded documents will be refused until the documents exist in the CRM or a manager overrides. Plan a short review of open cases first.
+- Rollback: drop triggers `cases_stage_guard`, `cases_return_guard` and the functions; the tables/columns can stay.

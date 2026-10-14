@@ -362,3 +362,8 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-ov-v.is-ok { color: var(--atx-green); }
 .atx-ov-s { font-size: 12.5px; color: var(--atx-muted); line-height: 1.35; }
 @media (max-width: 640px) { .atx-table th, .atx-table td { padding: 9px 10px; } .atx-search { min-width: 0; max-width: none; } }
+
+/* ====================== Case workflow: blockers and returned cases ====================== */
+.atx-blockers { padding: 12px 14px; border-radius: 12px; background: rgba(201, 48, 44, 0.07); color: #9b2420; border: 1px solid rgba(201, 48, 44, 0.18); }
+.atx-returned { margin-bottom: 12px; padding: 14px 16px; border-radius: 14px; background: #fff6e5; color: #6b4300; border: 1px solid #f0d59a; }
+.atx-returned strong { font-size: 15px; }

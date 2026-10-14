@@ -80,9 +80,9 @@ export function WorkflowTab() {
       <div className="atx-panel">
         <div className="atx-card-head"><h2 className="atx-section-title">Κατάσταση κανόνων</h2></div>
         <ul className="m-0 p-0 list-none">
-          <li className="atx-check"><span className="flex-1"><b>Επιτρεπτές μεταβάσεις</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Από τον πίνακα της εφαρμογής· η επιβολή στον server δεν έχει επαληθευτεί ζωντανά.</span></span><span className="atx-tag">Δεν έχει επαληθευτεί ζωντανά</span></li>
-          <li className="atx-check"><span className="flex-1"><b>Απαιτούμενα έγγραφα πριν την αλλαγή σταδίου</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Σήμερα μόνο καθοδήγηση στο UI. Η επιβολή από τον server είναι το επόμενο βήμα.</span></span><span className="atx-tag t-warning">Χρειάζεται ενέργεια</span></li>
-          <li className="atx-check"><span className="flex-1"><b>Επιστροφή για διόρθωση (Back Office)</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Εγκεκριμένο από τον ιδιοκτήτη· υλοποιείται στο επόμενο PR με υποχρεωτική αιτιολογία, audit και ειδοποίηση.</span></span><span className="atx-tag t-warning">Δεν έχει υλοποιηθεί</span></li>
+          <li className="atx-check"><span className="flex-1"><b>Επιτρεπτές μεταβάσεις</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Επιβάλλονται από τη βάση (staged phase2/07, trigger στο στάδιο) — ενεργές μόλις εφαρμοστεί· ως τότε μόνο το UI τις περιορίζει.</span></span><span className="atx-tag">Δεν έχει επαληθευτεί ζωντανά</span></li>
+          <li className="atx-check"><span className="flex-1"><b>Απαιτούμενα έγγραφα πριν την αλλαγή σταδίου</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Η βάση απορρίπτει τη μετάβαση όταν λείπουν (Έλεγχος εγγράφων) ή δεν έχουν ελεγχθεί (Καταχώρηση/Ενεργοποίηση/Ολοκλήρωση). Παράκαμψη μόνο Διαχειριστής/Διευθυντής με αιτιολογία. Οι κανόνες χρειάζονται επιβεβαίωση από την επιχείρηση.</span></span><span className="atx-tag t-warning">Εκκρεμεί εφαρμογή (phase2/07)</span></li>
+          <li className="atx-check"><span className="flex-1"><b>Επιστροφή για διόρθωση (Back Office)</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Υποχρεωτική αιτιολογία και στοιχεία, ίδιο case, ειδοποίηση υπευθύνου, χρονολόγιο και audit· «Επανυποβολή» από την ομάδα που το παρέλαβε.</span></span><span className="atx-tag t-warning">Εκκρεμεί εφαρμογή (phase2/07)</span></li>
         </ul>
       </div>
     </div>

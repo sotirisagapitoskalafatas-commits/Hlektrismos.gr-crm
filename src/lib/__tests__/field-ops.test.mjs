@@ -59,6 +59,10 @@ test('ops queue: only back-office stages; urgent first, then blocked, then oldes
   assert.ok(q.find((x) => x.id === 'blocked').blockers.includes('Λείπει: Ταυτότητα ή διαβατήριο'));
   assert.equal(q.find((x) => x.id === 'act').blockers.length, 0, 'activation is not blocked by documents');
 });
+test('ops queue: a returned case shows who it waits on, first', () => {
+  const q = O.buildOpsQueue([kase('r', { returned_at: at(-1), return_to_team: 'field_sales' })], { r: FULL }, 'me', NOW);
+  assert.equal(q[0].blockers[0], 'Επιστράφηκε για διόρθωση σε Field Sales');
+});
 test('ops queue: received-but-unverified documents are "to check" during document check; owner and overdue follow-up', () => {
   const q = O.buildOpsQueue([kase('k', { back_office_owner: 'me', next_follow_up_at: at(-2) })], { k: [{ category: 'id_card', status: 'received' }] }, 'me', NOW);
   assert.ok(q[0].blockers.includes('Προς έλεγχο: Ταυτότητα ή διαβατήριο'));

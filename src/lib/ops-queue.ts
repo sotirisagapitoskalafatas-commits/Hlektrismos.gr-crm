@@ -13,6 +13,9 @@ export interface OpsCase {
   stage_entered_at: string | null; updated_at: string; next_follow_up_at: string | null;
   next_action: string; next_action_owner_id: string | null; back_office_owner: string | null;
   customer: { full_name: string } | null;
+  /** Returned for correction (phase2/07): the case waits on Inside/Field Sales, not on Back Office. */
+  returned_at?: string | null;
+  return_to_team?: string | null;
 }
 
 export interface OpsItem {
@@ -45,6 +48,7 @@ export function buildOpsQueue(cases: OpsCase[], docsByCase: Record<string, { cat
           if (c.current_stage === 'document_check' && i.required && i.status === 'received') blockers.push(`Προς έλεγχο: ${i.label}`);
         }
       }
+      if (c.returned_at) blockers.unshift(`Επιστράφηκε για διόρθωση σε ${c.return_to_team === 'field_sales' ? 'Field Sales' : 'Inside Sales'}`);
       if (c.next_follow_up_at && new Date(c.next_follow_up_at).getTime() < now) blockers.push('Εκπρόθεσμο follow-up');
       const ownerId = c.next_action_owner_id ?? c.back_office_owner;
       return {

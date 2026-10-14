@@ -116,6 +116,32 @@ const canManageMock = (actor, from, to = from) => !!actor && (MANAGE[actor.role]
 const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.field_sales.id ? 5 : 0);
 // Presentation preview: allowed for the mock admin unless MOCK_PREVIEW=expired.
 const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
+let gatesOn = process.env.MOCK_GATES === 'on'; // GET /__gates?state=on|off
+const GATES = { document_check: 'received', submitted: 'verified', activation: 'verified', completed: 'verified' };
+const ALLOWED = { new: ['contacted', 'lost', 'cancelled'], contacted: ['offer', 'application', 'lost', 'cancelled'], offer: ['application', 'signed', 'lost', 'cancelled'],
+  application: ['signed', 'document_check', 'lost', 'cancelled'], signed: ['document_check', 'lost', 'cancelled'], document_check: ['submitted', 'application', 'lost', 'cancelled'],
+  submitted: ['activation', 'document_check', 'lost', 'cancelled'], activation: ['completed', 'submitted', 'lost', 'cancelled'], lost: ['new'], cancelled: ['new'] };
+const reqsFor = (c) => {
+  const svc = c.service_type ?? 'energy';
+  const l = [{ any: ['id_card', 'identity'], label: 'Ταυτότητα ή διαβατήριο' }];
+  if (svc === 'energy' || svc === 'gas') {
+    l.push(svc === 'gas' ? { any: ['bill_gas', 'bill'], label: 'Λογαριασμός φυσικού αερίου' } : { any: ['bill_electricity', 'bill'], label: 'Λογαριασμός ρεύματος' });
+    l.push({ any: ['e9', 'lease', 'free_use'], label: 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)' });
+  }
+  if (svc === 'solar') { l.push({ any: ['bill_electricity', 'bill'], label: 'Λογαριασμός ρεύματος' }, { any: ['e9', 'property_title'], label: 'Ε9 ή τίτλος ιδιοκτησίας' }); }
+  l.push({ any: ['signed'], label: 'Υπογεγραμμένη σύμβαση / αίτηση' });
+  return l;
+};
+const blockersFor = (caseId, stage) => {
+  const g = GATES[stage]; const c = caseRows.find((x) => x.id === caseId);
+  if (!g || !c) return [];
+  const docs = (TABLES.case_documents ?? []).filter((d) => d.case_id === caseId);
+  return reqsFor(c).flatMap((r) => {
+    const f = docs.filter((d) => r.any.includes(d.category));
+    const st = f.some((d) => d.status === 'verified') ? 'verified' : f.some((d) => d.status !== 'rejected') ? 'received' : f.length ? 'rejected' : 'missing';
+    return st === 'missing' || st === 'rejected' || (g === 'verified' && st !== 'verified') ? [{ label: r.label, status: st === 'received' ? 'unverified' : st }] : [];
+  });
+};
 let previewState = process.env.MOCK_PREVIEW ?? 'on'; // switch at runtime: GET /__preview?state=expired|on
 const previewAllowedMock = (u) => u?.role === 'admin' && previewState !== 'expired';
 
@@ -172,6 +198,7 @@ http.createServer((req, res) => {
     const send = (code, obj, extra = {}) => { res.writeHead(code, { ...cors, ...extra }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
+    if (url.pathname === '/__gates') { gatesOn = url.searchParams.get('state') === 'on'; return send(200, { gatesOn }); }
     if (url.pathname === '/__preview') { previewState = url.searchParams.get('state') ?? 'on'; return send(200, { previewState }); }
 
     if (url.pathname.startsWith('/auth/v1/')) {
@@ -249,6 +276,43 @@ http.createServer((req, res) => {
         table.splice(table.indexOf(row), 1);
         return send(200, { deleted: true, files });
       }
+      // ---- case workflow (mirrors staged-migrations/phase2/07) ----
+      if (name === 'case_document_blockers') return gatesOn ? send(200, blockersFor(json.p_case, json.p_stage)) : send(404, { code: 'PGRST202', message: 'Could not find the function public.case_document_blockers' });
+      if (name === 'change_case_stage_override') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!['admin', 'manager'].includes(u?.role)) return deny('override: not allowed');
+        if (String(json.p_reason ?? '').trim().length < 10) return send(400, { code: '22023', message: 'override: a reason of at least 10 characters is required' });
+        const c = caseRows.find((x) => x.id === json.p_case);
+        if (!(ALLOWED[c.current_stage] ?? []).includes(json.p_stage)) return send(400, { code: 'P0001', message: `stage_transition_not_allowed: ${c.current_stage} -> ${json.p_stage}`, hint: 'transition' });
+        c.current_stage = json.p_stage;
+        TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'stage_override', title: 'Παράκαμψη ελέγχου εγγράφων', description: json.p_reason, user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
+        return send(200, null);
+      }
+      if (name === 'return_case_for_correction') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!['back_office', 'admin', 'manager'].includes(u?.role)) return deny('return: not allowed');
+        if (String(json.p_reason ?? '').trim().length < 10) return send(400, { code: '22023', message: 'return: a reason of at least 10 characters is required' });
+        if (!Array.isArray(json.p_items) || json.p_items.length === 0) return send(400, { code: '22023', message: 'return: at least one missing or incorrect item is required' });
+        const c = caseRows.find((x) => x.id === json.p_case);
+        if (!['application', 'document_check', 'submitted', 'activation'].includes(c.current_stage)) return send(400, { code: 'P0001', message: 'return: only cases in a Back Office stage can be returned' });
+        if (c.returned_at) return send(400, { code: 'P0001', message: 'return: the case is already returned' });
+        const to = json.p_to_team === 'field_sales' ? c.field_sales_owner : c.inside_sales_owner;
+        Object.assign(c, { returned_at: new Date().toISOString(), returned_by: u.id, return_reason: json.p_reason.trim(), return_items: json.p_items, return_to_team: json.p_to_team,
+          return_from_stage: c.current_stage, next_action_owner_id: to, next_action: `Διόρθωση για Back Office: ${json.p_reason.trim()}` });
+        TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'returned', title: 'Επιστροφή για διόρθωση', description: json.p_reason, user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
+        TABLES.notifications.push({ id: crypto.randomUUID(), user_id: to, case_id: c.id, title: 'Επιστροφή για διόρθωση', body: json.p_reason, type: 'returned', link: '', read_at: null, created_at: new Date().toISOString() });
+        return send(200, { to_user: to, to_team: json.p_to_team });
+      }
+      if (name === 'resubmit_returned_case') {
+        log.push({ method: 'RPC', table: name, body: json });
+        const c = caseRows.find((x) => x.id === json.p_case);
+        if (!c?.returned_at) return send(400, { code: 'P0001', message: 'resubmit: the case is not returned' });
+        if (!(['admin', 'manager'].includes(u?.role) || u?.role === c.return_to_team || c.next_action_owner_id === u?.id)) return deny('resubmit: not allowed');
+        Object.assign(c, { returned_at: null, returned_by: null, return_reason: null, return_items: null, return_to_team: null, return_from_stage: null,
+          next_action_owner_id: c.back_office_owner, next_action: 'Επανέλεγχος μετά τη διόρθωση' });
+        TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'resubmitted', title: 'Επανυποβολή στο Back Office', description: json.p_note ?? '', user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
+        return send(200, null);
+      }
       if (name === 'staff_list') {
         if (!u || !MANAGE[u.role]) return deny('staff_list: not allowed');
         const rows = staffRows.filter((r) => u.role !== 'back_office' || r.role === 'back_office')
@@ -321,6 +385,14 @@ http.createServer((req, res) => {
     const tbl = (TABLES[table] ??= []);
     if (req.method === 'PATCH') {
       const hit = applyFilters(tbl, url.searchParams);
+      if (gatesOn && table === 'cases' && json.current_stage) {
+        for (const r of hit) {
+          if (r.current_stage === json.current_stage) continue;
+          if (!(ALLOWED[r.current_stage] ?? []).includes(json.current_stage)) return send(400, { code: 'P0001', message: `stage_transition_not_allowed: ${r.current_stage} -> ${json.current_stage}`, details: null, hint: 'transition' });
+          const b = blockersFor(r.id, json.current_stage);
+          if (b.length) return send(400, { code: 'P0001', message: 'stage_blocked: required documents', details: JSON.stringify(b), hint: 'document_blockers' });
+        }
+      }
       for (const r of hit) Object.assign(r, json);
       return send(200, hit);
     }

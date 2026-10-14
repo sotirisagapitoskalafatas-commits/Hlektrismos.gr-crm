@@ -280,6 +280,89 @@ for (const role of Object.keys(EXPECT)) {
   }
 }
 
+/* ---- 2e. Case workflow: server document gates, override, Back Office return & resubmit ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  await fetch(`${M}/__gates?state=on`);
+  const openCaseNo = async (page, no) => {
+    await click(page, 'Cases', '#shell-rail nav button');
+    await sleep(1200);
+    await page.evaluate((n) => { const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === n && e.offsetParent)[0]; el && el.click(); }, no);
+    await sleep(1600);
+  };
+  // the forward-stage actions under the «Πορεία» stepper
+  const pickStep = (page, label) => page.evaluate((l) => { const b = [...document.querySelectorAll('main button.atx-btn')].find((x) => x.textContent.trim() === l && !x.disabled); b?.click(); return !!b; }, label);
+  const body = (page) => page.evaluate(() => document.body.innerText);
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, sel, v);
+  // 1) Back Office: blocked by the server, sees what is missing, no override
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await openCaseNo(page, 'CS-2026-005'); // «Υπογραφή»
+    const opened = await pickStep(page, 'Έλεγχος εγγράφων');
+    await sleep(900);
+    const t = await body(page);
+    check('Gates: the stage action exists for Back Office', opened);
+    check('Gates: moving to «Έλεγχος εγγράφων» without documents shows the server blockers', t.includes('Δεν μπορεί να προχωρήσει ακόμη') && t.includes('Ταυτότητα ή διαβατήριο — λείπει'));
+    check('Gates: no confirm and no override for Back Office', await page.evaluate(() => ![...document.querySelectorAll('button')].some((b) => ['Επιβεβαίωση', 'Παράκαμψη & μετάβαση'].includes(b.textContent.trim()))));
+    await browser.close();
+  }
+  // 2) Admin: override with a written reason
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await openCaseNo(page, 'CS-2026-005');
+    await pickStep(page, 'Έλεγχος εγγράφων');
+    await sleep(900);
+    const disabled = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Παράκαμψη & μετάβαση')?.disabled);
+    await setVal(page, '#override-reason', 'Ο πάροχος δέχεται τα έγγραφα μέσα στην εβδομάδα');
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Παράκαμψη & μετάβαση')?.click());
+    await sleep(1500);
+    const log = await (await fetch(`${M}/__log`)).json();
+    check('Gates: admin override needs a reason, goes through change_case_stage_override and moves the case', disabled === true
+      && log.some((l) => l.table === 'change_case_stage_override' && l.body.p_stage === 'document_check' && l.body.p_reason.length >= 10)
+      && (await body(page)).includes('με παράκαμψη'));
+    await browser.close();
+  }
+  // 3) Back Office returns CS-2026-006 («Έλεγχος εγγράφων») for correction
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await openCaseNo(page, 'CS-2026-006');
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Επιστροφή για διόρθωση')?.click());
+    await sleep(600);
+    const submitDisabled = await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.includes('Επιστροφή για διόρθωση')).pop()?.disabled);
+    await setVal(page, '#return-reason', 'Λείπει η υπογραφή στη σελίδα 2 και ο λογαριασμός είναι παλιός');
+    await sleep(200);
+    const toField = await page.evaluate(() => [...document.querySelectorAll('[role="radiogroup"][aria-label="Επιστροφή σε"] [role="radio"]')].find((b) => b.getAttribute('aria-checked') === 'true')?.textContent.includes('Field Sales'));
+    await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.includes('Επιστροφή για διόρθωση')).pop()?.click());
+    await sleep(1500);
+    const log = await (await fetch(`${M}/__log`)).json();
+    const r = log.filter((l) => l.table === 'return_case_for_correction').pop();
+    check('Return: needs a reason; missing items preselected; signature → Field Sales by default', submitDisabled === true && toField === true && r?.body?.p_to_team === 'field_sales' && r.body.p_items.length >= 1);
+    check('Return: banner on the case, same stage, no second return', (await body(page)).includes('Επιστράφηκε για διόρθωση → Field Sales')
+      && (await body(page)).includes('Έλεγχος εγγράφων') && !(await page.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Επιστροφή για διόρθωση'))));
+    await click(page, 'Λειτουργίες', '#shell-rail nav button');
+    await sleep(1500);
+    check('Return: Λειτουργίες shows the case waits on Field Sales', (await body(page)).includes('Επιστράφηκε για διόρθωση σε Field Sales'));
+    await browser.close();
+  }
+  // 4) Field Sales resubmits
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'field_sales');
+    await openCaseNo(page, 'CS-2026-006');
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Επανυποβολή στο Back Office'))?.click());
+    await sleep(400);
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Επανυποβολή')?.click());
+    await sleep(1500);
+    const log = await (await fetch(`${M}/__log`)).json();
+    check('Return: the receiving team resubmits to Back Office; banner disappears', log.some((l) => l.table === 'resubmit_returned_case') && !(await page.evaluate(() => !!document.querySelector('[data-returned]'))));
+    await browser.close();
+  }
+  await fetch(`${M}/__gates?state=off`);
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);

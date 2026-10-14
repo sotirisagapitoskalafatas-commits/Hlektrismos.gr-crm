@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import CaptureModal from './CaptureModal';
+import CaseDocuments from '@/components/documents/CaseDocuments';
+import { docLabel } from '@/lib/documents';
 import SignaturePad from './SignaturePad';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import {
-  ACTIVITY_META, CHANNELS, DOC_CATEGORIES, DOC_STATUSES, SERVICES, STAGES,
+  ACTIVITY_META, CHANNELS, DOC_STATUSES, SERVICES, STAGES,
   STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, stageLabel,
 } from '@/lib/roles';
 import type { ActivityType, Stage } from '@/lib/roles';
 import {
   Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, Lead, TimelineEvent,
-  addActivity, addDocument, captureSignature, changeStage, checkInVisit, checkOutVisit,
+  addActivity, captureSignature, changeStage, checkInVisit, checkOutVisit,
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
   fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
@@ -235,99 +236,6 @@ function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
   );
 }
 
-/* ================= Documents ================= */
-function DocumentsTab({ caseId }: { caseId: string }) {
-  const { role } = useAuth();
-  const [items, setItems] = useState<CaseDocument[]>([]);
-  const [category, setCategory] = useState('identity');
-  const [desc, setDesc] = useState('');
-  const [up, setUp] = useState(false);
-  const [captureOpen, setCaptureOpen] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [urls, setUrls] = useState<Record<string, string>>({});
-
-  const loadItems = useCallback(async () => {
-    const docs = await fetchDocuments(caseId);
-    setItems(docs);
-    const resolved: Record<string, string> = {};
-    for (const d of docs) {
-      const u = await getDocumentUrl(d.file_url);
-      if (u) resolved[d.id] = u;
-    }
-    setUrls(resolved);
-  }, [caseId]);
-  useEffect(() => { loadItems(); }, [loadItems]);
-
-  const saveFile = async (f: File) => {
-    setUp(true);
-    const up = await uploadDocumentFile(f);
-    if (up) {
-      await addDocument(caseId, { category, file_name: up.name, file_url: up.path, mime_type: up.mime, size: up.size, description: desc || undefined });
-    }
-    setUp(false);
-    setDesc('');
-    loadItems();
-  };
-
-  const onFile = (f: File | null) => { if (f) saveFile(f); };
-
-  const canVerify = can(role, 'verify_document');
-
-  return (
-    <Card>
-      <CardHeader micro="Documents" title="Έγγραφα"
-        action={can(role, 'add_document')
-          ? <div className="flex items-center gap-2">
-              <Btn onClick={() => setCaptureOpen(true)}><Camera className="w-3.5 h-3.5" /> Κάμερα</Btn>
-              <Btn onClick={() => fileRef.current?.click()}>{up ? <Spinner /> : <Plus className="w-3.5 h-3.5" />} Φόρτωση</Btn>
-            </div>
-          : undefined} />
-
-      {can(role, 'add_document') && (
-        <div className="mb-4 p-3 rounded-xl bg-paper border border-line flex items-center gap-2 flex-wrap">
-          <select className="field !w-44 !py-1.5 text-[13px]" value={category} onChange={e => setCategory(e.target.value)}>
-            {Object.entries(DOC_CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          <input className="field flex-1 !py-1.5 text-[13px] min-w-[160px]" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Σύντομη περιγραφή / σχόλιο…" />
-          <input ref={fileRef} type="file" className="hidden" onChange={e => onFile(e.target.files?.[0] ?? null)} />
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {items.length === 0 && <EmptyState icon={FolderOpen} title="Δεν υπάρχουν έγγραφα" hint="Αντιστοιχήστε έγγραφα στο case." />}
-        {items.map(d => (
-          <div key={d.id} className={`flex items-center gap-3 p-3 rounded-xl border border-line ${d.status === 'verified' ? 'bg-ok-100/40' : d.status === 'rejected' ? 'bg-bad-100/40' : 'bg-paper/50'}`}>
-            <span className="w-7 h-7 rounded-lg bg-white border border-line flex items-center justify-center shrink-0">
-              <FileText className="w-3.5 h-3.5 text-ink/60" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-ink truncate">{d.description || d.file_name}</div>
-              <div className="text-xs text-ink/45">{DOC_CATEGORIES[d.category] ?? d.category} · {fmtDateTime(d.created_at)}</div>
-              {urls[d.id] && (
-                <a href={urls[d.id]} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline inline-block mt-0.5">
-                  Άνοιγμα αρχείου ↗
-                </a>
-              )}
-            </div>
-            <Pill tone={d.status === 'verified' ? 'green' : d.status === 'rejected' ? 'red' : 'amber'}>{DOC_STATUSES[d.status] ?? d.status}</Pill>
-            {canVerify && d.status !== 'verified' && (
-              <Btn variant="ok" onClick={async () => { await setDocumentStatus(d.id, 'verified'); loadItems(); }}>
-                <Check className="w-3.5 h-3.5" />
-              </Btn>
-            )}
-            {canVerify && d.status !== 'rejected' && (
-              <Btn variant="danger" onClick={async () => { await setDocumentStatus(d.id, 'rejected'); loadItems(); }}>
-                Απόρριψη
-              </Btn>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <CaptureModal open={captureOpen} title="Λήψη φωτογραφίας πεδίου" onClose={() => setCaptureOpen(false)} onCapture={saveFile} />
-    </Card>
-  );
-}
 
 /* ================= Visits ================= */
 function VisitsTab({ caseId }: { caseId: string }) {
@@ -594,9 +502,9 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
             <div className="flex gap-1.5 flex-wrap">
               {docs.map(d => (
                 <button key={d.id} onClick={() => setDocumentStatus(d.id, d.status === 'verified' ? 'received' : 'verified').then(() => fetchDocuments(c.id).then(setDocs))}
-                  title={`${DOC_CATEGORIES[d.category] ?? d.category} — ${DOC_STATUSES[d.status] ?? d.status} (κλικ για εναλλαγή)`}
+                  title={`${docLabel(d.category)} — ${DOC_STATUSES[d.status] ?? d.status} (κλικ για εναλλαγή)`}
                   className={`px-2 py-1 rounded-lg border text-[11px] font-mono uppercase transition-colors ${d.status === 'verified' ? 'bg-ok-100 text-ok-600 border-ok-600/20' : d.status === 'rejected' ? 'bg-bad-100 text-bad-600 border-bad-600/20' : 'bg-white border-line text-ink/45'}`}>
-                  {DOC_CATEGORIES[d.category]?.split(' ')[0] ?? d.category}
+                  {docLabel(d.category)}
                 </button>
               ))}
               {docs.length === 0 && <span className="text-xs text-ink/40">Δεν έχουν ανέβει έγγραφα ακόμα.</span>}
@@ -906,7 +814,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
 
       {tab === 'timeline' && <TimelineTab caseId={c.id} load={reload} />}
       {tab === 'followups' && <FollowUpsTab caseId={c.id} load={reload} />}
-      {tab === 'docs' && <DocumentsTab caseId={c.id} />}
+      {tab === 'docs' && <CaseDocuments c={c} />}
       {tab === 'visits' && <VisitsTab caseId={c.id} />}
       {tab === 'offers' && <OffersTab caseId={c.id} />}
       {tab === 'signatures' && <SignaturesTab caseId={c.id} />}

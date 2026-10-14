@@ -15,7 +15,7 @@ import {
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, ChevronDown, ChevronRight, CircleHelp, Download, FileText, LogOut,
+  Bell, ChevronDown, Sparkles, ChevronRight, CircleHelp, Download, FileText, LogOut,
   Menu, Plus, Search, SlidersHorizontal, UserCircle, UsersRound, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';
@@ -23,6 +23,7 @@ import TabletShell from '@/components/shells/TabletShell';
 import DesktopShell from '@/components/shells/DesktopShell';
 import QuickAdd from './QuickAdd';
 import '@/styles/atlas-ux.css';
+import CrmAssistant from '@/components/assistant/CrmAssistant';
 import RoleSwitcher from './RoleSwitcher';
 
 import HomePage from './HomePage';
@@ -181,8 +182,8 @@ function Drawer({ open, onClose }: {
 }
 
 /* ---------------- Header (shared across shells) ---------------- */
-function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
-  onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void;
+function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
+  onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void; onOpenAssistant: () => void;
 }) {
   const { role, profile, user } = useAuth();
   const { view, openCase, go } = useNav();
@@ -236,6 +237,12 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
       </button>
 
       <QuickAdd />
+
+      <button onClick={onOpenAssistant} title="Atlas AI — βοηθός CRM" aria-label="Atlas AI βοηθός"
+        className="flex items-center gap-1.5 h-9 px-2.5 rounded-[10px] bg-[rgba(22,119,255,0.1)] text-[#1677ff] text-[13px] font-semibold hover:bg-[rgba(22,119,255,0.16)] transition-colors">
+        <Sparkles className="w-4 h-4" aria-hidden="true" />
+        <span className="hidden xl:inline">Atlas AI</span>
+      </button>
 
       {showInstall && (
         <button onClick={() => void install()}
@@ -295,11 +302,11 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
             style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </span>
-          <span className="hidden md:block text-left">
+          <span className="hidden lg:block text-left">
             <span className="block text-[13px] font-semibold text-ink leading-tight max-w-[140px] truncate">{profile?.full_name ?? 'Χρήστης'}</span>
             <span className="block micro text-ink/40 leading-tight">{roleLabel(role)}{sim ? ' · sim' : ''}</span>
           </span>
-          <ChevronDown className="hidden md:block w-3.5 h-3.5 text-ink/40" />
+          <ChevronDown className="hidden lg:block w-3.5 h-3.5 text-ink/40" />
         </button>
         {acctOpen && (
           <>
@@ -516,6 +523,7 @@ export default function AppShell() {
   const isDesktop = device === 'DESKTOP';
   const [drawer, setDrawer] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const counts = useShellCounts();
 
   useEffect(() => {
@@ -536,6 +544,8 @@ export default function AppShell() {
   }, [drawer]);
 
   useEffect(() => { void cacheAppShell(); }, []);
+  // Portaled dialogs render under <body>, outside .atx-shell; this class lets them share the CRM look.
+  useEffect(() => { document.body.classList.add('atx-app'); return () => document.body.classList.remove('atx-app'); }, []);
 
   const onSignOut = () => { signOut(); window.location.hash = '/'; };
 
@@ -571,7 +581,7 @@ export default function AppShell() {
       {isDesktop && <DesktopShell counts={counts} />}
       {isTablet && <TabletShell counts={counts} />}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
-        <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} />
+        <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} onOpenAssistant={() => setAssistantOpen(true)} />
         <main className={`flex-1 overflow-y-auto px-4 sm:px-7 pt-6 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-10'}`}>
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>
@@ -589,6 +599,7 @@ export default function AppShell() {
         <Drawer open={drawer} onClose={() => setDrawer(false)} />
       )}
       <Palette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <CrmAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>
   );
 }

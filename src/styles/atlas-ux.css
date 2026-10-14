@@ -4,17 +4,23 @@
    sentence-case labels, subtle borders, restrained shadows, visible focus. */
 
 .atx-shell {
-  --atx-bg: #f5f5f7;
+  /* Reference tokens (approved concept image). Use these variables, never raw hex, in new UI. */
+  --atx-navy: #0b1f3a;
+  --atx-navy-2: #12294a;
+  --atx-bg: #f5f7fa;
   --atx-surface: #ffffff;
-  --atx-ink: #1d1d1f;
-  --atx-muted: #6e6e73;
-  --atx-faint: #86868b;
-  --atx-line: rgba(0, 0, 0, 0.08);
-  --atx-blue: #0066cc;
-  --atx-blue-soft: rgba(0, 102, 204, 0.09);
-  --atx-red: #c9302c;
+  --atx-ink: #14233b;
+  --atx-muted: #64748b;
+  --atx-faint: #8895a7;
+  --atx-line: rgba(20, 35, 59, 0.09);
+  --atx-blue: #1677ff;
+  --atx-blue-hover: #0f63d9;
+  --atx-blue-soft: rgba(22, 119, 255, 0.1);
+  --atx-red: #d1342f;
   --atx-amber: #b25e09;
   --atx-green: #1f7a3d;
+  --atx-radius: 16px;
+  --atx-radius-sm: 10px;
   font-family: 'Inter', 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--atx-ink);
   -webkit-font-smoothing: antialiased;
@@ -53,52 +59,40 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-/* ---- sidebar: light, translucent, one blue accent ---- */
+/* ---- sidebar: dark navy, compact, solid blue active state (matches the approved reference) ---- */
 .atx-shell .glass-nav,
 .atx-shell .glass-drawer {
-  background: rgba(255, 255, 255, 0.86);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border-right: 1px solid var(--atx-line);
+  background: var(--atx-navy);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: none;
 }
-/* existing markup uses white text/borders for the old dark rail — remap, do not rewrite 3 duplicated components */
-.atx-shell .glass-nav [class*="text-white/"],
-.atx-shell .glass-drawer [class*="text-white/"] { color: var(--atx-muted) !important; }
-.atx-shell .glass-nav .text-white,
-.atx-shell .glass-drawer .text-white { color: var(--atx-ink) !important; }
 .atx-shell .glass-nav [class*="border-white"],
-.atx-shell .glass-drawer [class*="border-white"] { border-color: var(--atx-line) !important; }
-.atx-shell .glass-nav [class*="hover:bg-white"]:hover,
-.atx-shell .glass-drawer [class*="hover:bg-white"]:hover { background: rgba(0, 0, 0, 0.05) !important; color: var(--atx-ink) !important; }
+.atx-shell .glass-drawer [class*="border-white"] { border-color: rgba(255, 255, 255, 0.08) !important; }
 .atx-shell .glass-nav .nav-leaf,
-.atx-shell .glass-drawer .nav-leaf { color: #3a3a3c; border-radius: 10px; padding: 8px 11px; font-size: 14px; font-weight: 500; }
+.atx-shell .glass-drawer .nav-leaf { color: rgba(255, 255, 255, 0.78); border-radius: 10px; padding: 9px 12px; font-size: 14px; font-weight: 500; }
 .atx-shell .glass-nav .nav-leaf:hover,
-.atx-shell .glass-drawer .nav-leaf:hover { background: rgba(0, 0, 0, 0.05); color: var(--atx-ink); box-shadow: none; }
+.atx-shell .glass-drawer .nav-leaf:hover { background: rgba(255, 255, 255, 0.07); color: #fff; box-shadow: none; }
 .atx-shell .glass-nav .nav-leaf.nav-active,
 .atx-shell .glass-drawer .nav-leaf.nav-active,
 .atx-shell .glass-nav .nav-leaf.nav-atlas-active,
 .atx-shell .glass-drawer .nav-leaf.nav-atlas-active {
-  background: var(--atx-blue-soft) !important;
-  color: var(--atx-blue) !important;
+  background: var(--atx-blue) !important;
+  color: #fff !important;
   box-shadow: none !important;
   font-weight: 600;
 }
 .atx-shell .glass-nav .nav-leaf.nav-active svg,
 .atx-shell .glass-drawer .nav-leaf.nav-active svg,
 .atx-shell .glass-nav .nav-leaf.nav-atlas-active svg,
-.atx-shell .glass-drawer .nav-leaf.nav-atlas-active svg { color: var(--atx-blue) !important; }
-.atx-shell .nav-atlas, .atx-shell .glass-nav .nav-atlas, .atx-shell .glass-drawer .nav-atlas { color: #3a3a3c; animation: none; }
+.atx-shell .glass-drawer .nav-leaf.nav-atlas-active svg { color: #fff !important; }
+.atx-shell .nav-atlas, .atx-shell .glass-nav .nav-atlas, .atx-shell .glass-drawer .nav-atlas { color: rgba(255, 255, 255, 0.78); animation: none; }
 .atx-shell .glass-nav .nav-leaf .dot, .atx-shell .glass-drawer .nav-leaf .dot { display: none; } /* maturity dots are noise for staff */
 .atx-shell .glass-nav .nav-leaf .nav-dot, .atx-shell .glass-drawer .nav-leaf .nav-dot { display: none; }
-.atx-shell .nav-badge {
-  background: var(--atx-blue-soft) !important;
-  color: var(--atx-blue) !important;
-  font-family: inherit;
-  font-weight: 600;
-}
+.atx-shell .nav-badge { background: rgba(255, 255, 255, 0.16) !important; color: #fff !important; font-family: inherit; font-weight: 600; }
+.atx-shell .nav-leaf.nav-active .nav-badge { background: rgba(255, 255, 255, 0.28) !important; }
 .atx-shell .glass-nav nav .nav-section-caption,
-.atx-shell .glass-drawer nav .nav-section-caption { color: var(--atx-faint) !important; font-size: 12px; font-weight: 600; padding: 0 11px; margin-bottom: 4px; }
+.atx-shell .glass-drawer nav .nav-section-caption { color: rgba(255, 255, 255, 0.45) !important; font-size: 12px; font-weight: 600; padding: 0 12px; margin-bottom: 4px; }
+.atx-shell .glass-nav :focus-visible, .atx-shell .glass-drawer :focus-visible { outline-color: #fff; }
 
 /* ---- header ---- */
 .atx-shell header {
@@ -161,7 +155,7 @@
 
 .atx-btn { height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13.5px; font-weight: 600; border: 1px solid transparent; cursor: pointer; white-space: nowrap; transition: background .15s ease, opacity .15s ease; }
 .atx-btn-primary { background: var(--atx-blue); color: #fff; }
-.atx-btn-primary:hover:not(:disabled) { background: #0058b0; }
+.atx-btn-primary:hover:not(:disabled) { background: var(--atx-blue-hover); }
 .atx-btn-quiet { background: rgba(0, 0, 0, 0.05); color: var(--atx-ink); }
 .atx-btn-quiet:hover:not(:disabled) { background: rgba(0, 0, 0, 0.09); }
 .atx-btn-icon { width: 34px; padding: 0; }
@@ -177,7 +171,7 @@
 .atx-tab { height: 30px; padding: 0 14px; border-radius: 9px; border: 0; background: transparent; font-size: 13.5px; font-weight: 500; color: var(--atx-muted); cursor: pointer; white-space: nowrap; }
 .atx-tab[aria-selected="true"] { background: #fff; color: var(--atx-ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .atx-chip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--atx-line); background: #fff; font-size: 13px; color: var(--atx-muted); cursor: pointer; }
-.atx-chip[aria-pressed="true"] { background: var(--atx-blue-soft); border-color: rgba(0, 102, 204, 0.3); color: var(--atx-blue); font-weight: 600; }
+.atx-chip[aria-pressed="true"] { background: var(--atx-blue-soft); border-color: rgba(22, 119, 255, 0.3); color: var(--atx-blue); font-weight: 600; }
 
 .atx-empty { text-align: center; padding: 44px 20px; color: var(--atx-muted); }
 .atx-empty strong { display: block; color: var(--atx-ink); font-size: 16px; margin-bottom: 4px; }
@@ -197,3 +191,15 @@
   .atx-stat, .atx-btn { transition: none; }
   .atx-skeleton { animation: none; }
 }
+
+/* ---- dialogs portaled to <body> while the CRM is open: opaque, readable surfaces ---- */
+body.atx-app > .fixed.inset-0 > .card {
+  background: #fff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(11, 31, 58, 0.22);
+  font-family: 'Inter', 'IBM Plex Sans', system-ui, sans-serif;
+  color: #14233b;
+}
+body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: #64748b; }

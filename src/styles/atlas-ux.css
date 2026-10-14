@@ -3,7 +3,7 @@
    Principles: neutral background, white surfaces, one blue accent, Inter (has Greek glyphs; the mono face does not),
    sentence-case labels, subtle borders, restrained shadows, visible focus. */
 
-.atx-shell {
+.atx-shell, body.atx-app {
   /* Reference tokens (approved concept image). Use these variables, never raw hex, in new UI. */
   --atx-navy: #0b1f3a;
   --atx-navy-2: #12294a;
@@ -203,3 +203,26 @@ body.atx-app > .fixed.inset-0 > .card {
   color: #14233b;
 }
 body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: #64748b; }
+
+/* ---- progress stepper (case journey) ---- */
+.atx-stepper { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.atx-step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; min-width: 0; }
+.atx-step::before { content: ''; position: absolute; top: 13px; left: calc(-50% + 16px); right: calc(50% + 16px); height: 2px; background: var(--atx-line); }
+.atx-step:first-child::before { display: none; }
+.atx-step.is-done::before, .atx-step.is-current::before { background: var(--atx-blue); }
+.atx-step-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  background: #fff; border: 2px solid var(--atx-line); color: var(--atx-muted); position: relative; z-index: 1; }
+.atx-step.is-done .atx-step-dot { background: var(--atx-blue); border-color: var(--atx-blue); color: #fff; }
+.atx-step.is-current .atx-step-dot { border-color: var(--atx-blue); color: var(--atx-blue); box-shadow: 0 0 0 4px var(--atx-blue-soft); }
+.atx-step-label { font-size: 12px; line-height: 1.25; color: var(--atx-muted); overflow-wrap: anywhere; }
+.atx-step.is-current .atx-step-label { color: var(--atx-ink); font-weight: 600; }
+@media (max-width: 760px) {
+  .atx-stepper { grid-template-columns: 1fr; gap: 0; }
+  .atx-step { flex-direction: row; text-align: left; gap: 10px; padding: 4px 0; }
+  .atx-step::before { top: auto; bottom: calc(50% + 14px); left: 13px; right: auto; width: 2px; height: 16px; }
+}
+/* ---- shared tab bar inside pages ---- */
+.atx-pagetabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--atx-line); }
+.atx-pagetab { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; background: none; font-size: 14px; font-weight: 500;
+  color: var(--atx-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.atx-pagetab[aria-selected="true"] { color: var(--atx-blue); border-bottom-color: var(--atx-blue); font-weight: 600; }

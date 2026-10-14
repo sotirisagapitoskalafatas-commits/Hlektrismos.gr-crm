@@ -21,7 +21,7 @@ const MAX_MB = 15;
 const STATUS_TONE: Record<string, 'green' | 'amber' | 'red' | 'gray'> = { verified: 'green', received: 'amber', rejected: 'red', missing: 'gray' };
 const STATUS_TEXT: Record<string, string> = { verified: 'Ελέγχθηκε', received: 'Παραλήφθηκε', rejected: 'Απορρίφθηκε', missing: 'Λείπει' };
 
-export default function CaseDocuments({ c }: { c: Case }) {
+export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: () => void }) {
   const { role } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<CaseDocument[]>([]);
@@ -66,11 +66,13 @@ export default function CaseDocuments({ c }: { c: Case }) {
     toast(`Αποθηκεύτηκε: ${docLabel(picker.type)}`, 'ok');
     setPicker({ open: false, type: '', note: '' });
     void load();
+    onChanged?.();
   };
 
   const setStatus = async (d: CaseDocument, status: 'verified' | 'rejected') => {
     await setDocumentStatus(d.id, status);
     await load();
+    onChanged?.();
   };
 
   const groups = useMemo(() => {

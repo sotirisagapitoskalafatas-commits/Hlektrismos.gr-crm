@@ -197,7 +197,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
   const nav = findNav(view.page);
   const title = view.page === 'case' ? 'Case' : PAGE_TITLES[view.page] ?? 'ATLAS';
   const crumb = view.page === 'case'
-    ? ['Cases', 'Case Detail']
+    ? ['Cases', 'Λεπτομέρειες']
     : nav ? (nav.section.label === nav.item.label ? [nav.section.label] : [nav.section.label, nav.item.label]) : ['ATLAS'];
 
   const navCat = view.page === 'case' ? '#0066cc' : nav ? sectionColor(nav.section) : '#475569';
@@ -215,7 +215,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
       </button>
 
       <div className="flex-1 min-w-0">
-        <div className="micro truncate leading-tight inline-flex items-center gap-1">
+        <div className="micro truncate leading-tight flex items-center gap-1 overflow-hidden whitespace-nowrap">
           {crumb.map((c, i) => (
             <span key={`${view.page}-${i}`} className="inline-flex items-center gap-1">
               <span style={i === 0 ? { color: navCat } : undefined} className={i === 0 ? 'font-semibold' : 'text-ink/55'}>{c}</span>

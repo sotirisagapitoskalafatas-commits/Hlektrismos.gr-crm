@@ -83,7 +83,11 @@ const notifications = [
     body: caseRows[1].title, type: 'followup', link: '', read_at: null, created_at: iso(-2 * H) },
 ];
 
-const TABLES = { profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [] };
+const TABLES = { profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
+  timeline_events: [
+    { id: '70000000-0000-4000-8000-000000000001', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'call', title: 'Τηλεφωνική επικοινωνία', description: 'Ενδιαφέρεται για πρόγραμμα ρεύματος', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: { id: U('inside_sales'), full_name: USERS.inside_sales.full_name, role: 'inside_sales' } },
+    { id: '70000000-0000-4000-8000-000000000002', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'email', title: 'Αποστολή προσφοράς', description: '', user_id: U('inside_sales'), occurred_at: iso(-1 * D), location: null, metadata: {}, user: null },
+  ] };
 const log = [];
 
 function applyFilters(rows, params) {

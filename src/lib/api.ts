@@ -678,6 +678,16 @@ export async function setDocumentStatus(id: string, status: string): Promise<voi
   }
 }
 
+/** Read-only: documents for many cases in one query (Back Office queue). RLS decides visibility. */
+export async function fetchDocumentsForCases(caseIds: string[]): Promise<Record<string, CaseDocument[]>> {
+  if (!supabase || caseIds.length === 0) return {};
+  const { data, error } = await supabase.from('case_documents').select('*').in('case_id', caseIds);
+  if (error) { logError('fetchDocumentsForCases', error); return {}; }
+  const out: Record<string, CaseDocument[]> = {};
+  for (const d of (data ?? []) as CaseDocument[]) (out[d.case_id] ??= []).push(d);
+  return out;
+}
+
 export async function uploadDocumentFile(file: File): Promise<{ path: string; name: string; mime: string; size: number } | null> {
   if (!supabase) return null;
   const path = `cases/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;

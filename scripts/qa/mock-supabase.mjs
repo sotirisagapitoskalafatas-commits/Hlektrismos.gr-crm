@@ -83,7 +83,20 @@ const notifications = [
     body: caseRows[1].title, type: 'followup', link: '', read_at: null, created_at: iso(-2 * H) },
 ];
 
-const TABLES = { profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
+// Field visits for the field_sales user: one in progress, two planned today (one with coordinates), one overdue, one tomorrow.
+caseRows[3].lat = 37.9838; caseRows[3].lng = 23.7275; caseRows[3].address = 'Ερμού 10, Αθήνα';
+const visitCase = (i) => ({ id: caseRows[i].id, case_no: caseRows[i].case_no, title: caseRows[i].title, customer: { id: caseRows[i].customer.id, full_name: caseRows[i].customer.full_name, phone: caseRows[i].customer.phone } });
+const visit = (n, i, status, sched, extra = {}) => ({
+  id: `80000000-0000-4000-8000-00000000000${n}`, case_id: caseRows[i].id, user_id: U('field_sales'), purpose: 'Υπογραφή συμβολαίου', status,
+  scheduled_at: sched === null ? null : iso(sched * H), started_at: status === 'in_progress' ? iso(-0.5 * H) : null, ended_at: null,
+  check_in: null, check_out: null, location: null, result: '', notes: '', created_at: iso(-3 * D), case: visitCase(i), ...extra,
+});
+const visits = [
+  visit(1, 3, 'planned', 1), visit(2, 4, 'planned', 3), visit(3, 2, 'planned', -26), visit(4, 1, 'planned', 26),
+  visit(5, 0, 'completed', -3, { ended_at: iso(-2 * H), result: 'Ενδιαφέρεται — συνέχεια' }),
+];
+
+const TABLES = { case_visits: visits, profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
   timeline_events: [
     { id: '70000000-0000-4000-8000-000000000001', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'call', title: 'Τηλεφωνική επικοινωνία', description: 'Ενδιαφέρεται για πρόγραμμα ρεύματος', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: { id: U('inside_sales'), full_name: USERS.inside_sales.full_name, role: 'inside_sales' } },
     { id: '70000000-0000-4000-8000-000000000002', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'email', title: 'Αποστολή προσφοράς', description: '', user_id: U('inside_sales'), occurred_at: iso(-1 * D), location: null, metadata: {}, user: null },
@@ -148,6 +161,16 @@ http.createServer((req, res) => {
       const last = (json.messages || []).at(-1)?.content || '';
       return setTimeout(() => send(200, { reply: `Mock απάντηση για: «${last}»` }), 300);
     }
+    if (url.pathname === '/rest/v1/rpc/field_checkin' || url.pathname === '/rest/v1/rpc/field_checkout') {
+      const out = url.pathname.endsWith('checkout');
+      log.push({ method: 'RPC', table: out ? 'field_checkout' : 'field_checkin', body: json });
+      const v = visits.find((x) => x.id === json.p_visit_id);
+      if (!v) return send(200, { accepted: false, code: 'NO_VISIT', message: 'Η επίσκεψη δεν βρέθηκε.' });
+      if (out) { v.status = 'completed'; v.ended_at = new Date().toISOString(); v.notes = json.p_notes; return send(200, { accepted: true, code: 'CHECKOUT' }); }
+      if (json.p_lat == null) return send(200, { accepted: false, code: 'GPS_UNCERTAIN', visitId: v.id, message: 'Η θέση σας δεν είναι διαθέσιμη ή δεν έχει αρκετή ακρίβεια.' });
+      v.status = 'in_progress'; v.started_at = new Date().toISOString();
+      return send(200, { accepted: true, code: 'INSIDE_RADIUS', visitId: v.id });
+    }
     if (url.pathname === '/rest/v1/rpc/convert_lead_to_case') {
       log.push({ method: 'RPC', table: 'convert_lead_to_case', body: json });
       const l = TABLES.leads.find((x) => x.id === json.p_lead_id);
@@ -186,7 +209,8 @@ http.createServer((req, res) => {
       TABLES[table] = tbl.filter((r) => !hit.has(r));
       return send(204);
     }
-    const rowsIn = (Array.isArray(json) ? json : [json]).map((r) => ({ id: r.id ?? crypto.randomUUID(), ...r }));
+    const stamp = new Date().toISOString(); // emulate DB defaults
+    const rowsIn = (Array.isArray(json) ? json : [json]).map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: stamp, occurred_at: stamp, ...r }));
     tbl.push(...rowsIn);
     return send(201, rowsIn);
   });

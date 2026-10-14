@@ -321,6 +321,13 @@ export async function fetchCustomers(): Promise<Customer[]> {
 
 /* Update a customer's contact / location fields (phone, email, address, city,
    postal_code, lat/lng, notes, full_name, company). Whitelist only. */
+export async function fetchCustomer(id: string): Promise<Customer | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('customers').select('*').eq('id', id).maybeSingle();
+  if (error) { logError('fetchCustomer', error); return null; }
+  return (data ?? null) as Customer | null;
+}
+
 export async function updateCustomer(id: string, patch: Partial<Pick<Customer, 'full_name' | 'phone' | 'email' | 'company' | 'address' | 'city' | 'postal_code' | 'notes' | 'lat' | 'lng'>>): Promise<boolean> {
   if (!supabase) return false;
   const upd: Record<string, unknown> = {};

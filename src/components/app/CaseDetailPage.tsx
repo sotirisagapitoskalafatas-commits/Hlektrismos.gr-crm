@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import CaseDocuments from '@/components/documents/CaseDocuments';
-import { docLabel } from '@/lib/documents';
+import { buildChecklist, docLabel } from '@/lib/documents';
+import { stageText } from '@/lib/case-flow';
+import { CaseNextStepCard, CaseProgress, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
+import { useStaff } from '@/lib/useStaff';
 import SignaturePad from './SignaturePad';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import {
-  ACTIVITY_META, CHANNELS, DOC_STATUSES, SERVICES, STAGES,
-  STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, stageLabel,
-} from '@/lib/roles';
+  ACTIVITY_META, CHANNELS, DOC_STATUSES, SERVICES, STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, } from '@/lib/roles';
 import type { ActivityType, Stage } from '@/lib/roles';
 import {
   Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, Lead, TimelineEvent,
@@ -20,11 +21,10 @@ import {
   uploadDocumentFile,
 } from '@/lib/api';
 import {
-  Btn, Card, CardHeader, EmptyState, Field, IconBtn, Micro, Modal, Pill, Spinner, StagePill,
-  fmtDate, fmtDateTime, fmtMoney,
+  Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner, fmtDate, fmtDateTime, fmtMoney,
 } from '@/lib/ui';
 import {
-  ArrowLeft, CalendarClock, Camera, Check, CheckCircle2, ChevronRight, ClipboardCheck,
+  ArrowLeft, CalendarClock, Camera, Check, CheckCircle2, ClipboardCheck,
   Crosshair, FileText, FolderOpen, LogIn, LogOut, Mail, MapPin, MessageCircle, MessageSquare,
   Pencil, PenLine, Phone, Plus, Send, StickyNote, X,
 } from 'lucide-react';
@@ -576,7 +576,10 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const [c, setC] = useState<Case | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [tab, setTab] = useState<'timeline' | 'followups' | 'docs' | 'visits' | 'offers' | 'signatures' | 'backoffice'>('timeline');
-  const [stagePending, setStagePending] = useState<{ stage: Stage; note: string } | null>(null);
+  const [stagePending, setStagePending] = useState<Stage | null>(null);
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [docs, setDocs] = useState<CaseDocument[]>([]);
+  const staff = useStaff();
   const [editContact, setEditContact] = useState(false);
   const [contactForm, setContactForm] = useState({
     full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', lat: '', lng: '',
@@ -635,6 +638,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
     if (data) {
       setC(data);
       setLead(data.lead_id ? await fetchLead(data.lead_id) : null);
+      setDocs(await fetchDocuments(caseId));
     }
   }, [caseId]);
 
@@ -648,8 +652,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const canChange = can(role, 'change_stage');
   const canEditContact = can(role, 'edit_case');
   const isBO = can(role, 'create_application');
-  const stages = STAGES.filter(s => s.id !== 'lost' && s.id !== 'cancelled');
-  const stageIdx = stages.findIndex(s => s.id === c.current_stage);
+  const checklist = buildChecklist(c, docs);
 
   const tabs: { id: typeof tab; label: string; icon: IconType }[] = [
     { id: 'timeline', label: 'Χρονολόγιο', icon: CalendarClock },
@@ -662,36 +665,40 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   if (isBO) tabs.push({ id: 'backoffice', label: 'Back Office', icon: ClipboardCheck });
 
   return (
-    <div className="max-w-7xl space-y-4">
-      {/* Header */}
-      <div className="flex items-start gap-3 flex-wrap">
-        <IconBtn title="Πίσω" onClick={() => go('cases')}>
-          <ArrowLeft className="w-4 h-4" />
-        </IconBtn>
-        <div className="flex-1 min-w-0">
+    <div className="atx-page space-y-5" style={{ maxWidth: 1120 }}>
+      <button className="atx-link inline-flex items-center gap-1" onClick={() => go('cases')}><ArrowLeft size={15} /> Επιστροφή στα cases</button>
+
+      {/* Identity */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <span className="w-14 h-14 rounded-full grid place-items-center text-[18px] font-bold shrink-0" style={{ background: 'var(--atx-blue-soft)', color: 'var(--atx-blue)' }} aria-hidden="true">
+          {(c.customer?.full_name ?? c.title).split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+        </span>
+        <div className="flex-1 min-w-[220px]">
           <div className="flex items-center gap-2 flex-wrap">
-            <Micro tone="brand">{c.case_no}</Micro>
-            <StagePill stage={c.current_stage} />
-            {c.source && <Pill tone="gray">{leadSourceInfo(c.source).emoji} {leadSourceInfo(c.source).label}</Pill>}
-            {c.priority === 'high' && <Pill tone="red">υψηλή προτεραιότητα</Pill>}
-            {c.priority === 'critical' && <Pill tone="red">κρίσιμο</Pill>}
+            <h1 className="atx-title" style={{ fontSize: 28 }}>{c.customer?.full_name ?? c.title}</h1>
+            <span className={`atx-tag ${['lost', 'cancelled'].includes(c.current_stage) ? 't-danger' : c.current_stage === 'completed' ? 't-success' : 't-info'}`}>{stageText(c.current_stage)}</span>
+            {(c.priority === 'high' || c.priority === 'critical') && <span className="atx-tag t-danger">{c.priority === 'critical' ? 'Κρίσιμο' : 'Υψηλή προτεραιότητα'}</span>}
           </div>
-          <h2 className="text-[17px] font-semibold text-ink tracking-tight mt-1">{c.customer?.full_name ?? c.title}</h2>
-          <div className="text-xs text-ink/45 mt-0.5">
-            {SERVICES[c.service_type] ?? c.service_type}
-            {c.property_type ? ` · ${c.property_type}` : ''}
-            {c.value ? ` · ${fmtMoney(c.value)}` : ''}
-            {c.probability ? ` · ${c.probability}%` : ''}
-          </div>
+          <p className="atx-sub" style={{ marginTop: 2 }}>
+            Case {c.case_no} · {SERVICES[c.service_type] ?? c.service_type}{c.property_type ? ` · ${c.property_type}` : ''}
+            {c.source ? ` · ${leadSourceInfo(c.source).label}` : ''} · από {fmtDate(c.created_at)}
+          </p>
         </div>
         <div className="text-right">
-          <div className="text-sm font-semibold text-ink">{fmtMoney(c.value)}</div>
-          <div className="text-xs text-ink/45">εδώ · {fmtDate(c.created_at)}</div>
+          <div className="text-[20px] font-semibold">{c.value > 0 ? fmtMoney(c.value) : <span className="text-[15px] text-[var(--atx-faint)] font-medium">Χωρίς καταχωρημένη αξία</span>}</div>
+          {c.value > 0 && c.probability ? <div className="text-[12.5px] text-[var(--atx-muted)]">πιθανότητα {c.probability}%</div> : null}
         </div>
       </div>
 
-      {/* Customer + Stage */}
+      <CaseProgress c={c} allowedNext={allowedNext} canChange={canChange} onPick={setStagePending} />
+
+      {/* Next step + customer */}
       <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <CaseNextStepCard c={c} allowedNext={allowedNext} checklist={checklist} staff={staff}
+            canChange={canChange} canAssign={can(role, 'assign')} onPick={setStagePending}
+            onHandover={() => setHandoverOpen(true)} onDocs={() => setTab('docs')} />
+        </div>
         <Card>
           <div className="flex items-center justify-between gap-2">
             <Micro>Πελάτης</Micro>
@@ -743,9 +750,10 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
           ) : (
             <div className="mt-2 space-y-1.5 text-[13px] text-ink/75">
               <div className="font-medium text-ink">{c.customer?.full_name ?? '—'}</div>
-              {c.customer?.phone && <div>📞 {c.customer.phone}</div>}
-              {c.customer?.email && <div>✉️ {c.customer.email}</div>}
-              {(c.customer?.address || c.address) && <div>📍 {c.address || c.customer?.address}</div>}
+              {c.customer_id && <button className="atx-link !p-0 text-[13px]" onClick={() => go('customers', { customer: c.customer_id! })}>Προφίλ πελάτη →</button>}
+              {c.customer?.phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-ink/40" aria-hidden="true" /><a className="hover:underline" href={`tel:${c.customer.phone.replace(/\s+/g, '')}`}>{c.customer.phone}</a></div>}
+              {c.customer?.email && <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-ink/40" aria-hidden="true" /><a className="hover:underline truncate" href={`mailto:${c.customer.email}`}>{c.customer.email}</a></div>}
+              {(c.customer?.address || c.address) && <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-ink/40" aria-hidden="true" />{c.address || c.customer?.address}</div>}
               {c.next_follow_up_at && (
                 <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${new Date(c.next_follow_up_at) < new Date() ? 'bg-bad-100 text-bad-600' : 'bg-warn-100 text-warn-600'}`}>
                   <span className="text-xs font-medium">Επόμενο follow up</span>
@@ -765,82 +773,29 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
           )}
         </Card>
 
-        <Card className="lg:col-span-2">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <Micro>Πορεία {stageIdx >= 0 ? `· βήμα ${stageIdx + 1}/${stages.length}` : ''}</Micro>
-            {canChange && allowedNext.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] text-ink/40 mr-1">Μετάβαση:</span>
-                {allowedNext.map(s => (
-                  <Btn key={s} variant="outline" onClick={() => setStagePending({ stage: s, note: '' })}>
-                    {stageLabel(s)} <ChevronRight className="w-3 h-3" />
-                  </Btn>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {stages.map((s, i) => {
-              const current = s.id === c.current_stage;
-              const passed = i < stageIdx;
-              const target = s.id === stagePending?.stage;
-              return (
-                <div key={s.id} className="flex items-center gap-1.5">
-                  {i > 0 && <span className={`w-4 h-px ${passed || current ? 'bg-ok-600' : 'bg-line'}`} />}
-                  <button
-                    onClick={() => { if (canChange && allowedNext.includes(s.id)) setStagePending({ stage: s.id, note: '' }); }}
-                    disabled={!canChange || !allowedNext.includes(s.id)}
-                    className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono uppercase tracking-wide transition-colors ${current ? 'bg-ink text-paper border-ink' : passed ? 'bg-ok-100 text-ok-600 border-ok-600/20' : target ? 'bg-brand-500 text-white border-brand-500' : 'bg-white border-line text-ink/40'}`}
-                    title={passed ? 'Πέρασε' : current ? 'Τρέχον στάδιο' : allowedNext.includes(s.id) ? 'Διαθέσιμο επόμενο στάδιο' : s.short}>
-                    {s.short}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          {c.notes && <div className="mt-3 text-xs text-ink/50 border-t border-line pt-3">{c.notes}</div>}
-        </Card>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="atx-pagetabs" role="tablist" aria-label="Ενότητες case">
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`shrink-0 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-ink text-paper' : 'bg-white border border-line text-ink/55 hover:text-ink'}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className="atx-pagetab" onClick={() => setTab(t.id)}>
+            <t.icon className="w-4 h-4" aria-hidden="true" /> {t.label}
           </button>
         ))}
       </div>
 
       {tab === 'timeline' && <TimelineTab caseId={c.id} load={reload} />}
       {tab === 'followups' && <FollowUpsTab caseId={c.id} load={reload} />}
-      {tab === 'docs' && <CaseDocuments c={c} />}
+      {tab === 'docs' && <CaseDocuments c={c} onChanged={reload} />}
       {tab === 'visits' && <VisitsTab caseId={c.id} />}
       {tab === 'offers' && <OffersTab caseId={c.id} />}
       {tab === 'signatures' && <SignaturesTab caseId={c.id} />}
       {tab === 'backoffice' && <BackOfficeTab c={c} reload={reload} />}
 
-      {/* Stage change confirm */}
-      <Modal open={stagePending !== null} onClose={() => setStagePending(null)} title="Αλλαγή σταδίου" micro={`→ ${stagePending ? stageLabel(stagePending.stage) : ''}`}>
-        {stagePending && (
-          <>
-            <p className="text-sm text-ink/60 mb-3">
-              Αλλάξτε το case <span className="font-medium text-ink">{c.case_no}</span> σε <span className="font-semibold text-ink">{stageLabel(stagePending.stage)}</span>;
-            </p>
-            <input className="field" value={stagePending.note} onChange={e => setStagePending({ ...stagePending, note: e.target.value })}
-              placeholder="Σημείωση αλλαγής (προαιρετικό)…" />
-            <div className="flex justify-end gap-2 mt-5">
-              <Btn variant="ghost" onClick={() => setStagePending(null)}>Ακύρωση</Btn>
-              <Btn onClick={async () => {
-                const target = stagePending.stage;
-                setStagePending(null);
-                await changeStage(c.id, target, role, stagePending.note || undefined);
-                reload();
-              }}>Επιβεβαίωση</Btn>
-            </div>
-          </>
-        )}
-      </Modal>
+      <StageChangeDialog c={c} stage={stagePending} role={role} onClose={() => setStagePending(null)}
+        onDone={() => { setStagePending(null); void reload(); }} />
+      <HandoverDialog c={c} open={handoverOpen} staff={staff} role={role} onClose={() => setHandoverOpen(false)}
+        onDone={() => { setHandoverOpen(false); void reload(); }} />
     </div>
   );
 }

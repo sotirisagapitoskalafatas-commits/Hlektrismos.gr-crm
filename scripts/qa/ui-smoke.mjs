@@ -196,6 +196,61 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await browser.close();
 }
 
+/* ---- 9. Customer details ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Πελάτες', '#shell-rail nav button');
+  await sleep(1200);
+  await page.evaluate(() => { const el = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Αθηνά Κωνσταντίνου')); el && el.click(); });
+  await sleep(1800);
+  const body = () => page.evaluate(() => document.querySelector('main').innerText);
+  const t = await body();
+  check('Customer detail: opens with next step, cases and contact', t.includes('Επόμενο βήμα') && t.includes('Επικοινωνία') && /CS-2026-00/.test(t));
+  await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(500);
+  check('Customer detail: history merges case timeline events', (await body()).includes('Τηλεφωνική επικοινωνία'));
+  await click(page, 'Επεξεργασία'); await sleep(400);
+  await page.evaluate(() => { const i = [...document.querySelectorAll('main label')].find((l) => l.textContent.startsWith('Πόλη')).querySelector('input'); i.focus(); });
+  await page.keyboard.type(' Κέντρο');
+  await click(page, 'Αποθήκευση'); await sleep(1500);
+  const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Customer detail: edit saves via PATCH customers', log.some((l) => l.method === 'PATCH' && l.table === 'customers' && /Κέντρο/.test(l.body.city || '')));
+  await browser.close();
+}
+
+/* ---- 10. Case details: stepper, next step, blockers, handover, exit needs a reason ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+  await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === 'CS-2026-006' && e.offsetParent); el && el.click(); });
+  await sleep(2000);
+  const t = await page.evaluate(() => document.querySelector('main').innerText);
+  check('Case detail: stepper uses full Greek labels, no 3-letter codes', t.includes('Έλεγχος εγγράφων') && t.includes('Καταχώρηση παρόχου') && !/\bΕΓΓ\b|\bΚΑΤ\b|\bΥΠΓ\b/.test(t));
+  check('Case detail: next step lists missing documents as blockers', /Λείπει: Ταυτότητα/.test(t) && t.includes('Επόμενο βήμα'));
+  await click(page, 'Παράδοση'); await sleep(500);
+  // dialog is portaled to <body>; team defaults to Back Office; pick the first colleague listed
+  const opts = await page.evaluate(() => {
+    const dlg = [...document.querySelectorAll('body > .fixed.inset-0 .card')].at(-1);
+    const sel = dlg.querySelectorAll('select')[1];
+    const values = [...sel.options].map((o) => o.value).filter(Boolean);
+    const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+    set.call(sel, values[0]); sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return values;
+  });
+  await sleep(200);
+  await page.type('body > .fixed.inset-0 .card textarea', 'Έλεγχος εγγράφων και καταχώρηση');
+  await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Παράδοση').at(-1).click());
+  await sleep(1800);
+  const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Handover: case updated with the new next-action owner', log.some((l) => l.method === 'PATCH' && l.table === 'cases' && l.body.next_action_owner_id === opts[0]));
+  check('Handover: recorded on the shared timeline', log.some((l) => l.method === 'POST' && l.table === 'timeline_events' && l.body.activity_type === 'assignment'));
+  await click(page, 'Χάθηκε'); await sleep(500);
+  const dis = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Επιβεβαίωση').disabled);
+  check('Closing as Χάθηκε requires a reason', dis === true);
+  await browser.close();
+}
+
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
 process.exit(failed.length ? 1 : 0);

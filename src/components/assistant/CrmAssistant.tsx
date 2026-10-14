@@ -58,7 +58,7 @@ export default function CrmAssistant({ open, onClose }: { open: boolean; onClose
   const act = (a: AssistantAction) => {
     if (a.type === 'case') openCase(a.id);
     else if (a.type === 'lead') go('leads', { lead: a.id });
-    else if (a.type === 'customer') go('customers');
+    else if (a.type === 'customer') go('customers', { customer: a.id });
     else go(a.page as PageKey, a.filters);
     onClose();
   };

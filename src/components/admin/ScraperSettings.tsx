@@ -80,7 +80,11 @@ export default function ScraperSettingsCard() {
           <input type="number" min={5} max={60} className="field" value={config.max_results}
             onChange={e => setConfig(c => ({ ...c, max_results: Math.min(60, Math.max(5, parseInt(e.target.value, 10) || 20)) }))} />
         </Field>
-        <Field label="Όριο αναζητήσεων / λεπτό">
+        <Field label="Ημερήσιο όριο αναζητήσεων (όλη η ομάδα)">
+          <input type="number" min={0} max={1000} className="field" value={config.daily_query_limit ?? 100}
+            onChange={e => setConfig(c => ({ ...c, daily_query_limit: Math.min(1000, Math.max(0, parseInt(e.target.value, 10) || 0)) }))} />
+        </Field>
+        <Field label="Μέγιστες αναζητήσεις ανά εκτέλεση">
           <input type="number" min={1} max={60} className="field" value={config.rate_limit_per_minute}
             onChange={e => setConfig(c => ({ ...c, rate_limit_per_minute: Math.min(60, Math.max(1, parseInt(e.target.value, 10) || 10)) }))} />
         </Field>

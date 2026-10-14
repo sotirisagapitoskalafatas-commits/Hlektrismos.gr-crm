@@ -18,7 +18,8 @@ const EXPECT = {
   manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', ...ADMIN_ONLY], mustNot: [] },
   inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'Λειτουργίες', 'Χάρτης'] },
   field_sales: { must: ['Αρχική', 'Η εργασία μου', 'Ημέρα μου', 'Χάρτης', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Λειτουργίες', 'B2B Prospecting'] },
-  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Λειτουργίες', 'Cases', 'Διαχείριση'], mustNot: ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Leads', 'Χάρτης', 'B2B Prospecting'] },
+  // Back Office reviews and distributes B2B prospects (phase3/08), so it sees B2B Prospecting.
+  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Λειτουργίες', 'Cases', 'Διαχείριση', 'B2B Prospecting'], mustNot: ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Leads', 'Χάρτης'] },
 };
 
 /* ---- 1. per-role navigation + role simulator ---- */
@@ -361,6 +362,91 @@ for (const role of Object.keys(EXPECT)) {
     await browser.close();
   }
   await fetch(`${M}/__gates?state=off`);
+}
+
+/* ---- 2f. B2B: discover → review → distribute (never leads directly, never outreach) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const openB2B = async (page) => { await click(page, 'B2B Prospecting', '#shell-rail nav button'); await sleep(1200); };
+  const tabTo = (page, t) => page.evaluate((x) => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim().startsWith(x))?.click(), t);
+  const setInput = (page, idx, v) => page.evaluate((i, val) => { const el = [...document.querySelectorAll('input.field')][i]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, idx, v);
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'field_sales');
+    const nav = await text(page, '#shell-rail nav button');
+    check('B2B: field sales has no prospecting', !nav.some((t) => t.startsWith('B2B Prospecting')));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openB2B(page);
+    const leadsBefore = (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'POST' && l.table === 'leads').length;
+    await setInput(page, 0, 'Γλυφάδα, Βούλα');
+    await page.evaluate(() => [...document.querySelectorAll('[aria-label="Κατηγορίες"] button')].find((b) => b.textContent.includes('Εστιατόρια'))?.click());
+    await sleep(200);
+    const preview = await page.evaluate(() => document.body.innerText.match(/(\d+) αναζητήσεις/)?.[1]);
+    await page.evaluate(() => [...document.querySelectorAll('button.atx-btn-primary')].find((b) => b.textContent.trim() === 'Αναζήτηση')?.click());
+    await sleep(1500);
+    const log = await (await fetch(`${M}/__log`)).json();
+    const call = log.filter((l) => l.table === 'scrape-b2b').pop();
+    check('B2B: multi-select search (2 categories × 2 cities = 4 searches) goes to scrape-b2b', preview === '4' && call?.body?.categories?.length === 2 && call.body.cities.length === 2);
+    check('B2B: results go to the review queue, not to leads', (await page.evaluate(() => document.querySelector('[data-outcome="ok"]')?.innerText ?? '')).includes('νέες για έλεγχο')
+      && log.filter((l) => l.method === 'POST' && l.table === 'leads').length === leadsBefore);
+    await tabTo(page, 'Έλεγχος');
+    await sleep(1000);
+    check('B2B: inside sales sees the queue but cannot approve', (await page.evaluate(() => document.querySelectorAll('[data-prospect]').length)) >= 8
+      && (await page.evaluate(() => { document.querySelector('[data-prospect] input[type="checkbox"]')?.click(); return ![...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Έγκριση'); })));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await openB2B(page);
+    await tabTo(page, 'Έλεγχος');
+    await sleep(1000);
+    check('B2B: duplicate of an existing lead is flagged', (await page.evaluate(() => document.body.innerText)).includes('Υπάρχει ήδη ως lead (ίδιο τηλέφωνο)'));
+    // exclude the flagged one with a reason
+    await page.evaluate(() => [...document.querySelectorAll('[data-prospect]')].find((r) => r.innerText.includes('Υπάρχει ήδη'))?.querySelector('input[type="checkbox"]')?.click());
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Εξαίρεση')?.click());
+    await sleep(400);
+    const disabled = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Επιβεβαίωση')?.disabled);
+    await page.evaluate((val) => { const el = [...document.querySelectorAll('input.field')].pop(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, 'Υπάρχει ήδη ως πελάτης μας');
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Επιβεβαίωση')?.click());
+    await sleep(1000);
+    let log = await (await fetch(`${M}/__log`)).json();
+    check('B2B: exclusion needs a reason and goes through b2b_review', disabled === true && log.some((l) => l.table === 'b2b_review' && l.body.p_action === 'exclude' && l.body.p_reason.length >= 3));
+    // approve three
+    await page.evaluate(() => [...document.querySelectorAll('[data-prospect] input[type="checkbox"]')].slice(0, 3).forEach((b) => b.click()));
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Έγκριση')?.click());
+    await sleep(1000);
+    await tabTo(page, 'Ανάθεση');
+    await sleep(1500);
+    check('B2B: approved businesses wait in «Ανάθεση»', (await page.evaluate(() => document.querySelectorAll('[data-prospect]').length)) === 3);
+    await page.evaluate(() => document.querySelector('[data-prospect] input[type="checkbox"]')?.closest('table')?.querySelector('thead input[type="checkbox"]')?.click());
+    await page.evaluate(() => [...document.querySelectorAll('[aria-label="Πωλητές"] label')].forEach((l) => l.querySelector('input')?.click()));
+    await page.evaluate(() => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent.includes('Εκ περιτροπής'))?.click());
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('button.atx-btn-primary')].find((b) => b.textContent.includes('Ανάθεση'))?.click());
+    await sleep(1500);
+    log = await (await fetch(`${M}/__log`)).json();
+    const d = log.filter((l) => l.table === 'b2b_distribute').pop();
+    check('B2B: round-robin distribution to two agents through b2b_distribute', d?.body?.p_mode === 'round_robin' && d.body.p_agents.length === 2 && d.body.p_ids.length === 3);
+    check('B2B: nothing left to assign; no message was sent', (await page.evaluate(() => document.querySelectorAll('[data-prospect]').length)) === 0
+      && !log.some((l) => /send-campaign|send-sms|make-voice-call|send-email/.test(l.table ?? '')));
+    await tabTo(page, 'Ιστορικό');
+    await sleep(1000);
+    check('B2B: search history shows who, what and counts', (await page.evaluate(() => document.body.innerText)).includes('Ελένη Δημητρίου'));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await click(page, 'Leads', '#shell-rail nav button');
+    await sleep(1200);
+    check('B2B: the assigned business appears as a B2B lead for the agent', (await page.evaluate(() => document.querySelector('main').innerText)).includes('Δοκιμαστική Επιχείρηση'));
+    await browser.close();
+  }
 }
 
 /* ---- 3. Home and My Work agree; actions really work ---- */

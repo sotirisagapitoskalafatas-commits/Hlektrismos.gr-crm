@@ -116,6 +116,12 @@ const canManageMock = (actor, from, to = from) => !!actor && (MANAGE[actor.role]
 const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.field_sales.id ? 5 : 0);
 // Presentation preview: allowed for the mock admin unless MOCK_PREVIEW=expired.
 const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
+// ---- B2B pipeline (mirrors staged-migrations/phase3/08 + scrape-b2b; synthetic, never calls SerpApi) ----
+const b2bProspects = [];
+const b2bJobs = [];
+const b2bProfiles = [];
+const B2B_SEARCH = ['admin', 'manager', 'inside_sales', 'back_office'];
+const B2B_REVIEW = ['admin', 'manager', 'back_office'];
 let gatesOn = process.env.MOCK_GATES === 'on'; // GET /__gates?state=on|off
 const GATES = { document_check: 'received', submitted: 'verified', activation: 'verified', completed: 'verified' };
 const ALLOWED = { new: ['contacted', 'lost', 'cancelled'], contacted: ['offer', 'application', 'lost', 'cancelled'], offer: ['application', 'signed', 'lost', 'cancelled'],
@@ -145,7 +151,7 @@ const blockersFor = (caseId, stage) => {
 let previewState = process.env.MOCK_PREVIEW ?? 'on'; // switch at runtime: GET /__preview?state=expired|on
 const previewAllowedMock = (u) => u?.role === 'admin' && previewState !== 'expired';
 
-const TABLES = { staff_admin_audit: staffAudit, case_visits: visits, profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
+const TABLES = { b2b_prospects: b2bProspects, b2b_search_jobs: b2bJobs, b2b_search_profiles: b2bProfiles, staff_admin_audit: staffAudit, case_visits: visits, profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
   timeline_events: [
     { id: '70000000-0000-4000-8000-000000000001', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'call', title: 'Τηλεφωνική επικοινωνία', description: 'Ενδιαφέρεται για πρόγραμμα ρεύματος', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: { id: U('inside_sales'), full_name: USERS.inside_sales.full_name, role: 'inside_sales' } },
     { id: '70000000-0000-4000-8000-000000000002', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'email', title: 'Αποστολή προσφοράς', description: '', user_id: U('inside_sales'), occurred_at: iso(-1 * D), location: null, metadata: {}, user: null },
@@ -229,7 +235,7 @@ http.createServer((req, res) => {
       l.status = 'converted'; l.converted_case_id = caseRows[0].id; l.converted_at = new Date().toISOString();
       return send(200, caseRows[0].id);
     }
-    if (url.pathname.startsWith('/rest/v1/rpc/') || url.pathname.startsWith('/functions/v1/admin-users')) {
+    if (url.pathname.startsWith('/rest/v1/rpc/') || url.pathname.startsWith('/functions/v1/admin-users') || url.pathname.startsWith('/functions/v1/scrape-b2b')) {
       const u = userForToken(req.headers.authorization);
       const name = url.pathname.split('/').pop();
       const deny = (msg) => send(403, { code: '42501', message: msg });
@@ -313,6 +319,70 @@ http.createServer((req, res) => {
         TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'resubmitted', title: 'Επανυποβολή στο Back Office', description: json.p_note ?? '', user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
         return send(200, null);
       }
+      // ---- B2B ----
+      if (name === 'b2b_queries_today') return send(200, b2bJobs.reduce((n, j) => n + j.queries_done, 0));
+      if (name === 'scrape-b2b') {
+        log.push({ method: 'FN', table: 'scrape-b2b', body: json });
+        if (!u || !B2B_SEARCH.includes(u.role)) return send(403, { success: false, error: 'Ο ρόλος σας δεν έχει πρόσβαση στην αναζήτηση επιχειρήσεων.' });
+        const cats = json.categories ?? [], places = (json.cities ?? []).length ? json.cities : json.regions ?? [];
+        const queries = [...cats, ...(json.keywords ?? [])].flatMap((c) => places.map((pl) => ({ c, pl })));
+        const job = { id: crypto.randomUUID(), created_by: u.id, status: 'done', params: json, queries_planned: queries.length, queries_done: queries.length,
+          results_found: 0, results_new: 0, results_duplicate: 0, error: null, created_at: new Date().toISOString(), finished_at: new Date().toISOString() };
+        queries.forEach(({ c, pl }, qi) => {
+          for (let k = 1; k <= 2; k++) {
+            const nm = `Δοκιμαστική Επιχείρηση ${qi + 1}.${k} ${pl}`;
+            job.results_found++;
+            if (b2bProspects.some((x) => x.company_name === nm)) continue;
+            const dup = qi === 0 && k === 1; // first result matches an existing lead's phone
+            b2bProspects.push({ id: crypto.randomUUID(), company_name: nm, phone: dup ? '+30 6910000010' : `69100${String(b2bProspects.length).padStart(5, '0')}`,
+              website: k === 2 ? null : `https://example${b2bProspects.length}.invalid`, domain: k === 2 ? null : `example${b2bProspects.length}.invalid`,
+              address: `${pl} ${k}`, city: (json.cities ?? []).includes(pl) ? pl : null, region: (json.regions ?? [])[0] ?? null, category: cats.includes(c) ? c : null,
+              source_query: `${c} ${pl}`, rating: 4.2, reviews: 10, quality: k === 2 ? ['no_website'] : [], status: 'new',
+              duplicate_of: dup ? { type: 'lead', id: TABLES.leads[0].id, reason: 'phone' } : null, review_reason: null, reviewed_at: null,
+              assigned_to: null, assigned_at: null, lead_id: null, phone_screening: 'not_checked', collected_at: new Date().toISOString() });
+            job.results_new++; if (dup) job.results_duplicate++;
+          }
+        });
+        b2bJobs.unshift(job);
+        return send(200, { success: true, job_id: job.id, planned: queries.length, ran: queries.length, truncated: 0, found: job.results_found, new: job.results_new,
+          duplicates: job.results_duplicate, errors: [], used_today: b2bJobs.reduce((n, j) => n + j.queries_done, 0), daily_limit: 100 });
+      }
+      if (name === 'b2b_review') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!B2B_REVIEW.includes(u?.role)) return deny('b2b_review: not allowed');
+        const map = { approve: [['new'], 'approved'], exclude: [['new', 'approved'], 'excluded'], duplicate: [['new', 'approved'], 'duplicate'], reopen: [['excluded', 'duplicate'], 'new'] };
+        const [from, to] = map[json.p_action] ?? [];
+        if (!to) return send(400, { code: '22023', message: 'b2b_review: invalid action' });
+        if (['exclude', 'duplicate'].includes(json.p_action) && String(json.p_reason ?? '').trim().length < 3) return send(400, { code: '22023', message: 'b2b_review: a reason is required' });
+        let n = 0;
+        for (const x of b2bProspects) if (json.p_ids.includes(x.id) && from.includes(x.status)) {
+          Object.assign(x, { status: to, review_reason: json.p_reason ?? null, reviewed_at: new Date().toISOString() });
+          if (to === 'excluded') Object.assign(x, { website: null, address: null, domain: null });
+          n++;
+        }
+        return send(200, n);
+      }
+      if (name === 'b2b_distribute') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!B2B_REVIEW.includes(u?.role)) return deny('b2b_distribute: not allowed');
+        const agents = (json.p_agents ?? []).filter((id) => Object.values(USERS).some((x) => x.id === id && ['inside_sales', 'field_sales'].includes(x.role)));
+        if (!agents.length) return send(400, { code: '22023', message: 'b2b_distribute: choose at least one active sales agent' });
+        if (json.p_mode === 'manual' && agents.length !== 1) return send(400, { code: '22023', message: 'b2b_distribute: manual mode takes exactly one agent' });
+        const open = (a) => TABLES.leads.filter((l) => l.assigned_to_user_id === a && ['new', 'contacted', 'qualified', 'meeting', 'offer'].includes(l.status)).length;
+        const out = [];
+        let i = 0;
+        for (const x of b2bProspects.filter((p) => json.p_ids.includes(p.id) && p.status === 'approved')) {
+          const a = json.p_mode === 'workload' ? [...agents].sort((m, n) => open(m) - open(n))[0] : agents[i % agents.length];
+          const lead = { ...TABLES.leads[0], id: crypto.randomUUID(), full_name: x.company_name, client_name: x.company_name, company: x.company_name, phone: x.phone,
+            status: 'new', source: 'import', source_label: 'B2B Scraper · Google Maps', lead_type: 'B2B', assigned_to_user_id: a,
+            assigned_to: { full_name: Object.values(USERS).find((v) => v.id === a)?.full_name }, converted_case_id: null, converted_at: null, attached_files: null,
+            created_at: new Date().toISOString(), comments: 'Πριν από τηλεφωνική προώθηση: έλεγχος μητρώου Άρθρου 11 — ΔΕΝ έχει γίνει' };
+          TABLES.leads.push(lead);
+          Object.assign(x, { status: 'assigned', assigned_to: a, assigned_at: new Date().toISOString(), lead_id: lead.id });
+          out.push({ prospect: x.id, lead: lead.id, agent: a }); i++;
+        }
+        return send(200, out);
+      }
       if (name === 'staff_list') {
         if (!u || !MANAGE[u.role]) return deny('staff_list: not allowed');
         const rows = staffRows.filter((r) => u.role !== 'back_office' || r.role === 'back_office')
@@ -369,7 +439,7 @@ http.createServer((req, res) => {
       return send(200, { Key: url.pathname.replace('/storage/v1/object/', ''), Id: 'mock' });
     }
 
-    const m = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
+    const m = /^\/rest\/v1\/([a-z0-9_]+)$/.exec(url.pathname);
     if (!m) return send(404, {});
     const table = m[1];
     if (req.method === 'GET' || req.method === 'HEAD') {

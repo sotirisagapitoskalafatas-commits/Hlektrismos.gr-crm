@@ -215,16 +215,12 @@ export type NavSection = {
    Each category and its leaves carry the design-computed hue. Active
    leaves render as rgba(color,.16) + 2px colored left border; count
    badges use rgba(color,.14). */
-export type NavSectionId = 'home' | 'sales' | 'field' | 'operations' | 'customers' | 'analytics' | 'system';
+export type NavSectionId = 'home' | 'mywork' | 'crm' | 'sales' | 'field' | 'operations' | 'analytics' | 'ai' | 'system';
 
+// One restrained primary blue for every destination (Apple-inspired single accent). Kept as a map so call sites are unchanged.
 export const CATEGORY_COLORS: Record<NavSectionId, string> = {
-  home: '#1e293b',
-  sales: '#0066cc',
-  field: '#b45309',
-  operations: '#7c3aed',
-  customers: '#15803d',
-  analytics: '#0e7490',
-  system: '#475569',
+  home: '#0066cc', mywork: '#0066cc', crm: '#0066cc', sales: '#0066cc', field: '#0066cc',
+  operations: '#0066cc', analytics: '#0066cc', ai: '#0066cc', system: '#0066cc',
 };
 
 const ALL: Role[] = ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'];
@@ -235,8 +231,25 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Αρχική',
     icon: Home,
     children: [
-      { key: 'dashboard', label: 'Πίνακας Ελέγχου', icon: LayoutDashboard, page: 'home', roles: ALL, maturity: 'live' },
-      { key: 'mywork', label: 'My Work', icon: Inbox, page: 'mywork', roles: ALL, maturity: 'live' },
+      { key: 'dashboard', label: 'Αρχική', icon: LayoutDashboard, page: 'home', roles: ALL, maturity: 'live' },
+    ],
+  },
+  {
+    id: 'mywork',
+    label: 'Η εργασία μου',
+    icon: Inbox,
+    children: [
+      { key: 'mywork', label: 'Η εργασία μου', icon: Inbox, page: 'mywork', roles: ALL, maturity: 'live' },
+      { key: 'followups', label: 'Follow-ups', icon: CalendarClock, page: 'followups', roles: ALL, maturity: 'live', badge: 'followups' },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    icon: UsersRound,
+    children: [
+      { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live', badge: 'leads' },
+      { key: 'customers', label: 'Πελάτες', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live', badge: 'customers' },
     ],
   },
   {
@@ -244,12 +257,9 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Πωλήσεις',
     icon: ShoppingBag,
     children: [
-      { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live', badge: 'leads' },
-      { key: 'customers', label: 'Πελάτες', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live', badge: 'customers' },
+      { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
       { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live' },
       { key: 'providers', label: 'Πάροχοι & Προγράμματα', icon: Boxes, page: 'providers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
-      { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
-      { key: 'followups', label: 'Follow Ups', icon: CalendarClock, page: 'followups', roles: ALL, maturity: 'live', badge: 'followups' },
     ],
   },
   {
@@ -257,37 +267,44 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Πεδίο',
     icon: Navigation,
     children: [
-      { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
       { key: 'myday', label: 'Ημέρα μου', icon: Sun, page: 'myday', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
+      { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
       { key: 'fieldmode', label: 'Λειτουργία Πεδίου', icon: Smartphone, page: 'field', roles: ['admin', 'manager', 'field_sales'], maturity: 'beta' },
     ],
   },
   {
     id: 'operations',
-    label: 'Λειτουργία',
+    label: 'Λειτουργίες',
     icon: Cog,
     children: [
-      { key: 'backoffice', label: 'Back Office', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
+      { key: 'backoffice', label: 'Λειτουργίες', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
     ],
   },
   {
     id: 'analytics',
-    label: 'Αναλυτικά',
+    label: 'Insights',
     icon: BarChart3,
     children: [
-      { key: 'reports', label: 'Reports', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
+      { key: 'reports', label: 'Αναφορές', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
       { key: 'revenue', label: 'Έσοδα', icon: Wallet, page: 'revenue', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
   {
+    id: 'ai',
+    label: 'Atlas AI',
+    icon: Bot,
+    children: [
+      { key: 'automations', label: 'Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
+      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
+    ],
+  },
+  {
     id: 'system',
-    label: 'Σύστημα',
+    label: 'Ρυθμίσεις',
     icon: Settings,
     children: [
-      { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
-      { key: 'automations', label: 'AI & Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
-      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true, badge: 'beta' },
+      { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
       { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager'], maturity: 'live' },
     ],
   },
@@ -322,23 +339,23 @@ export function categoryColor(page: PageKey | 'case'): string {
 }
 
 export const PAGE_TITLES: Record<PageKey, string> = {
-  home: 'Πίνακας Ελέγχου',
-  mywork: 'My Work',
+  home: 'Αρχική',
+  mywork: 'Η εργασία μου',
   leads: 'Leads',
   prospecting: 'B2B Prospecting',
   providers: 'Πάροχοι & Προγράμματα',
   cases: 'Cases',
   customers: 'Πελάτες',
-  followups: 'Follow Ups',
+  followups: 'Follow-ups',
   myday: 'Ημέρα μου',
   map: 'Χάρτης',
   field: 'Λειτουργία Πεδίου',
-  backoffice: 'Operations',
-  reports: 'Reports',
+  backoffice: 'Λειτουργίες',
+  reports: 'Αναφορές',
   revenue: 'Έσοδα',
   admin: 'Διαχείριση',
-  automations: 'AI & Αυτοματισμοί',
-  aiworkforce: 'AI Workforce',
+  automations: 'Αυτοματισμοί',
+  aiworkforce: 'AI Εργατικό Δυναμικό',
   account: 'Λογαριασμός',
   preferences: 'Προτιμήσεις',
 };

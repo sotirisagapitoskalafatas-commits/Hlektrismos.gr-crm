@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "qa": "playwright test -c qa/playwright.config.ts",
     "qa:install": "playwright install chromium",
-    "test": "node --test src/lib/__tests__/*.test.mjs supabase/functions/_shared/__tests__/*.test.mjs supabase/tests/*.test.mjs"
+    "test": "node --test src/lib/__tests__/*.test.mjs supabase/functions/_shared/__tests__/*.test.mjs supabase/tests/*.test.mjs",
+    "qa:ui": "node scripts/qa/ui-smoke.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

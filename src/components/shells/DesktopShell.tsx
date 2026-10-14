@@ -101,12 +101,7 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
               const c = sectionColor(s);
               return (
                 <div key={s.id}>
-                  <div className="flex items-center gap-1.5 px-2 mb-1.5">
-                    <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.2) }}>
-                      <s.icon className="w-3.5 h-3.5" style={{ color: '#fff' }} aria-hidden="true" />
-                    </span>
-                    <span className="micro text-white/60">{s.label}</span>
-                  </div>
+                  {s.children.length > 1 && s.children[0].label !== s.label && <div className="nav-section-caption">{s.label}</div>}
                   <div className="space-y-0.5">
                     {s.children.map((item: NavLeaf) => (
                       <LeafButton key={item.key} item={item} active={view.page === item.page}

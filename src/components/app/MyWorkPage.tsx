@@ -1,153 +1,129 @@
-/* ------------------------------------------------------------------ */
-/*  MyWorkPage — universal work inbox (CRM Shell Redesign).           */
-/*  Real data only: cases + follow-ups touching the signed-in user.    */
-/* ------------------------------------------------------------------ */
+/* Η εργασία μου — one prioritized list of what needs the signed-in employee, built by lib/work.ts from real
+   follow-ups, leads and cases. Same data and definitions as Αρχική, so the numbers always agree.
+   Authorization is NOT decided here: the lists show whatever the database returns to this user. */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/lib/auth';
+import { useMemo, useState } from 'react';
+import { Inbox } from 'lucide-react';
 import { useNav } from '@/lib/nav';
-import { SERVICES } from '@/lib/roles';
-import { Case, FollowUp, fetchCases, fetchFollowUps } from '@/lib/api';
-import { Card, CardHeader, EmptyState, Micro, Spinner, StagePill, fmtTime, timeUntil, todayLabel } from '@/lib/ui';
-import { Briefcase, CalendarClock, Inbox, Sun } from 'lucide-react';
+import { useWorkData } from '@/lib/useWorkData';
+import type { Bucket, WorkItem, WorkKind } from '@/lib/work';
+import { WorkRow } from '@/components/work/WorkRow';
+
+type Tab = 'today' | 'upcoming' | 'all';
+type Kind = 'all' | WorkKind;
+type Sort = 'priority' | 'oldest';
+
+const TAB_OF: Record<Bucket, Tab> = { overdue: 'today', today: 'today', now: 'today', upcoming: 'upcoming' };
+const SECTION: Record<Bucket, string> = { overdue: 'Εκπρόθεσμα', today: 'Σήμερα', now: 'Έτοιμα για ενέργεια', upcoming: 'Προσεχώς' };
+const KIND_LABEL: Record<Kind, string> = { all: 'Όλα', followup: 'Follow-ups', lead: 'Leads', case: 'Cases' };
+
+const asTab = (v?: string): Tab => (v === 'upcoming' || v === 'all' ? v : 'today');
+const asKind = (v?: string): Kind => (v === 'followup' || v === 'lead' || v === 'case' ? v : 'all');
 
 export default function MyWorkPage() {
-  const { user } = useAuth();
-  const { openCase } = useNav();
-  const [cases, setCases] = useState<Case[]>([]);
-  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { view } = useNav();
+  const { loading, error, items, now, reload } = useWorkData();
+  const [tab, setTab] = useState<Tab>(() => asTab(view.filters?.tab));
+  const [kind, setKind] = useState<Kind>(() => asKind(view.filters?.kind));
+  const [sort, setSort] = useState<Sort>('priority');
 
-  const load = useCallback(async () => {
-    const [c, f] = await Promise.all([
-      fetchCases(),
-      fetchFollowUps({ status: 'all' }),
-    ]);
-    setCases(c);
-    setFollowUps(f);
-    setLoading(false);
-  }, []);
+  const inTab = useMemo(() => items.filter(i => tab === 'all' || TAB_OF[i.bucket] === tab), [items, tab]);
+  const counts = useMemo(() => {
+    const c: Record<Kind, number> = { all: inTab.length, followup: 0, lead: 0, case: 0 };
+    for (const i of inTab) c[i.kind]++;
+    return c;
+  }, [inTab]);
+  const tabCount = (t: Tab) => items.filter(i => t === 'all' || TAB_OF[i.bucket] === t).length;
 
-  useEffect(() => { load(); }, [load]);
+  const visible = useMemo(() => {
+    const list = inTab.filter(i => kind === 'all' || i.kind === kind);
+    if (sort === 'priority') return list;
+    const key = (i: WorkItem) => i.due ?? i.since ?? 0;
+    return [...list].sort((a, b) => key(a) - key(b));
+  }, [inTab, kind, sort]);
 
-  const uid = user?.id ?? null;
+  // Section headers only make sense in the priority order.
+  const sections = useMemo(() => {
+    if (sort !== 'priority') return [{ label: '', rows: visible }];
+    const out: { label: string; rows: WorkItem[] }[] = [];
+    for (const row of visible) {
+      const label = SECTION[row.bucket];
+      const last = out[out.length - 1];
+      if (last && last.label === label) last.rows.push(row);
+      else out.push({ label, rows: [row] });
+    }
+    return out;
+  }, [visible, sort]);
 
-  const mine = useMemo(() => {
-    if (!uid) return { cases: [] as Case[], fus: [] as FollowUp[] };
-    const openCases = cases.filter(c =>
-      c.owner_id === uid || c.inside_sales_owner === uid ||
-      c.field_sales_owner === uid || c.back_office_owner === uid ||
-      c.next_action_owner_id === uid,
-    );
-    const now = Date.now();
-    const fus = followUps.filter(f => {
-      if (f.assignee_id !== uid) return false;
-      if (f.status === 'completed' || f.status === 'cancelled') return false;
-      if (f.status === 'snoozed') return f.snoozed_until ? new Date(f.snoozed_until).getTime() <= now : false;
-      return true;
-    }).sort((a, b) => +new Date(a.due_at) - +new Date(b.due_at));
-    return { cases: openCases, fus };
-  }, [uid, cases, followUps]);
-
-  const overdueFu = mine.fus.filter(f => new Date(f.due_at).getTime() < Date.now());
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'today', label: 'Σήμερα' }, { id: 'upcoming', label: 'Προσεχώς' }, { id: 'all', label: 'Όλα' },
+  ];
 
   return (
-    <div className="max-w-5xl space-y-4">
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <Micro tone="brand">Universal work OS</Micro>
-          <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">My Work · {todayLabel()}</h2>
+    <div className="atx-page">
+      <div className="atx-head">
+        <h1 className="atx-title">Η εργασία μου</h1>
+        <p className="atx-sub">Ό,τι χρειάζεται τη δική σας ενέργεια, με σειρά προτεραιότητας.</p>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3 justify-between">
+        <div className="atx-tabs" role="tablist" aria-label="Χρονικό εύρος">
+          {tabs.map(t => (
+            <button key={t.id} role="tab" aria-selected={tab === t.id} className="atx-tab" onClick={() => setTab(t.id)}>
+              {t.label}{!loading && <span className="ml-1.5 opacity-60">{tabCount(t.id)}</span>}
+            </button>
+          ))}
         </div>
+        <label className="flex items-center gap-2 text-[13px] text-[var(--atx-muted)]">
+          Ταξινόμηση
+          <select className="atx-chip !pr-2" value={sort} onChange={e => setSort(e.target.value as Sort)} aria-label="Ταξινόμηση">
+            <option value="priority">Προτεραιότητα</option>
+            <option value="oldest">Παλαιότερα πρώτα</option>
+          </select>
+        </label>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="!p-4">
-          <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-ink/[0.06] text-ink/60 flex items-center justify-center">
-              <Briefcase className="w-4.5 h-4.5" />
-            </span>
-            <div>
-              <div className="text-xl font-bold text-ink leading-none">{mine.cases.length}</div>
-              <Micro>Ανοιχτά cases μου</Micro>
-            </div>
-          </div>
-        </Card>
-        <Card className="!p-4">
-          <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-brand-500/10 text-brand-600 flex items-center justify-center">
-              <CalendarClock className="w-4.5 h-4.5" />
-            </span>
-            <div>
-              <div className="text-xl font-bold text-ink leading-none">{mine.fus.length}</div>
-              <Micro>Follow ups μου</Micro>
-            </div>
-          </div>
-        </Card>
-        <Card className="!p-4">
-          <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-bad-500/10 text-bad-600 flex items-center justify-center">
-              <Sun className="w-4.5 h-4.5" />
-            </span>
-            <div>
-              <div className="text-xl font-bold text-ink leading-none">{overdueFu.length}</div>
-              <Micro>καθυστερούν</Micro>
-            </div>
-          </div>
-        </Card>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Τύπος εργασίας">
+        {(Object.keys(KIND_LABEL) as Kind[]).map(k => (
+          <button key={k} className="atx-chip" aria-pressed={kind === k} onClick={() => setKind(k)}>
+            {KIND_LABEL[k]}{!loading && <span className="ml-1.5 opacity-60">{counts[k]}</span>}
+          </button>
+        ))}
       </div>
 
-      {loading && <div className="flex items-center justify-center py-24"><Spinner /></div>}
-      {!loading && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader micro="Follow ups" title="Επικοινωνίες που με αφορούν"
-              action={<span className="pill bg-ink/[0.06] text-ink/60">{mine.fus.length}</span>} />
-            <div className="space-y-1.5">
-              {mine.fus.length === 0 && (
-                <EmptyState icon={Inbox} title="Καμία εκκρεμότητα" hint="Τα follow ups που σας έχουν ανατεθεί θα εμφανιστούν εδώ." />
-              )}
-              {mine.fus.map(f => {
-                const over = new Date(f.due_at).getTime() < Date.now();
-                return (
-                  <button key={f.id} onClick={() => f.case_id && openCase(f.case_id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2.5 border ${over ? 'spine spine-critical bg-bad-100/50' : 'bg-paper/60 border-line'}`}>
-                    <CalendarClock className={`w-3.5 h-3.5 shrink-0 ${over ? 'text-bad-600' : 'text-ink/40'}`} />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-medium text-ink truncate">{f.case?.customer?.full_name ?? '—'}</span>
-                      <span className="block text-xs text-ink/45 truncate">{f.case ? `${f.case.case_no} · ` : ''}{f.reason}{f.due_at ? ` · ${fmtTime(f.due_at)}` : ''}</span>
-                    </span>
-                    <span className={`text-[11px] shrink-0 ${over ? 'text-bad-600' : 'text-ink/40'}`}>{timeUntil(f.due_at)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader micro="Cases" title="Aνοιχτά cases που με αφορούν"
-              action={<span className="pill bg-ink/[0.06] text-ink/60">{mine.cases.length}</span>} />
-            <div className="space-y-1.5">
-              {mine.cases.length === 0 && (
-                <EmptyState icon={Briefcase} title="Κανένα ανοιχτό case" hint="Τα ενεργά cases που σας έχουν ανατεθεί θα εμφανιστούν εδώ." />
-              )}
-              {mine.cases.map(c => (
-                <button key={c.id} onClick={() => openCase(c.id)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-ink/5 flex items-center gap-2.5">
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-medium text-ink truncate">{c.customer?.full_name ?? c.title}</span>
-                    <span className="block text-xs text-ink/45 truncate">{c.case_no} · {SERVICE_LABEL(c)}</span>
-                  </span>
-                  <StagePill stage={c.current_stage} />
-                </button>
-              ))}
-            </div>
-          </Card>
+      {error && (
+        <div className="atx-notice mt-4 flex items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          <button className="atx-btn atx-btn-quiet" onClick={() => void reload()}>Δοκιμή ξανά</button>
         </div>
       )}
+
+      <div className="atx-panel mt-5" aria-busy={loading}>
+        {loading && [0, 1, 2, 3].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
+
+        {!loading && visible.length === 0 && (
+          <div className="atx-empty">
+            <Inbox className="mx-auto mb-3" size={28} aria-hidden="true" />
+            <strong>{items.length === 0 ? 'Δεν υπάρχει εργασία για εσάς' : 'Τίποτα σε αυτή την προβολή'}</strong>
+            {items.length === 0
+              ? 'Όταν σας ανατεθούν leads, cases ή follow-ups, θα εμφανιστούν εδώ.'
+              : 'Αλλάξτε το χρονικό εύρος ή τον τύπο εργασίας για να δείτε τα υπόλοιπα.'}
+          </div>
+        )}
+
+        {!loading && sections.map((s, si) => (
+          <div role="region" key={s.label || si} aria-label={s.label || undefined}>
+            {s.label && (
+              <h2 className="px-4 pt-3 pb-1.5 text-[12.5px] font-semibold text-[var(--atx-faint)]" style={si > 0 ? { borderTop: '1px solid var(--atx-line)' } : undefined}>
+                {s.label} · {s.rows.length}
+              </h2>
+            )}
+            <ul className="m-0 p-0 list-none">
+              {s.rows.map(row => <WorkRow key={row.key} item={row} now={now} onChanged={reload} />)}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
-}
-
-function SERVICE_LABEL(c: Case) {
-  return SERVICES[c.service_type] ?? c.service_type;
 }

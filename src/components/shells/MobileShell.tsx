@@ -10,8 +10,8 @@ import { useNav } from '@/lib/nav';
 import { categoryColor } from '@/lib/roles';
 import type { PageKey, Role } from '@/lib/roles';
 import {
-  Briefcase, CalendarClock, Compass, Home, Map, MonitorCog, MoreHorizontal, Plus, Route,
-  UserPlus, UsersRound, X,
+  Briefcase, Compass, Home, Inbox, Map, MonitorCog, MoreHorizontal, Plus, Route,
+  UserPlus, X,
 } from 'lucide-react';
 
 type Counts = { leads: number; followups: number; backoffice: number };
@@ -21,19 +21,20 @@ type Tab = { page: PageKey; label: string; icon: typeof Home; badge?: keyof Coun
 /* Master-prompt mobile nav: role-aware 5-tab bar. Sales → Leads/Πελάτες;
    Field → Ημέρα μου/Χάρτης; Back Office → Operations/Follow Ups. */
 function tabsForRole(role: Role): Tab[] {
+  // Αρχική + Η εργασία μου are always first; the rest is role-specific. Other pages stay reachable from «Περισσότερα».
   const tabs: Tab[] = [
     { page: 'home', label: 'Αρχική', icon: Home },
-    { page: 'cases', label: 'Cases', icon: Briefcase },
+    { page: 'mywork', label: 'Εργασία', icon: Inbox },
   ];
   if (role === 'admin' || role === 'manager' || role === 'inside_sales') {
     tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
-    tabs.push({ page: 'customers', label: 'Πελάτες', icon: UsersRound });
+    tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
   } else if (role === 'field_sales') {
     tabs.push({ page: 'myday', label: 'Ημέρα μου', icon: Compass, badge: 'followups' });
     tabs.push({ page: 'map', label: 'Χάρτης', icon: Map });
   } else {
-    tabs.push({ page: 'backoffice', label: 'Operations', icon: MonitorCog });
-    tabs.push({ page: 'followups', label: 'Follow Ups', icon: CalendarClock, badge: 'followups' });
+    tabs.push({ page: 'backoffice', label: 'Λειτουργίες', icon: MonitorCog });
+    tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
   }
   return tabs.slice(0, 4);
 }

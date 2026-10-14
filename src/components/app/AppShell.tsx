@@ -15,13 +15,14 @@ import {
   fetchNotifications, markNotificationsRead,
 } from '@/lib/api';
 import {
-  Bell, Briefcase, CalendarClock, ChevronDown, ChevronRight, CircleHelp, Download, FileText, LogOut,
-  Menu, Plus, Search, SlidersHorizontal, UserCircle, UserPlus, UsersRound, X,
+  Bell, ChevronDown, ChevronRight, CircleHelp, Download, FileText, LogOut,
+  Menu, Plus, Search, SlidersHorizontal, UserCircle, UsersRound, X,
 } from 'lucide-react';
 import MobileShell from '@/components/shells/MobileShell';
 import TabletShell from '@/components/shells/TabletShell';
 import DesktopShell from '@/components/shells/DesktopShell';
 import QuickAdd from './QuickAdd';
+import '@/styles/atlas-ux.css';
 import RoleSwitcher from './RoleSwitcher';
 
 import HomePage from './HomePage';
@@ -138,12 +139,7 @@ function Drawer({ open, onClose }: {
             const c = sectionColor(s);
             return (
               <div key={s.id}>
-                <div className="flex items-center gap-1.5 px-2 mb-1.5">
-                  <span className="w-5 h-5 rounded-md inline-flex items-center justify-center" style={{ background: rgbaOf(c, 0.2) }}>
-                    <s.icon className="w-3.5 h-3.5" style={{ color: '#fff' }} aria-hidden="true" />
-                  </span>
-                  <span className="micro text-white/60">{s.label}</span>
-                </div>
+                {s.children.length > 1 && s.children[0].label !== s.label && <div className="nav-section-caption">{s.label}</div>}
                 <div className="space-y-0.5">
                   {s.children.map((item: NavLeaf) => (
                     <button key={item.key} onClick={() => { go(item.page); onClose(); }}
@@ -185,8 +181,8 @@ function Drawer({ open, onClose }: {
 }
 
 /* ---------------- Header (shared across shells) ---------------- */
-function Header({ onOpenPalette, onOpenDrawer, onSignOut, counts }: {
-  onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void; counts: ShellCounts;
+function Header({ onOpenPalette, onOpenDrawer, onSignOut }: {
+  onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void;
 }) {
   const { role, profile, user } = useAuth();
   const { view, openCase, go } = useNav();
@@ -201,7 +197,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, counts }: {
   const title = view.page === 'case' ? 'Case' : PAGE_TITLES[view.page] ?? 'ATLAS';
   const crumb = view.page === 'case'
     ? ['Cases', 'Case Detail']
-    : nav ? [nav.section.label, nav.item.label] : ['ATLAS'];
+    : nav ? (nav.section.label === nav.item.label ? [nav.section.label] : [nav.section.label, nav.item.label]) : ['ATLAS'];
 
   const navCat = view.page === 'case' ? '#0066cc' : nav ? sectionColor(nav.section) : '#475569';
 
@@ -232,34 +228,11 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, counts }: {
         </div>
       </div>
 
-      {/* Top-bar shortcuts (desktop only) — Leads · Πελάτες · Cases · Follow Ups */}
-      <div className="hidden xl:flex items-center gap-0.5 mr-1">
-        {([
-          { key: 'leads' as const, label: 'Leads', page: 'leads' as const, icon: UserPlus, color: '#087CF5' },
-          { key: 'customers' as const, label: 'Πελάτες', page: 'customers' as const, icon: UsersRound, color: '#15803d' },
-          { key: 'cases' as const, label: 'Cases', page: 'cases' as const, icon: Briefcase, color: '#7c3aed' },
-          { key: 'followups' as const, label: 'Follow Ups', page: 'followups' as const, icon: CalendarClock, color: '#b45309' },
-        ]).map(q => {
-          const n = counts[q.key];
-          return (
-            <button key={q.key} onClick={() => go(q.page)} title={q.label}
-              className="flex items-center gap-1.5 h-9 px-2.5 rounded-[9px] bg-ink/[0.03] hover:bg-ink/[0.07] text-ink/65 hover:text-ink text-[12.5px] font-medium transition-colors">
-              <q.icon className="w-4 h-4" style={{ color: q.color }} aria-hidden="true" />
-              <span className="hidden 2xl:inline">{q.label}</span>
-              {n > 0 && (
-                <span className="min-w-[16px] h-4 px-1 rounded-full inline-flex items-center justify-center text-[9px] font-bold font-[var(--font-mono)]"
-                  style={{ background: rgbaOf(q.color, 0.12), color: q.color }}>{n > 9 ? '9+' : n}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
       <button onClick={onOpenPalette}
-        className="flex items-center gap-2 h-9 px-3 rounded-[10px] bg-ink/[0.045] text-ink/45 hover:text-ink/75 hover:bg-ink/[0.07] text-[13px] transition-colors w-[280px] max-w-[38vw]">
+        className="flex items-center gap-2 h-9 rounded-[10px] bg-ink/[0.045] text-ink/45 hover:text-ink/75 hover:bg-ink/[0.07] text-[13px] transition-colors w-9 sm:w-[280px] sm:max-w-[38vw] justify-center sm:justify-start px-0 sm:px-3" aria-label="Αναζήτηση">
         <Search className="w-4 h-4 shrink-0" />
-        <span className="flex-1 text-left truncate">Αναζήτηση…</span>
-        <kbd className="micro bg-white/70 text-ink/40 rounded px-1.5 py-0.5 border border-ink/10">⌘K</kbd>
+        <span className="hidden sm:inline flex-1 text-left truncate">Αναζήτηση…</span>
+        <kbd className="hidden sm:inline micro bg-white/70 text-ink/40 rounded px-1.5 py-0.5 border border-ink/10">⌘K</kbd>
       </button>
 
       <QuickAdd />
@@ -593,12 +566,12 @@ export default function AppShell() {
   })();
 
   return (
-    <div className="relative min-h-screen bg-paper text-ink flex">
+    <div className="atx-shell relative min-h-screen bg-paper text-ink flex">
       <div className="shell-backdrop" aria-hidden="true" />
       {isDesktop && <DesktopShell counts={counts} />}
       {isTablet && <TabletShell counts={counts} />}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
-        <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} counts={counts} />
+        <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} />
         <main className={`flex-1 overflow-y-auto px-4 sm:px-7 pt-6 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-10'}`}>
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>

@@ -1,39 +1,7 @@
-/* ------------------------------------------------------------------ */
-/*  B2B Prospecting (scraper) — data layer.                            */
-/*                                                                     */
-/*  Search runs in the `scrape-b2b` edge function (SerpApi Google Maps  */
-/*  engine, key held server-side in crm_settings). The import step      */
-/*  stays on the client so scraped businesses enter the CRM through     */
-/*  createLead() — same attribution, provider resolution and pipeline   */
-/*  status as a hand-typed lead.                                       */
-/* ------------------------------------------------------------------ */
+/* B2B scraper — shared labels and admin settings. The search itself runs in the scrape-b2b edge function
+   (key server-side) and lands in the B2B review queue (lib/b2b.ts), never directly in leads. */
 
 import { supabase } from './supabase';
-import { createLead } from './api';
-
-export type ScrapedBusiness = {
-  company: string;
-  phone: string;
-  email: string;
-  address: string;
-  website: string;
-  category: string;
-  region: string;
-  source: string;
-  rating: number | null;
-  totalReviews: number | null;
-  placeId: string | null;
-  lat: number | null;
-  lng: number | null;
-};
-
-export type ScrapeSourceInfo = { api: string; query: string; region: string; ll: string };
-
-export type ScrapeResult = {
-  businesses: ScrapedBusiness[];
-  sourceInfo: ScrapeSourceInfo | null;
-  error: string | null;
-};
 
 /* Business categories the edge function knows how to query. */
 export const B2B_CATEGORIES: { value: string; label: string }[] = [
@@ -75,119 +43,14 @@ function logError(method: string, err: unknown) {
   console.error(`[atlas.scraper] ${method}:`, err);
 }
 
-/* ---------------- Search ---------------- */
-
-export async function runB2BScrape(params: {
-  category: string; region: string; maxResults: number;
-}): Promise<ScrapeResult> {
-  const empty: ScrapeResult = { businesses: [], sourceInfo: null, error: null };
-  if (!supabase) return { ...empty, error: 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.' };
-  try {
-    const { data, error } = await supabase.functions.invoke('scrape-b2b', {
-      body: {
-        category: params.category,
-        region: params.region,
-        maxResults: params.maxResults,
-        importToDb: false,
-      },
-    });
-    if (error) throw error;
-    if (data?.error) return { ...empty, error: String(data.error) };
-    const businesses = Array.isArray(data?.businesses) ? (data.businesses as ScrapedBusiness[]) : [];
-    return { businesses, sourceInfo: (data?.source_info ?? null) as ScrapeSourceInfo | null, error: null };
-  } catch (e) {
-    logError('runB2BScrape', e);
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ...empty, error: `Η αναζήτηση απέτυχε: ${msg}` };
-  }
-}
-
-/* ---------------- Import to the lead pipeline ---------------- */
-
-export function normalizePhone(v: string | null | undefined): string {
-  const digits = (v ?? '').replace(/\D/g, '');
-  return digits.length > 10 ? digits.slice(-10) : digits;
-}
-
-async function existingLeadPhones(): Promise<Set<string>> {
-  const out = new Set<string>();
-  if (!supabase) return out;
-  const { data, error } = await supabase.from('leads').select('phone');
-  if (error) { logError('existingLeadPhones', error); return out; }
-  for (const row of data ?? []) {
-    const p = normalizePhone((row as { phone: string | null }).phone);
-    if (p) out.add(p);
-  }
-  return out;
-}
-
-export type ImportOutcome = { imported: number; duplicates: number; failed: number };
-
-/* Scraped businesses become `import` leads tagged with a source label —
-   `leads.source` is a constrained enum, so the scraper identifies itself
-   through source_label instead of a new source value. */
-export async function importScrapedBusinesses(
-  list: ScrapedBusiness[],
-  opts?: { serviceCategory?: string },
-): Promise<ImportOutcome> {
-  const outcome: ImportOutcome = { imported: 0, duplicates: 0, failed: 0 };
-  const known = await existingLeadPhones();
-  const service = opts?.serviceCategory ?? 'energy';
-
-  for (const b of list) {
-    const phone = normalizePhone(b.phone);
-    if (phone && known.has(phone)) { outcome.duplicates++; continue; }
-
-    const notes = [
-      `Πηγή: ${b.source === 'serpapi' ? 'SerpApi Google Maps' : b.source}`,
-      b.category ? `Κατηγορία: ${b.category}` : null,
-      b.address ? `Διεύθυνση: ${b.address}` : null,
-      b.website ? `Ιστοσελίδα: ${b.website}` : null,
-      b.rating ? `Αξιολόγηση: ${b.rating} (${b.totalReviews ?? 0} κριτικές)` : null,
-    ].filter(Boolean).join(' | ');
-
-    const lead = await createLead({
-      full_name: b.company,
-      company: b.company,
-      phone: b.phone || null,
-      email: b.email || null,
-      address: b.address || null,
-      region: b.region || null,
-      service_category: service,
-      lead_type: 'B2B',
-      source: 'import',
-      source_label: 'B2B Scraper · Google Maps',
-      status: 'new',
-      comments: notes,
-      lat: b.lat ?? null,
-      lng: b.lng ?? null,
-      location_source: b.lat != null && b.lng != null ? 'scraper' : null,
-    });
-
-    if (lead) { outcome.imported++; if (phone) known.add(phone); }
-    else outcome.failed++;
-  }
-  return outcome;
-}
-
-/* ---------------- CSV export ---------------- */
-
-export function businessesToCsv(list: ScrapedBusiness[]): string {
-  const headers = ['Εταιρεία', 'Κατηγορία', 'Περιοχή', 'Τηλέφωνο', 'Ιστοσελίδα', 'Διεύθυνση', 'Πηγή', 'Αξιολόγηση', 'Κριτικές'];
-  const rows = list.map(r => [
-    r.company, r.category, r.region, r.phone, r.website, r.address, r.source,
-    r.rating != null ? String(r.rating) : '', r.totalReviews != null ? String(r.totalReviews) : '',
-  ]);
-  const esc = (c: string) => `"${(c ?? '').replace(/"/g, '""')}"`;
-  /* BOM keeps Greek readable when Excel opens the file. */
-  return '﻿' + [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n');
-}
-
 /* ---------------- Settings (admin) ---------------- */
 
 export type ScraperConfig = {
   max_results: number;
+  /** Used as the cap of searches per run (scrape-b2b). */
   rate_limit_per_minute: number;
+  /** Searches allowed per day for the whole workspace (Europe/Athens). */
+  daily_query_limit?: number;
   auto_import: boolean;
   default_region: string;
   default_category: string;
@@ -196,6 +59,7 @@ export type ScraperConfig = {
 export const DEFAULT_SCRAPER_CONFIG: ScraperConfig = {
   max_results: 20,
   rate_limit_per_minute: 10,
+  daily_query_limit: 100,
   auto_import: false,
   default_region: 'Αττική',
   default_category: 'energy',

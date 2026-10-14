@@ -367,3 +367,12 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-blockers { padding: 12px 14px; border-radius: 12px; background: rgba(201, 48, 44, 0.07); color: #9b2420; border: 1px solid rgba(201, 48, 44, 0.18); }
 .atx-returned { margin-bottom: 12px; padding: 14px 16px; border-radius: 14px; background: #fff6e5; color: #6b4300; border: 1px solid #f0d59a; }
 .atx-returned strong { font-size: 15px; }
+
+/* ====================== B2B prospecting ====================== */
+.atx-form { padding: 16px; display: grid; gap: 14px; }
+.atx-form-label { display: block; font-size: 13px; font-weight: 600; color: var(--atx-ink); margin-bottom: 6px; }
+.atx-chip.is-on { background: var(--atx-blue-soft); color: var(--atx-blue); border-color: rgba(22, 119, 255, 0.35); font-weight: 600; }
+.atx-count { margin-left: 6px; display: inline-flex; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; background: var(--atx-blue-soft); color: var(--atx-blue); }
+.atx-result { padding: 12px 14px; border-radius: 12px; background: rgba(31, 122, 61, 0.08); color: #1f5c33; }
+.atx-bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-radius: 12px; background: var(--atx-blue-soft); font-size: 14px; }

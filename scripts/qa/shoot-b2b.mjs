@@ -1,0 +1,26 @@
+// Screenshots of B2B Prospecting: search, review queue, assignment (mock Supabase, synthetic data, no SerpApi).
+import { launch, signInAs, sleep } from './ui-session.mjs';
+const OUT = 'docs/product/screenshots/after';
+const tab = (page, t) => page.evaluate((x) => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim().startsWith(x))?.click(), t);
+const { browser, page } = await launch(1440, 900);
+await signInAs(page, 'back_office');
+await page.evaluate(() => [...document.querySelectorAll('#shell-rail nav button')].find((b) => b.textContent.trim().startsWith('B2B Prospecting'))?.click());
+await sleep(1200);
+await page.evaluate(() => { const i = [...document.querySelectorAll('input.field')][0]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Γλυφάδα, Βούλα'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+await page.evaluate(() => [...document.querySelectorAll('[aria-label="Κατηγορίες"] button')].find((b) => b.textContent.includes('Εστιατόρια'))?.click());
+await sleep(300);
+await page.evaluate(() => [...document.querySelectorAll('button.atx-btn-primary')].find((b) => b.textContent.trim() === 'Αναζήτηση')?.click());
+await sleep(1500);
+await page.screenshot({ path: `${OUT}/b2b-search-1440.jpg`, type: 'jpeg', quality: 75 });
+await tab(page, 'Έλεγχος');
+await sleep(1200);
+await page.evaluate(() => { const boxes = [...document.querySelectorAll('[data-prospect] input[type="checkbox"]')].slice(0, 3); boxes.forEach((b) => b.click()); });
+await sleep(300);
+await page.screenshot({ path: `${OUT}/b2b-review-1440.jpg`, type: 'jpeg', quality: 75 });
+await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Έγκριση')?.click());
+await sleep(1200);
+await tab(page, 'Ανάθεση');
+await sleep(1500);
+await page.screenshot({ path: `${OUT}/b2b-assign-1440.jpg`, type: 'jpeg', quality: 75 });
+await browser.close();
+console.log('done');

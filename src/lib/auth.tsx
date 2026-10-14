@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { Role, DEFAULT_ROLE } from './roles';
 import { fetchUserRoles } from './api';
+import { previewAllowed, ROLE_PREVIEW_HARD_STOP, setPreviewActive } from './role-preview';
 
 export type Profile = {
   id: string;
@@ -21,8 +22,10 @@ interface AuthContextValue {
   /* Canonical multi-role set from user_roles (Phase 1.1). Falls back to the
      single profile role when the foundation tables are not yet live. */
   roles: Role[];
-  setRoleOverride: (r: Role) => void;
-  clearRoleOverride: () => void;
+  /** Presentation-only role preview (server-allowlisted, time-boxed, read-only). Never changes real permissions. */
+  preview: { allowed: boolean; role: Role | null; expiresAt: number | null };
+  startPreview: (r: Role) => Promise<boolean>;
+  endPreview: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -30,16 +33,21 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const ROLE_KEY = 'atlas.role.override';
+// Per browser tab only (sessionStorage): a preview never outlives the tab, and is re-validated on load.
+const PREVIEW_KEY = 'atlas.preview.role';
+const LEGACY_ROLE_KEY = 'atlas.role.override';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [canonicalRoles, setCanonicalRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [roleOverride, setRoleOverrideState] = useState<Role | null>(
-    () => (localStorage.getItem(ROLE_KEY) as Role) ?? null,
-  );
+  const [previewRole, setPreviewRole] = useState<Role | null>(() => {
+    try { localStorage.removeItem(LEGACY_ROLE_KEY); return (sessionStorage.getItem(PREVIEW_KEY) as Role) ?? null; } catch { return null; }
+  });
+  // Server answer: { allowed, expires_at, server_now }; offset = server clock − browser clock.
+  const [previewGrant, setPreviewGrant] = useState<{ status: Record<string, unknown> | null; offset: number }>({ status: null, offset: 0 });
+  const [tick, setTick] = useState(() => Date.now());
 
   const refreshProfile = useCallback(async () => {
     if (!supabase || !session?.user) return;
@@ -82,27 +90,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
-  const signOut = async () => {
-    if (supabase) await supabase.auth.signOut();
-    localStorage.removeItem(ROLE_KEY);
-  };
-
-  const setRoleOverride = (r: Role) => {
-    localStorage.setItem(ROLE_KEY, r);
-    setRoleOverrideState(r);
-  };
-
-  const clearRoleOverride = () => {
-    localStorage.removeItem(ROLE_KEY);
-    setRoleOverrideState(null);
-  };
-
-  // Effective role = admin-only simulator override, else the real profile role.
-  // Security: the override is a UI-only "view as" aid and is honoured ONLY for a real admin.
-  // For everyone else any stored override is ignored (real data access is enforced by the database and
-  // edge functions, never by this value).
   const physicalRole: Role = profile?.role ?? DEFAULT_ROLE;
-  const role: Role = physicalRole === 'admin' && roleOverride ? roleOverride : physicalRole;
+
+  // Ask the server whether this account may use the presentation preview (fails closed on any error).
+  useEffect(() => {
+    let alive = true;
+    if (!supabase || !profile || profile.role !== 'admin' || Date.now() >= ROLE_PREVIEW_HARD_STOP) {
+      setPreviewGrant({ status: null, offset: 0 });
+      return;
+    }
+    const sent = Date.now();
+    supabase.rpc('role_preview_status').then(({ data, error }) => {
+      if (!alive) return;
+      const st = !error && data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+      const serverNow = st ? Date.parse(String(st.server_now ?? '')) : NaN;
+      setPreviewGrant({ status: st, offset: Number.isFinite(serverNow) ? serverNow - Math.round((sent + Date.now()) / 2) : 0 });
+    }, () => alive && setPreviewGrant({ status: null, offset: 0 }));
+    return () => { alive = false; };
+  }, [profile]);
+
+  // Re-check the expiry every 20 s so the preview ends by itself at 00:00 Athens.
+  useEffect(() => { const t = window.setInterval(() => setTick(Date.now()), 20_000); return () => window.clearInterval(t); }, []);
+
+  const allowed = physicalRole === 'admin' && previewAllowed(previewGrant.status as never, tick, previewGrant.offset);
+  const activePreview: Role | null = allowed && previewRole && previewRole !== physicalRole ? previewRole : null;
+  setPreviewActive(activePreview !== null); // keep the request guard in sync before children render
+  const expiresAt = allowed ? Math.min(Date.parse(String(previewGrant.status?.expires_at)), ROLE_PREVIEW_HARD_STOP) : null;
+
+  const clearPreviewState = () => {
+    try { sessionStorage.removeItem(PREVIEW_KEY); } catch { /* ignore */ }
+    setPreviewRole(null);
+    setPreviewActive(false);
+  };
+
+  // Expired or no longer allowed → drop any stored preview.
+  useEffect(() => { if (previewRole && !allowed && profile) clearPreviewState(); }, [allowed, previewRole, profile]);
+
+  const startPreview = async (r: Role): Promise<boolean> => {
+    if (!supabase || !allowed) return false;
+    if (r === physicalRole) { await endPreview(); return true; }
+    // The server re-checks the grant and records the start in the audit log; no answer → no preview.
+    const { data, error } = await supabase.rpc('role_preview_event', { p_action: 'start', p_role: r });
+    if (error || data !== true) return false;
+    try { sessionStorage.setItem(PREVIEW_KEY, r); } catch { /* ignore */ }
+    setPreviewRole(r);
+    setPreviewActive(true);
+    return true;
+  };
+
+  const endPreview = async () => {
+    const was = previewRole;
+    clearPreviewState();
+    if (supabase && was) await supabase.rpc('role_preview_event', { p_action: 'end', p_role: was }).then(() => undefined, () => undefined);
+  };
+
+  const signOut = async () => {
+    clearPreviewState();
+    if (supabase) await supabase.auth.signOut();
+  };
+
+  // Effective role for rendering = the preview role while a valid preview runs, else the real profile role.
+  // Data access is always enforced by the database/edge functions with the REAL session role.
+  const role: Role = activePreview ?? physicalRole;
 
   // Canonical role set: prefer user_roles; fall back to the single profile role
   // so existing single-role installs behave identically.
@@ -119,8 +168,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         role,
         roles,
-        setRoleOverride,
-        clearRoleOverride,
+        preview: { allowed, role: activePreview, expiresAt },
+        startPreview,
+        endPreview,
         signIn,
         signOut,
         refreshProfile,

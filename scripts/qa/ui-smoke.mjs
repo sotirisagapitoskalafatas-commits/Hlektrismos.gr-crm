@@ -18,7 +18,7 @@ const EXPECT = {
   manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', ...ADMIN_ONLY], mustNot: [] },
   inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'Λειτουργίες', 'Χάρτης'] },
   field_sales: { must: ['Αρχική', 'Η εργασία μου', 'Ημέρα μου', 'Χάρτης', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Λειτουργίες', 'B2B Prospecting'] },
-  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Λειτουργίες', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Χάρτης', 'B2B Prospecting'] },
+  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Λειτουργίες', 'Cases', 'Διαχείριση'], mustNot: ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Leads', 'Χάρτης', 'B2B Prospecting'] },
 };
 
 /* ---- 1. per-role navigation + role simulator ---- */
@@ -29,12 +29,17 @@ for (const role of Object.keys(EXPECT)) {
   const label = (n) => nav.some((t) => t.startsWith(n));
   for (const m of EXPECT[role].must) check(`${role}: nav shows «${m}»`, label(m));
   for (const m of EXPECT[role].mustNot) check(`${role}: nav hides «${m}»`, !label(m));
-  const sim = await page.evaluate(() => document.body.innerText.includes('Επίδειξη ρόλου'));
-  // the simulator lives in the account area; check Preferences page for the section
+  // The demo selector exists only in the account menu, only for the server-allowlisted admin (mock: admin).
+  await page.evaluate(() => document.querySelector('[aria-label="Λογαριασμός"]')?.click());
+  await sleep(500);
+  const menu = await page.evaluate(() => document.querySelector('[role="menu"]')?.innerText ?? '');
+  check(`${role}: account menu = identity, real role, Λογαριασμός, Προτιμήσεις, Κέντρο βοήθειας, Αποσύνδεση`,
+    ['Λογαριασμός', 'Προτιμήσεις', 'Κέντρο βοήθειας', 'Αποσύνδεση', 'Ρόλος'].every((t) => menu.includes(t)) && !/\bsim\b|πραγματικός/.test(menu));
+  check(`${role}: demo role selector ${role === 'admin' ? 'shown (allowed)' : 'absent'}`, (role === 'admin') === menu.includes('Επίδειξη ρόλου'));
+  await page.evaluate(() => document.querySelector('.fixed.inset-0.z-40')?.click());
   await click(page, 'Προτιμήσεις');
   await sleep(700);
-  const simPref = await page.evaluate(() => document.body.innerText.includes('Προσομοίωση ρόλου'));
-  check(`${role}: role simulator ${role === 'admin' ? 'available' : 'hidden'}`, (role === 'admin') === (simPref || sim));
+  check(`${role}: no role simulator on Preferences`, !(await page.evaluate(() => document.body.innerText.includes('Προσομοίωση ρόλου'))));
   check(`${role}: no unexpected console errors`, errors.filter((e) => !/fetchPriority|fetchpriority|Failed to load resource/.test(e)).length === 0, errors.slice(0, 1).join('|'));
   await browser.close();
 }
@@ -43,11 +48,147 @@ for (const role of Object.keys(EXPECT)) {
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'inside_sales');
-  await page.evaluate(() => localStorage.setItem('atlas.role.override', 'admin'));
+  await page.evaluate(() => { localStorage.setItem('atlas.role.override', 'admin'); sessionStorage.setItem('atlas.preview.role', 'admin'); });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await sleep(3000);
   const nav = await text(page, '#shell-rail nav button');
   check('inside_sales with stored admin override: admin items stay hidden', !nav.some((t) => ADMIN_ONLY.some((a) => t.startsWith(a))));
+  check('inside_sales with stored preview: no preview banner', !(await page.evaluate(() => document.body.innerText.includes('ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ'))));
+  await browser.close();
+}
+
+/* ---- 2b. Role preview (presentation): banner, read-only, exit, expiry ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'admin');
+  await sleep(1200);
+  await page.evaluate(() => document.querySelector('[aria-label="Λογαριασμός"]')?.click());
+  await sleep(400);
+  await page.evaluate(() => [...document.querySelectorAll('[role="menu"] [role="radio"]')].find((b) => b.textContent.includes('Back Office'))?.click());
+  await sleep(1500);
+  const body = () => page.evaluate(() => document.body.innerText);
+  check('Preview: banner says DEMO, real role and read-only', /ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ — DEMO/.test(await body()) && (await body()).includes('Πραγματικός ρόλος: Διαχειριστής') && (await body()).includes('μόνο ανάγνωση'));
+  const nav = await text(page, '#shell-rail nav button');
+  check('Preview: navigation shows the Back Office view', nav.some((t) => t.startsWith('Λειτουργίες')) && !nav.some((t) => t.startsWith('Leads')));
+  let log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Preview: start recorded on the server (audited)', log.some((l) => l.table === 'role_preview_event' && l.body.p_action === 'start' && l.body.p_role === 'back_office'));
+  // a write while previewing never leaves the browser
+  await click(page, 'Διαχείριση', '#shell-rail nav button');
+  await sleep(1500);
+  await page.evaluate(() => document.querySelector('[data-staff="bo2@example.invalid"] button[title="Επεξεργασία"]')?.click());
+  await sleep(800);
+  await page.evaluate(() => { const i = [...document.querySelectorAll('input.field')][0]; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, 'Αλλαγμένο Όνομα'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await click(page, 'Αποθήκευση');
+  await sleep(1200);
+  log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Preview: writes are blocked before reaching the server', !log.some((l) => l.table === 'staff_update') && (await body()).includes('μόνο ανάγνωση'));
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Άκυρο')?.click());
+  await click(page, 'Επιστροφή στον πραγματικό ρόλο');
+  await sleep(1200);
+  log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Preview: exit restores the real role and is audited', !(await body()).includes('ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ') && log.some((l) => l.table === 'role_preview_event' && l.body.p_action === 'end'));
+  // after expiry the selector disappears and a stored preview is ignored (server says no)
+  await page.evaluate(() => sessionStorage.setItem('atlas.preview.role', 'field_sales'));
+  await fetch('http://127.0.0.1:54399/__preview?state=expired');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await sleep(2500);
+  await page.evaluate(() => document.querySelector('[aria-label="Λογαριασμός"]')?.click());
+  await sleep(400);
+  check('Preview expired: selector gone and stored preview ignored', !(await body()).includes('Επίδειξη ρόλου') && !(await body()).includes('ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ'));
+  await fetch('http://127.0.0.1:54399/__preview?state=on');
+  await browser.close();
+}
+
+/* ---- 2c. Admin Center: tabs per role, honest security, user management ---- */
+{
+  const tabsOf = async (page) => page.evaluate(() => [...document.querySelectorAll('[role="tablist"][aria-label="Ενότητες διαχείρισης"] [role="tab"]')].map((t) => t.textContent.trim()));
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'admin');
+  await click(page, 'Διαχείριση', '#shell-rail nav button');
+  await sleep(1500);
+  const tabs = await tabsOf(page);
+  check('Admin Center (admin): 8 grouped tabs', ['Επισκόπηση', 'Χρήστες & Ρόλοι', 'Δικαιώματα', 'Cases & Ροή εργασίας', 'Έγγραφα', 'B2B Scraper', 'Ασφάλεια & Έλεγχοι', 'Audit Log'].every((t) => tabs.includes(t)), tabs.join(','));
+  check('Admin Center: no unverified green claims', !(await page.evaluate(() => /Όλα τα tables προστατεύονται|Ιδιωτικό bucket μόνο για staff|Role-check policies/.test(document.body.innerText))));
+  await click(page, 'Ασφάλεια & Έλεγχοι', '[role="tab"]');
+  await sleep(500);
+  check('Security: unverified items are labelled «Δεν έχει επαληθευτεί ζωντανά»', await page.evaluate(() => document.querySelectorAll('[data-status="unverified"]').length >= 4 && document.body.innerText.includes('Δεν έχει επαληθευτεί ζωντανά')));
+  check('Security: the profile self-promotion finding is flagged', await page.evaluate(() => document.querySelector('[data-check="profiles-self-promotion"]')?.getAttribute('data-status') === 'action'));
+  await click(page, 'Χρήστες & Ρόλοι', '[role="tab"]');
+  await sleep(1200);
+  check('Users: directory with e-mail and status; no actions on your own row', await page.evaluate(() => !!document.querySelector('[data-staff="manager@example.invalid"]') && !document.querySelector('[data-staff="admin@example.invalid"] button[title="Διαγραφή"]')));
+  // create (invite)
+  await click(page, 'Νέος χρήστης');
+  await sleep(500);
+  await page.evaluate(() => {
+    const set = (el, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const ins = [...document.querySelectorAll('input.field')];
+    set(ins[0], 'Δοκιμαστικός Χρήστης'); set(ins[1], 'new.staff@example.invalid');
+    [...document.querySelectorAll('[role="radiogroup"][aria-label="Ρόλος"] [role="radio"]')].find((b) => b.querySelector('span')?.textContent.trim() === 'Field Sales')?.click();
+  });
+  await sleep(200);
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.click());
+  await sleep(1500);
+  let log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  const created = log.filter((l) => l.table === 'admin-users').pop();
+  check('Users: create sends role + invite to the admin-users function (no password)', created?.body?.action === 'create' && created.body.role === 'field_sales' && created.body.mode === 'invite' && !created.body.password);
+  check('Users: new account appears after re-reading the directory', await page.evaluate(() => !!document.querySelector('[data-staff="new.staff@example.invalid"]')));
+  // delete someone with CRM history → refused, deactivation offered
+  await page.evaluate(() => document.querySelector('[data-staff="inside_sales@example.invalid"] button[title="Διαγραφή"]')?.click());
+  await sleep(800);
+  check('Users: deleting someone with CRM history is refused (deactivate instead)', await page.evaluate(() => document.body.innerText.includes('εγγραφές του CRM') && !![...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Απενεργοποίηση')));
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Απενεργοποίηση')?.click());
+  await sleep(400);
+  await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Απενεργοποίηση').pop()?.click());
+  await sleep(1200);
+  log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Users: deactivation goes through staff_set_active', log.some((l) => l.table === 'staff_set_active' && l.body.p_active === false));
+  // delete the new account (no history) with typed confirmation
+  await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim() === 'Όλοι')?.click());
+  await sleep(300);
+  await page.evaluate(() => document.querySelector('[data-staff="new.staff@example.invalid"] button[title="Διαγραφή"]')?.click());
+  await sleep(800);
+  const delBtnDisabled = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Οριστική διαγραφή'))?.disabled);
+  await page.evaluate(() => { const i = [...document.querySelectorAll('input.field')].pop(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'new.staff@example.invalid'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await sleep(200);
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Οριστική διαγραφή'))?.click());
+  await sleep(1500);
+  check('Users: permanent delete needs the typed e-mail and removes the account', delBtnDisabled === true && !(await page.evaluate(() => !!document.querySelector('[data-staff="new.staff@example.invalid"]'))));
+  await click(page, 'Audit Log', '[role="tab"]');
+  await sleep(1000);
+  check('Audit Log: create / deactivate / delete are listed', await page.evaluate(() => ['Δημιουργία χρήστη', 'Απενεργοποίηση', 'Οριστική διαγραφή'].every((t) => document.body.innerText.includes(t))));
+  await browser.close();
+}
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'manager');
+  await click(page, 'Διαχείριση', '#shell-rail nav button');
+  await sleep(1200);
+  await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim() === 'Χρήστες & Ρόλοι')?.click());
+  await sleep(1000);
+  await click(page, 'Νέος χρήστης');
+  await sleep(500);
+  const opts = await page.evaluate(() => [...document.querySelectorAll('[role="radiogroup"][aria-label="Ρόλος"] [role="radio"]')].map((b) => b.textContent));
+  check('Manager: can create only Inside Sales / Field Sales / Back Office', opts.length === 3 && !opts.some((o) => /Διαχειριστής|Διευθυντής/.test(o)), opts.join('|'));
+  check('Manager: no actions on admin rows', await page.evaluate(() => !document.querySelector('[data-staff="admin@example.invalid"] button[title="Επεξεργασία"]')));
+  await browser.close();
+}
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'back_office');
+  await click(page, 'Διαχείριση', '#shell-rail nav button');
+  await sleep(1500);
+  const roles = await page.evaluate(() => [...document.querySelectorAll('[data-staff] .atx-role')].map((x) => x.textContent));
+  check('Back Office: sees and manages Back Office colleagues only', roles.length >= 1 && roles.every((r) => r === 'Back Office') && (await page.evaluate(() => !document.body.innerText.includes('Ασφάλεια & Έλεγχοι'))), roles.join(','));
+  await browser.close();
+}
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Λογαριασμός', '#shell-rail nav button');
+  await sleep(1000);
+  const t = await page.evaluate(() => document.body.innerText);
+  check('Account page: real role read-only with the administrator note; no role list', t.includes('Ο ρόλος και τα δικαιώματά σας ορίζονται από τον διαχειριστή.') && !t.includes('τρέχων'));
   await browser.close();
 }
 
@@ -108,6 +249,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
       await page.evaluate((l) => { const el = [...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith(l) && b.offsetParent); el && el.click(); }, hash);
       await sleep(900);
     }
+    await sleep(1200); // measure the settled page, not a frame during data loading
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check(`${w}px ${hash === '-' ? 'Αρχική' : 'Η εργασία μου'}: no horizontal overflow`, over <= 0, `overflow=${over}`);
     await browser.close();

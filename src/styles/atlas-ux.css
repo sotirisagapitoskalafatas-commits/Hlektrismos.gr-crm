@@ -324,3 +324,41 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-detail3 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 @media (min-width: 1024px) { .atx-detail3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .atx-detail3 > :nth-child(3) { grid-column: 1 / -1; } }
 @media (min-width: 1280px) { .atx-detail3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .atx-detail3 > :nth-child(3) { grid-column: auto; } }
+
+/* ====================== Role preview banner (presentation only) ====================== */
+.atx-preview-banner { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: #fff3d1; color: #6b4300;
+  border-bottom: 1px solid #efcf7d; font-size: 13px; line-height: 1.4; flex-wrap: wrap; z-index: 20; }
+.atx-preview-banner strong { font-weight: 700; letter-spacing: .01em; }
+.atx-preview-roles { display: inline; color: #7a5a1a; }
+.atx-preview-exit { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid #d9a93a;
+  background: #fff; color: #6b4300; font-weight: 600; font-size: 13px; cursor: pointer; }
+.atx-preview-exit:hover { background: #fffaf0; }
+
+/* ====================== Admin Center ====================== */
+.atx-page.atx-admin { max-width: 1280px; width: 100%; }
+.atx-search { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--atx-line);
+  background: #fff; color: var(--atx-muted); min-width: 240px; flex: 1 1 260px; max-width: 420px; }
+.atx-search input { border: 0; outline: 0; background: transparent; flex: 1; font-size: 14px; color: var(--atx-ink); min-width: 0; }
+.atx-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.atx-table th { text-align: left; font-size: 12px; font-weight: 600; color: var(--atx-muted); padding: 10px 14px; border-bottom: 1px solid var(--atx-line); background: rgba(20, 35, 59, 0.02); }
+.atx-table td { padding: 10px 14px; border-bottom: 1px solid var(--atx-line); vertical-align: middle; }
+.atx-table tr:last-child td { border-bottom: 0; }
+.atx-table tr.is-muted td { color: var(--atx-faint); }
+.atx-avatar { width: 34px; height: 34px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex: none; }
+.atx-role { display: inline-flex; padding: 2px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.atx-icon-btn { width: 32px; height: 32px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--atx-muted);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.atx-icon-btn:hover { background: rgba(20, 35, 59, 0.05); color: var(--atx-ink); }
+.atx-icon-btn.is-danger:hover { background: rgba(201, 48, 44, 0.08); color: var(--atx-red); }
+.atx-check { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--atx-line); }
+.atx-matrix th:not(:first-child), .atx-matrix td:not(:first-child) { text-align: center; }
+.atx-matrix-group td { background: rgba(20, 35, 59, 0.03); font-size: 12px; font-weight: 600; color: var(--atx-muted); }
+.atx-ov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.atx-ov { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--atx-line); background: #fff; cursor: pointer; }
+.atx-ov:hover { box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06); }
+.atx-ov-k { font-size: 12.5px; color: var(--atx-muted); }
+.atx-ov-v { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.atx-ov-v.is-warn { color: var(--atx-amber); }
+.atx-ov-v.is-ok { color: var(--atx-green); }
+.atx-ov-s { font-size: 12.5px; color: var(--atx-muted); line-height: 1.35; }
+@media (max-width: 640px) { .atx-table th, .atx-table td { padding: 9px 10px; } .atx-search { min-width: 0; max-width: none; } }

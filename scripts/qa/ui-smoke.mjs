@@ -251,6 +251,70 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await browser.close();
 }
 
+/* ---- 11. Field day: order, GPS-less fallback, check-in, outcome-gated check-out ---- */
+{
+  const { browser, page } = await launch(390, 844);
+  await signInAs(page, 'field_sales');
+  await page.evaluate(() => { const el = [...document.querySelectorAll('nav button')].find((b) => b.textContent.includes('Ημέρα μου')); el && el.click(); });
+  await sleep(2000);
+  const main = () => page.evaluate(() => document.querySelector('main').innerText);
+  const t = await main();
+  check('Field: next visit shown first with call and check-in', t.includes('Επόμενη επίσκεψη') && t.includes('Πέτρος Νικολάου') && t.includes('Κλήση') && t.includes('Check In'));
+  check('Field: overdue visits from previous days listed separately', t.includes('Εκκρεμείς από προηγούμενες ημέρες'));
+  check('Field: only my follow-ups (no other employees\' items)', !t.includes('Επιβεβαίωση προσφοράς'));
+  await click(page, 'Check In'); await sleep(1800);
+  check('Field: without GPS the server rejects and a labelled fallback is offered', (await main()).includes('Καταγραφή χωρίς GPS') && (await main()).includes('Δεν μετράει ως Check In'));
+  await page.type('[aria-label="Αιτία καταγραφής χωρίς GPS"]', 'Χωρίς σήμα στο υπόγειο');
+  await click(page, 'Καταγραφή χωρίς GPS'); await sleep(1800);
+  let log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Field: fallback recorded as a case note, not a check-in', log.some((l) => l.method === 'POST' && l.table === 'timeline_events' && l.body.title === 'Επίσκεψη χωρίς επιβεβαίωση GPS'));
+  await browser.close();
+
+  const s2 = await launch(390, 844);
+  const ctx = s2.browser.defaultBrowserContext();
+  await ctx.overridePermissions('http://localhost:5199', ['geolocation']);
+  await s2.page.setGeolocation({ latitude: 37.9838, longitude: 23.7275, accuracy: 12 });
+  await signInAs(s2.page, 'field_sales');
+  await s2.page.evaluate(() => { const el = [...document.querySelectorAll('nav button')].find((b) => b.textContent.includes('Ημέρα μου')); el && el.click(); });
+  await sleep(2000);
+  await click(s2.page, 'Check In'); await sleep(2000);
+  const t2 = await s2.page.evaluate(() => document.querySelector('main').innerText);
+  check('Field: with GPS the check-in is accepted and the visit is in progress', t2.includes('Σε εξέλιξη') && t2.includes('Ολοκλήρωση επίσκεψης'));
+  const disabled = await s2.page.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Επιλέξτε αποτέλεσμα/.test(b.textContent)).disabled);
+  check('Field: check-out blocked until an outcome is chosen', disabled === true);
+  await click(s2.page, 'Υπογραφή / συλλογή εγγράφων', '[role="radio"]');
+  await s2.page.type('[aria-label="Σημειώσεις επίσκεψης"]', 'Πήρα ΑΤ και λογαριασμό');
+  await s2.page.evaluate(() => { const i = document.querySelector('input[type="datetime-local"]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, '2030-01-10T10:00'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await click(s2.page, 'Check Out'); await sleep(2200);
+  log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Field: check-out sent with the outcome in the note', log.some((l) => l.table === 'field_checkout' && /Αποτέλεσμα: Υπογραφή/.test(l.body.p_notes)));
+  check('Field: outcome stored on the visit', log.some((l) => l.method === 'PATCH' && l.table === 'case_visits' && l.body.result === 'Υπογραφή / συλλογή εγγράφων'));
+  check('Field: next follow-up created on the case', log.some((l) => l.method === 'POST' && l.table === 'follow_ups'));
+  const over = await s2.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  check('Field: no horizontal overflow at 390px', over <= 0, `overflow=${over}`);
+  await s2.browser.close();
+}
+
+/* ---- 12. Operations queue ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'back_office');
+  await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(2000);
+  const t = await page.evaluate(() => document.querySelector('main').innerText);
+  check('Ops: one queue with blockers and days in stage (no stage columns)', t.includes('Λείπει: Ταυτότητα') && /στο στάδιο/.test(t) && !t.includes('Κενό — κανένα case εδώ'));
+  check('Ops: only back-office stages (no Νέο/Προσφορά cases)', !/· Προσφορά ·|· Νέο ·/.test(t));
+  await click(page, 'Με εκκρεμότητες', '[role="tab"]'); await sleep(300);
+  const blockedRows = await page.$$eval('main li.atx-row', (r) => r.length);
+  await click(page, 'Έτοιμα να προχωρήσουν', '[role="tab"]'); await sleep(300);
+  const readyRows = await page.$$eval('main li.atx-row', (r) => r.length);
+  check('Ops: filters split blocked and ready cases', blockedRows > 0 && readyRows > 0, `${blockedRows}/${readyRows}`);
+  await click(page, 'Ολοκληρώθηκε', 'main button'); await sleep(600);
+  await click(page, 'Επιβεβαίωση'); await sleep(1800);
+  const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Ops: ready case advanced through the confirmed stage change', log.some((l) => l.method === 'PATCH' && l.table === 'cases' && l.body.current_stage === 'completed'));
+  await browser.close();
+}
+
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
 process.exit(failed.length ? 1 : 0);

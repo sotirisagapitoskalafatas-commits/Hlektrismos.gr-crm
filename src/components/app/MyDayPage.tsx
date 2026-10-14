@@ -161,15 +161,15 @@ export default function MyDayPage() {
     const expanded = hero || openId === v.id || inProgress;
     return (
       <li key={v.id} className={hero ? '' : 'atx-row'} style={hero ? undefined : { alignItems: 'flex-start', flexDirection: 'column', gap: 10 }}>
-        <div className="flex items-start gap-3 w-full">
+        <div className="flex items-start gap-x-3 gap-y-1 w-full flex-wrap">
           <span className="atx-icon" aria-hidden="true"><MapPin size={16} /></span>
           <button className="atx-row-main" onClick={() => setOpenId(openId === v.id ? null : v.id)} aria-expanded={expanded}>
-            <span className="atx-row-title" style={hero ? { fontSize: 19 } : undefined}>{name}</span>
+            <span className="atx-row-title" style={hero ? { fontSize: 19, whiteSpace: 'normal' } : { whiteSpace: 'normal' }}>{name}</span>
             <span className="atx-row-sub" style={{ whiteSpace: 'normal' }}>
               {[v.scheduled_at ? fmtTime(v.scheduled_at) : 'Χωρίς ώρα', v.purpose || 'Επίσκεψη', v.case?.case_no, km != null ? `${formatDistance(km)} · ~${durationMinutes(km)}′` : null].filter(Boolean).join(' · ')}
             </span>
           </button>
-          <span className={`atx-tag ${inProgress ? 't-info' : ''}`}>{inProgress ? 'Σε εξέλιξη' : 'Προγραμματισμένη'}</span>
+          <span className="order-last sm:order-none basis-full sm:basis-auto pl-[46px] sm:pl-0"><span className={`atx-tag ${inProgress ? 't-info' : ''}`}>{inProgress ? 'Σε εξέλιξη' : 'Προγραμματισμένη'}</span></span>
         </div>
         {expanded && (
           <div className="w-full grid gap-2" style={{ paddingLeft: hero ? 0 : 46 }}>

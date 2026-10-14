@@ -55,9 +55,12 @@ for (const role of Object.keys(EXPECT)) {
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'inside_sales');
-  const stats = await text(page, '.atx-stat-n');
+  await page.waitForFunction(() => document.querySelectorAll('.atx-kpi-n').length === 5 && !document.querySelector('.atx-kpi-n.is-na'), { timeout: 15000 }).catch(() => {});
+  const all = await text(page, '.atx-kpi-n');
+  const stats = all.slice(0, 4); // the 5th card is the recorded value (money or «μη διαθέσιμο»)
   const [overdue, today, leads, cases] = stats.map(Number);
-  check('Home: stats are numbers (no placeholders/negatives)', stats.length === 4 && stats.every((s) => /^\d+$/.test(s)), stats.join(','));
+  check('Home: stats are numbers (no placeholders/negatives)', all.length === 5 && stats.every((s) => /^\d+$/.test(s)), all.join(','));
+  check('Home: recorded value is money or «μη διαθέσιμο», never a bare 0', /€|μη διαθέσιμο/.test(all[4] ?? ''), all[4]);
   await click(page, 'Η εργασία μου', '#shell-rail nav button');
   await sleep(900);
   const chips = await text(page, '[aria-label="Τύπος εργασίας"] button');
@@ -138,6 +141,39 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await sleep(2500);
   check('Public site: visitor chatbot still present', !!(await p2.page.$('.jv-launcher')));
   await p2.browser.close();
+}
+
+/* ---- 6b. Home command center (admin, 1440×900) ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'admin');
+  await page.waitForSelector('.cc-team .atx-team-row', { timeout: 15000 }).catch(() => {});
+  await sleep(800);
+  const geo = await page.evaluate(() => {
+    const r = (sel) => { const b = document.querySelector(sel)?.getBoundingClientRect(); return b && { left: b.left, top: b.top, right: b.right, width: b.width }; };
+    const main = document.querySelector('main'), work = r('.cc-work'), pipe = r('.cc-pipe'), team = r('.cc-team');
+    return { mainW: main.clientWidth, pageW: r('.atx-page.atx-wide')?.width, work, pipe, team, overflow: main.scrollWidth > main.clientWidth + 1 };
+  });
+  check('Home: uses the available width (no 880px column) and no horizontal overflow', geo.pageW > geo.mainW - 80 && !geo.overflow, `${geo.pageW} of ${geo.mainW}`);
+  check('Home: work, pipeline and team side by side at 1440', geo.work && geo.pipe && geo.team && Math.abs(geo.work.top - geo.pipe.top) < 2 && Math.abs(geo.pipe.top - geo.team.top) < 2 && geo.work.right <= geo.pipe.left && geo.pipe.right <= geo.team.left,
+    JSON.stringify([geo.work, geo.pipe, geo.team].map((x) => x && [Math.round(x.left), Math.round(x.top), Math.round(x.right)])));
+  const body = await page.evaluate(() => document.body.innerText);
+  check('Home: every module present (team, staffing, AI, summary, funnel, back office, docs, top cases, notifications)',
+    ['Η ομάδα', 'Στελέχωση', 'Atlas AI', 'Ενεργά Cases', 'Funnel κατά στάδιο', 'Back Office ροή', 'Έγγραφα & Υπογραφές', 'Κορυφαία Cases', 'Τελευταία συμβάντα'].every((t) => body.includes(t)));
+  check('Home: staffing shown once (moved, not duplicated)', (body.match(/Στελέχωση/g) || []).length === 1);
+  await page.evaluate(() => document.querySelector('.atx-pipe-stage[aria-label^="Αίτηση"]')?.click());
+  await sleep(1200);
+  const listed = await page.evaluate(() => document.querySelector('main').innerText);
+  check('Home: pipeline stage opens Cases filtered by that stage', listed.includes('CS-2026-004') && !listed.includes('CS-2026-001'));
+  await click(page, 'Αρχική', '#shell-rail nav button');
+  await sleep(1500);
+  await click(page, 'Απόκρυψη αναλυτικού πίνακα');
+  await sleep(400);
+  const hidden = await page.evaluate(() => !document.body.innerText.includes('Funnel κατά στάδιο'));
+  await click(page, 'Εμφάνιση αναλυτικού πίνακα');
+  await sleep(400);
+  check('Home: detailed panel can be hidden and shown again', hidden && (await page.evaluate(() => document.body.innerText.includes('Funnel κατά στάδιο'))));
+  await browser.close();
 }
 
 /* ---- 7. Lead details: open from My Work, record first contact, convert ---- */

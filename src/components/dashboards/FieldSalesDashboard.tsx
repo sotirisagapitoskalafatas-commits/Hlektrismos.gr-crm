@@ -72,7 +72,7 @@ export default function FieldSalesDashboard({ d }: { d: DashboardData }) {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Next stop */}
         <Card className="lg:col-span-2">
           <CardHeader micro="Next stop" title="Επόμενη επίσκεψη" action={next && <Pill tone={next.status === 'in_progress' ? 'blue' : 'gray'}>{VISIT_LABEL[next.status]}</Pill>} />

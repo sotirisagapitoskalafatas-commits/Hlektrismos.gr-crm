@@ -524,6 +524,8 @@ export default function AppShell() {
   const [drawer, setDrawer] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  // Pages (e.g. Home «Atlas AI» panel) open the same assistant via a window event.
+  useEffect(() => { const h = () => setAssistantOpen(true); window.addEventListener('atlas:open-assistant', h); return () => window.removeEventListener('atlas:open-assistant', h); }, []);
   const counts = useShellCounts();
 
   useEffect(() => {

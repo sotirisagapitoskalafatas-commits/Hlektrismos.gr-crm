@@ -31,7 +31,7 @@ export default function InsideSalesDashboard({ d }: { d: DashboardData }) {
         <KpiCard label="Follow Ups σήμερα" value={String(overdue.length + today.length)} sub={`${today.length} σήμερα · ${overdue.length} εκπρόθεσμα`} icon={Plus} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Leads needing contact */}
         <Card className="lg:col-span-2 !p-0" pad={false}>
           <CardHeader micro="Leads" title="Χρειάζονται επικοινωνία" className="px-5 pt-5"

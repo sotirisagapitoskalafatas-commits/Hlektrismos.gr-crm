@@ -3,7 +3,8 @@ import { BACK_OFFICE_STAGES, stageLabel } from '@/lib/roles';
 import { Btn, Card, CardHeader, EmptyState, Pill, StagePill, fmtDateTime, fmtMoney } from '@/lib/ui';
 import { History, MonitorCog, Target, Users } from 'lucide-react';
 import type { DashboardData } from './data';
-import { activeCases, lastActionDays, lostCases, overdueFUs, pipelineValue, wonCases, wonValue, ServiceLabel } from './data';
+import { activeCases, lastActionDays, lostCases, overdueFUs, wonCases, wonValue, ServiceLabel } from './data';
+import { pipelineStats } from '@/lib/home-insights';
 import { BarRow, EmptyNote, KpiCard } from './shared';
 
 function leaderTitle(a: 'inside_sales_owner' | 'field_sales_owner' | 'back_office_owner'): string {
@@ -15,6 +16,7 @@ export default function ManagerDashboard({ d }: { d: DashboardData }) {
   const { cases, leads, followUps } = d;
 
   const active = activeCases(cases);
+  const pipe = pipelineStats(cases);
   const won = wonCases(cases);
   const lost = lostCases(cases);
   const finished = won.length + lost.length;
@@ -44,11 +46,11 @@ export default function ManagerDashboard({ d }: { d: DashboardData }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Ενεργά Cases" value={String(active.length)} sub={`${total} συνολικά`} icon={Target} />
         <KpiCard label="Win rate" value={`${winRate}%`} sub={`${won.length} κερδισμένα · ${lost.length} χαμένα`} tone="text-ok-600" icon={Target} />
-        <KpiCard label="Pipeline (σταθμισμένο)" value={fmtMoney(pipelineValue(cases))} sub={`αξία ${fmtMoney(wonValue(cases))} κερδισμένων`} icon={Target} />
+        <KpiCard label="Pipeline (σταθμισμένο)" value={pipe.weighted === null ? 'μη διαθέσιμο' : fmtMoney(pipe.weighted)} sub={`${pipe.withoutValue ? `${pipe.withoutValue} χωρίς αξία εκτός · ` : ''}${fmtMoney(wonValue(cases))} κερδισμένα`} icon={Target} />
         <KpiCard label="Εκπρόθεσμα Follow Ups" value={String(overdue.length)} sub="χρειάζονται σήμερα" icon={History} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Outcome split + conversion */}
         <Card className="lg:col-span-2">
           <CardHeader micro="Αποτελέσματα" title="Έκβαση cases" action={<Pill tone="gray">{cases.length}</Pill>} />
@@ -109,7 +111,7 @@ export default function ManagerDashboard({ d }: { d: DashboardData }) {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Team workload */}
         <Card className="lg:col-span-2">
           <CardHeader micro="Ομάδα" title="Φόρτος εργασιών" action={<Users className="w-3.5 h-3.5 text-ink/30" />} />

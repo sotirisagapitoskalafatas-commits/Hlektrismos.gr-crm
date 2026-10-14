@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { classifyUpload, storageName } from '@/lib/upload-files';
 
 const BUCKET = 'hlektrismos_docs';
 
@@ -12,41 +13,24 @@ export type UploadedFile = {
 
 /**
  * Upload a file to the hlektrismos_docs bucket and return the file metadata.
- * Supports PDF, JPG, PNG, WebP, Excel, CSV up to 25MB.
+ * Supports PDF, JPG, PNG, WebP, HEIC/HEIF, Excel, CSV up to 25MB.
  */
 export async function uploadDocument(
   file: File,
   leadId?: string,
 ): Promise<{ data: UploadedFile | null; error: string | null }> {
-  // Validate file size (25MB max)
-  if (file.size > 25 * 1024 * 1024) {
-    return { data: null, error: 'Το αρχείο υπερβαίνει το όριο 25MB.' };
-  }
-
-  // Validate file type
-  const allowed = [
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel',
-    'text/csv',
-  ];
-  if (!allowed.includes(file.type)) {
-    return { data: null, error: 'Μη υποστηριζόμενος τύπος αρχείου. Επιτρέπονται: PDF, JPG, PNG, WebP, Excel, CSV.' };
-  }
+  // Accept by MIME type or extension: phones send HEIC photos and, on some Android pickers, an empty type.
+  const check = classifyUpload(file);
+  if (!check.ok) return { data: null, error: check.error ?? 'Μη υποστηριζόμενο αρχείο.' };
 
   // Build path: lead-specific or anonymous contact form
-  const timestamp = Date.now();
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const folder = leadId ? `leads/${leadId}` : 'contact-forms';
-  const path = `${folder}/${timestamp}_${safeName}`;
+  const path = `${folder}/${storageName(file.name, check.ext)}`;
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(path, file, {
-      contentType: file.type,
+      contentType: check.contentType,
       upsert: false,
     });
 
@@ -57,7 +41,7 @@ export async function uploadDocument(
   const fileData: UploadedFile = {
     path,
     name: file.name,
-    type: file.type,
+    type: check.contentType,
     size: file.size,
   };
 

@@ -4,6 +4,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { classifyUpload, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
 import LegalLinks from '@/components/LegalLinks';
 
@@ -434,6 +435,10 @@ export default function LandingPage() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [leadEmailSent, setLeadEmailSent] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [sentFiles, setSentFiles] = useState(0);
+  // Files already stored during a failed submit are not uploaded again on retry.
+  const uploadedRef = useRef(new WeakMap<File, { path: string; name: string; type: string; size: number }>());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -480,15 +485,13 @@ export default function LandingPage() {
   const handleBillChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
-    const maxSize = 25 * 1024 * 1024;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!allowed.includes(file.type)) { setFormError(`Το αρχείο "${file.name}" δεν είναι αποδεκτό. Επιτρέπονται μόνο PDF, JPG, PNG.`); e.target.value = ''; return; }
-      if (file.size > maxSize) { setFormError(`Το αρχείο "${file.name}" υπερβαίνει το όριο 25MB.`); e.target.value = ''; return; }
-    }
-    setFormError('');
-    setForm((p) => ({ ...p, billFiles: [...p.billFiles, ...Array.from(files)] }));
+    // Phones send HEIC photos and sometimes an empty file type: check by type OR extension,
+    // keep the valid files and name the ones that were not added.
+    const picked = Array.from(files);
+    const errors = picked.map((f) => classifyUpload(f, PUBLIC_FORM_KINDS)).filter((c) => !c.ok).map((c) => c.error);
+    const ok = picked.filter((f) => classifyUpload(f, PUBLIC_FORM_KINDS).ok);
+    setFormError(errors.join(' '));
+    if (ok.length) setForm((p) => ({ ...p, billFiles: [...p.billFiles, ...ok] }));
     e.target.value = '';
   };
 
@@ -502,15 +505,32 @@ export default function LandingPage() {
     if (!form.adult) { setFormError('Η φόρμα απευθύνεται μόνο σε ενήλικες (18+).'); return; }
     setSubmitting(true);
 
+    // Upload first. If a file fails, stop and say which one — previously the request was sent
+    // without it and the warning was hidden behind the «Ευχαριστούμε» screen.
     const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
-    let fileWarning = '';
-    for (const file of form.billFiles) {
-      try {
-        const { uploadDocument } = await import('@/lib/storage');
-        const { data, error: uploadError } = await uploadDocument(file);
-        if (uploadError) { fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`; }
-        else if (data) { uploadedFiles.push(data); }
-      } catch { fileWarning = `Σημείωση: Το αρχείο "${file.name}" δεν μεταφορτώθηκε.`; }
+    const failed: string[] = [];
+    if (form.billFiles.length > 0) {
+      const { uploadDocument } = await import('@/lib/storage');
+      for (let i = 0; i < form.billFiles.length; i++) {
+        const file = form.billFiles[i];
+        const done = uploadedRef.current.get(file);
+        if (done) { uploadedFiles.push(done); continue; }
+        setUploadStatus(`Ανέβασμα αρχείου ${i + 1} από ${form.billFiles.length}…`);
+        try {
+          const ready = await prepareForUpload(file);
+          const { data, error: uploadError } = await uploadDocument(ready);
+          if (data) { uploadedRef.current.set(file, data); uploadedFiles.push(data); }
+          else failed.push(`«${file.name}»${uploadError ? ` (${uploadError})` : ''}`);
+        } catch {
+          failed.push(`«${file.name}»`);
+        }
+      }
+      setUploadStatus('');
+    }
+    if (failed.length > 0) {
+      setSubmitting(false);
+      setFormError(`Δεν ανέβηκ${failed.length === 1 ? 'ε το αρχείο' : 'αν τα αρχεία'} ${failed.join(', ')}. Έλεγξε τη σύνδεσή σου και πάτησε ξανά «Ζητήστε κλήση», ή αφαίρεσέ ${failed.length === 1 ? 'το' : 'τα'} για να στείλεις το αίτημα χωρίς ${failed.length === 1 ? 'αυτό' : 'αυτά'}.`);
+      return;
     }
 
     const { error } = await supabase.rpc('insert_website_lead', {
@@ -550,7 +570,8 @@ export default function LandingPage() {
       }).catch(() => {});
     }
 
-    if (fileWarning) setFormError(fileWarning);
+    setSentFiles(uploadedFiles.length);
+    uploadedRef.current = new WeakMap();
     setSubmitted(true);
     setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false, adult: false });
   };
@@ -709,9 +730,9 @@ export default function LandingPage() {
               {submitted ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
                   <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fff' }}>✓</span>
-                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ευχαριστούμε!</h3>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20, color: '#fff' }}>Ευχαριστούμε!</h3>
                   <p style={{ fontSize: 14.5, color: '#a9bcc6', maxWidth: 320 }}>
-                    Λάβαμε το αίτημά σου. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailSent ? ' — μόλις σου στείλαμε και email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : '.'}
+                    Λάβαμε το αίτημά σου{sentFiles > 0 ? ` και ${sentFiles === 1 ? '1 αρχείο' : `${sentFiles} αρχεία`}` : ''}. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailSent ? ' — μόλις σου στείλαμε και email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : '.'}
                   </p>
                 </div>
               ) : (
@@ -768,13 +789,13 @@ export default function LandingPage() {
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#D7DDE5' }}>
                               <FileText size={14} style={{ color: '#fff', flexShrink: 0 }} />
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{f.name}</span>
-                              <span style={{ fontSize: 11, flexShrink: 0 }}>{(f.size / 1024 / 1024).toFixed(1)}MB</span>
+                              <span style={{ fontSize: 11, flexShrink: 0 }}>{f.size < 1024 * 1024 ? `${Math.max(1, Math.round(f.size / 1024))}KB` : `${(f.size / 1024 / 1024).toFixed(1)}MB`}</span>
                               <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2, lineHeight: 1 }}>×</button>
                             </div>
                           ))}
                         </div>
                       )}
-                      <input id="lead-file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleBillChange} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }} />
+                      <input id="lead-file-input" type="file" multiple accept={PUBLIC_FORM_ACCEPT} onChange={handleBillChange} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }} />
                       <label
                         htmlFor="lead-file-input"
                         role="button"
@@ -788,13 +809,13 @@ export default function LandingPage() {
                         <span style={{ flex: 1 }}>
                           {form.billFiles.length === 0 ? 'Κάνε κλικ και επίλεξε αρχεία' : `Πρόσθεσε κι άλλα αρχεία (+${form.billFiles.length} ήδη επιλεγμένα)`}
                         </span>
-                        <span style={{ fontSize: 12, color: '#7f939c', flexShrink: 0 }}>PDF / JPG / PNG</span>
+                        <span style={{ fontSize: 12, color: '#7f939c', flexShrink: 0 }}>PDF / φωτογραφία</span>
                       </label>
-                      <span style={{ fontSize: 12, color: '#7f939c' }}>Μπορείς να επιλέξεις πολλά αρχεία μαζί ή να προσθέτεις περισσότερα σταδιακά — έως 25MB το καθένα. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
+                      <span style={{ fontSize: 12, color: '#7f939c' }}>Από το κινητό μπορείς να βγάλεις φωτογραφία τον λογαριασμό ή να επιλέξεις από τη συλλογή. Πολλά αρχεία μαζί ή σταδιακά — έως 25MB το καθένα. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
                     </div>
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
-                      Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.
+                      <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>
                     </label>
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
                       <input required type="checkbox" checked={form.adult} onChange={(e) => update('adult', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
@@ -802,7 +823,7 @@ export default function LandingPage() {
                     </label>
                     {formError && <p style={{ color: '#f87171', fontSize: 14 }}>{formError}</p>}
                     <button type="submit" disabled={submitting} className="cine-cta" style={{ marginTop: 6, fontFamily: 'var(--font-body)', justifyContent: 'center', width: '100%' }}>
-                      {submitting ? 'Αποστολή...' : 'Ζητήστε κλήση'}
+                      {submitting ? (uploadStatus || 'Αποστολή...') : 'Ζητήστε κλήση'}
                     </button>
                   </div>
                 </form>

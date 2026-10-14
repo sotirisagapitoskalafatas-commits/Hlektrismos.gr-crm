@@ -21,3 +21,16 @@
    - `qa.backoffice` → sees only Back Office colleagues.
    - `qa.admin` → «Επίδειξη ρόλου (demo)» visible on 15/10; after 16/10 00:00 Athens it disappears.
 5. Rollback: drop the trigger `profiles_guard_privileged`, the new functions and tables; re-create the previous `crm_settings_admin_all` policy (see the migration header). The preview grant can be removed at any time with `delete from role_preview_grants`.
+
+---
+
+# 06 — «Κάδος» for leads and customers (NOT applied)
+
+`06_trash_leads_customers.sql` — owner decision 14/10/2026: trash + admin-only permanent delete.
+
+- **Διαγραφή** (admin, manager) moves a lead/customer to the trash (`deleted_at/by/reason`). A RESTRICTIVE row policy hides trashed rows from every other role. A customer with open cases cannot be trashed.
+- **Επαναφορά** (admin, manager) restores it unchanged.
+- **Οριστική διαγραφή** (admin only) only from the trash and only when no other row references the record (cases, consent records, …, including tables that would otherwise cascade). It returns the lead's website-attachment paths; the admin's browser removes them from Storage (new admin-only delete policy on `hlektrismos_docs`).
+- The trash columns can only be changed through these functions (trigger). Every action is written to `activity_log` with the actor; the purge entry keeps ids only, no personal data.
+- Local evidence: `node --test supabase/tests/trash.test.mjs` — 6/6.
+- Apply after 05 (independent, but same review). Rollback: drop the two restrictive policies, the triggers and functions; the added columns can stay (null).

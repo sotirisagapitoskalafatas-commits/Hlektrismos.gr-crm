@@ -13,6 +13,7 @@ import type { Case, CaseDocument, Customer, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
 import { useToast } from '@/lib/toast';
+import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import { fmtDate, fmtDateTime, fmtMoney } from '@/lib/ui';
 
 const COMMS = ['call', 'email', 'sms', 'whatsapp', 'meeting', 'visit', 'check_in', 'note', 'comment', 'offer', 'send_offer', 'signature', 'document', 'status_change', 'assignment', 'follow_up', 'completed'];
@@ -127,8 +128,10 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
             Πελάτης{cust.city ? ` · ${cust.city}` : ''} · από {fmtDate(cust.created_at)} · {summary.active} ενεργά από {summary.total} cases
           </p>
         </div>
-        {canEdit && !editing && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={openEdit}><Pencil size={14} /> Επεξεργασία</button>}
+        {!cust.deleted_at && <TrashButton type="customer" id={cust.id} name={cust.full_name} onTrashed={() => { go('customers'); }} />}
+        {canEdit && !editing && !cust.deleted_at && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={openEdit}><Pencil size={14} /> Επεξεργασία</button>}
       </div>
+      {cust.deleted_at && <InTrashBanner type="customer" id={cust.id} deletedAt={cust.deleted_at} onRestored={() => void load()} />}
 
       {editing && (
         <div className="atx-panel" style={{ padding: 20 }}>

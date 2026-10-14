@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import LeadDetail from '@/components/leads/LeadDetail';
+import { TrashButton } from '@/components/trash/TrashControls';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
 import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLead, updateLeadStage } from '@/lib/api';
 import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
@@ -230,6 +231,8 @@ export default function LeadsPage() {
                       <ExternalLink className="w-3.5 h-3.5" /> Άνοιγμα Case
                     </Btn>
                   )}
+                  <TrashButton compact type="lead" id={l.id} name={name}
+                    onTrashed={async () => { const list = await fetchLeads(); setItems(list); return !list.some(x => x.id === l.id); }} />
                 </div>
               );
             })}

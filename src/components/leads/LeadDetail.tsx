@@ -9,6 +9,7 @@ import { useNav } from '@/lib/nav';
 import { can, LEAD_STATUSES, leadSourceInfo, SERVICES } from '@/lib/roles';
 import { convertLeadToCase, fetchEntityActivity, fetchLead, getLeadFileUrl, logAudit, updateLeadStage } from '@/lib/api';
 import { fileSizeText, leadFiles } from '@/lib/lead-files';
+import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import type { ActivityLogRow, Lead } from '@/lib/api';
 import { leadStatusDisplay } from '@/lib/lead-status';
 import { leadNextAction } from '@/lib/lead-next';
@@ -119,7 +120,8 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
             {lead.assigned_to?.full_name ? ` · Υπεύθυνος: ${lead.assigned_to.full_name}` : ' · Χωρίς υπεύθυνο'}
           </p>
         </div>
-        {isStaff && lead.status !== 'converted' && (
+        {!lead.deleted_at && <TrashButton type="lead" id={lead.id} name={name} onTrashed={() => { go('leads'); }} />}
+        {isStaff && lead.status !== 'converted' && !lead.deleted_at && (
           <div className="flex gap-2 flex-wrap">
             <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={() => onEdit(lead)}><Pencil size={14} /> Επεξεργασία</button>
             <label className="sr-only" htmlFor="lead-status">Κατάσταση</label>
@@ -130,6 +132,8 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
           </div>
         )}
       </div>
+
+      {lead.deleted_at && <InTrashBanner type="lead" id={lead.id} deletedAt={lead.deleted_at} onRestored={() => void load()} />}
 
       <div className="grid gap-4 mt-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4 min-w-0">

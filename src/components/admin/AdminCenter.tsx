@@ -1,7 +1,7 @@
 /* Admin Center («Διαχείριση») — grouped tabs instead of one long page of static claims.
    Tabs per displayed role (a presentation preview only changes the view; it never grants administration):
-     admin        → Επισκόπηση · Χρήστες & Ρόλοι · Δικαιώματα · Cases & Ροή · Έγγραφα · B2B Scraper · Ασφάλεια & Έλεγχοι · Audit Log
-     manager      → Επισκόπηση · Χρήστες & Ρόλοι · Δικαιώματα · Cases & Ροή · Έγγραφα · Audit Log
+     admin        → Επισκόπηση · Χρήστες & Ρόλοι · Κάδος · Δικαιώματα · Cases & Ροή · Έγγραφα · B2B Scraper · Ασφάλεια & Έλεγχοι · Audit Log
+     manager      → Επισκόπηση · Χρήστες & Ρόλοι · Κάδος · Δικαιώματα · Cases & Ροή · Έγγραφα · Audit Log
      back_office  → Χρήστες & Ρόλοι (Back Office colleagues only)
    Every status shown is either read live, or labelled «Δεν έχει επαληθευτεί ζωντανά». */
 
@@ -18,15 +18,16 @@ import AdminSecurity, { CheckList } from './AdminSecurity';
 import { SOURCE_FINDINGS, lastAnonChecks } from '@/lib/admin-checks';
 import { DocumentsTab, PermissionsTab, WorkflowTab } from './AdminReference';
 import ScraperSettingsCard from './ScraperSettings';
+import { TrashTab } from '@/components/trash/TrashControls';
 
-type Tab = 'overview' | 'users' | 'permissions' | 'workflow' | 'documents' | 'scraper' | 'security' | 'audit';
+type Tab = 'overview' | 'users' | 'trash' | 'permissions' | 'workflow' | 'documents' | 'scraper' | 'security' | 'audit';
 const TAB_LABEL: Record<Tab, string> = {
-  overview: 'Επισκόπηση', users: 'Χρήστες & Ρόλοι', permissions: 'Δικαιώματα', workflow: 'Cases & Ροή εργασίας',
+  overview: 'Επισκόπηση', users: 'Χρήστες & Ρόλοι', trash: 'Κάδος', permissions: 'Δικαιώματα', workflow: 'Cases & Ροή εργασίας',
   documents: 'Έγγραφα', scraper: 'B2B Scraper', security: 'Ασφάλεια & Έλεγχοι', audit: 'Audit Log',
 };
 function tabsFor(role: Role | null | undefined): Tab[] {
-  if (role === 'admin') return ['overview', 'users', 'permissions', 'workflow', 'documents', 'scraper', 'security', 'audit'];
-  if (role === 'manager') return ['overview', 'users', 'permissions', 'workflow', 'documents', 'audit'];
+  if (role === 'admin') return ['overview', 'users', 'trash', 'permissions', 'workflow', 'documents', 'scraper', 'security', 'audit'];
+  if (role === 'manager') return ['overview', 'users', 'trash', 'permissions', 'workflow', 'documents', 'audit'];
   if (role === 'back_office') return ['users'];
   return [];
 }
@@ -62,6 +63,7 @@ export default function AdminCenter() {
       <div className="mt-4" role="tabpanel" aria-label={TAB_LABEL[tab]}>
         {tab === 'overview' && <Overview role={realRole} onOpen={setTab} />}
         {tab === 'users' && <StaffAdmin />}
+        {tab === 'trash' && <TrashTab />}
         {tab === 'permissions' && <PermissionsTab />}
         {tab === 'workflow' && <WorkflowTab />}
         {tab === 'documents' && <DocumentsTab />}

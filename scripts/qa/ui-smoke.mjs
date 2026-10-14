@@ -192,6 +192,94 @@ for (const role of Object.keys(EXPECT)) {
   await browser.close();
 }
 
+/* ---- 2d. Κάδος: trash, restore, permanent delete (admin), refusals ---- */
+{
+  const fill = (page, v) => page.evaluate((val) => { const i = [...document.querySelectorAll('input.field')].pop(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, val); i.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+  const btn = (page, label) => page.evaluate((l) => { const b = [...document.querySelectorAll('button')].filter((x) => x.textContent.trim().includes(l) && x.offsetParent).pop(); b?.click(); return !!b; }, label);
+  const leadsAll = async (page) => { await click(page, 'Leads', '#shell-rail nav button'); await sleep(1000); await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /^🗂️?\s*Όλα/.test(b.textContent.trim()) || b.textContent.trim().startsWith('Όλα'))?.click()); await sleep(500); };
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await leadsAll(page);
+    check('Trash: inside sales has no delete button', await page.evaluate(() => !document.querySelector('button[title="Διαγραφή (μεταφορά στον κάδο)"]')));
+    await browser.close();
+  }
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'admin');
+  await leadsAll(page);
+  await page.evaluate(() => document.querySelector('button[aria-label="Διαγραφή Δοκιμαστικό Lead 2"]')?.click());
+  await sleep(500);
+  await fill(page, 'Διπλότυπο');
+  await btn(page, 'Μεταφορά στον κάδο');
+  await sleep(1500);
+  let log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  const trashed = log.filter((l) => l.table === 'trash_record').pop();
+  check('Trash: lead moved to trash through trash_record with the reason', trashed?.body?.p_type === 'lead' && trashed.body.p_reason === 'Διπλότυπο');
+  check('Trash: trashed lead disappears from the list', !(await page.evaluate(() => document.querySelector('main').innerText.includes('Δοκιμαστικό Lead 2'))));
+  await click(page, 'Διαχείριση', '#shell-rail nav button');
+  await sleep(1200);
+  await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim() === 'Κάδος')?.click());
+  await sleep(1000);
+  check('Trash: listed in Admin Center → Κάδος with reason and who deleted it', await page.evaluate(() => { const r = document.querySelector('[data-trash="Δοκιμαστικό Lead 2"]'); return !!r && r.innerText.includes('Διπλότυπο') && r.innerText.includes('Μαρία'); }));
+  await page.evaluate(() => [...document.querySelectorAll('[data-trash="Δοκιμαστικό Lead 2"] button')].find((b) => b.textContent.includes('Επαναφορά'))?.click());
+  await sleep(1200);
+  check('Trash: restore removes it from the trash', await page.evaluate(() => !document.querySelector('[data-trash="Δοκιμαστικό Lead 2"]')));
+  await leadsAll(page);
+  check('Trash: restored lead is back in the list', await page.evaluate(() => document.querySelector('main').innerText.includes('Δοκιμαστικό Lead 2')));
+  // trash again, then delete permanently (typed confirmation)
+  await page.evaluate(() => document.querySelector('button[aria-label="Διαγραφή Δοκιμαστικό Lead 2"]')?.click());
+  await sleep(400);
+  await btn(page, 'Μεταφορά στον κάδο');
+  await sleep(1200);
+  // and a converted lead (has a case) → can be trashed but not purged
+  await page.evaluate(() => document.querySelector('button[aria-label="Διαγραφή Δοκιμαστικό Lead 8"]')?.click());
+  await sleep(400);
+  await btn(page, 'Μεταφορά στον κάδο');
+  await sleep(1200);
+  await click(page, 'Διαχείριση', '#shell-rail nav button');
+  await sleep(1000);
+  await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim() === 'Κάδος')?.click());
+  await sleep(1000);
+  await page.evaluate(() => [...document.querySelectorAll('[data-trash="Δοκιμαστικό Lead 8"] button')].find((b) => b.textContent.includes('Οριστική'))?.click());
+  await sleep(500);
+  check('Trash: a lead with a case cannot be deleted permanently (history kept)', await page.evaluate(() => document.body.innerText.includes('Δεν επιτρέπεται: η εγγραφή συνδέεται με 1 cases') && ![...document.querySelectorAll('[role="dialog"] button, .card button')].some((b) => b.textContent.trim() === 'Οριστική διαγραφή' && !b.closest('tr'))));
+  await btn(page, 'Άκυρο');
+  await sleep(300);
+  await page.evaluate(() => [...document.querySelectorAll('[data-trash="Δοκιμαστικό Lead 2"] button')].find((b) => b.textContent.includes('Οριστική'))?.click());
+  await sleep(500);
+  const disabledFirst = await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Οριστική διαγραφή' && !b.closest('tr')).pop()?.disabled);
+  await fill(page, 'Δοκιμαστικό Lead 2');
+  await sleep(200);
+  await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Οριστική διαγραφή' && !b.closest('tr')).pop()?.click());
+  await sleep(1500);
+  log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Trash: permanent delete needs the typed name, then purges and leaves the trash', disabledFirst === true && log.some((l) => l.table === 'purge_record' && l.body.p_type === 'lead')
+    && (await page.evaluate(() => !document.querySelector('[data-trash="Δοκιμαστικό Lead 2"]'))));
+  // customer with open cases → refused with a clear reason
+  await click(page, 'Πελάτες', '#shell-rail nav button');
+  await sleep(1000);
+  await page.evaluate(() => document.querySelector('button[aria-label^="Διαγραφή Αθηνά"]')?.click());
+  await sleep(400);
+  await btn(page, 'Μεταφορά στον κάδο');
+  await sleep(1000);
+  check('Trash: customer with open cases is refused with the reason', await page.evaluate(() => /έχει \d+ ανοιχτά cases/.test(document.body.innerText)));
+  await browser.close();
+  {
+    const m = await launch(1440, 900);
+    await signInAs(m.page, 'manager');
+    await click(m.page, 'Διαχείριση', '#shell-rail nav button');
+    await sleep(1000);
+    await m.page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim() === 'Κάδος')?.click());
+    await sleep(1000);
+    check('Trash: manager can restore but has no permanent delete', await m.page.evaluate(() => !![...document.querySelectorAll('[data-trash] button')].find((b) => b.textContent.includes('Επαναφορά')) && ![...document.querySelectorAll('[data-trash] button')].some((b) => b.textContent.includes('Οριστική'))));
+    // leave the shared mock as we found it: the manager restores Lead 8 (used by later sections)
+    await m.page.evaluate(() => [...document.querySelectorAll('[data-trash="Δοκιμαστικό Lead 8"] button')].find((b) => b.textContent.includes('Επαναφορά'))?.click());
+    await sleep(1200);
+    check('Trash: manager restore works', await m.page.evaluate(() => !document.querySelector('[data-trash="Δοκιμαστικό Lead 8"]')));
+    await m.browser.close();
+  }
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);

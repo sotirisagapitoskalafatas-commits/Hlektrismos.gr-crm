@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Search, Users } from 'lucide-react';
 import { useNav } from '@/lib/nav';
 import { fetchCases, fetchCustomers } from '@/lib/api';
+import { TrashButton } from '@/components/trash/TrashControls';
 import type { Case, Customer } from '@/lib/api';
 import { fmtMoney } from '@/lib/ui';
 import { norm } from '@/lib/crm-assistant';
@@ -90,6 +91,8 @@ export default function CustomersPage() {
                     {ks.length === 0 ? 'Χωρίς case' : `${active} ενεργά / ${ks.length}`}
                     {known > 0 && <span className="block">{fmtMoney(known)}</span>}
                   </span>
+                  <TrashButton compact type="customer" id={c.id} name={c.full_name}
+                    onTrashed={async () => { const list = await fetchCustomers(); setCustomers(list); return !list.some(x => x.id === c.id); }} />
                   <ChevronRight size={16} className="text-[var(--atx-faint)] shrink-0" aria-hidden="true" />
                 </li>
               );

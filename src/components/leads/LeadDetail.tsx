@@ -2,12 +2,13 @@
    Uses ONLY existing lead operations: updateLeadStage, convertLeadToCase, updateLead (via the page's edit form).
    Status changes are audited with the existing logAudit helper. Stored status values are never rewritten for display. */
 
-import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Briefcase, Clock, Mail, MapPin, Pencil, Phone, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Briefcase, Clock, FileText, Mail, MapPin, Pencil, Phone, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { can, LEAD_STATUSES, leadSourceInfo, SERVICES } from '@/lib/roles';
-import { convertLeadToCase, fetchEntityActivity, fetchLead, logAudit, updateLeadStage } from '@/lib/api';
+import { convertLeadToCase, fetchEntityActivity, fetchLead, getLeadFileUrl, logAudit, updateLeadStage } from '@/lib/api';
+import { fileSizeText, leadFiles } from '@/lib/lead-files';
 import type { ActivityLogRow, Lead } from '@/lib/api';
 import { leadStatusDisplay } from '@/lib/lead-status';
 import { leadNextAction } from '@/lib/lead-next';
@@ -33,6 +34,19 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
     setActivity(a);
   }, [leadId]);
   useEffect(() => { void load(); }, [load, version]);
+
+  // Files the visitor attached on the website form (private bucket; links are short-lived).
+  const files = useMemo(() => leadFiles(lead?.attached_files), [lead]);
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const r: Record<string, string> = {};
+      for (const f of files) { const u = await getLeadFileUrl(f.path); if (u) r[f.path] = u; }
+      if (alive) setFileUrls(r);
+    })();
+    return () => { alive = false; };
+  }, [files]);
 
   if (lead === undefined) return <div className="atx-page"><div className="atx-panel">{[0, 1, 2].map(i => <div key={i} className="atx-skeleton" />)}</div></div>;
   if (lead === null) {
@@ -141,6 +155,29 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
               ))}
             </dl>
           </div>
+
+          {files.length > 0 && (
+            <div className="atx-panel" style={{ padding: 20 }} aria-label="Αρχεία από τη φόρμα">
+              <h2 className="atx-section-title mb-1">Αρχεία από τη φόρμα ({files.length})</h2>
+              <p className="text-[13px] text-[var(--atx-muted)] mb-3">
+                {lead.converted_case_id ? 'Καταχωρήστε τα ως δικαιολογητικά στο Case → Έγγραφα.' : 'Μετά τη μετατροπή σε Case θα εμφανίζονται στα Έγγραφα, για καταχώρηση ανά τύπο.'}
+              </p>
+              <ul className="m-0 p-0 list-none space-y-2">
+                {files.map(f => (
+                  <li key={f.path} className="flex items-center gap-3 text-[14px]">
+                    <span className="atx-icon" style={{ width: 30, height: 30 }} aria-hidden="true"><FileText size={14} /></span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-medium truncate">{f.name}</span>
+                      <span className="block text-[12.5px] text-[var(--atx-muted)]">{fileSizeText(f.size) || '—'}</span>
+                    </span>
+                    {fileUrls[f.path]
+                      ? <a className="atx-btn atx-btn-quiet" href={fileUrls[f.path]} target="_blank" rel="noreferrer">Άνοιγμα</a>
+                      : <span className="text-[12.5px] text-[var(--atx-faint)]">Μη διαθέσιμο</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="atx-panel" style={{ padding: 20 }}>
             <h2 className="atx-section-title mb-3">Ιστορικό</h2>

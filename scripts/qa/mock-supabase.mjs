@@ -74,10 +74,17 @@ const lead = (n, status, extra = {}) => ({
 });
 const leads = [
   lead(1, 'new'), lead(2, 'new'), lead(3, 'new', { assigned_to_user_id: null, assigned_to: null }),
-  lead(4, 'contacted'), lead(5, 'qualified'), lead(6, 'meeting'), lead(7, 'offer'), lead(8, 'converted'),
+  lead(4, 'contacted'), lead(5, 'qualified'), lead(6, 'meeting'), lead(7, 'offer'),
+  // Converted website lead with two files attached on the public form (CS-2026-001).
+  lead(8, 'converted', { converted_case_id: caseRows[0].id, converted_at: iso(-1 * D), attached_files: [
+    { path: 'contact-forms/1791950659849_ab12cd_IMG_4021.heic', name: 'IMG_4021.HEIC', type: 'image/heic', size: 2_400_000 },
+    { path: 'contact-forms/1791950659862_ef34gh_file.pdf', name: 'Λογαριασμός ΔΕΗ.pdf', type: 'application/pdf', size: 180_000 },
+  ] }),
   lead(9, 'lost'), lead(1 + 9, 'unqualified'), lead(11, 'duplicate'), lead(12, 'legacy_import_status'),
   lead(13, 'new', { assigned_to_user_id: U('field_sales'), assigned_to: { full_name: USERS.field_sales.full_name } }),
 ];
+caseRows[0].lead_id = leads.find((l) => l.status === 'converted').id;
+
 const notifications = [
   { id: '60000000-0000-4000-8000-000000000001', user_id: U('inside_sales'), case_id: caseRows[1].id, title: 'Νέα προσφορά προς αποστολή',
     body: caseRows[1].title, type: 'followup', link: '', read_at: null, created_at: iso(-2 * H) },

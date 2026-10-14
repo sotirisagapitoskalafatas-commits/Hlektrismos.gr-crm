@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import {
   ArrowRight, Phone, Mail, Home, FileText, Upload, X, Menu,
-  Lock,
+  Lock, Camera,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { classifyUpload, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
+import { classifyUpload, MAX_FORM_FILES, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
 import LegalLinks from '@/components/LegalLinks';
 
@@ -489,11 +489,16 @@ export default function LandingPage() {
     // keep the valid files and name the ones that were not added.
     const picked = Array.from(files);
     const errors = picked.map((f) => classifyUpload(f, PUBLIC_FORM_KINDS)).filter((c) => !c.ok).map((c) => c.error);
-    const ok = picked.filter((f) => classifyUpload(f, PUBLIC_FORM_KINDS).ok);
+    const valid = picked.filter((f) => classifyUpload(f, PUBLIC_FORM_KINDS).ok);
+    const room = Math.max(0, MAX_FORM_FILES - form.billFiles.length);
+    const ok = valid.slice(0, room);
+    if (valid.length > room) errors.push(`Έως ${MAX_FORM_FILES} αρχεία ανά αίτημα — ${valid.length - room === 1 ? 'ένα δεν προστέθηκε' : `${valid.length - room} δεν προστέθηκαν`}.`);
     setFormError(errors.join(' '));
     if (ok.length) setForm((p) => ({ ...p, billFiles: [...p.billFiles, ...ok] }));
     e.target.value = '';
   };
+
+  const hasCamera = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
   const removeBillFile = (i: number) => setForm((p) => ({ ...p, billFiles: p.billFiles.filter((_, idx) => idx !== i) }));
 
@@ -807,11 +812,21 @@ export default function LandingPage() {
                       >
                         <Upload size={16} style={{ color: '#fff', flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>
-                          {form.billFiles.length === 0 ? 'Κάνε κλικ και επίλεξε αρχεία' : `Πρόσθεσε κι άλλα αρχεία (+${form.billFiles.length} ήδη επιλεγμένα)`}
+                          {form.billFiles.length === 0 ? 'Επίλεξε αρχεία ή φωτογραφίες — πολλά μαζί' : `Πρόσθεσε κι άλλα (${form.billFiles.length} από ${MAX_FORM_FILES})`}
                         </span>
                         <span style={{ fontSize: 12, color: '#7f939c', flexShrink: 0 }}>PDF / φωτογραφία</span>
                       </label>
-                      <span style={{ fontSize: 12, color: '#7f939c' }}>Από το κινητό μπορείς να βγάλεις φωτογραφία τον λογαριασμό ή να επιλέξεις από τη συλλογή. Πολλά αρχεία μαζί ή σταδιακά — έως 25MB το καθένα. Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
+                      {hasCamera && (
+                        <>
+                          <input id="lead-camera-input" type="file" accept="image/*" capture="environment" onChange={handleBillChange} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }} />
+                          <label htmlFor="lead-camera-input" role="button" tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-camera-input')?.click(); } }}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.3)', background: 'rgba(255,255,255,.07)', cursor: 'pointer', fontSize: 13.5, color: '#fff' }}>
+                            <Camera size={16} aria-hidden="true" /> Φωτογράφισε τον λογαριασμό
+                          </label>
+                        </>
+                      )}
+                      <span style={{ fontSize: 12, color: '#7f939c' }}>Μπορείς να στείλεις όλες τις σελίδες: διάλεξε πολλά αρχεία ή φωτογραφίες μαζί, ή πρόσθεσε κι άλλα μετά (έως {MAX_FORM_FILES}, 25MB το καθένα). Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
                     </div>
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />

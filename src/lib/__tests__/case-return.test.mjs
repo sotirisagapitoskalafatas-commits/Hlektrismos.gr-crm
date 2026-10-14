@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildSync } from 'esbuild';
+import { fileURLToPath } from 'node:url';
+
+const out = buildSync({ entryPoints: [fileURLToPath(new URL('../case-return.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent' });
+const R = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
+
+test('who may return / resubmit', () => {
+  const c = { current_stage: 'document_check', returned_at: null };
+  assert.deepEqual(['back_office', 'admin', 'manager', 'inside_sales', 'field_sales'].map((r) => R.canReturn(r, c)), [true, true, true, false, false]);
+  assert.equal(R.canReturn('back_office', { current_stage: 'offer' }), false, 'only Back Office stages');
+  assert.equal(R.canReturn('back_office', { ...c, returned_at: '2026-10-14' }), false, 'not twice');
+  const ret = { current_stage: 'document_check', returned_at: '2026-10-14', return_to_team: 'inside_sales', next_action_owner_id: 'u1' };
+  assert.equal(R.canResubmit('inside_sales', 'x', ret), true);
+  assert.equal(R.canResubmit('field_sales', 'u1', ret), true, 'the person it was assigned to');
+  assert.equal(R.canResubmit('field_sales', 'x', ret), false);
+  assert.equal(R.canResubmit('back_office', 'x', ret), false);
+  assert.equal(R.canResubmit('manager', 'x', ret), true);
+  assert.equal(R.defaultReturnTeam(['Υπογεγραμμένη σύμβαση / αίτηση']), 'field_sales');
+  assert.equal(R.defaultReturnTeam(['Λογαριασμός ρεύματος']), 'inside_sales');
+});
+
+test('database refusals become clear messages', () => {
+  const e = R.parseStageError({ message: 'stage_blocked: required documents', hint: 'document_blockers', details: '[{"label":"Ταυτότητα ή διαβατήριο","status":"missing"},{"label":"Υπογεγραμμένη σύμβαση / αίτηση","status":"unverified"}]' });
+  assert.equal(e.kind, 'documents');
+  assert.equal(R.stageErrorText(e), 'Δεν επιτρέπεται η μετάβαση: Ταυτότητα ή διαβατήριο (λείπει) · Υπογεγραμμένη σύμβαση / αίτηση (δεν έχει ελεγχθεί).');
+  assert.equal(R.parseStageError({ message: 'stage_transition_not_allowed: signed -> completed', hint: 'transition' }).kind, 'transition');
+  assert.equal(R.parseStageError(null), null);
+  assert.match(R.stageErrorText({ kind: 'other', message: 'return: a reason of at least 10 characters is required' }), /10 χαρακτήρων/);
+  assert.match(R.stageErrorText({ kind: 'other', message: 'Could not find the function public.return_case_for_correction' }), /phase2\/07/);
+});

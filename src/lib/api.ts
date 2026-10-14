@@ -5,6 +5,8 @@ import type { Role, Stage } from './roles';
 import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 import { notTrashed } from './trash';
+import { parseStageError } from './case-return';
+import type { ReturnTeam, StageBlocker, StageError } from './case-return';
 
 export type Customer = {
   id: string;
@@ -27,6 +29,13 @@ export type Case = {
   id: string;
   case_no: string;
   title: string;
+  /** «Επιστροφή για διόρθωση» (staged migration phase2/07). */
+  returned_at?: string | null;
+  returned_by?: string | null;
+  return_reason?: string | null;
+  return_items?: string[] | null;
+  return_to_team?: 'inside_sales' | 'field_sales' | null;
+  return_from_stage?: string | null;
   customer_id: string | null;
   source: string;
   service_type: string;
@@ -457,8 +466,8 @@ export async function fetchCase(id: string): Promise<Case | null> {
   return applyCanonicalLabels([row], catalog)[0];
 }
 
-export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?: boolean; role?: Role }): Promise<void> {
-  if (!supabase) return;
+export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?: boolean; role?: Role }): Promise<{ error: { message: string; details?: string | null; hint?: string | null } | null }> {
+  if (!supabase) return { error: { message: 'Database not configured' } };
   const prev = opts?.log ? await fetchCase(id) : null;
   const catalog = await loadCatalog();
   const providerId =
@@ -475,7 +484,7 @@ export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?
   delete upd.created_at;
   delete upd.updated_at;
   const { error } = await supabase.from('cases').update(upd).eq('id', id);
-  if (error) { logError('updateCase', error); return; }
+  if (error) { logError('updateCase', error); return { error }; }
   if (opts?.log && prev) {
     const changed: string[] = [];
     if (patch.current_stage && patch.current_stage !== prev.current_stage) {
@@ -495,17 +504,48 @@ export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?
       });
     }
   }
+  return { error: null };
 }
 
-export async function changeStage(id: string, stage: Stage, role: Role, note?: string): Promise<void> {
-  await updateCase(id, {
+/** Changes the stage. The database refuses moves that skip the allowed path or lack required documents
+ *  (staged migration phase2/07); the reason comes back as a StageError instead of a silent failure. */
+export async function changeStage(id: string, stage: Stage, role: Role, note?: string): Promise<{ error: StageError | null }> {
+  const { error } = await updateCase(id, {
     current_stage: stage,
     ...(stage === 'completed' ? { status: 'completed', activation_status: 'active' } : {}),
     ...(stage === 'lost' || stage === 'cancelled' ? { status: 'lost' } : {}),
   }, { log: true, role });
+  if (error) return { error: parseStageError(error) };
   if (note) {
     await addActivity(id, { role: 'system', activity_type: 'note', title: stage === 'completed' ? 'Σχόλιο ολοκλήρωσης' : 'Σημείωση αλλαγής σταδίου', description: note });
   }
+  return { error: null };
+}
+
+/** Server view of what blocks a stage (null = the check is not available yet, e.g. migration not applied). */
+export async function fetchStageBlockers(caseId: string, stage: Stage): Promise<StageBlocker[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('case_document_blockers', { p_case: caseId, p_stage: stage });
+  if (error || !Array.isArray(data)) return null;
+  return (data as { label: string; status: StageBlocker['status'] }[]).map(b => ({ label: b.label, status: b.status }));
+}
+
+export async function overrideStage(caseId: string, stage: Stage, reason: string): Promise<{ error: StageError | null }> {
+  if (!supabase) return { error: { kind: 'other', message: 'Database not configured' } };
+  const { error } = await supabase.rpc('change_case_stage_override', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
+  return { error: parseStageError(error) };
+}
+
+export async function returnCase(caseId: string, input: { reason: string; items: string[]; toTeam: ReturnTeam }): Promise<{ error: StageError | null; toUser: string | null }> {
+  if (!supabase) return { error: { kind: 'other', message: 'Database not configured' }, toUser: null };
+  const { data, error } = await supabase.rpc('return_case_for_correction', { p_case: caseId, p_reason: input.reason.trim(), p_items: input.items, p_to_team: input.toTeam });
+  return { error: parseStageError(error), toUser: (data as { to_user?: string | null } | null)?.to_user ?? null };
+}
+
+export async function resubmitCase(caseId: string, note: string): Promise<{ error: StageError | null }> {
+  if (!supabase) return { error: { kind: 'other', message: 'Database not configured' } };
+  const { error } = await supabase.rpc('resubmit_returned_case', { p_case: caseId, p_note: note.trim() });
+  return { error: parseStageError(error) };
 }
 
 /* ---------------- Timeline ---------------- */

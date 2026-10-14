@@ -6,6 +6,8 @@ import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { stageText } from '@/lib/case-flow';
 import { CaseNextStepCard, CaseProgress, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
+import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
+import { canResubmit as canResubmitCase, canReturn as canReturnCase } from '@/lib/case-return';
 import { useStaff } from '@/lib/useStaff';
 import SignaturePad from './SignaturePad';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
@@ -572,7 +574,7 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
 
 /* ================= Main ================= */
 export default function CaseDetailPage({ caseId }: { caseId: string }) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { go } = useNav();
   const [c, setC] = useState<Case | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
@@ -580,6 +582,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const [tab, setTab] = useState<'timeline' | 'followups' | 'docs' | 'visits' | 'offers' | 'signatures' | 'backoffice'>('timeline');
   const [stagePending, setStagePending] = useState<Stage | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
   const [docs, setDocs] = useState<CaseDocument[]>([]);
   const staff = useStaff();
   const [editContact, setEditContact] = useState(false);
@@ -697,9 +700,11 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       {/* Next step + customer */}
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
+          <ReturnedBanner c={c} staff={staff} canResubmit={canResubmitCase(role, user?.id, c)} onDone={() => void reload()} />
           <CaseNextStepCard c={c} allowedNext={allowedNext} checklist={checklist} staff={staff}
             canChange={canChange} canAssign={can(role, 'assign')} onPick={setStagePending}
-            onHandover={() => setHandoverOpen(true)} onDocs={() => setTab('docs')} />
+            onHandover={() => setHandoverOpen(true)} onDocs={() => setTab('docs')}
+            onReturn={canReturnCase(role, c) ? () => setReturnOpen(true) : undefined} />
         </div>
         <Card>
           <div className="flex items-center justify-between gap-2">
@@ -798,6 +803,8 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
         onDone={() => { setStagePending(null); void reload(); }} />
       <HandoverDialog c={c} open={handoverOpen} staff={staff} role={role} onClose={() => setHandoverOpen(false)}
         onDone={() => { setHandoverOpen(false); void reload(); }} />
+      {returnOpen && <ReturnDialog c={c} checklist={checklist} staff={staff} onClose={() => setReturnOpen(false)}
+        onDone={() => { setReturnOpen(false); void reload(); }} />}
     </div>
   );
 }

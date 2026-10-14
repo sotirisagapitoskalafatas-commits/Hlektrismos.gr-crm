@@ -3,8 +3,8 @@
    success is claimed only after re-reading the case from the server. */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRightLeft, Check, ChevronRight, Sparkles } from 'lucide-react';
-import { addActivity, changeStage, fetchCase, updateCase } from '@/lib/api';
+import { AlertTriangle, ArrowRightLeft, Check, ChevronRight, ShieldAlert, Sparkles, Undo2 } from 'lucide-react';
+import { addActivity, changeStage, fetchCase, fetchStageBlockers, overrideStage, updateCase } from '@/lib/api';
 import type { Case, StaffProfile } from '@/lib/api';
 import type { Role, Stage } from '@/lib/roles';
 import { Modal } from '@/lib/ui';
@@ -12,6 +12,8 @@ import { useToast } from '@/lib/toast';
 import { caseNextStep, journeySteps, stageText, TEAM_LABEL } from '@/lib/case-flow';
 import type { Team } from '@/lib/case-flow';
 import type { ChecklistItem } from '@/lib/documents';
+import { BLOCKER_TEXT, stageErrorText } from '@/lib/case-return';
+import type { StageBlocker } from '@/lib/case-return';
 
 
 export function CaseProgress({ c, allowedNext, canChange, onPick }: {
@@ -53,9 +55,11 @@ export function CaseProgress({ c, allowedNext, canChange, onPick }: {
   );
 }
 
-export function CaseNextStepCard({ c, allowedNext, checklist, staff, canChange, canAssign, onPick, onHandover, onDocs }: {
+export function CaseNextStepCard({ c, allowedNext, checklist, staff, canChange, canAssign, onPick, onHandover, onDocs, onReturn }: {
   c: Case; allowedNext: Stage[]; checklist: ChecklistItem[]; staff: StaffProfile[];
   canChange: boolean; canAssign: boolean; onPick: (s: Stage) => void; onHandover: () => void; onDocs: () => void;
+  /** Back Office «Επιστροφή για διόρθωση» — offered only when allowed. */
+  onReturn?: () => void;
 }) {
   const [now] = useState(() => Date.now());
   const n = caseNextStep(c, allowedNext, checklist, now);
@@ -85,6 +89,7 @@ export function CaseNextStepCard({ c, allowedNext, checklist, staff, canChange, 
             <button className="atx-btn atx-btn-primary" onClick={() => onPick(n.suggestedStage as Stage)}>Μετάβαση σε «{stageText(n.suggestedStage)}»</button>
           )}
           {canAssign && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={onHandover}><ArrowRightLeft size={14} /> Παράδοση</button>}
+          {onReturn && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={onReturn}><Undo2 size={14} /> Επιστροφή για διόρθωση</button>}
         </div>
       )}
     </div>
@@ -97,27 +102,78 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   const { toast } = useToast();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setNote(''); }, [stage]);
+  // What the SERVER says blocks this move (null = not checked / check not available yet).
+  const [blockers, setBlockers] = useState<StageBlocker[] | null>(null);
+  const [override, setOverride] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    setNote(''); setOverride(''); setErr(null); setBlockers(null);
+    if (!stage) return;
+    let alive = true;
+    void fetchStageBlockers(c.id, stage).then(b => { if (alive) setBlockers(b); });
+    return () => { alive = false; };
+  }, [stage, c.id]);
   if (!stage) return null;
   const exit = stage === 'lost' || stage === 'cancelled';
-  const submit = async () => {
-    setBusy(true);
-    await changeStage(c.id, stage, role, note.trim() || undefined);
+  const blocked = !!blockers && blockers.length > 0;
+  const canOverride = role === 'admin' || role === 'manager';
+
+  const verify = async (ok: string) => {
     const fresh = await fetchCase(c.id);
     setBusy(false);
-    if (fresh?.current_stage === stage) { toast(`Στάδιο: ${stageText(stage)}`, 'ok'); onDone(); }
+    if (fresh?.current_stage === stage) { toast(ok, 'ok'); onDone(); }
     else toast('Η αλλαγή σταδίου δεν αποθηκεύτηκε. Δοκιμάστε ξανά.', 'bad');
   };
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    const r = await changeStage(c.id, stage, role, note.trim() || undefined);
+    if (r.error) {
+      setBusy(false);
+      if (r.error.kind === 'documents') setBlockers(r.error.blockers);
+      setErr(stageErrorText(r.error));
+      return;
+    }
+    await verify(`Στάδιο: ${stageText(stage)}`);
+  };
+  const submitOverride = async () => {
+    setBusy(true); setErr(null);
+    const r = await overrideStage(c.id, stage, override);
+    if (r.error) { setBusy(false); setErr(stageErrorText(r.error)); return; }
+    await verify(`Στάδιο: ${stageText(stage)} (με παράκαμψη — καταγράφηκε)`);
+  };
+
   return (
     <Modal open onClose={() => !busy && onClose()} title={exit ? `Κλείσιμο case: ${stageText(stage)}` : 'Αλλαγή σταδίου'} micro={c.case_no}>
       <p className="text-[14px] text-[var(--atx-muted,#64748b)] mb-3">
         {stageText(c.current_stage)} → <strong>{stageText(stage)}</strong>
       </p>
-      <textarea className="field" rows={3} value={note} onChange={e => setNote(e.target.value)}
-        placeholder={exit ? 'Αιτία (απαιτείται), π.χ. «Επέλεξε άλλον πάροχο»' : 'Σημείωση (προαιρετική)'} aria-label={exit ? 'Αιτία' : 'Σημείωση'} />
+      {blocked && (
+        <div className="atx-blockers" role="alert" data-blockers="true">
+          <strong className="flex items-center gap-1.5"><ShieldAlert size={15} aria-hidden="true" /> Δεν μπορεί να προχωρήσει ακόμη</strong>
+          <ul className="m-0 mt-1.5 p-0 list-none space-y-1">
+            {blockers!.map(b => <li key={b.label} className="text-[13.5px]">{b.label} — <span className="font-medium">{BLOCKER_TEXT[b.status]}</span></li>)}
+          </ul>
+          <span className="block text-[12px] mt-1.5 opacity-80">Ελέγχεται από τον server· ανεβάστε/ελέγξτε τα έγγραφα στην καρτέλα «Έγγραφα».</span>
+        </div>
+      )}
+      {!blocked && (
+        <textarea className="field" rows={3} value={note} onChange={e => setNote(e.target.value)}
+          placeholder={exit ? 'Αιτία (απαιτείται), π.χ. «Επέλεξε άλλον πάροχο»' : 'Σημείωση (προαιρετική)'} aria-label={exit ? 'Αιτία' : 'Σημείωση'} />
+      )}
+      {blocked && canOverride && (
+        <div className="mt-3">
+          <label className="text-[13px] font-semibold" htmlFor="override-reason">Παράκαμψη (Διαχειριστής / Διευθυντής)</label>
+          <textarea id="override-reason" className="field mt-1" rows={2} value={override} onChange={e => setOverride(e.target.value)}
+            placeholder="Γιατί προχωράει χωρίς τα έγγραφα; (τουλάχιστον 10 χαρακτήρες — καταγράφεται)" />
+        </div>
+      )}
+      {err && !blocked && <div className="atx-notice mt-3" role="alert">{err}</div>}
       <div className="flex justify-end gap-2 mt-4">
         <button className="atx-btn atx-btn-quiet" disabled={busy} onClick={onClose}>Άκυρο</button>
-        <button className="atx-btn atx-btn-primary" disabled={busy || (exit && note.trim().length < 3)} onClick={() => void submit()}>{busy ? '…' : 'Επιβεβαίωση'}</button>
+        {blocked && canOverride && (
+          <button className="atx-btn atx-btn-quiet" disabled={busy || override.trim().length < 10} onClick={() => void submitOverride()}>{busy ? '…' : 'Παράκαμψη & μετάβαση'}</button>
+        )}
+        {!blocked && <button className="atx-btn atx-btn-primary" disabled={busy || (exit && note.trim().length < 3)} onClick={() => void submit()}>{busy ? '…' : 'Επιβεβαίωση'}</button>}
       </div>
     </Modal>
   );

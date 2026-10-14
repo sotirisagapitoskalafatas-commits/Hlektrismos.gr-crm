@@ -5,6 +5,8 @@
    and open on any staff computer. If the browser cannot decode a photo, the original is uploaded unchanged. */
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Files per public-form request (all pages of a bill, ID front/back, etc.). */
+export const MAX_FORM_FILES = 10;
 
 const BY_EXT: Record<string, { type: string; kind: 'pdf' | 'image' | 'sheet' }> = {
   pdf: { type: 'application/pdf', kind: 'pdf' },

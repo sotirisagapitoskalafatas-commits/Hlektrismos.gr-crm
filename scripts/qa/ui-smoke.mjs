@@ -196,6 +196,48 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await browser.close();
 }
 
+/* ---- 8b. Website form files reach the CRM (lead + case documents) ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Cases', '#shell-rail nav button');
+  await sleep(1200);
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === 'CS-2026-001' && e.offsetParent)[0];
+    el && el.click();
+  });
+  await sleep(1500);
+  await click(page, 'Έγγραφα');
+  await sleep(1500);
+  const t0 = await page.evaluate(() => document.body.innerText);
+  check('Website files: listed in the case documents with open links', t0.includes('Αρχεία που έστειλε ο πελάτης') && t0.includes('IMG_4021.HEIC') && t0.includes('Λογαριασμός ΔΕΗ.pdf')
+    && (await page.$$('[data-lead-file] a[href]')).length === 2);
+  check('Website files: checklist tells staff to file them', t0.includes('Ο πελάτης έστειλε 2 αρχεία από την ιστοσελίδα'));
+  await page.evaluate(() => [...document.querySelectorAll('[data-lead-file="Λογαριασμός ΔΕΗ.pdf"] button')].find((b) => b.textContent.includes('Καταχώρηση ως'))?.click());
+  await sleep(500);
+  await click(page, 'Λογαριασμός ρεύματος', '[role="radio"]');
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Καταχώρηση')?.click());
+  await sleep(1800);
+  const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  const ins = log.filter((l) => l.method === 'POST' && l.table === 'case_documents').pop();
+  check('Website files: filed as a typed case document pointing at the same stored file (no re-upload)',
+    ins?.body?.category === 'bill_electricity' && ins?.body?.file_url === 'hlektrismos_docs/contact-forms/1791950659862_ef34gh_file.pdf', JSON.stringify(ins?.body));
+  const t1 = await page.evaluate(() => document.body.innerText);
+  check('Website files: filed file no longer pending; bill item received', t1.includes('Προς καταχώρηση 1') && /Λογαριασμός ρεύματος[\s\S]{0,40}Παραλήφθηκε/.test(t1));
+  await click(page, 'Leads', '#shell-rail nav button');
+  await sleep(1200);
+  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /ΜΕΤ/.test(b.textContent))?.click()); // converted tab
+  await sleep(600);
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === 'Δοκιμαστικό Lead 8' && e.offsetParent)[0];
+    el && el.click();
+  });
+  await sleep(1500);
+  const t2 = await page.evaluate(() => document.body.innerText);
+  check('Website files: shown on the lead details', t2.includes('Αρχεία από τη φόρμα (2)') && t2.includes('IMG_4021.HEIC'));
+  await browser.close();
+}
+
 /* ---- 9. Customer details ---- */
 {
   const { browser, page } = await launch(1440, 900);

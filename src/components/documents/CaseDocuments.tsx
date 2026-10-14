@@ -1,13 +1,16 @@
 /* Case documents — "what is this file?" comes FIRST.
    Every upload (file or camera) starts by choosing the document type from the Greek energy-provider catalog
    (lib/documents.ts); only then is the file chosen. A checklist shows the typical documents for this case and
-   what is still missing. Uses the existing upload/insert/verify API; no schema change. */
+   what is still missing. Uses the existing upload/insert/verify API; no schema change.
+   Files the customer attached on the website form are listed too and can be filed under a type without re-upload. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, FileText, FolderOpen, Plus, Upload, X } from 'lucide-react';
+import { Camera, Check, FileText, FolderOpen, Globe, Plus, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { can, DOC_STATUSES } from '@/lib/roles';
-import { addDocument, fetchDocuments, getDocumentUrl, setDocumentStatus, uploadDocumentFile } from '@/lib/api';
+import { addDocument, fetchDocuments, getDocumentUrl, getLeadFileUrl, setDocumentStatus, uploadDocumentFile } from '@/lib/api';
+import { fileSizeText, leadFileRef, unfiledLeadFiles } from '@/lib/lead-files';
+import type { LeadFile } from '@/lib/lead-files';
 import type { Case, CaseDocument } from '@/lib/api';
 import { buildChecklist, docLabel, DOC_GROUP_LABEL, uploadableDocTypes } from '@/lib/documents';
 import type { DocGroup } from '@/lib/documents';
@@ -21,13 +24,14 @@ const MAX_MB = 15;
 const STATUS_TONE: Record<string, 'green' | 'amber' | 'red' | 'gray'> = { verified: 'green', received: 'amber', rejected: 'red', missing: 'gray' };
 const STATUS_TEXT: Record<string, string> = { verified: 'Ελέγχθηκε', received: 'Παραλήφθηκε', rejected: 'Απορρίφθηκε', missing: 'Λείπει' };
 
-export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: () => void }) {
+export default function CaseDocuments({ c, onChanged, leadFiles = [] }: { c: Case; onChanged?: () => void; leadFiles?: LeadFile[] }) {
   const { role } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<CaseDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const [picker, setPicker] = useState<{ open: boolean; type: string; note: string }>({ open: false, type: '', note: '' });
+  const [picker, setPicker] = useState<{ open: boolean; type: string; note: string; fromLead?: LeadFile }>({ open: false, type: '', note: '' });
+  const [leadUrls, setLeadUrls] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -47,10 +51,21 @@ export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: (
   }, [c.id]);
   useEffect(() => { void load(); }, [load]);
 
+  const unfiled = useMemo(() => unfiledLeadFiles(leadFiles, items), [leadFiles, items]);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const r: Record<string, string> = {};
+      for (const f of leadFiles) { const u = await getLeadFileUrl(f.path); if (u) r[f.path] = u; }
+      if (alive) setLeadUrls(r);
+    })();
+    return () => { alive = false; };
+  }, [leadFiles]);
+
   const checklist = useMemo(() => buildChecklist(c, items), [c, items]);
   const missingRequired = checklist.filter(i => i.required && (i.status === 'missing' || i.status === 'rejected')).length;
 
-  const openPicker = (type = '') => setPicker({ open: true, type, note: '' });
+  const openPicker = (type = '', fromLead?: LeadFile) => setPicker({ open: true, type, note: '', fromLead });
   const closePicker = () => { if (!busy) setPicker(p => ({ ...p, open: false })); };
 
   const save = async (file: File) => {
@@ -64,6 +79,20 @@ export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: (
     setBusy(false);
     if (!row) { toast('Το έγγραφο δεν αποθηκεύτηκε. Δοκιμάστε ξανά.', 'bad'); return; }
     toast(`Αποθηκεύτηκε: ${docLabel(picker.type)}`, 'ok');
+    setPicker({ open: false, type: '', note: '' });
+    void load();
+    onChanged?.();
+  };
+
+  // File a website attachment under a type: a new case document pointing at the same stored file.
+  const fileLeadAttachment = async () => {
+    const f = picker.fromLead;
+    if (!f || !picker.type) return;
+    setBusy(true);
+    const row = await addDocument(c.id, { category: picker.type, file_name: f.name, file_url: leadFileRef(f.path), mime_type: f.type || undefined, size: f.size || undefined, description: picker.note || 'Από τη φόρμα της ιστοσελίδας' });
+    setBusy(false);
+    if (!row) { toast('Το έγγραφο δεν καταχωρήθηκε. Δοκιμάστε ξανά.', 'bad'); return; }
+    toast(`Καταχωρήθηκε: ${docLabel(picker.type)}`, 'ok');
     setPicker({ open: false, type: '', note: '' });
     void load();
     onChanged?.();
@@ -100,8 +129,37 @@ export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: (
             </li>
           ))}
         </ul>
+        {unfiled.length > 0 && (
+          <p className="text-[13px] mt-3 rounded-lg px-3 py-2 bg-brand-50 text-brand-700">
+            Ο πελάτης έστειλε {unfiled.length === 1 ? '1 αρχείο' : `${unfiled.length} αρχεία`} από την ιστοσελίδα — δείτε τα παρακάτω και καταχωρήστε τα στον σωστό τύπο.
+          </p>
+        )}
         <p className="text-xs text-ink/50 mt-3">Ενδεικτική λίστα για παρόχους ενέργειας στην Ελλάδα. Τα ακριβή δικαιολογητικά διαφέρουν ανά πάροχο — επιβεβαιώστε με την αίτηση του παρόχου.</p>
       </Card>
+
+      {leadFiles.length > 0 && (
+        <Card>
+          <CardHeader micro="Από την ιστοσελίδα" title="Αρχεία που έστειλε ο πελάτης"
+            action={<Pill tone={unfiled.length ? 'amber' : 'green'}>{unfiled.length ? `Προς καταχώρηση ${unfiled.length}` : 'Όλα καταχωρήθηκαν'}</Pill>} />
+          <div className="space-y-2">
+            {leadFiles.map(f => {
+              const pending = unfiled.includes(f);
+              return (
+                <div key={f.path} className="flex items-center gap-3 p-3 rounded-xl border border-line bg-white flex-wrap" data-lead-file={f.name}>
+                  <span className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0"><Globe className="w-4 h-4 text-brand-600" /></span>
+                  <div className="flex-1 min-w-[180px]">
+                    <div className="text-[14px] font-medium text-ink truncate">{f.name}</div>
+                    <div className="text-xs text-ink/50">{[fileSizeText(f.size), pending ? 'Χωρίς τύπο εγγράφου' : 'Καταχωρήθηκε ως έγγραφο'].filter(Boolean).join(' · ')}</div>
+                    {leadUrls[f.path] ? <a href={leadUrls[f.path]} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline">Άνοιγμα αρχείου ↗</a>
+                      : <span className="text-xs text-ink/40">Ο σύνδεσμος δεν είναι διαθέσιμος</span>}
+                  </div>
+                  {pending && canAdd && <Btn variant="outline" onClick={() => openPicker('', f)}>Καταχώρηση ως…</Btn>}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardHeader micro="Αρχεία" title="Έγγραφα"
@@ -125,7 +183,7 @@ export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: (
         </div>
       </Card>
 
-      <Modal open={picker.open} onClose={closePicker} title="Τι έγγραφο ανεβάζετε;" micro="Βήμα 1 από 2" wide>
+      <Modal open={picker.open} onClose={closePicker} title={picker.fromLead ? `Τι έγγραφο είναι το «${picker.fromLead.name}»;` : 'Τι έγγραφο ανεβάζετε;'} micro={picker.fromLead ? 'Αρχείο από την ιστοσελίδα' : 'Βήμα 1 από 2'} wide>
         <div className="space-y-4 max-h-[52vh] overflow-y-auto pr-1" role="radiogroup" aria-label="Τύπος εγγράφου">
           {groups.map(([g, types]) => (
             <div key={g}>
@@ -145,6 +203,14 @@ export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: (
         </div>
         <input className="field mt-4" value={picker.note} onChange={e => setPicker(p => ({ ...p, note: e.target.value }))}
           placeholder={picker.type === 'other' ? 'Τι είναι το έγγραφο; (απαιτείται)' : 'Σχόλιο (προαιρετικό)'} aria-label="Σχόλιο εγγράφου" />
+        {picker.fromLead ? (
+          <div className="mt-4 flex items-center justify-end gap-2 flex-wrap">
+            <Btn variant="outline" disabled={busy} onClick={closePicker}><X className="w-3.5 h-3.5" /> Άκυρο</Btn>
+            <Btn disabled={!picker.type || busy || (picker.type === 'other' && !picker.note.trim())} onClick={() => void fileLeadAttachment()}>
+              {busy ? <Spinner /> : <Check className="w-3.5 h-3.5" />} Καταχώρηση
+            </Btn>
+          </div>
+        ) : (
         <div className="mt-4 flex items-center justify-between gap-2 flex-wrap">
           <span className="text-xs text-ink/50">Βήμα 2: επιλέξτε αρχείο (PDF ή εικόνα, έως {MAX_MB} MB) ή φωτογραφίστε.</span>
           <div className="flex gap-2">
@@ -157,6 +223,7 @@ export default function CaseDocuments({ c, onChanged }: { c: Case; onChanged?: (
             </Btn>
           </div>
         </div>
+        )}
         <input ref={fileRef} type="file" accept={ACCEPT} className="hidden"
           onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void save(f); }} />
       </Modal>

@@ -3,6 +3,7 @@ import { applyCanonicalLabels, loadCatalog, resolveProductId, resolveProviderId 
 import { ROLES } from './roles';
 import type { Role, Stage } from './roles';
 import type { MapCoordinate } from './maps/types';
+import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 
 export type Customer = {
   id: string;
@@ -196,6 +197,8 @@ export type Lead = {
   created_at: string;
   created_by?: { full_name: string } | null;
   assigned_to?: { full_name: string } | null;
+  /** Files attached on the public contact form (jsonb; see lib/lead-files). */
+  attached_files?: unknown;
 };
 
 function logError(method: string, err: unknown) {
@@ -691,7 +694,18 @@ export async function uploadDocumentFile(file: File): Promise<{ path: string; na
 export async function getDocumentUrl(path: string): Promise<string | null> {
   if (!supabase || !path) return null;
   if (/^https?:\/\//i.test(path)) return path;
+  // Website files filed as case documents stay in the contact-form bucket (see lib/lead-files).
+  const websitePath = leadFilePath(path);
+  if (websitePath) return getLeadFileUrl(websitePath);
   const { data } = await supabase.storage.from('client_documents').createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
+
+/* Short-lived link to a file a visitor attached on the public form (private bucket; staff-only read policy). */
+export async function getLeadFileUrl(path: string): Promise<string | null> {
+  if (!supabase || !path) return null;
+  const { data, error } = await supabase.storage.from(LEAD_FILES_BUCKET).createSignedUrl(path, 3600);
+  if (error) { logError('getLeadFileUrl', error); return null; }
   return data?.signedUrl ?? null;
 }
 

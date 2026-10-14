@@ -34,6 +34,8 @@ async function run(failStorage) {
   const accept = await page.$eval('#lead-file-input', (e) => e.accept);
   ok(accept.includes('image/*') && accept.includes('.heic'), `accept lets phones use camera/gallery and HEIC (${accept})`);
 
+  ok(await page.$eval('#lead-file-input', (e) => e.multiple), 'picker allows several files and photos at once');
+  ok((await page.$('#lead-camera-input[capture]')) !== null && (await page.evaluate(() => document.body.innerText)).includes('Φωτογράφισε τον λογαριασμό'), 'phone shows a separate camera button');
   const input = await page.$('#lead-file-input');
   await input.uploadFile(exe);
   await sleep(300);

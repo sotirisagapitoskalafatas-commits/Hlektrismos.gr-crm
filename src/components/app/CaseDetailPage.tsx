@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import CaseDocuments from '@/components/documents/CaseDocuments';
+import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { stageText } from '@/lib/case-flow';
 import { CaseNextStepCard, CaseProgress, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
@@ -575,6 +576,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const { go } = useNav();
   const [c, setC] = useState<Case | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
+  const websiteFiles = useMemo(() => toLeadFiles(lead?.attached_files), [lead]);
   const [tab, setTab] = useState<'timeline' | 'followups' | 'docs' | 'visits' | 'offers' | 'signatures' | 'backoffice'>('timeline');
   const [stagePending, setStagePending] = useState<Stage | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
@@ -786,7 +788,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
 
       {tab === 'timeline' && <TimelineTab caseId={c.id} load={reload} />}
       {tab === 'followups' && <FollowUpsTab caseId={c.id} load={reload} />}
-      {tab === 'docs' && <CaseDocuments c={c} onChanged={reload} />}
+      {tab === 'docs' && <CaseDocuments c={c} onChanged={reload} leadFiles={websiteFiles} />}
       {tab === 'visits' && <VisitsTab caseId={c.id} />}
       {tab === 'offers' && <OffersTab caseId={c.id} />}
       {tab === 'signatures' && <SignaturesTab caseId={c.id} />}

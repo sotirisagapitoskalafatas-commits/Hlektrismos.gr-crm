@@ -266,7 +266,7 @@ Path: `AI → Skill → Tool → Policy check → Integration Gateway / CRM serv
 | M1 | `*_crm_os_ai_event_bus.sql` | ALTER `business_events` (+org_id, event_version, correlation_id, causation_id, source) · `event_types` registry + seeds · `emit_business_event()` RPC · pg_notify trigger | `supabase db push` after review |
 | M2 | `*_crm_os_ai_policy.sql` | `policy_rules`, `consent_records`, `evaluate_policy()`, `tools`, `tool_call_log`, default policy seeds | same |
 | M3 | `*_crm_os_automation_os.sql` | `automation_definitions/versions/runs/execution_nodes`, `entity_state`, `approval_requests` | same |
-| M4 | `*_crm_os_job_queue.sql` | `job_queue` + enqueue/claim/complete/fail RPCs + global kill-switch config seed | same |
+| M4 | ✅ `20260916000000_crm_os_job_queue.sql` | `job_queue` + enqueue/claim/heartbeat/complete/fail/reap/cancel RPCs (idempotency, retry+backoff, lease heartbeat, crash-resume reaper) + global kill switch (`ai_kill_switch` + `ai_is_killed()`/`ai_kill_switch_set()`) + guarded pg_cron reaper | **IMPLEMENTED** (committed; pending `db push`) |
 | M5 | `*_crm_os_ai_workforce.sql` | `ai_employees`, `ai_tasks`, `ai_task_events`, `ai_recommendations`, `shadow_evaluations`, `ai_cost_log`, `ai_budgets` | same |
 | M6 | `*_crm_os_communications.sql` | `customer_comm_prefs`, `comm_outbox`, `comm_gov_decisions`, `journeys/stages/enrolments/rules`, `comm_governor()` RPC, enrich `crm_emails/chat_messages` (intent/sentiment/risk) | same |
 | M7 | `*_crm_os_ai_ops.sql` | `ai_control_room` view, `data_quality_rules/findings`, `conversation_insights` | same |
@@ -310,7 +310,7 @@ Following the mandated order (event bus → state/workflow → automation → jo
 
 ## 15. WHAT IS MISSING
 
-Event v2 fields & registry · Policy Engine (table+RPC) · Tool Registry & gateway · Automation OS (defs/versions/runs/nodes) · State machine objects (`entity_state`) · Job queue runtime · AI Employee canonical registry · AI Task runtime & task-events · Approval inbox · Communication Governor + outbox + coalescing + prefs · Customer Journeys · Conversation intelligence (intent/sentiment/handoff) · AI control room (view+UI) · Shadow/evaluation framework · Cost accounting & budgets & global kill switch · AI business-outcome attribution (event-linked) · Data-quality layer · org-scoped agent identity (ai_agents is per-user).
+Event v2 fields & registry · Policy Engine (table+RPC) · Tool Registry & gateway · Automation OS (defs/versions/runs/nodes) · State machine objects (`entity_state`) · AI Employee canonical registry · AI Task runtime & task-events · Approval inbox · Communication Governor + outbox + coalescing + prefs · Customer Journeys · Conversation intelligence (intent/sentiment/handoff) · AI control room (view+UI) · Shadow/evaluation framework · Cost accounting & budgets · AI business-outcome attribution (event-linked) · Data-quality layer · org-scoped agent identity (ai_agents is per-user).
 
 ## 16. WHAT SHOULD BE IMPLEMENTED NOW
 

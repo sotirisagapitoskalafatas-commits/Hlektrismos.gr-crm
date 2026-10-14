@@ -1,6 +1,6 @@
 /* One row of work, used by both Home and My Work. Only real, connected actions are offered:
    - follow-up: Ολοκλήρωση (completeFollowUp), Αναβολή (snoozeFollowUp → tomorrow 09:00), open the case
-   - lead:      open the Leads screen (a per-lead deep link arrives with the Lead Details increment), `tel:` link
+   - lead:      open the lead's detail screen, `tel:` link
    - case:      open the case */
 
 import { useState } from 'react';
@@ -28,6 +28,7 @@ export function WorkRow({ item, now, onChanged }: { item: WorkItem; now: number;
 
   const open = () => {
     if (item.caseId) openCase(item.caseId);
+    else if (item.leadId) go('leads', { lead: item.leadId });
     else go('leads');
   };
 

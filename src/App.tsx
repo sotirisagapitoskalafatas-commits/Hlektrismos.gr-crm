@@ -74,13 +74,15 @@ function AppContent() {
 }
 
 export default function App() {
+  // The public visitor chatbot is for the website only; inside the CRM staff use Atlas AI (top bar).
+  const [route] = useRoute();
   return (
     <DeviceProvider>
       <AuthProvider>
         <NavProvider>
           <ToastProvider>
             <AppContent />
-            <JarvisWidget />
+            {route !== 'app' && <JarvisWidget />}
           </ToastProvider>
         </NavProvider>
       </AuthProvider>

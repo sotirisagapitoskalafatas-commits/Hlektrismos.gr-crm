@@ -34,7 +34,7 @@ const cust = (i) => customers[i];
 const stages = ['new', 'contacted', 'offer', 'application', 'signed', 'document_check', 'submitted', 'activation'];
 const caseRows = stages.map((stage, i) => ({
   id: `30000000-0000-4000-8000-00000000000${i + 1}`, case_no: `CS-2026-00${i + 1}`, title: `Ρεύμα — ${cust(i % 6).full_name}`,
-  customer_id: cust(i % 6).id, source: 'website', service_type: i % 3 === 0 ? 'electricity' : i % 3 === 1 ? 'gas' : 'solar',
+  customer_id: cust(i % 6).id, source: 'website', service_type: i % 3 === 0 ? 'energy' : i % 3 === 1 ? 'gas' : 'solar',
   property_type: null, case_type: null, current_stage: stage, priority: i === 2 ? 'high' : 'normal', status: 'open',
   value: i === 5 ? 0 : 400 + i * 120, probability: 20 + i * 10, expected_close_date: null,
   owner_id: U('inside_sales'), lead_id: null, stage_entered_at: iso(-i * D),
@@ -83,7 +83,7 @@ const notifications = [
     body: caseRows[1].title, type: 'followup', link: '', read_at: null, created_at: iso(-2 * H) },
 ];
 
-const TABLES = { profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications };
+const TABLES = { profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [] };
 const log = [];
 
 function applyFilters(rows, params) {
@@ -144,7 +144,19 @@ http.createServer((req, res) => {
       const last = (json.messages || []).at(-1)?.content || '';
       return setTimeout(() => send(200, { reply: `Mock απάντηση για: «${last}»` }), 300);
     }
+    if (url.pathname === '/rest/v1/rpc/convert_lead_to_case') {
+      log.push({ method: 'RPC', table: 'convert_lead_to_case', body: json });
+      const l = TABLES.leads.find((x) => x.id === json.p_lead_id);
+      if (!l) return send(400, { message: 'lead not found' });
+      l.status = 'converted'; l.converted_case_id = caseRows[0].id; l.converted_at = new Date().toISOString();
+      return send(200, caseRows[0].id);
+    }
     if (url.pathname.startsWith('/rest/v1/rpc/')) return send(200, null);
+    if (url.pathname.startsWith('/storage/v1/object/')) {
+      log.push({ method: req.method, table: 'storage', query: url.pathname });
+      if (url.pathname.startsWith('/storage/v1/object/sign/')) return send(200, { signedURL: '/mock-file' });
+      return send(200, { Key: url.pathname.replace('/storage/v1/object/', ''), Id: 'mock' });
+    }
 
     const m = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
     if (!m) return send(404, {});

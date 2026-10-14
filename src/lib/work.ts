@@ -184,3 +184,19 @@ export function buildHomeSummary(i: {
   }
   return summary;
 }
+
+/** The eight ACTIVE case stages in journey order (completed/lost/cancelled are outcomes, not steps). */
+export const PIPELINE_STAGES = ['new', 'contacted', 'offer', 'application', 'signed', 'document_check', 'submitted', 'activation'] as const;
+
+/** Count of ACTIVE cases per journey stage. Ordinary roles: cases they own or must act on. Team view: all loaded cases.
+ *  Cases in a stage outside the journey are not counted (and never silently renamed). */
+export function pipelineByStage(cases: CaseLike[], opts: { uid: string; isTeamView: boolean }): { stage: string; count: number }[] {
+  const mine = (c: CaseLike) => opts.isTeamView
+    || [c.owner_id, c.inside_sales_owner, c.field_sales_owner, c.back_office_owner, c.next_action_owner_id].includes(opts.uid);
+  const counts = new Map<string, number>(PIPELINE_STAGES.map(st => [st, 0]));
+  for (const c of cases) {
+    if (!isActiveCase(c) || !mine(c)) continue;
+    if (counts.has(c.current_stage)) counts.set(c.current_stage, (counts.get(c.current_stage) ?? 0) + 1);
+  }
+  return PIPELINE_STAGES.map(stage => ({ stage, count: counts.get(stage) ?? 0 }));
+}

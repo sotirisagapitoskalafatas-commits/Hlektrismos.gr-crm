@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
+import LeadDetail from '@/components/leads/LeadDetail';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
 import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLead, updateLeadStage } from '@/lib/api';
 import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
@@ -14,7 +15,9 @@ const EMPTY_FORM = {
 
 export default function LeadsPage() {
   const { role } = useAuth();
-  const { openCase } = useNav();
+  const { openCase, view, go } = useNav();
+  const detailId = view.filters?.lead ?? null;
+  const [detailVersion, setDetailVersion] = useState(0);
   const [items, setItems] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -60,7 +63,7 @@ export default function LeadsPage() {
       comments: editForm.comments || null,
     });
     if (!ok) setErr('Αποτυχία ενημέρωσης lead.');
-    else { setEditing(null); await load(); }
+    else { setEditing(null); await load(); setDetailVersion(v => v + 1); }
   };
 
   const load = useCallback(async () => {
@@ -122,6 +125,7 @@ export default function LeadsPage() {
 
   return (
     <div className="max-w-6xl space-y-4">
+      {detailId ? <LeadDetail leadId={detailId} version={detailVersion} onEdit={openEdit} /> : (<>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <Micro tone="brand">CRM</Micro>
@@ -174,7 +178,7 @@ export default function LeadsPage() {
                   </span>
                   <div className="flex-1 min-w-[180px]">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-ink">{name}</span>
+                      <button type="button" onClick={() => go('leads', { lead: l.id })} className="text-[13px] font-medium text-ink hover:text-brand-600 hover:underline text-left">{name}</button>
                       <Pill tone={info.id === 'new' ? 'blue' : info.id === 'converted' ? 'green' : info.id === 'lost' || info.id === 'unqualified' ? 'red' : info.id === 'duplicate' ? 'amber' : 'gray'}>
                         {info.emoji} {info.label}
                       </Pill>
@@ -232,6 +236,8 @@ export default function LeadsPage() {
           </div>
         )}
       </Card>
+
+      </>)}
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="Επεξεργασία Lead" micro="Στοιχεία επικοινωνίας">
         <div className="space-y-4">

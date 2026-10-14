@@ -111,6 +111,91 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   }
 }
 
+/* ---- 6. CRM has its own assistant, not the visitor chatbot ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  check('CRM: visitor chatbot launcher is not rendered', !(await page.$('.jv-launcher')));
+  await click(page, 'Atlas AI');
+  await sleep(600);
+  check('CRM: Atlas AI panel opens from the top bar', !!(await page.$('[aria-label="Atlas AI βοηθός CRM"]')));
+  await page.type('[aria-label="Ερώτηση προς τον βοηθό"]', 'βρες λεαδ 1');
+  await page.keyboard.press('Enter');
+  await sleep(500);
+  await page.type('[aria-label="Ερώτηση προς τον βοηθό"]', 'Τι έχω σήμερα;');
+  await page.keyboard.press('Enter');
+  await sleep(600);
+  const results = await text(page, '[aria-label="Atlas AI βοηθός CRM"] li button');
+  check('Atlas AI: «Τι έχω σήμερα;» returns real work items', results.length > 0, results.slice(0, 2).join(' | '));
+  await page.type('[aria-label="Ερώτηση προς τον βοηθό"]', 'Άνοιξε Έσοδα');
+  await page.keyboard.press('Enter');
+  await sleep(500);
+  check('Atlas AI: refuses a page outside the role', await page.evaluate(() => document.body.innerText.includes('δεν είναι διαθέσιμη για τον ρόλο σας')));
+  await browser.close();
+  // public site keeps the visitor chatbot
+  const p2 = await launch(1440, 900);
+  await p2.page.goto('http://localhost:5199/', { waitUntil: 'domcontentloaded' });
+  await sleep(2500);
+  check('Public site: visitor chatbot still present', !!(await p2.page.$('.jv-launcher')));
+  await p2.browser.close();
+}
+
+/* ---- 7. Lead details: open from My Work, record first contact, convert ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Η εργασία μου', '#shell-rail nav button');
+  await sleep(900);
+  await click(page, 'Άνοιγμα lead');
+  await sleep(1500);
+  const body = () => page.evaluate(() => document.body.innerText);
+  check('Lead detail: opens from My Work with the recommended action', (await body()).includes('Προτεινόμενη ενέργεια') && (await body()).includes('Καταγραφή πρώτης επικοινωνίας'));
+  await click(page, 'Καταγραφή πρώτης επικοινωνίας');
+  await sleep(1500);
+  const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Lead detail: status PATCH contacted sent', log.some((l) => l.method === 'PATCH' && l.table === 'leads' && l.body.status === 'contacted'));
+  check('Lead detail: status change audited', log.some((l) => l.method === 'POST' && l.table === 'activity_log' && l.body.action === 'status_change'));
+  check('Lead detail: next action advances to qualification', (await body()).includes('Σήμανση ως ειδικευμένο'));
+  await click(page, 'Σήμανση ως ειδικευμένο');
+  await sleep(1500);
+  await click(page, 'Μετατροπή σε Case');
+  await sleep(2000);
+  const log2 = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Lead detail: conversion uses the existing RPC', log2.some((l) => l.table === 'convert_lead_to_case'));
+  await browser.close();
+}
+
+/* ---- 8. Documents: type first, then file; checklist updates ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Cases', '#shell-rail nav button');
+  await sleep(1200);
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === 'CS-2026-001' && e.offsetParent)[0];
+    el && el.click();
+  });
+  await sleep(1500);
+  await click(page, 'Έγγραφα');
+  await sleep(1200);
+  const t0 = await page.evaluate(() => document.body.innerText);
+  check('Documents: checklist lists ID, bill and proof of use', t0.includes('Ταυτότητα ή διαβατήριο') && t0.includes('Λογαριασμός ρεύματος') && /Ε9, μισθωτήριο/.test(t0));
+  await click(page, 'Προσθήκη εγγράφου');
+  await sleep(500);
+  const disabledBefore = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Επιλογή αρχείου')).disabled);
+  check('Documents: file choice is blocked until a type is chosen', disabledBefore === true);
+  await click(page, 'Μισθωτήριο', '[role="radio"]');
+  const input = await page.$('input[type="file"][accept="image/*,application/pdf"]');
+  await input.uploadFile('C:/Users/kalaf/hlek/docs/product/screenshots/after/inside_sales-home-1440.jpg');
+  await sleep(2000);
+  const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  const ins = log.find((l) => l.method === 'POST' && l.table === 'case_documents');
+  check('Documents: saved with the chosen type (category=lease)', ins?.body?.category === 'lease', JSON.stringify(ins?.body?.category));
+  const t1 = await page.evaluate(() => document.body.innerText);
+  check('Documents: proof-of-use item now shows Παραλήφθηκε', /Ε9, μισθωτήριο ή παραχώρηση\)[\s\S]{0,40}Παραλήφθηκε/.test(t1));
+  await browser.close();
+}
+
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
 process.exit(failed.length ? 1 : 0);

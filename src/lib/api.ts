@@ -1431,6 +1431,22 @@ export async function logAudit(entity_type: string, entity_id: string, action: s
   } catch { /* non-fatal */ }
 }
 
+export type ActivityLogRow = { id: string; action: string; details: Record<string, unknown> | null; created_at: string };
+
+/** Read-only: audit entries recorded for one entity (RLS decides visibility; errors -> null so the UI can say "unavailable"). */
+export async function fetchEntityActivity(entity_type: string, entity_id: string): Promise<ActivityLogRow[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('id, action, details, created_at')
+    .eq('entity_type', entity_type)
+    .eq('entity_id', entity_id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) { logError('fetchEntityActivity', error); return null; }
+  return (data ?? []) as ActivityLogRow[];
+}
+
 /* ================= AI Event Bus & Policy Engine (M1 / M2) ================= */
 
 export type PolicyEffect = 'allow' | 'require_approval' | 'deny';

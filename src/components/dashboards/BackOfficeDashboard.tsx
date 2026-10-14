@@ -71,7 +71,7 @@ export default function BackOfficeDashboard({ d }: { d: DashboardData }) {
         </div>
       </Card>
 
-      <div className="grid lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Pending list */}
         <Card className="lg:col-span-3 !p-0" pad={false}>
           <CardHeader micro="Εκκρεμείς εργασίες" title="Back Office σε ροή" className="px-5 pt-5"

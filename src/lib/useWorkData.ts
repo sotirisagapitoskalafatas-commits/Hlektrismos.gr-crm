@@ -58,5 +58,5 @@ export function useWorkData() {
     [uid, isTeamView, items, state.cases, state.leads, state.followUps, now],
   );
 
-  return { loading: state.loading, error: state.error, items, summary, now, reload: load, role, cases: state.cases, leads: state.leads, uid, firstName: (profile?.full_name ?? '').split(' ')[0] };
+  return { loading: state.loading, error: state.error, items, summary, now, reload: load, role, cases: state.cases, leads: state.leads, followUps: state.followUps, uid, firstName: (profile?.full_name ?? '').split(' ')[0] };
 }

@@ -1,6 +1,6 @@
 // Helpers for UI tests against scripts/qa/mock-supabase.mjs (LOCAL, synthetic).
 import puppeteer from 'puppeteer-core';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,7 +13,19 @@ export const IDS = {
 };
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Windows keeps Chrome profile files locked for a moment after close, so the rmSync on disconnect often fails and
+// profiles pile up in %TEMP% (hundreds of MB each). Sweep our own leftovers older than 10 minutes on every launch.
+function sweepOldProfiles() {
+  const cutoff = Date.now() - 10 * 60_000;
+  for (const name of readdirSync(tmpdir())) {
+    if (!name.startsWith('atlas-qa-') && !name.startsWith('lead-upload-')) continue;
+    const dir = join(tmpdir(), name);
+    try { if (statSync(dir).mtimeMs < cutoff) rmSync(dir, { recursive: true, force: true }); } catch { /* still locked: next run */ }
+  }
+}
+
 export async function launch(width = 1440, height = 900, dpr = 1) {
+  sweepOldProfiles();
   // Isolated throwaway profile: never touches (or kills) the user's own Chrome.
   const userDataDir = mkdtempSync(join(tmpdir(), 'atlas-qa-'));
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', userDataDir, args: ['--no-sandbox', '--no-first-run'] });

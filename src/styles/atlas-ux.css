@@ -226,3 +226,101 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-pagetab { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; background: none; font-size: 14px; font-weight: 500;
   color: var(--atx-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
 .atx-pagetab[aria-selected="true"] { color: var(--atx-blue); border-bottom-color: var(--atx-blue); font-weight: 600; }
+
+/* ====================== Home command center ====================== */
+/* `.atx-page` stays 880px for reading pages; the dashboard uses the full width up to 1760px. */
+.atx-page.atx-wide { max-width: 1760px; width: 100%; min-width: 0; }
+.atx-wide .atx-title { font-size: clamp(24px, 2.2vw, 28px); }
+.atx-wide .atx-sub { margin-top: 2px; font-size: 14.5px; }
+
+/* Grid: one column on phones/tablets; 48 columns from 1024px (fine enough for 4 KPIs over 3/4 of the width). */
+.atx-cc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+.atx-cc > * { min-width: 0; }
+.cc-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1100px) { .cc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cc-kpis > :nth-child(5) { grid-column: span 2; } }
+@media (max-width: 640px) { .cc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+@media (min-width: 1024px) {
+  .atx-cc { grid-template-columns: repeat(48, minmax(0, 1fr)); }
+  .cc-kpis, .cc-sum, .cc-team { grid-column: 1 / -1; }
+  .cc-work { grid-column: 1 / span 28; }
+  .cc-pipe { grid-column: 29 / span 20; }
+}
+@media (min-width: 1280px) {
+  /* Admin/manager: KPIs over 3/4, the value card heads the team column; team spans the work row and summary row. */
+  .atx-cc.has-team { grid-template-rows: auto auto 1fr; } /* the tall team column grows the last row, not the work row */
+  .atx-cc.has-team .cc-kpis { display: contents; }
+  .atx-cc.has-team .cc-kpis > * { grid-column: span 9; grid-row: 1; }
+  .atx-cc.has-team .cc-kpis > :nth-child(5) { grid-column: 37 / span 12; }
+  .atx-cc.has-team .cc-work { grid-column: 1 / span 20; grid-row: 2; }
+  .atx-cc.has-team .cc-pipe { grid-column: 21 / span 16; grid-row: 2; }
+  .atx-cc.has-team .cc-team { grid-column: 37 / span 12; grid-row: 2 / span 2; }
+  .atx-cc.has-team .cc-sum { grid-column: 1 / span 36; grid-row: 3; }
+}
+
+.atx-kpi { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; min-width: 0; height: 100%;
+  background: var(--atx-surface); border: 1px solid var(--atx-line); border-radius: 14px; padding: 12px 14px; cursor: pointer;
+  transition: box-shadow .15s ease, transform .15s ease; }
+.atx-kpi:hover { box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07); transform: translateY(-1px); }
+.atx-kpi-icon { width: 32px; height: 32px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+.atx-kpi-n { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.atx-kpi-n.is-alert { color: var(--atx-red); }
+.atx-kpi-n.is-na { color: var(--atx-faint); font-size: 17px; font-weight: 600; line-height: 1.5; }
+.atx-kpi-l { color: var(--atx-ink); font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+.atx-chip-s { margin-top: 4px; display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 500; line-height: 1.4; }
+.atx-chip-s.t-gray { background: rgba(20, 35, 59, 0.05); color: var(--atx-muted); }
+.atx-chip-s.t-red { background: rgba(209, 52, 47, 0.09); color: var(--atx-red); }
+.atx-chip-s.t-green { background: rgba(21, 128, 61, 0.09); color: #15803d; }
+.atx-chip-s.t-blue { background: rgba(22, 119, 255, 0.09); color: var(--atx-blue); }
+@media (prefers-reduced-motion: reduce) { .atx-kpi, .atx-stat { transition: none; } .atx-kpi:hover { transform: none; } }
+
+.atx-stack { display: grid; gap: 12px; align-content: start; }
+.atx-card { border-radius: 16px; }
+.atx-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 10px; }
+.atx-card-head .atx-section-title { font-size: 16px; }
+/* The work queue keeps every item; long lists scroll inside the card instead of the page. */
+.atx-scroll { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--atx-line); }
+@media (max-width: 1023px) { .atx-scroll { max-height: none; } }
+.atx-fine { font-size: 12px; color: var(--atx-faint); margin-top: 8px; line-height: 1.4; }
+
+.cc-pipe { container-type: inline-size; }
+.atx-pipe-value { display: flex; flex-direction: column; margin-bottom: 10px; }
+.atx-pipe-value span { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.atx-pipe-value span.is-na { font-size: 17px; color: var(--atx-faint); font-weight: 600; }
+.atx-pipe-value small { font-size: 12.5px; color: var(--atx-muted); }
+.atx-pipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.atx-pipe-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; text-align: center; padding: 7px 4px; border-radius: 10px;
+  border: 1px solid transparent; background: rgba(22, 119, 255, 0.07); cursor: pointer; min-width: 0; transition: background .15s ease, border-color .15s ease; }
+.atx-pipe-stage.is-zero { background: rgba(20, 35, 59, 0.04); }
+.atx-pipe-stage:hover { border-color: rgba(22, 119, 255, 0.4); }
+.atx-pipe-n { font-size: 17px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--atx-blue); }
+.atx-pipe-stage.is-zero .atx-pipe-n { color: var(--atx-faint); font-weight: 600; }
+.atx-pipe-l { font-size: 11.5px; line-height: 1.2; color: var(--atx-muted); max-width: 100%; }
+.atx-pipe-l b { display: none; }
+/* Narrow pipeline column: two stages per row. */
+@container (max-width: 380px) { .atx-pipe { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.atx-pipe-flow { margin: 10px 0 0; font-size: 11.5px; color: var(--atx-faint); line-height: 1.5; }
+.atx-pipe-sum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--atx-line); }
+.atx-pipe-sum dt { font-size: 12px; color: var(--atx-muted); }
+.atx-pipe-sum dd { margin: 2px 0 0; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.atx-pipe-sum dd.is-na { color: var(--atx-faint); font-size: 13px; font-weight: 600; }
+
+.atx-insight { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-top: 1px solid var(--atx-line); }
+.atx-insight-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--atx-blue); flex: none; }
+.atx-insight-dot.is-alert { background: var(--atx-amber); }
+
+.atx-team-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 9px 16px; border: 0; border-top: 1px solid var(--atx-line); background: none; text-align: left; cursor: pointer; }
+.atx-team-row:hover { background: rgba(20, 35, 59, 0.03); }
+.atx-team-l { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.atx-team-h { display: block; font-size: 12px; color: var(--atx-muted); line-height: 1.3; }
+.atx-team-n { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.atx-team-n.is-alert { color: var(--atx-red); }
+.atx-staff { border-top: 1px solid var(--atx-line); padding: 10px 16px 12px; }
+.atx-staff-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--atx-muted); margin-bottom: 4px; }
+.atx-staff-head span { margin-left: auto; font-variant-numeric: tabular-nums; }
+.atx-staff-row { display: flex; justify-content: space-between; padding: 5px 10px; border-radius: 8px; font-size: 13px; }
+.atx-staff-row:nth-child(even) { background: rgba(20, 35, 59, 0.035); }
+.atx-staff-row b { font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.atx-detail3 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (min-width: 1024px) { .atx-detail3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .atx-detail3 > :nth-child(3) { grid-column: 1 / -1; } }
+@media (min-width: 1280px) { .atx-detail3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .atx-detail3 > :nth-child(3) { grid-column: auto; } }

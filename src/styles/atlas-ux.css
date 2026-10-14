@@ -1,0 +1,199 @@
+/* ATLAS UX layer — Apple-inspired clarity for the CRM shell ONLY.
+   Everything is scoped under `.atx-shell` so the public landing page, login and legacy dashboard are untouched.
+   Principles: neutral background, white surfaces, one blue accent, Inter (has Greek glyphs; the mono face does not),
+   sentence-case labels, subtle borders, restrained shadows, visible focus. */
+
+.atx-shell {
+  --atx-bg: #f5f5f7;
+  --atx-surface: #ffffff;
+  --atx-ink: #1d1d1f;
+  --atx-muted: #6e6e73;
+  --atx-faint: #86868b;
+  --atx-line: rgba(0, 0, 0, 0.08);
+  --atx-blue: #0066cc;
+  --atx-blue-soft: rgba(0, 102, 204, 0.09);
+  --atx-red: #c9302c;
+  --atx-amber: #b25e09;
+  --atx-green: #1f7a3d;
+  font-family: 'Inter', 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--atx-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.atx-shell.bg-paper { background: var(--atx-bg); }
+.atx-shell .shell-backdrop { display: none; }
+.atx-shell h1, .atx-shell h2, .atx-shell h3 { font-family: inherit; letter-spacing: -0.012em; }
+
+/* ---- labels: sentence case, no monospace (the mono font has no Greek glyphs) ---- */
+.atx-shell .micro {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.atx-shell .pill {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.atx-shell kbd.micro { font-family: inherit; font-size: 11px; }
+
+/* ---- surfaces ---- */
+.atx-shell .card {
+  background: var(--atx-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--atx-line);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ---- sidebar: light, translucent, one blue accent ---- */
+.atx-shell .glass-nav,
+.atx-shell .glass-drawer {
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-right: 1px solid var(--atx-line);
+  box-shadow: none;
+}
+/* existing markup uses white text/borders for the old dark rail — remap, do not rewrite 3 duplicated components */
+.atx-shell .glass-nav [class*="text-white/"],
+.atx-shell .glass-drawer [class*="text-white/"] { color: var(--atx-muted) !important; }
+.atx-shell .glass-nav .text-white,
+.atx-shell .glass-drawer .text-white { color: var(--atx-ink) !important; }
+.atx-shell .glass-nav [class*="border-white"],
+.atx-shell .glass-drawer [class*="border-white"] { border-color: var(--atx-line) !important; }
+.atx-shell .glass-nav [class*="hover:bg-white"]:hover,
+.atx-shell .glass-drawer [class*="hover:bg-white"]:hover { background: rgba(0, 0, 0, 0.05) !important; color: var(--atx-ink) !important; }
+.atx-shell .glass-nav .nav-leaf,
+.atx-shell .glass-drawer .nav-leaf { color: #3a3a3c; border-radius: 10px; padding: 8px 11px; font-size: 14px; font-weight: 500; }
+.atx-shell .glass-nav .nav-leaf:hover,
+.atx-shell .glass-drawer .nav-leaf:hover { background: rgba(0, 0, 0, 0.05); color: var(--atx-ink); box-shadow: none; }
+.atx-shell .glass-nav .nav-leaf.nav-active,
+.atx-shell .glass-drawer .nav-leaf.nav-active,
+.atx-shell .glass-nav .nav-leaf.nav-atlas-active,
+.atx-shell .glass-drawer .nav-leaf.nav-atlas-active {
+  background: var(--atx-blue-soft) !important;
+  color: var(--atx-blue) !important;
+  box-shadow: none !important;
+  font-weight: 600;
+}
+.atx-shell .glass-nav .nav-leaf.nav-active svg,
+.atx-shell .glass-drawer .nav-leaf.nav-active svg,
+.atx-shell .glass-nav .nav-leaf.nav-atlas-active svg,
+.atx-shell .glass-drawer .nav-leaf.nav-atlas-active svg { color: var(--atx-blue) !important; }
+.atx-shell .nav-atlas, .atx-shell .glass-nav .nav-atlas, .atx-shell .glass-drawer .nav-atlas { color: #3a3a3c; animation: none; }
+.atx-shell .glass-nav .nav-leaf .dot, .atx-shell .glass-drawer .nav-leaf .dot { display: none; } /* maturity dots are noise for staff */
+.atx-shell .glass-nav .nav-leaf .nav-dot, .atx-shell .glass-drawer .nav-leaf .nav-dot { display: none; }
+.atx-shell .nav-badge {
+  background: var(--atx-blue-soft) !important;
+  color: var(--atx-blue) !important;
+  font-family: inherit;
+  font-weight: 600;
+}
+.atx-shell .glass-nav nav .nav-section-caption,
+.atx-shell .glass-drawer nav .nav-section-caption { color: var(--atx-faint) !important; font-size: 12px; font-weight: 600; padding: 0 11px; margin-bottom: 4px; }
+
+/* ---- header ---- */
+.atx-shell header {
+  background: rgba(245, 245, 247, 0.78);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--atx-line);
+}
+
+/* ---- mobile bottom bar ---- */
+.atx-shell nav[aria-label*="Κύρια"][class*="fixed"] {
+  background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--atx-line);
+}
+
+/* ---- focus: always visible ---- */
+.atx-shell :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--atx-blue);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ====================== ATLAS UX components (Home / My Work) ====================== */
+.atx-page { max-width: 880px; margin: 0 auto; }
+.atx-eyebrow { color: var(--atx-muted); font-size: 14px; font-weight: 500; }
+.atx-title { font-size: clamp(26px, 3.2vw, 34px); font-weight: 700; line-height: 1.12; letter-spacing: -0.022em; color: var(--atx-ink); }
+.atx-sub { color: var(--atx-muted); font-size: 15px; line-height: 1.45; margin-top: 6px; }
+
+.atx-head { padding-bottom: 2px; }
+.atx-section { margin-top: 28px; }
+.atx-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 2px 10px; }
+.atx-section-title { font-size: 18px; font-weight: 650; letter-spacing: -0.012em; }
+.atx-link { color: var(--atx-blue); font-size: 14px; font-weight: 500; background: none; border: 0; cursor: pointer; padding: 4px 2px; }
+.atx-link:hover { text-decoration: underline; }
+
+.atx-panel { background: var(--atx-surface); border: 1px solid var(--atx-line); border-radius: 18px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); overflow: hidden; }
+
+.atx-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 760px) { .atx-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.atx-stat { text-align: left; background: var(--atx-surface); border: 1px solid var(--atx-line); border-radius: 16px; padding: 14px 16px; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+.atx-stat:hover { box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07); transform: translateY(-1px); }
+.atx-stat-n { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.atx-stat-l { color: var(--atx-muted); font-size: 13px; margin-top: 4px; line-height: 1.3; }
+.atx-stat-n.is-alert { color: var(--atx-red); }
+.atx-stat-n.is-na { color: var(--atx-faint); font-weight: 600; }
+
+.atx-row { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-top: 1px solid var(--atx-line); min-height: 64px; }
+.atx-row:first-child { border-top: 0; }
+.atx-row-main { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
+.atx-row-title { font-size: 15px; font-weight: 600; color: var(--atx-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.atx-row-sub { font-size: 13px; color: var(--atx-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; margin-top: 2px; }
+.atx-row-when { font-size: 12.5px; color: var(--atx-muted); white-space: nowrap; min-width: 74px; text-align: right; font-variant-numeric: tabular-nums; }
+.atx-row.is-overdue .atx-row-when { color: var(--atx-red); font-weight: 600; }
+.atx-row-when-inline { display: none; font-size: 12.5px; color: var(--atx-muted); margin-top: 2px; }
+.atx-row.is-overdue .atx-row-when-inline { color: var(--atx-red); font-weight: 600; }
+.atx-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; background: rgba(0, 0, 0, 0.045); color: var(--atx-muted); }
+.atx-row.is-overdue .atx-icon { background: rgba(201, 48, 44, 0.1); color: var(--atx-red); }
+
+.atx-btn { height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13.5px; font-weight: 600; border: 1px solid transparent; cursor: pointer; white-space: nowrap; transition: background .15s ease, opacity .15s ease; }
+.atx-btn-primary { background: var(--atx-blue); color: #fff; }
+.atx-btn-primary:hover:not(:disabled) { background: #0058b0; }
+.atx-btn-quiet { background: rgba(0, 0, 0, 0.05); color: var(--atx-ink); }
+.atx-btn-quiet:hover:not(:disabled) { background: rgba(0, 0, 0, 0.09); }
+.atx-btn-icon { width: 34px; padding: 0; }
+.atx-btn:disabled { opacity: .5; cursor: default; }
+
+.atx-tag { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.05); color: var(--atx-muted); white-space: nowrap; }
+.atx-tag.t-danger { background: rgba(201, 48, 44, 0.1); color: var(--atx-red); }
+.atx-tag.t-warning { background: rgba(178, 94, 9, 0.1); color: var(--atx-amber); }
+.atx-tag.t-success { background: rgba(31, 122, 61, 0.1); color: var(--atx-green); }
+.atx-tag.t-info { background: var(--atx-blue-soft); color: var(--atx-blue); }
+
+.atx-tabs { display: inline-flex; padding: 3px; background: rgba(0, 0, 0, 0.06); border-radius: 11px; gap: 2px; max-width: 100%; overflow-x: auto; }
+.atx-tab { height: 30px; padding: 0 14px; border-radius: 9px; border: 0; background: transparent; font-size: 13.5px; font-weight: 500; color: var(--atx-muted); cursor: pointer; white-space: nowrap; }
+.atx-tab[aria-selected="true"] { background: #fff; color: var(--atx-ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.atx-chip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--atx-line); background: #fff; font-size: 13px; color: var(--atx-muted); cursor: pointer; }
+.atx-chip[aria-pressed="true"] { background: var(--atx-blue-soft); border-color: rgba(0, 102, 204, 0.3); color: var(--atx-blue); font-weight: 600; }
+
+.atx-empty { text-align: center; padding: 44px 20px; color: var(--atx-muted); }
+.atx-empty strong { display: block; color: var(--atx-ink); font-size: 16px; margin-bottom: 4px; }
+.atx-notice { padding: 12px 16px; border-radius: 14px; background: rgba(178, 94, 9, 0.08); color: var(--atx-amber); font-size: 14px; }
+.atx-skeleton { height: 64px; border-top: 1px solid var(--atx-line); background: linear-gradient(90deg, rgba(0,0,0,.035), rgba(0,0,0,.065), rgba(0,0,0,.035)); background-size: 200% 100%; animation: atx-shimmer 1.4s ease infinite; }
+@keyframes atx-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 640px) {
+  .atx-row { flex-wrap: wrap; padding: 12px 14px; }
+  .atx-row-when { display: none; }
+  .atx-row-when-inline { display: block; }
+  .atx-row-sub { white-space: normal; }
+  .atx-row-act { margin-left: auto; }
+  .atx-btn { height: 40px; } /* comfortable touch target */
+}
+@media (prefers-reduced-motion: reduce) {
+  .atx-stat, .atx-btn { transition: none; }
+  .atx-skeleton { animation: none; }
+}

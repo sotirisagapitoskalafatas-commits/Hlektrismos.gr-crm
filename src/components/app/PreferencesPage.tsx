@@ -1,23 +1,16 @@
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth';
-import { ROLES, roleLabel } from '@/lib/roles';
-import type { Role } from '@/lib/roles';
-import { Btn, Card, CardHeader, Micro, Pill } from '@/lib/ui';
+import { Card, CardHeader, Micro } from '@/lib/ui';
 import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
 import type { NavigationApp } from '@/lib/navigation/external-maps';
-import { History, Navigation, PanelLeft, RefreshCcw, SlidersHorizontal, UserCog } from 'lucide-react';
+import { History, Navigation, PanelLeft, SlidersHorizontal } from 'lucide-react';
 
 export function dispatchPrefsChanged() {
   window.dispatchEvent(new Event('atlas:prefs'));
 }
 
 export default function PreferencesPage() {
-  const { role, profile, setRoleOverride, clearRoleOverride } = useAuth();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('atlas.nav.collapsed') === '1');
   const [navApp, setNavApp] = useState<NavigationApp>(() => getNavigationPreference());
-
-  const realRole = profile?.role ?? null;
-  const sim = role !== realRole;
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -74,36 +67,6 @@ export default function PreferencesPage() {
           </span>
         </div>
       </Card>
-
-      {/* Role simulator — real admins only (UI view-as; never changes authorization) */}
-      {realRole === 'admin' && (
-      <Card>
-        <CardHeader micro="Επίδειξη" title="Προσομοίωση ρόλου" className="mb-3" />
-        <div className="flex items-center gap-2 mb-3">
-          <Pill tone={sim ? 'amber' : 'green'}>{sim ? 'sim' : 'πραγματικός'}</Pill>
-          <span className="text-[13px] text-ink/70">
-            Τρέχων ρόλος: <strong className="text-ink">{roleLabel(role)}</strong>
-            {sim && realRole ? <span className="text-ink/45 font-normal"> (φυσικός: {roleLabel(realRole)})</span> : null}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <select value={role} onChange={e => setRoleOverride(e.target.value as Role)}
-            aria-label="Προσομοίωση ρόλου"
-            className="flex-1 sm:flex-none sm:w-64 text-[13px] font-medium bg-white border border-line rounded-lg px-2 py-2 text-ink focus:outline-none focus:border-brand-500 appearance-none">
-            {ROLES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-          </select>
-          {sim && (
-            <Btn variant="outline" onClick={clearRoleOverride} title="Επαναφορά στον φυσικό ρόλο">
-              <RefreshCcw className="w-3.5 h-3.5" /> Επαναφορά
-            </Btn>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-[11px] text-ink/45 mt-3 bg-ink/[0.03] rounded-lg px-3 py-2">
-          <UserCog className="w-3.5 h-3.5 shrink-0" />
-          Η προσομοίωση είναι προσωρινή και βοηθά στην επίδειξη των ρόλων. Ο φυσικός ρόλος προέρχεται από τον λογαριασμό σας.
-        </div>
-      </Card>
-      )}
 
       {/* History */}
       <Card>

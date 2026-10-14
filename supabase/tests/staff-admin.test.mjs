@@ -1,0 +1,192 @@
+// LOCAL verification only (embedded Postgres via PGlite) of supabase/staged-migrations/phase2/05.
+// Reproduces the profile self-promotion finding against the CURRENT policy definitions from migration
+// 20260910103000 (lines 581-586), then applies the staged SQL. NOT staging or production verification.
+import test, { before } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { PGlite } from '@electric-sql/pglite';
+
+const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+const db = new PGlite();
+
+const ADMIN = 'aaaaaaaa-0000-4000-8000-000000000001';
+const ADMIN2 = 'aaaaaaaa-0000-4000-8000-000000000002';
+const MANAGER = 'aaaaaaaa-0000-4000-8000-000000000003';
+const INSIDE = 'aaaaaaaa-0000-4000-8000-000000000004';
+const BO = 'aaaaaaaa-0000-4000-8000-000000000005';
+const BO2 = 'aaaaaaaa-0000-4000-8000-000000000006';
+const FIELD = 'aaaaaaaa-0000-4000-8000-000000000007';
+
+async function as(uid) {
+  await db.exec('reset role');
+  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [uid ?? '']);
+  if (uid) await db.exec('set role authenticated');
+}
+async function su() { await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub', '', false)"); }
+async function run(sql, params) { try { const r = await db.query(sql, params); return { ok: true, rows: r.rows }; } catch (e) { return { ok: false, err: e.message }; } }
+const roleOf = async (id) => { await su(); return (await db.query('select role, is_active from public.profiles where id = $1', [id])).rows[0]; };
+
+before(async () => {
+  await db.exec(`
+    create role anon nologin; create role authenticated nologin; create role service_role nologin;
+    create schema auth;
+    create table auth.users (id uuid primary key, email text, last_sign_in_at timestamptz);
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+    create table public.profiles (
+      id uuid primary key references auth.users(id), full_name text not null default '', role text not null default 'inside_sales',
+      phone text, avatar_url text, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+      is_active boolean not null default true, organization_id uuid,
+      constraint profiles_role_check check (role in ('admin','manager','inside_sales','field_sales','back_office')));
+    create function public.is_staff() returns boolean language sql stable security definer set search_path to 'public'
+      as $$ select exists (select 1 from public.profiles p where p.id = auth.uid() and coalesce(p.is_active, true)) $$;
+    create function public.is_role(r text) returns boolean language sql stable security definer set search_path = public
+      as $$ select (select p.role from public.profiles p where p.id = auth.uid()) = r $$;
+    create function public.crm_current_organization_id() returns uuid language sql stable as $$ select null::uuid $$;
+    alter table public.profiles enable row level security;
+    -- CURRENT definitions (migration 20260910103000, lines 581-586)
+    create policy "profiles read own or staff" on public.profiles for select to authenticated using ((auth.uid() = id) or (public.is_staff() and ((organization_id is null) or (organization_id = public.crm_current_organization_id()))));
+    create policy "profiles role managed by admin" on public.profiles for update to authenticated using (public.is_role('admin') and ((organization_id is null) or (organization_id = public.crm_current_organization_id()))) with check (public.is_role('admin') and ((organization_id is null) or (organization_id = public.crm_current_organization_id())));
+    create policy "profiles update own" on public.profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+    create table public.cases (id uuid primary key default gen_random_uuid(), owner_id uuid references public.profiles(id));
+    -- crm_settings as created by 20260911040000
+    create table public.crm_settings (setting_key text primary key, setting_value jsonb, category text, description text, updated_at timestamptz default now());
+    alter table public.crm_settings enable row level security;
+    create policy "crm_settings_admin_all" on public.crm_settings for all using (public.is_role('admin') or public.is_role('manager')) with check (public.is_role('admin') or public.is_role('manager'));
+    grant select, insert, update, delete on public.crm_settings to anon, authenticated;
+    insert into public.crm_settings values ('SERPAPI_KEY', '"sk-PLACEHOLDER"', 'scraper', null), ('b2b_scraper_config', '{"max_results":20}', 'scraper', null), ('role_permissions', '{}', 'security', null);
+    grant usage on schema public to anon, authenticated, service_role;
+    grant select, insert, update, delete on public.profiles, public.cases to anon, authenticated;
+    insert into auth.users (id, email) values
+      ('${ADMIN}','qa.admin@hlektrismos.gr'),('${ADMIN2}','second.admin@example.invalid'),('${MANAGER}','qa.manager@hlektrismos.gr'),
+      ('${INSIDE}','qa.insidesales@hlektrismos.gr'),('${BO}','qa.backoffice@hlektrismos.gr'),('${BO2}','bo2@example.invalid'),('${FIELD}','qa.fieldsales@hlektrismos.gr');
+    insert into public.profiles (id, full_name, role) values
+      ('${ADMIN}','QA Admin','admin'),('${ADMIN2}','Second Admin','admin'),('${MANAGER}','QA Manager','manager'),
+      ('${INSIDE}','QA Inside','inside_sales'),('${BO}','QA BO','back_office'),('${BO2}','BO Two','back_office'),('${FIELD}','QA Field','field_sales');
+    insert into public.cases (owner_id) values ('${INSIDE}'), ('${INSIDE}');
+  `);
+});
+
+test('BEFORE the fix (reproduces the source finding): any staff member can make themselves admin', async () => {
+  await as(INSIDE);
+  const r = await run("update public.profiles set role = 'admin' where id = $1", [INSIDE]);
+  assert.equal(r.ok, true);
+  assert.equal((await roleOf(INSIDE)).role, 'admin', 'self-promotion succeeded under the current policies');
+  await su();
+  // crm_settings before: a manager reads the SerpApi key and rewrites permission overrides
+  await as(MANAGER);
+  assert.equal((await run("select setting_value from public.crm_settings where setting_key = 'SERPAPI_KEY'")).rows.length, 1, 'manager reads the key (finding)');
+  assert.equal((await run(`update public.crm_settings set setting_value = '{"field_sales":["admin_everything"]}' where setting_key = 'role_permissions'`)).ok, true);
+  await su();
+  await db.exec(`update public.profiles set role = 'inside_sales' where id = '${INSIDE}'`);
+  await db.exec(read('../staged-migrations/phase2/05_staff_admin_and_role_preview.sql'));
+});
+
+test('AFTER: own role / status can no longer be changed directly; own name still editable', async () => {
+  await as(INSIDE);
+  assert.equal((await run("update public.profiles set role = 'admin' where id = $1", [INSIDE])).ok, false);
+  assert.equal((await run('update public.profiles set is_active = false where id = $1', [INSIDE])).ok, false);
+  assert.equal((await run("update public.profiles set full_name = 'Νέο όνομα' where id = $1", [INSIDE])).ok, true);
+  assert.equal((await roleOf(INSIDE)).role, 'inside_sales');
+  // even an admin cannot bypass the audited path with a direct API update
+  await as(ADMIN);
+  assert.equal((await run("update public.profiles set role = 'manager' where id = $1", [FIELD])).ok, false);
+  assert.equal((await roleOf(FIELD)).role, 'field_sales');
+});
+
+test('matrix: admin manages every role; manager only operational staff; back office only back office', async () => {
+  const upd = async (actor, target, role) => { await as(actor); return run('select public.staff_update($1, null, null, $2)', [target, role]); };
+  assert.equal((await upd(ADMIN, FIELD, 'manager')).ok, true, 'admin promotes to manager');
+  assert.equal((await upd(ADMIN, FIELD, 'field_sales')).ok, true);
+  assert.equal((await upd(MANAGER, FIELD, 'back_office')).ok, true, 'manager moves ops staff between ops roles');
+  assert.equal((await upd(MANAGER, FIELD, 'field_sales')).ok, true);
+  assert.equal((await upd(MANAGER, FIELD, 'manager')).ok, false, 'manager cannot promote to manager');
+  assert.equal((await upd(MANAGER, FIELD, 'admin')).ok, false, 'manager cannot promote to admin');
+  assert.equal((await upd(MANAGER, ADMIN2, 'inside_sales')).ok, false, 'manager cannot touch an admin');
+  assert.equal((await upd(BO, BO2, null)).ok, true, 'back office edits back office');
+  assert.equal((await upd(BO, FIELD, null)).ok, false, 'back office cannot edit field sales');
+  assert.equal((await upd(BO, BO2, 'inside_sales')).ok, false, 'back office cannot move someone out of back office');
+  assert.equal((await upd(INSIDE, FIELD, null)).ok, false, 'inside sales has no staff administration');
+  assert.equal((await upd(MANAGER, MANAGER, 'admin')).ok, false, 'no self-promotion through the RPC');
+  await su();
+  const changes = await db.query("select count(*)::int n from public.staff_admin_audit where action = 'role_change' and actor_id = $1", [ADMIN]);
+  assert.equal(changes.rows[0].n, 2);
+});
+
+test('deactivate / reactivate: scoped, never yourself, never the last active admin', async () => {
+  const act = async (actor, target, on) => { await as(actor); return run('select public.staff_set_active($1, $2)', [target, on]); };
+  assert.equal((await act(MANAGER, INSIDE, false)).ok, true);
+  assert.equal((await roleOf(INSIDE)).is_active, false);
+  assert.equal((await act(MANAGER, INSIDE, true)).ok, true);
+  assert.equal((await act(BO, INSIDE, false)).ok, false, 'back office cannot deactivate inside sales');
+  assert.equal((await act(ADMIN, ADMIN, false)).ok, false, 'not yourself');
+  assert.equal((await act(ADMIN, ADMIN2, false)).ok, true, 'one of two admins may be deactivated');
+  await su(); await db.exec(`update public.profiles set role = 'manager' where id = '${MANAGER}'`);
+  // now ADMIN is the last active admin: a second admin account cannot remove it either
+  await su(); await db.exec(`update public.profiles set is_active = true where id = '${ADMIN2}'`);
+  assert.equal((await act(ADMIN2, ADMIN, false)).ok, true);
+  assert.equal((await act(ADMIN, ADMIN2, false)).ok, false, 'deactivated admin has no rights');
+  await su(); await db.exec(`update public.profiles set is_active = true where id = '${ADMIN}'`);
+  await as(ADMIN);
+  assert.equal((await run("select public.staff_update($1, null, null, 'manager')", [ADMIN2])).ok, true, 'demote one of two admins');
+  assert.equal((await run("select public.staff_update($1, null, null, 'manager')", [ADMIN])).ok, false, 'own role / last admin');
+  await su(); await db.exec(`update public.profiles set role = 'admin' where id = '${ADMIN2}'`);
+});
+
+test('directory: admin/manager see all staff, back office sees back office only, others are refused', async () => {
+  await as(ADMIN);
+  const all = await run('select * from public.staff_list()');
+  assert.equal(all.rows.length, 7);
+  assert.equal(all.rows.find((r) => r.id === ADMIN).can_manage, false, 'cannot manage yourself');
+  assert.ok(all.rows.find((r) => r.id === INSIDE).email.includes('@'));
+  await as(MANAGER);
+  const m = await run('select id, role, can_manage from public.staff_list()');
+  assert.equal(m.rows.find((r) => r.id === ADMIN).can_manage, false);
+  assert.equal(m.rows.find((r) => r.id === FIELD).can_manage, true);
+  await as(BO);
+  const b = await run('select role from public.staff_list()');
+  assert.ok(b.rows.length === 2 && b.rows.every((r) => r.role === 'back_office'));
+  await as(INSIDE);
+  assert.equal((await run('select * from public.staff_list()')).ok, false);
+});
+
+test('reference count protects CRM history from permanent deletion', async () => {
+  await as(ADMIN);
+  assert.equal((await run('select public.staff_reference_count($1) n', [INSIDE])).rows[0].n, 2);
+  assert.equal((await run('select public.staff_reference_count($1) n', [BO2])).rows[0].n, 0);
+  await as(FIELD);
+  assert.equal((await run('select public.staff_reference_count($1) n', [INSIDE])).ok, false);
+});
+
+test('role preview: only the granted active admin, only before the expiry; start is audited and refused otherwise', async () => {
+  await su();
+  const g = await db.query("select expires_at = timestamptz '2026-10-15 21:00:00+00' ok from public.role_preview_grants where user_id = $1", [ADMIN]);
+  assert.equal(g.rows[0]?.ok, true, 'seeded for qa.admin until 16/10 00:00 Athens (= 15/10 21:00 UTC)');
+  await db.exec(`insert into public.role_preview_grants values ('${ADMIN2}', now() - interval '1 minute', 'expired'), ('${INSIDE}', now() + interval '1 day', 'not admin')`);
+  const status = async (uid) => { await as(uid); return (await run('select public.role_preview_status() s')).rows[0].s; };
+  const live = Date.now() < Date.parse('2026-10-16T00:00:00+03:00');
+  assert.equal((await status(ADMIN)).allowed, live, 'allowed only before the hard expiry');
+  assert.equal((await status(ADMIN2)).allowed, false, 'expired grant fails closed');
+  assert.equal((await status(INSIDE)).allowed, false, 'grant for a non-admin is ignored');
+  assert.equal((await status(MANAGER)).allowed, false, 'no grant, no preview');
+  await as(ADMIN2);
+  assert.equal((await run("select public.role_preview_event('start', 'back_office')")).ok, false);
+  await as(ADMIN);
+  assert.equal((await run("select public.role_preview_event('start', 'back_office')")).ok, live);
+  assert.equal((await run("select public.role_preview_event('end', 'back_office')")).ok, true);
+  await as(INSIDE);
+  assert.equal((await run('select * from public.role_preview_grants')).ok, false, 'grants table is not readable by staff');
+});
+
+test('crm_settings: managers no longer read credentials or rewrite permission overrides; admins write', async () => {
+  await as(MANAGER);
+  assert.equal((await run("select 1 from public.crm_settings where setting_key = 'SERPAPI_KEY'")).rows.length, 0);
+  assert.equal((await run("select 1 from public.crm_settings where setting_key = 'b2b_scraper_config'")).rows.length, 1, 'non-secret config still readable');
+  await run(`update public.crm_settings set setting_value = '{"x":1}' where setting_key = 'role_permissions'`);
+  await su();
+  assert.notDeepEqual((await db.query("select setting_value v from public.crm_settings where setting_key = 'role_permissions'")).rows[0].v, { x: 1 }, 'manager write had no effect');
+  await as(INSIDE);
+  assert.equal((await run('select 1 from public.crm_settings')).rows.length, 0);
+  await as(ADMIN);
+  assert.equal((await run(`update public.crm_settings set setting_value = '{}' where setting_key = 'role_permissions'`)).ok, true);
+});

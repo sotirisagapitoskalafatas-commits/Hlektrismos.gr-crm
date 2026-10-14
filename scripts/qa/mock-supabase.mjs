@@ -103,7 +103,23 @@ const visits = [
   visit(5, 0, 'completed', -3, { ended_at: iso(-2 * H), result: 'Ενδιαφέρεται — συνέχεια' }),
 ];
 
-const TABLES = { case_visits: visits, profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
+// ---- Staff administration (mirrors staged-migrations/phase2/05 + functions/admin-users; NO real auth) ----
+const staffRows = [
+  ...Object.values(USERS).map((u, i) => ({ id: u.id, full_name: u.full_name, email: `${u.role}@example.invalid`, phone: null, role: u.role,
+    is_active: true, created_at: iso(-(120 - i) * D), last_sign_in_at: iso(-i * H) })),
+  { id: '10000000-0000-4000-8000-000000000006', full_name: 'Σοφία Μαρκοπούλου', email: 'bo2@example.invalid', phone: '+30 6900000006', role: 'back_office', is_active: true, created_at: iso(-40 * D), last_sign_in_at: null },
+  { id: '10000000-0000-4000-8000-000000000007', full_name: 'Πρώην Συνεργάτης', email: 'former@example.invalid', phone: null, role: 'inside_sales', is_active: false, created_at: iso(-200 * D), last_sign_in_at: iso(-60 * D) },
+];
+const staffAudit = [];
+const MANAGE = { admin: ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'], manager: ['inside_sales', 'field_sales', 'back_office'], back_office: ['back_office'] };
+const canManageMock = (actor, from, to = from) => !!actor && (MANAGE[actor.role] ?? []).includes(from) && (MANAGE[actor.role] ?? []).includes(to);
+const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.field_sales.id ? 5 : 0);
+// Presentation preview: allowed for the mock admin unless MOCK_PREVIEW=expired.
+const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
+let previewState = process.env.MOCK_PREVIEW ?? 'on'; // switch at runtime: GET /__preview?state=expired|on
+const previewAllowedMock = (u) => u?.role === 'admin' && previewState !== 'expired';
+
+const TABLES = { staff_admin_audit: staffAudit, case_visits: visits, profiles: Object.values(USERS), customers, cases: caseRows, follow_ups: followUps, leads, notifications, case_documents: [], activity_log: [],
   timeline_events: [
     { id: '70000000-0000-4000-8000-000000000001', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'call', title: 'Τηλεφωνική επικοινωνία', description: 'Ενδιαφέρεται για πρόγραμμα ρεύματος', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: { id: U('inside_sales'), full_name: USERS.inside_sales.full_name, role: 'inside_sales' } },
     { id: '70000000-0000-4000-8000-000000000002', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'email', title: 'Αποστολή προσφοράς', description: '', user_id: U('inside_sales'), occurred_at: iso(-1 * D), location: null, metadata: {}, user: null },
@@ -156,6 +172,7 @@ http.createServer((req, res) => {
     const send = (code, obj, extra = {}) => { res.writeHead(code, { ...cors, ...extra }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
+    if (url.pathname === '/__preview') { previewState = url.searchParams.get('state') ?? 'on'; return send(200, { previewState }); }
 
     if (url.pathname.startsWith('/auth/v1/')) {
       const u = userForToken(req.headers.authorization);
@@ -185,7 +202,66 @@ http.createServer((req, res) => {
       l.status = 'converted'; l.converted_case_id = caseRows[0].id; l.converted_at = new Date().toISOString();
       return send(200, caseRows[0].id);
     }
-    if (url.pathname.startsWith('/rest/v1/rpc/')) return send(200, null);
+    if (url.pathname.startsWith('/rest/v1/rpc/') || url.pathname.startsWith('/functions/v1/admin-users')) {
+      const u = userForToken(req.headers.authorization);
+      const name = url.pathname.split('/').pop();
+      const deny = (msg) => send(403, { code: '42501', message: msg });
+      if (name === 'role_preview_status') return send(200, { allowed: previewAllowedMock(u), expires_at: PREVIEW_EXPIRES, server_now: new Date().toISOString() });
+      if (name === 'role_preview_event') {
+        log.push({ method: 'RPC', table: 'role_preview_event', body: json });
+        if (json.p_action === 'start' && !previewAllowedMock(u)) return deny('role_preview_event: role preview is not available for this account');
+        staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u?.id, action: `role_preview_${json.p_action}`, target_id: u?.id, target_email: null, before: null, after: null, note: json.p_role, created_at: new Date().toISOString() });
+        return send(200, true);
+      }
+      if (name === 'staff_list') {
+        if (!u || !MANAGE[u.role]) return deny('staff_list: not allowed');
+        const rows = staffRows.filter((r) => u.role !== 'back_office' || r.role === 'back_office')
+          .map((r) => ({ ...r, can_manage: r.id !== u.id && canManageMock(u, r.role) }));
+        return send(200, rows);
+      }
+      if (name === 'staff_reference_count') return MANAGE[u?.role] ? send(200, staffRefs(json.p_id)) : deny('not allowed');
+      if (name === 'staff_update') {
+        log.push({ method: 'RPC', table: 'staff_update', body: json });
+        const t = staffRows.find((r) => r.id === json.p_id);
+        const to = json.p_role || t?.role;
+        if (!t || !canManageMock(u, t.role, to)) return deny('staff_update: not allowed for this role');
+        if (t.id === u.id && to !== t.role) return deny('staff_update: you cannot change your own role');
+        staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: to !== t.role ? 'role_change' : 'update', target_id: t.id, target_email: t.email, before: { role: t.role }, after: { role: to }, note: null, created_at: new Date().toISOString() });
+        Object.assign(t, { full_name: json.p_full_name || t.full_name, phone: json.p_phone || null, role: to });
+        return send(200, null);
+      }
+      if (name === 'staff_set_active') {
+        log.push({ method: 'RPC', table: 'staff_set_active', body: json });
+        const t = staffRows.find((r) => r.id === json.p_id);
+        if (!t || t.id === u?.id || !canManageMock(u, t.role)) return deny('staff_set_active: not allowed for this role');
+        t.is_active = !!json.p_active;
+        staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: t.is_active ? 'reactivate' : 'deactivate', target_id: t.id, target_email: t.email, before: null, after: null, note: null, created_at: new Date().toISOString() });
+        return send(200, null);
+      }
+      if (name === 'admin-users') {
+        log.push({ method: 'FN', table: 'admin-users', body: { ...json, password: json.password ? '[redacted]' : undefined } });
+        if (!u) return send(401, { error: 'Απαιτείται σύνδεση χρήστη.' });
+        if (json.action === 'create') {
+          if (!canManageMock(u, json.role)) return send(403, { error: 'Δεν έχετε δικαίωμα να δημιουργήσετε χρήστη με αυτόν τον ρόλο.' });
+          if (staffRows.some((r) => r.email === String(json.email).toLowerCase())) return send(409, { error: 'Υπάρχει ήδη λογαριασμός με αυτό το email.' });
+          const id = `20000000-0000-4000-8000-${String(staffRows.length).padStart(12, '0')}`;
+          staffRows.push({ id, full_name: json.full_name, email: String(json.email).toLowerCase(), phone: json.phone || null, role: json.role, is_active: true, created_at: new Date().toISOString(), last_sign_in_at: null });
+          staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: 'create', target_id: id, target_email: json.email, before: null, after: { role: json.role }, note: null, created_at: new Date().toISOString() });
+          return send(200, { ok: true, id, invited: json.mode !== 'password' });
+        }
+        if (json.action === 'delete') {
+          const t = staffRows.find((r) => r.id === json.user_id);
+          if (!t) return send(404, { error: 'Ο χρήστης δεν βρέθηκε.' });
+          if (t.id === u.id || !canManageMock(u, t.role)) return send(403, { error: 'Δεν έχετε δικαίωμα διαχείρισης αυτού του ρόλου.' });
+          if (staffRefs(t.id) > 0) return send(409, { error: 'Ο χρήστης συνδέεται με εγγραφές του CRM.' });
+          staffRows.splice(staffRows.indexOf(t), 1);
+          staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: 'delete', target_id: t.id, target_email: t.email, before: { role: t.role }, after: null, note: null, created_at: new Date().toISOString() });
+          return send(200, { ok: true });
+        }
+        return send(400, { error: 'Άγνωστη ενέργεια.' });
+      }
+      return send(200, null);
+    }
     if (url.pathname.startsWith('/storage/v1/object/')) {
       log.push({ method: req.method, table: 'storage', query: url.pathname });
       if (url.pathname.startsWith('/storage/v1/object/sign/')) return send(200, { signedURL: '/mock-file' });

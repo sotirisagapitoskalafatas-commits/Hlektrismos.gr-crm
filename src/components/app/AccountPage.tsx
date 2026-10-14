@@ -3,17 +3,17 @@ import { useAuth } from '@/lib/auth';
 import { ROLES, roleLabel } from '@/lib/roles';
 import { updateProfile } from '@/lib/api';
 import { Btn, Card, CardHeader, Field, Micro, Pill } from '@/lib/ui';
-import { Check, LogOut, Mail, Phone as PhoneIcon, ShieldCheck, UserCog } from 'lucide-react';
+import { Check, LogOut, Mail, Phone as PhoneIcon, ShieldCheck } from 'lucide-react';
 
 export default function AccountPage() {
-  const { user, profile, role, refreshProfile, signOut } = useAuth();
+  const { user, profile, preview, refreshProfile, signOut } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Always the REAL assigned role (a presentation preview never changes it).
   const realRole = profile?.role ?? null;
-  const sim = role !== realRole;
 
   const save = async () => {
     if (!profile) return;
@@ -48,8 +48,8 @@ export default function AccountPage() {
             <div className="text-xs text-ink/50 truncate">{user?.email ?? '—'}</div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
-            <Pill tone={sim ? 'amber' : 'green'}>{sim ? `sim · ${roleLabel(role)}` : roleLabel(role)}</Pill>
-            <span className="micro text-ink/40">{ROLES.find(r => r.id === role)?.hint}</span>
+            <Pill tone="blue">{realRole ? roleLabel(realRole) : '—'}</Pill>
+            {preview.role && <span className="micro text-warn-600">προεπισκόπηση: {roleLabel(preview.role)}</span>}
           </div>
         </div>
       </Card>
@@ -79,10 +79,14 @@ export default function AccountPage() {
             </Field>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-ink/45 bg-ink/[0.03] rounded-lg px-3 py-2">
-            <ShieldCheck className="w-3.5 h-3.5 text-ok-600 shrink-0" />
-            Ο ρόλος σας αποδίδεται από τον διαχειριστή και δεν μπορεί να αλλάξει από εδώ.
-          </div>
+          <Field label="Ρόλος">
+            <div className="flex items-center gap-2 text-[13px] border border-line rounded-lg px-3 py-2 text-ink/70 bg-ink/[0.02]" aria-readonly="true">
+              <ShieldCheck className="w-3.5 h-3.5 text-ink/40" />
+              <span>{realRole ? roleLabel(realRole) : '—'}</span>
+              <span className="text-ink/40">· {ROLES.find(r => r.id === realRole)?.hint}</span>
+            </div>
+            <p className="text-[11px] text-ink/45 mt-1">Ο ρόλος και τα δικαιώματά σας ορίζονται από τον διαχειριστή.</p>
+          </Field>
 
           <div className="flex items-center gap-2 pt-1">
             <Btn onClick={save} disabled={saving || !profile || (fullName.trim() === profile?.full_name && phone.trim() === (profile?.phone ?? ''))}>
@@ -97,31 +101,6 @@ export default function AccountPage() {
         </div>
       </Card>
 
-      {/* Role info */}
-      <Card>
-        <CardHeader micro="Επίθεση ρόλου" title="Ο ρόλος σας" className="mb-3" />
-        <div className="grid sm:grid-cols-2 gap-2">
-          {ROLES.map(r => (
-            <div key={r.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${r.id === role ? 'border-brand-300 bg-brand-50/50' : 'border-line bg-white'}`}>
-              <UserCog className={`w-4 h-4 shrink-0 ${r.id === role ? 'text-brand-600' : 'text-ink/30'}`} />
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-ink">{r.label} <span className="micro text-ink/40">{r.short}</span></div>
-                <div className="text-[11px] text-ink/45 truncate">{r.hint}</div>
-              </div>
-              {r.id === role && <Pill tone="blue">τρέχων</Pill>}
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Danger zone */}
-      <Card className="border-bad-200">
-        <CardHeader micro="Disconnect" title="Σύνδεση λογαριασμού" className="mb-3" />
-        <p className="text-xs text-ink/50 mb-3">Η αποσύνδεση σας επιστρέφει στην δημόσια σελίδα της Hlektrismos.</p>
-        <Btn variant="outline" onClick={() => { signOut(); window.location.hash = '/'; }}>
-          <LogOut className="w-3.5 h-3.5" /> Αποσύνδεση από το CRM
-        </Btn>
-      </Card>
     </div>
   );
 }

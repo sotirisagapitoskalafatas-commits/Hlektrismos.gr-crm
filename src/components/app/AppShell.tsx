@@ -4,7 +4,7 @@ import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
-  ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, ROLES, can,
+  ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, can,
   findNav, flattenNav, leadStatusInfo, navForRole, roleLabel, sectionColor, stageLabel,
 } from '@/lib/roles';
 import type { NavLeaf, PageKey, ShellCounts, Stage } from '@/lib/roles';
@@ -24,7 +24,7 @@ import DesktopShell from '@/components/shells/DesktopShell';
 import QuickAdd from './QuickAdd';
 import '@/styles/atlas-ux.css';
 import CrmAssistant from '@/components/assistant/CrmAssistant';
-import RoleSwitcher from './RoleSwitcher';
+import RoleSwitcher, { PreviewBanner } from './RoleSwitcher';
 
 import HomePage from './HomePage';
 import CasesPage from './CasesPage';
@@ -167,10 +167,9 @@ function Drawer({ open, onClose }: {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-                  <Micro>{roleLabel(role)}{role !== profile?.role ? ' · sim' : ''}</Micro>
+                  <Micro>{roleLabel(profile?.role ?? role)}</Micro>
                 </div>
               </div>
-              <RoleSwitcher />
               <Btn variant="danger" onClick={() => { signOut(); window.location.hash = '/'; onClose(); }} className="w-full justify-center">
                 <LogOut className="w-3.5 h-3.5" /> Αποσύνδεση
               </Btn>
@@ -185,7 +184,7 @@ function Drawer({ open, onClose }: {
 function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
   onOpenPalette: () => void; onOpenDrawer: () => void; onSignOut: () => void; onOpenAssistant: () => void;
 }) {
-  const { role, profile, user } = useAuth();
+  const { role, profile, user, preview } = useAuth();
   const { view, openCase, go } = useNav();
   const { notifs, unread, load } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -193,7 +192,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
   const { canInstall, install } = usePwaInstall();
   const showInstall = canInstall && !isStandalone();
 
-  const sim = role !== profile?.role;
+  const realRole = profile?.role ?? role;
   const nav = findNav(view.page);
   const title = view.page === 'case' ? 'Case' : PAGE_TITLES[view.page] ?? 'ATLAS';
   const crumb = view.page === 'case'
@@ -225,7 +224,6 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
         </div>
         <div className="flex items-center gap-2">
           <h1 className="text-[17px] font-bold text-ink tracking-tight truncate leading-tight font-[var(--font-display)]">{title}</h1>
-          {sim && <span className="pill text-[11px]" style={{ background: rgbaOf(ROLE_COLOR[role], 0.12), color: ROLE_COLOR[role] }}>sim {roleLabel(role)}</span>}
         </div>
       </div>
 
@@ -299,12 +297,12 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
         <button onClick={() => setAcctOpen(o => !o)} aria-label="Λογαριασμός" aria-haspopup="menu"
           className="flex items-center gap-2 rounded-full bg-ink/[0.045] hover:bg-ink/[0.08] pl-1 pr-2 py-1 transition-colors">
           <span className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold"
-            style={{ background: rgbaOf(ROLE_COLOR[role], 0.14), color: ROLE_COLOR[role] }}>
+            style={{ background: rgbaOf(ROLE_COLOR[realRole], 0.14), color: ROLE_COLOR[realRole] }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </span>
           <span className="hidden lg:block text-left">
             <span className="block text-[13px] font-semibold text-ink leading-tight max-w-[140px] truncate">{profile?.full_name ?? 'Χρήστης'}</span>
-            <span className="block micro text-ink/40 leading-tight">{roleLabel(role)}{sim ? ' · sim' : ''}</span>
+            <span className="block micro text-ink/40 leading-tight">{preview.role ? `Προεπισκόπηση: ${roleLabel(preview.role)}` : roleLabel(realRole)}</span>
           </span>
           <ChevronDown className="hidden lg:block w-3.5 h-3.5 text-ink/40" />
         </button>
@@ -322,12 +320,9 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
                 </div>
               </div>
 
-              <div className="px-2 py-2 flex items-center justify-between gap-2 border-b border-line mb-1">
-                <div>
-                  <div className="text-[13px] font-medium text-ink">{roleLabel(role)}</div>
-                  <div className="micro text-ink/40">{ROLES.find(r => r.id === role)?.hint}</div>
-                </div>
-                <span className={`pill ${sim ? 'bg-warn-100 text-warn-600' : 'bg-ok-100 text-ok-600'}`}>{sim ? 'sim' : 'πραγματικός'}</span>
+              <div className="px-2 pb-2 flex items-center justify-between gap-2 border-b border-line mb-1">
+                <span className="text-[12px] text-ink/50">Ρόλος</span>
+                <span className="pill" style={{ background: rgbaOf(ROLE_COLOR[realRole], 0.12), color: ROLE_COLOR[realRole] }}>{roleLabel(realRole)}</span>
               </div>
 
               <button onClick={() => { go('account'); setAcctOpen(false); }}
@@ -343,9 +338,11 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
                 <CircleHelp className="w-4 h-4 text-ink/40" /> Κέντρο βοήθειας
               </button>
 
-              <div className="px-2 py-2 border-t border-line mt-1.5">
-                <RoleSwitcher />
-              </div>
+              {preview.allowed && (
+                <div className="px-2 py-2 border-t border-line mt-1.5">
+                  <RoleSwitcher onPicked={() => setAcctOpen(false)} />
+                </div>
+              )}
 
               <Btn variant="danger" onClick={onSignOut} className="w-full justify-center mt-1">
                 <LogOut className="w-3.5 h-3.5" /> Αποσύνδεση
@@ -584,6 +581,7 @@ export default function AppShell() {
       {isTablet && <TabletShell counts={counts} />}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
         <Header onOpenPalette={() => setPaletteOpen(true)} onOpenDrawer={() => setDrawer(true)} onSignOut={onSignOut} onOpenAssistant={() => setAssistantOpen(true)} />
+        <PreviewBanner />
         <main className={`flex-1 overflow-y-auto px-4 sm:px-7 pt-6 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+78px)]' : 'pb-10'}`}>
           <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>

@@ -1,0 +1,171 @@
+/* Admin Center («Διαχείριση») — grouped tabs instead of one long page of static claims.
+   Tabs per displayed role (a presentation preview only changes the view; it never grants administration):
+     admin        → Επισκόπηση · Χρήστες & Ρόλοι · Δικαιώματα · Cases & Ροή · Έγγραφα · B2B Scraper · Ασφάλεια & Έλεγχοι · Audit Log
+     manager      → Επισκόπηση · Χρήστες & Ρόλοι · Δικαιώματα · Cases & Ροή · Έγγραφα · Audit Log
+     back_office  → Χρήστες & Ρόλοι (Back Office colleagues only)
+   Every status shown is either read live, or labelled «Δεν έχει επαληθευτεί ζωντανά». */
+
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/lib/auth';
+import { useNav } from '@/lib/nav';
+import { ROLES, roleLabel } from '@/lib/roles';
+import type { Role } from '@/lib/roles';
+import { fetchScraperSettings } from '@/lib/scraper';
+import { fetchStaffAudit, listStaff } from '@/lib/staff-admin';
+import type { StaffAuditRow, StaffMember, StaffSource } from '@/lib/staff-admin';
+import StaffAdmin from './StaffAdmin';
+import AdminSecurity, { CheckList } from './AdminSecurity';
+import { SOURCE_FINDINGS, lastAnonChecks } from '@/lib/admin-checks';
+import { DocumentsTab, PermissionsTab, WorkflowTab } from './AdminReference';
+import ScraperSettingsCard from './ScraperSettings';
+
+type Tab = 'overview' | 'users' | 'permissions' | 'workflow' | 'documents' | 'scraper' | 'security' | 'audit';
+const TAB_LABEL: Record<Tab, string> = {
+  overview: 'Επισκόπηση', users: 'Χρήστες & Ρόλοι', permissions: 'Δικαιώματα', workflow: 'Cases & Ροή εργασίας',
+  documents: 'Έγγραφα', scraper: 'B2B Scraper', security: 'Ασφάλεια & Έλεγχοι', audit: 'Audit Log',
+};
+function tabsFor(role: Role | null | undefined): Tab[] {
+  if (role === 'admin') return ['overview', 'users', 'permissions', 'workflow', 'documents', 'scraper', 'security', 'audit'];
+  if (role === 'manager') return ['overview', 'users', 'permissions', 'workflow', 'documents', 'audit'];
+  if (role === 'back_office') return ['users'];
+  return [];
+}
+
+export default function AdminCenter() {
+  const { profile, role } = useAuth();
+  const { view } = useNav();
+  // Tabs follow the role being SHOWN (a presentation preview shows that role's view); server data and every write
+  // are still authorized by the real session — and writes are blocked while previewing.
+  const realRole = role;
+  const tabs = tabsFor(realRole);
+  const wanted = view.filters?.tab as Tab | undefined;
+  const [tab, setTab] = useState<Tab>(() => (wanted && tabs.includes(wanted) ? wanted : tabs[0] ?? 'users'));
+  useEffect(() => { if (!tabs.includes(tab) && tabs[0]) setTab(tabs[0]); }, [tabs, tab]);
+
+  if (!profile) return null;
+  if (tabs.length === 0) {
+    return <div className="atx-page"><div className="atx-panel"><div className="atx-empty"><strong>Δεν έχετε πρόσβαση στη Διαχείριση</strong>Ο ρόλος σας δεν περιλαμβάνει διαχειριστικές λειτουργίες.</div></div></div>;
+  }
+
+  return (
+    <div className="atx-page atx-admin">
+      <div className="atx-head">
+        <p className="atx-eyebrow">Διαχείριση</p>
+        <h1 className="atx-title">{realRole === 'back_office' ? 'Ομάδα Back Office' : 'Κέντρο διαχείρισης'}</h1>
+        <p className="atx-sub">Χρήστες, ρόλοι, ροή εργασίας και έλεγχοι — με πραγματική κατάσταση, όχι στατικές δηλώσεις.</p>
+      </div>
+      {tabs.length > 1 && (
+        <div className="atx-pagetabs mt-4" role="tablist" aria-label="Ενότητες διαχείρισης">
+          {tabs.map(t => <button key={t} role="tab" aria-selected={tab === t} className="atx-pagetab" onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>)}
+        </div>
+      )}
+      <div className="mt-4" role="tabpanel" aria-label={TAB_LABEL[tab]}>
+        {tab === 'overview' && <Overview role={realRole} onOpen={setTab} />}
+        {tab === 'users' && <StaffAdmin />}
+        {tab === 'permissions' && <PermissionsTab />}
+        {tab === 'workflow' && <WorkflowTab />}
+        {tab === 'documents' && <DocumentsTab />}
+        {tab === 'scraper' && <ScraperSettingsCard />}
+        {tab === 'security' && <AdminSecurity />}
+        {tab === 'audit' && <AuditTab />}
+      </div>
+    </div>
+  );
+}
+
+function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => void }) {
+  const [staff, setStaff] = useState<{ rows: StaffMember[]; source: StaffSource } | null>(null);
+  const [keySet, setKeySet] = useState<boolean | null | 'n/a'>(null);
+  useEffect(() => {
+    let alive = true;
+    void listStaff().then(r => alive && setStaff({ rows: r.rows, source: r.source }));
+    if (role === 'admin' || role === 'manager') void fetchScraperSettings().then(s => alive && setKeySet(s ? s.keySet : 'n/a'));
+    return () => { alive = false; };
+  }, [role]);
+  const byRole = useMemo(() => ROLES.map(r => ({ r: r.id as Role, n: staff?.rows.filter(s => s.role === r.id && s.is_active).length ?? 0 })), [staff]);
+  const last = lastAnonChecks();
+  const issues = last?.results.filter(r => r.status === 'action').length ?? 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="atx-ov-grid">
+        <button type="button" className="atx-ov" onClick={() => onOpen('users')}>
+          <span className="atx-ov-k">Ενεργοί χρήστες</span>
+          <span className="atx-ov-v">{staff ? staff.rows.filter(s => s.is_active).length : '…'}</span>
+          <span className="atx-ov-s">{byRole.filter(x => x.n).map(x => `${roleLabel(x.r)} ${x.n}`).join(' · ') || '—'}</span>
+        </button>
+        <button type="button" className="atx-ov" onClick={() => onOpen('users')}>
+          <span className="atx-ov-k">Διαχείριση χρηστών</span>
+          <span className={`atx-ov-v ${staff?.source === 'server' ? '' : 'is-warn'}`}>{!staff ? '…' : staff.source === 'server' ? 'Ενεργή' : 'Εκκρεμεί'}</span>
+          <span className="atx-ov-s">{staff?.source === 'server' ? 'Ο server απαντά στις ενέργειες διαχείρισης.' : 'Απαιτεί migration phase2/05 και function admin-users.'}</span>
+        </button>
+        {role === 'admin' && (
+          <button type="button" className="atx-ov" onClick={() => onOpen('security')}>
+            <span className="atx-ov-k">Έλεγχοι ανώνυμης πρόσβασης</span>
+            <span className={`atx-ov-v ${!last ? '' : issues ? 'is-warn' : 'is-ok'}`}>{!last ? 'Δεν έχουν εκτελεστεί' : issues ? `${issues} θέματα` : 'Χωρίς θέματα'}</span>
+            <span className="atx-ov-s">{last ? `Τελευταίος έλεγχος ${new Date(last.at).toLocaleString('el-GR')}` : 'Εκτελέστε τους από «Ασφάλεια & Έλεγχοι».'}</span>
+          </button>
+        )}
+        {(role === 'admin' || role === 'manager') && (
+          <button type="button" className="atx-ov" onClick={() => role === 'admin' && onOpen('scraper')}>
+            <span className="atx-ov-k">Κλειδί SerpApi</span>
+            <span className="atx-ov-v">{keySet === null ? '…' : keySet === 'n/a' ? 'Μη διαθέσιμο' : keySet ? 'Ρυθμισμένο' : 'Λείπει'}</span>
+            <span className="atx-ov-s">Δείχνει μόνο αν υπάρχει· η τιμή δεν επιστρέφεται ποτέ στον browser.</span>
+          </button>
+        )}
+      </div>
+      {role === 'admin' && (
+        <div className="atx-panel">
+          <div className="atx-card-head"><h2 className="atx-section-title">Εκκρεμότητες ασφαλείας από τον κώδικα</h2><button className="atx-link" onClick={() => onOpen('security')}>Όλοι οι έλεγχοι →</button></div>
+          <CheckList items={SOURCE_FINDINGS} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ACTION_TEXT: Record<string, string> = {
+  create: 'Δημιουργία χρήστη', update: 'Επεξεργασία στοιχείων', role_change: 'Αλλαγή ρόλου', deactivate: 'Απενεργοποίηση', reactivate: 'Ενεργοποίηση',
+  delete: 'Οριστική διαγραφή', denied: 'Άρνηση (χωρίς δικαίωμα)', role_preview_start: 'Έναρξη επίδειξης ρόλου', role_preview_end: 'Λήξη επίδειξης ρόλου',
+};
+
+function AuditTab() {
+  const [rows, setRows] = useState<StaffAuditRow[] | null | undefined>(undefined);
+  const [names, setNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    void fetchStaffAudit().then(setRows);
+    void listStaff().then(r => setNames(new Map(r.rows.map(s => [s.id, s.full_name]))));
+  }, []);
+  const who = (id: string | null, email?: string | null) => (id ? names.get(id) ?? email ?? 'χρήστης' : email ?? '—');
+  const rl = (v: unknown) => roleLabel(String(v ?? '') as Role);
+  const describe = (r: StaffAuditRow) => {
+    if (r.action === 'role_change') return `${rl(r.before?.role)} → ${rl(r.after?.role)}`;
+    if (r.action.startsWith('role_preview')) return r.note ? `προβολή ως ${rl(r.note)}` : '';
+    if (r.action === 'create') return `ρόλος ${rl(r.after?.role)}`;
+    return r.note ?? '';
+  };
+  return (
+    <div className="atx-panel" aria-busy={rows === undefined}>
+      <div className="atx-card-head"><h2 className="atx-section-title">Ενέργειες διαχείρισης χρηστών</h2></div>
+      {rows === undefined && [0, 1, 2].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
+      {rows === null && <p className="px-4 pb-4 text-[14px] text-[var(--atx-muted)]">Το audit log διαχείρισης χρηστών θα είναι διαθέσιμο μετά την εφαρμογή της migration phase2/05.</p>}
+      {rows && rows.length === 0 && <p className="px-4 pb-4 text-[14px] text-[var(--atx-muted)]">Δεν υπάρχουν καταγραφές ακόμη.</p>}
+      {rows && rows.length > 0 && (
+        <table className="atx-table">
+          <thead><tr><th>Πότε</th><th>Ποιος</th><th>Ενέργεια</th><th>Σε ποιον</th><th>Λεπτομέρειες</th></tr></thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.id}>
+                <td className="whitespace-nowrap text-[13px]">{new Date(r.created_at).toLocaleString('el-GR')}</td>
+                <td>{who(r.actor_id)}</td>
+                <td>{ACTION_TEXT[r.action] ?? r.action}</td>
+                <td>{who(r.target_id, r.target_email)}</td>
+                <td className="text-[13px] text-[var(--atx-muted)]">{describe(r)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

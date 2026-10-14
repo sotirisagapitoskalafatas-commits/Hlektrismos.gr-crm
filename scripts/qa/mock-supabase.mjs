@@ -213,6 +213,42 @@ http.createServer((req, res) => {
         staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u?.id, action: `role_preview_${json.p_action}`, target_id: u?.id, target_email: null, before: null, after: null, note: json.p_role, created_at: new Date().toISOString() });
         return send(200, true);
       }
+      // ---- Κάδος (mirrors staged-migrations/phase2/06; NO real RLS here) ----
+      if (['trash_record', 'restore_record', 'purge_record', 'trash_list'].includes(name)) {
+        log.push({ method: 'RPC', table: name, body: json });
+        const role = u?.role;
+        if (!['admin', 'manager'].includes(role)) return deny(`${name}: not allowed`);
+        const table = json.p_type === 'lead' ? TABLES.leads : TABLES.customers;
+        const row = table?.find((r) => r.id === json.p_id);
+        const refsOf = (type, id) => { const n = caseRows.filter((c) => (type === 'lead' ? c.lead_id : c.customer_id) === id).length; return n ? { cases: n } : {}; };
+        if (name === 'trash_list') {
+          const pack = (type, r) => ({ entity_type: type, id: r.id, name: r.full_name ?? r.client_name, phone: r.phone ?? null, email: r.email ?? null, deleted_at: r.deleted_at,
+            deleted_by_name: Object.values(USERS).find((x) => x.id === r.deleted_by)?.full_name ?? null, deleted_reason: r.deleted_reason ?? null, references_json: refsOf(type, r.id) });
+          return send(200, [...TABLES.leads.filter((r) => r.deleted_at).map((r) => pack('lead', r)), ...TABLES.customers.filter((r) => r.deleted_at).map((r) => pack('customer', r))]
+            .sort((a, b) => b.deleted_at.localeCompare(a.deleted_at)));
+        }
+        if (name === 'trash_record') {
+          if (!row || row.deleted_at) return send(404, { code: 'P0002', message: 'trash: not found or already in trash' });
+          if (json.p_type === 'customer') {
+            const open = caseRows.filter((c) => c.customer_id === row.id && !['completed', 'lost', 'cancelled'].includes(c.current_stage)).length;
+            if (open) return send(400, { code: 'P0001', message: `trash: customer has ${open} open case(s)` });
+          }
+          Object.assign(row, { deleted_at: new Date().toISOString(), deleted_by: u.id, deleted_reason: json.p_reason ?? null });
+          return send(200, null);
+        }
+        if (name === 'restore_record') {
+          if (!row?.deleted_at) return send(404, { code: 'P0002', message: 'restore: not in trash' });
+          Object.assign(row, { deleted_at: null, deleted_by: null, deleted_reason: null });
+          return send(200, null);
+        }
+        if (role !== 'admin') return deny('purge: only an administrator can delete permanently');
+        if (!row?.deleted_at) return send(404, { code: 'P0002', message: 'purge: move the record to the trash first' });
+        const refs = refsOf(json.p_type, row.id);
+        if (Object.keys(refs).length) return send(400, { code: 'P0001', message: `purge: referenced by ${JSON.stringify(refs)}` });
+        const files = Array.isArray(row.attached_files) ? row.attached_files.map((f) => f.path) : [];
+        table.splice(table.indexOf(row), 1);
+        return send(200, { deleted: true, files });
+      }
       if (name === 'staff_list') {
         if (!u || !MANAGE[u.role]) return deny('staff_list: not allowed');
         const rows = staffRows.filter((r) => u.role !== 'back_office' || r.role === 'back_office')
@@ -264,6 +300,7 @@ http.createServer((req, res) => {
     }
     if (url.pathname.startsWith('/storage/v1/object/')) {
       log.push({ method: req.method, table: 'storage', query: url.pathname });
+      if (req.method === 'DELETE') return send(200, (json.prefixes ?? []).map((n) => ({ name: n })));
       if (url.pathname.startsWith('/storage/v1/object/sign/')) return send(200, { signedURL: '/mock-file' });
       return send(200, { Key: url.pathname.replace('/storage/v1/object/', ''), Id: 'mock' });
     }

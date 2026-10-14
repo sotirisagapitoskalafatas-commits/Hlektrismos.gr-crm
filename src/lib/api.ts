@@ -4,10 +4,13 @@ import { ROLES } from './roles';
 import type { Role, Stage } from './roles';
 import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
+import { notTrashed } from './trash';
 
 export type Customer = {
   id: string;
   full_name: string;
+  /** Set when the customer is in the trash (staged migration phase2/06). */
+  deleted_at?: string | null;
   email: string | null;
   phone: string | null;
   company: string | null;
@@ -199,6 +202,8 @@ export type Lead = {
   assigned_to?: { full_name: string } | null;
   /** Files attached on the public contact form (jsonb; see lib/lead-files). */
   attached_files?: unknown;
+  /** Set when the lead is in the trash (staged migration phase2/06). */
+  deleted_at?: string | null;
 };
 
 function logError(method: string, err: unknown) {
@@ -319,7 +324,7 @@ export async function fetchCustomers(): Promise<Customer[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
   if (error) { logError('fetchCustomers', error); return []; }
-  return (data ?? []) as Customer[];
+  return notTrashed((data ?? []) as Customer[]);
 }
 
 /* Update a customer's contact / location fields (phone, email, address, city,
@@ -1256,7 +1261,7 @@ export async function fetchLeads(): Promise<Lead[]> {
     .order('created_at', { ascending: false });
   if (error) { logError('fetchLeads', error); return []; }
   const catalog = await loadCatalog();
-  return applyCanonicalLabels((data ?? []) as Lead[], catalog);
+  return applyCanonicalLabels(notTrashed((data ?? []) as Lead[]), catalog);
 }
 
 export async function fetchLead(id: string): Promise<Lead | null> {

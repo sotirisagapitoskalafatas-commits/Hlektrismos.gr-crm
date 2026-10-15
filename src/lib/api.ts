@@ -215,6 +215,7 @@ export type Lead = {
   assigned_to?: { full_name: string } | null;
   /** Files attached on the public contact form (jsonb; see lib/lead-files). */
   attached_files?: unknown;
+  partner?: string | null;
   /** Set when the lead is in the trash (staged migration phase2/06). */
   deleted_at?: string | null;
 };
@@ -1388,6 +1389,8 @@ export type LeadInput = {
   lat?: number | null;
   lng?: number | null;
   location_source?: string | null;
+  /** Partner who brought the customer (existing leads.partner column; no commission logic). */
+  partner?: string | null;
 };
 
 /* Staff-managed lead entry. Public intake stays on insert_website_lead().
@@ -1418,6 +1421,7 @@ export async function createLead(input: LeadInput): Promise<{ lead: Lead | null;
       location_source: input.location_source ?? null,
       campaign_id: input.campaign_id ?? null,
       campaign_name: input.campaign_name ?? null,
+      ...(input.partner ? { partner: input.partner } : {}),
       provider: input.provider ?? null,
       program: input.program ?? null,
       provider_id: providerId,

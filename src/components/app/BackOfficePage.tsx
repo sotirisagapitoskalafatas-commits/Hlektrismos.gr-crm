@@ -16,6 +16,7 @@ import { stageText } from '@/lib/case-flow';
 import { useStaff } from '@/lib/useStaff';
 import { StageChangeDialog } from '@/components/cases/CaseOverview';
 import CheckinReview from '@/components/field-sales/CheckinReview';
+import BackofficeLeads from '@/components/leads/BackofficeLeads';
 
 type Filter = 'all' | 'mine' | 'blocked' | 'ready';
 
@@ -59,6 +60,8 @@ export default function BackOfficePage() {
         <h1 className="atx-title">Λειτουργίες</h1>
         <p className="atx-sub">{loading ? 'Φόρτωση…' : `${queue.length} cases σε επεξεργασία · ${count('blocked')} με εκκρεμότητες · ${count('ready')} έτοιμα`}</p>
       </div>
+
+      <BackofficeLeads />
 
       <div className="mt-5 flex flex-wrap items-center gap-3 justify-between">
         <div className="atx-tabs" role="tablist" aria-label="Φίλτρο ουράς">

@@ -179,3 +179,12 @@ test('a case outside the Back Office stages cannot be returned; with no owner, m
   await su();
   assert.equal((await db.query("select count(*)::int n from public.app_notifications where case_id = 'cccccccc-0000-4000-8000-000000000003' and user_id = $1", [MANAGER])).rows[0].n, 1);
 });
+
+test('rollback option A (docs/ops/rollback_phase2_07_transitions.sql) stops the transition check, keeps block-mode gates', async () => {
+  await su();
+  await db.exec(read('../../docs/ops/rollback_phase2_07_transitions.sql'));
+  await db.exec("insert into public.cases (id, title, current_stage) values ('cccccccc-0000-4000-8000-0000000000bb', 'Skip', 'new')");
+  assert.equal((await setStage(ADMIN, 'offer', 'cccccccc-0000-4000-8000-0000000000bb')).ok, true, 'new → offer (not in the list) now passes');
+  const blocked = await setStage(ADMIN, 'submitted', 'cccccccc-0000-4000-8000-0000000000bb');
+  assert.equal(blocked.hint, 'document_blockers', 'a stage set to «block» still blocks');
+});

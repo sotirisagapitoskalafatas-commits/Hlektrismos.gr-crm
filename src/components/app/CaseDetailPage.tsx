@@ -5,7 +5,7 @@ import CaseDocuments from '@/components/documents/CaseDocuments';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { stageText } from '@/lib/case-flow';
-import { CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
+import { CaseExceptionCard, CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
 import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase } from '@/lib/case-return';
 import { useStaff } from '@/lib/useStaff';
@@ -488,6 +488,8 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
   const requiredMissing = docs.filter(d => d.status === 'missing' || d.status === 'rejected').length;
 
   return (
+    <>
+    <CaseExceptionCard c={c} onChanged={reload} />
     <Card>
       <CardHeader micro="Back office" title="Λειτουργική Ολοκλήρωση" />
       {can(role, 'create_application') || can(role, 'submit_provider') || can(role, 'change_stage') ? (
@@ -569,6 +571,7 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
 
       {c.application_status && <div className="mt-1 text-xs text-ink/45">Κατάσταση αίτησης: {c.application_status}{c.activation_status ? ` · Ενεργοποίηση: ${c.activation_status}` : ''}</div>}
     </Card>
+    </>
   );
 }
 

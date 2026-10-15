@@ -69,3 +69,29 @@ test('ops queue: received-but-unverified documents are "to check" during documen
   assert.ok(q[0].blockers.includes('Εκπρόθεσμο follow-up'));
   assert.equal(q[0].mine, true); assert.equal(q[0].stageLabel, 'Έλεγχος εγγράφων');
 });
+
+test('visit outcomes: Νέο Sale and manager follow-up branch; no sale / not interested need a listed reason', () => {
+  assert.equal(F.outcomeByLabel('Νέο Sale').next, 'sale');
+  assert.equal(F.outcomeByLabel('Follow-up από υπεύθυνο').next, 'manager');
+  assert.ok(F.VISIT_OUTCOMES.includes('Υπογραφή / συλλογή εγγράφων'), 'existing labels stay readable');
+  assert.equal(F.checkoutReady('Δεν ενδιαφέρεται', ''), false);
+  assert.equal(F.checkoutReady('Δεν ενδιαφέρεται', 'Δεν θέλει αλλαγή τώρα'), true);
+  assert.equal(F.checkoutReady('Χωρίς πώληση', 'Τυχαίο'), false);
+  assert.equal(F.checkoutReady('Νέο Sale', ''), true);
+  assert.equal(F.checkoutReady('', ''), false);
+  assert.equal(F.checkoutNote('Χωρίς πώληση', '', 'Τιμή / κόστος'), 'Αποτέλεσμα: Χωρίς πώληση — Τιμή / κόστος');
+  assert.ok(F.isManagerFollowUp('Follow-up από υπεύθυνο — τιμολόγηση'));
+});
+
+test('ops queue: exception states show first among blockers; returned = missing info; «Από Sales» flag', () => {
+  const q = O.buildOpsQueue([
+    kase('ex', { current_stage: 'signed', exception_state: 'unsigned' }),
+    kase('ret', { returned_at: at(-1), return_to_team: 'inside_sales' }),
+    kase('sale', { current_stage: 'application', next_action: 'Παραλαβή από Sales — Νέο Sale' }),
+    kase('plain', {}),
+  ], { ex: FULL, ret: FULL, sale: FULL, plain: FULL }, 'me', NOW);
+  const by = Object.fromEntries(q.map((x) => [x.id, x]));
+  assert.equal(by.ex.blockers[0], 'Στάλθηκε, δεν έχει υπογραφεί'); assert.equal(by.ex.exception, 'unsigned');
+  assert.equal(by.ret.exception, 'missing_info');
+  assert.equal(by.sale.fromSales, true); assert.equal(by.plain.fromSales, false);
+});

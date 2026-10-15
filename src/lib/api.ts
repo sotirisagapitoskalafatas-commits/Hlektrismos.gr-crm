@@ -39,6 +39,10 @@ export type Case = {
   return_reason?: string | null;
   return_items?: string[] | null;
   return_to_team?: 'inside_sales' | 'field_sales' | null;
+  /** Back Office exception (staged phase4/13). */
+  exception_state?: 'offer_declined' | 'no_response' | 'unsigned' | 'provider_rejected' | null;
+  exception_note?: string | null;
+  exception_at?: string | null;
   return_from_stage?: string | null;
   customer_id: string | null;
   source: string;
@@ -98,6 +102,7 @@ export type FollowUp = {
   reason: string;
   priority: string;
   assignee_id: string | null;
+  created_by?: string | null;
   status: 'pending' | 'completed' | 'cancelled' | 'snoozed';
   notes: string;
   snoozed_until: string | null;
@@ -569,6 +574,17 @@ export async function overrideStage(caseId: string, stage: Stage, reason: string
   if (!supabase) return { error: { kind: 'other', message: 'Database not configured' } };
   const { error } = await supabase.rpc('change_case_stage_override', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
   return { error: parseStageError(error) };
+}
+
+/** Set or clear (state null) a Back Office exception on a case (staged phase4/13). Returns a Greek error or null. */
+export async function setCaseException(caseId: string, state: Case['exception_state'], note: string): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('set_case_exception', { p_case: caseId, p_state: state ?? null, p_note: note.trim() || null });
+  if (!error) return null;
+  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Οι εξαιρέσεις ενεργοποιούνται μετά την εφαρμογή της migration phase4/13.';
+  if (/a note is required/i.test(error.message)) return 'Γράψτε σύντομα τι συνέβη.';
+  if (/not allowed|42501/i.test(error.message)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
+  return 'Η αλλαγή δεν αποθηκεύτηκε.';
 }
 
 export async function returnCase(caseId: string, input: { reason: string; items: string[]; toTeam: ReturnTeam }): Promise<{ error: StageError | null; toUser: string | null }> {

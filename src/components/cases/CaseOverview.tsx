@@ -4,7 +4,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRightLeft, CalendarClock, Check, ChevronRight, MapPin, ShieldAlert, Sparkles, Undo2 } from 'lucide-react';
-import { addActivity, changeStage, fetchCase, fetchFollowUps, fetchStageBlockers, fetchVisits, overrideStage, updateCase } from '@/lib/api';
+import { addActivity, changeStage, fetchCase, fetchFollowUps, fetchStageBlockers, fetchVisits, overrideStage, setCaseException, updateCase } from '@/lib/api';
+import { EXCEPTION_TEXT } from '@/lib/ops-queue';
 import type { Case, StaffProfile } from '@/lib/api';
 import type { Role, Stage } from '@/lib/roles';
 import { Modal } from '@/lib/ui';
@@ -299,6 +300,40 @@ export function CaseUpcoming({ caseId, version, onOpenTab }: { caseId: string; v
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Back Office exception on the case (staged phase4/13): offer declined, no response, unsigned, provider rejection.
+    It does not move or close the case; missing information uses «Επιστροφή για διόρθωση». */
+export function CaseExceptionCard({ c, onChanged }: { c: Case; onChanged: () => void }) {
+  const { toast } = useToast();
+  const [state, setState] = useState<string>(c.exception_state ?? '');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setState(c.exception_state ?? ''); setNote(''); }, [c.exception_state]);
+  const save = async (next: string) => {
+    setBusy(true);
+    const e = await setCaseException(c.id, (next || null) as Case['exception_state'], note);
+    setBusy(false);
+    if (e) { toast(e, 'bad'); return; }
+    toast(next ? `Εξαίρεση: ${EXCEPTION_TEXT[next]}` : 'Η εξαίρεση έκλεισε.', 'ok');
+    onChanged();
+  };
+  return (
+    <div className="atx-panel mb-4" style={{ padding: 16 }} data-case-exception>
+      <h3 className="text-[14px] font-semibold mb-1">Εξαίρεση</h3>
+      {c.exception_state
+        ? <p className="text-[13.5px] m-0 mb-2"><strong style={{ color: 'var(--atx-red)' }}>{EXCEPTION_TEXT[c.exception_state]}</strong>{c.exception_note ? ` — ${c.exception_note}` : ''}</p>
+        : <p className="text-[13px] text-[var(--atx-muted)] m-0 mb-2">Χωρίς εξαίρεση. Για ελλείψεις στοιχείων χρησιμοποιήστε «Επιστροφή για διόρθωση».</p>}
+      <div className="flex gap-2 flex-wrap items-center">
+        <select className="field max-w-xs" value={state} onChange={e => setState(e.target.value)} aria-label="Εξαίρεση">
+          <option value="">— Καμία —</option>
+          {Object.entries(EXCEPTION_TEXT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        {state && state !== (c.exception_state ?? '') && <input className="field max-w-sm" value={note} onChange={e => setNote(e.target.value)} placeholder="Τι συνέβη (υποχρεωτικό)" aria-label="Σημείωση εξαίρεσης" />}
+        <button className="atx-btn atx-btn-quiet" disabled={busy || state === (c.exception_state ?? '') || (!!state && note.trim().length < 3)} onClick={() => void save(state)}>Αποθήκευση</button>
+      </div>
     </div>
   );
 }

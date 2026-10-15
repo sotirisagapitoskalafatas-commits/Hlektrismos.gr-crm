@@ -15,7 +15,15 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Windows keeps Chrome profile files locked for a moment after close, so the rmSync on disconnect often fails and
 // profiles pile up in %TEMP% (hundreds of MB each). Sweep our own leftovers older than 10 minutes on every launch.
+// Profiles of browsers that already closed in THIS run: retried on every launch (never a profile still in use).
+const closedProfiles = new Set();
+function sweepClosedProfiles() {
+  for (const dir of closedProfiles) {
+    try { rmSync(dir, { recursive: true, force: true }); closedProfiles.delete(dir); } catch { /* still locked: next launch */ }
+  }
+}
 function sweepOldProfiles() {
+  sweepClosedProfiles();
   const cutoff = Date.now() - 10 * 60_000;
   for (const name of readdirSync(tmpdir())) {
     if (!name.startsWith('atlas-qa-') && !name.startsWith('lead-upload-')) continue;
@@ -29,7 +37,7 @@ export async function launch(width = 1440, height = 900, dpr = 1) {
   // Isolated throwaway profile: never touches (or kills) the user's own Chrome.
   const userDataDir = mkdtempSync(join(tmpdir(), 'atlas-qa-'));
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', userDataDir, args: ['--no-sandbox', '--no-first-run'] });
-  browser.on('disconnected', () => { try { rmSync(userDataDir, { recursive: true, force: true }); } catch { /* ignore */ } });
+  browser.on('disconnected', () => { closedProfiles.add(userDataDir); sweepClosedProfiles(); });
   const page = await browser.newPage();
   await page.setViewport({ width, height, deviceScaleFactor: dpr, isMobile: width < 500, hasTouch: width < 500 });
   const errors = [];

@@ -108,7 +108,8 @@ export const outcomeByLabel = (label: string) => OUTCOMES.find(o => o.label === 
 
 /** Prefix that marks a follow-up as «for the manager / Back Office» (a convention in code until workflows are configurable). */
 export const MANAGER_FOLLOWUP_PREFIX = 'Follow-up από υπεύθυνο';
-export const isManagerFollowUp = (reason: string | null | undefined) => (reason ?? '').startsWith(MANAGER_FOLLOWUP_PREFIX);
+/** The flag (follow_ups.kind, staged phase4/14) is authoritative; the text prefix is only a fallback until it is applied. */
+export const isManagerFollowUp = (f: { kind?: string | null; reason?: string | null }) => f.kind === 'manager' || (f.reason ?? '').startsWith(MANAGER_FOLLOWUP_PREFIX);
 
 /** Text stored with the check-out, so the outcome survives even when the visit is queued offline. */
 export function checkoutNote(outcome: string, notes: string, reason?: string): string {

@@ -80,7 +80,9 @@ test('visit outcomes: Νέο Sale and manager follow-up branch; no sale / not in
   assert.equal(F.checkoutReady('Νέο Sale', ''), true);
   assert.equal(F.checkoutReady('', ''), false);
   assert.equal(F.checkoutNote('Χωρίς πώληση', '', 'Τιμή / κόστος'), 'Αποτέλεσμα: Χωρίς πώληση — Τιμή / κόστος');
-  assert.ok(F.isManagerFollowUp('Follow-up από υπεύθυνο — τιμολόγηση'));
+  assert.ok(F.isManagerFollowUp({ reason: 'Follow-up από υπεύθυνο — τιμολόγηση' }), 'fallback before phase4/14');
+  assert.ok(F.isManagerFollowUp({ kind: 'manager', reason: 'οτιδήποτε' }), 'the flag wins');
+  assert.ok(!F.isManagerFollowUp({ kind: null, reason: 'Κλήση' }));
 });
 
 test('ops queue: exception states show first among blockers; returned = missing info; «Από Sales» flag', () => {
@@ -94,4 +96,14 @@ test('ops queue: exception states show first among blockers; returned = missing 
   assert.equal(by.ex.blockers[0], 'Στάλθηκε, δεν έχει υπογραφεί'); assert.equal(by.ex.exception, 'unsigned');
   assert.equal(by.ret.exception, 'missing_info');
   assert.equal(by.sale.fromSales, true); assert.equal(by.plain.fromSales, false);
+});
+
+test('ops queue: a Νέο Sale handed over while still in «Προσφορά» is in the queue; closed ones are not', () => {
+  const q = O.buildOpsQueue([
+    kase('offer-sale', { current_stage: 'offer', next_action: 'Παραλαβή από Sales — Νέο Sale' }),
+    kase('lost-sale', { current_stage: 'lost', next_action: 'Παραλαβή από Sales — Νέο Sale' }),
+    kase('offer-plain', { current_stage: 'offer' }),
+  ], {}, 'me', NOW);
+  assert.deepEqual(q.map((x) => x.id), ['offer-sale']);
+  assert.equal(q[0].fromSales, true);
 });

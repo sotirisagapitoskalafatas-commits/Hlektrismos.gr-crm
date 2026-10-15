@@ -18,7 +18,7 @@ export default function ManagerFollowUps() {
   const [rows, setRows] = useState<FollowUp[] | null>(null);
   const load = useCallback(async () => {
     const all = await fetchFollowUps({ status: 'pending' });
-    setRows(all.filter(f => isManagerFollowUp(f.reason)).sort((a, b) => +new Date(a.due_at) - +new Date(b.due_at)));
+    setRows(all.filter(f => isManagerFollowUp(f)).sort((a, b) => +new Date(a.due_at) - +new Date(b.due_at)));
   }, []);
   useEffect(() => { void load(); }, [load]);
   if (!rows || rows.length === 0) return null;

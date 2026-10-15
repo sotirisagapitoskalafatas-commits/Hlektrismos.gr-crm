@@ -117,6 +117,14 @@ const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.fiel
 // Presentation preview: allowed for the mock admin unless MOCK_PREVIEW=expired.
 const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 // ---- B2B pipeline (mirrors staged-migrations/phase3/08 + scrape-b2b; synthetic, never calls SerpApi) ----
+// ---- Contact eligibility (mirrors staged-migrations/phase3/09; synthetic) ----
+const contactObjections = [];
+const contactConsents = [];
+const article11 = [];
+const emailSuppressed = new Set();
+const cPhone = (p) => { const d = String(p ?? '').replace(/\D/g, ''); return d ? d.slice(-10) : null; };
+const cEmail = (e) => { const x = String(e ?? '').trim().toLowerCase(); return x.indexOf('@') < 1 || x.endsWith('@hlektrismos.local') ? null : x; };
+const EVIDENCE_ROLES = ['admin', 'manager', 'back_office'];
 const b2bProspects = [];
 const b2bJobs = [];
 const b2bProfiles = [];
@@ -318,6 +326,77 @@ http.createServer((req, res) => {
           next_action_owner_id: c.back_office_owner, next_action: 'Επανέλεγχος μετά τη διόρθωση' });
         TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'resubmitted', title: 'Επανυποβολή στο Back Office', description: json.p_note ?? '', user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
         return send(200, null);
+      }
+      // ---- Contact eligibility ----
+      if (['contact_facts', 'record_contact_objection', 'lift_contact_objection', 'record_contact_consent', 'withdraw_contact_consent', 'record_article11_screening'].includes(name)) {
+        if (name !== 'contact_facts') log.push({ method: 'RPC', table: name, body: json });
+        if (!u) return deny(`${name}: not allowed`);
+        const pk = cPhone(json.p_phone), ek = cEmail(json.p_email);
+        const bad = (m) => send(400, { code: '22023', message: `${name}: ${m}` });
+        const keyFor = (ch) => (ch === 'email' ? ['email', ek] : ['phone', pk]);
+        if (name === 'contact_facts') {
+          const consents = {};
+          for (const c of contactConsents) if ((c.kind === 'phone' && c.key === pk) || (c.kind === 'email' && c.key === ek)) consents[c.channel] = { status: c.status, basis: c.basis, evidence_ref: c.evidence_ref, evidence_at: c.evidence_at, text_version: c.text_version, updated_at: c.updated_at };
+          const a = article11.filter((x) => x.phone_key === pk).sort((x, y) => (x.screened_at < y.screened_at ? 1 : -1))[0];
+          return send(200, {
+            has_phone: !!pk, has_email: !!ek,
+            objections: contactObjections.filter((o) => !o.lifted_at && ((o.kind === 'phone' && o.key === pk) || (o.kind === 'email' && o.key === ek)))
+              .map(({ id, batch, kind, scope, channels, reason, source, created_at }) => ({ id, batch_id: batch, address_kind: kind, scope, channels, reason, source, created_at })),
+            consents,
+            article11: a ? { result: a.result, screened_at: a.screened_at, register_source: a.register_source } : null,
+            email_suppressed: !!ek && emailSuppressed.has(ek),
+          });
+        }
+        if (name === 'record_contact_objection') {
+          if (!['marketing', 'all'].includes(json.p_scope)) return bad('invalid scope');
+          if (String(json.p_reason ?? '').trim().length < 3) return bad('a reason is required');
+          const ch = json.p_channels;
+          let n = 0;
+          const batch = crypto.randomUUID();
+          const add = (kind, key) => { contactObjections.push({ id: crypto.randomUUID(), batch, kind, key, scope: json.p_scope, channels: ch, reason: json.p_reason.trim(), source: json.p_source ?? 'customer_request', created_at: new Date().toISOString(), lifted_at: null }); n++; };
+          if (pk && (!ch || ch.some((c) => c !== 'email'))) add('phone', pk);
+          if (ek && (!ch || ch.includes('email'))) { add('email', ek); emailSuppressed.add(ek); }
+          if (!n) return bad('no phone or email for these channels');
+          return send(200, n);
+        }
+        if (name === 'lift_contact_objection') {
+          if (u.role !== 'admin') return deny('lift_contact_objection: not allowed');
+          if (String(json.p_reason ?? '').trim().length < 3) return bad('a reason is required');
+          const o = contactObjections.find((x) => x.id === json.p_id);
+          const rows = o ? contactObjections.filter((x) => x.batch === o.batch && !x.lifted_at) : [];
+          if (!rows.length) return send(200, false);
+          for (const x of rows) { x.lifted_at = new Date().toISOString(); if (x.kind === 'email') emailSuppressed.delete(x.key); }
+          return send(200, true);
+        }
+        if (name === 'record_contact_consent') {
+          if (!EVIDENCE_ROLES.includes(u.role)) return deny('record_contact_consent: not allowed');
+          if (String(json.p_evidence_ref ?? '').trim().length < 3 || !json.p_evidence_at) return bad('evidence is required');
+          const [kind, key] = keyFor(json.p_channel);
+          if (!key) return bad('no address for this channel');
+          const row = contactConsents.find((c) => c.kind === kind && c.key === key && c.channel === json.p_channel);
+          const v = { status: 'granted', basis: json.p_basis, evidence_ref: json.p_evidence_ref, evidence_at: json.p_evidence_at, text_version: json.p_text_version, updated_at: new Date().toISOString() };
+          if (row) Object.assign(row, v); else contactConsents.push({ kind, key, channel: json.p_channel, ...v });
+          return send(200, crypto.randomUUID());
+        }
+        if (name === 'withdraw_contact_consent') {
+          if (String(json.p_reason ?? '').trim().length < 3) return bad('a reason is required');
+          const [kind, key] = keyFor(json.p_channel);
+          if (!key) return bad('no address for this channel');
+          const row = contactConsents.find((c) => c.kind === kind && c.key === key && c.channel === json.p_channel);
+          if (row) Object.assign(row, { status: 'withdrawn', updated_at: new Date().toISOString() });
+          else contactConsents.push({ kind, key, channel: json.p_channel, status: 'withdrawn', basis: null, evidence_ref: null, evidence_at: null, text_version: null, updated_at: new Date().toISOString() });
+          if (kind === 'email') emailSuppressed.add(key);
+          return send(200, true);
+        }
+        if (name === 'record_article11_screening') {
+          if (!EVIDENCE_ROLES.includes(u.role)) return deny('record_article11_screening: not allowed');
+          if (!['not_listed', 'listed'].includes(json.p_result)) return bad('invalid result');
+          if (String(json.p_register_source ?? '').trim().length < 2) return bad('the register checked is required');
+          if (!pk) return bad('no phone number');
+          article11.push({ phone_key: pk, result: json.p_result, register_source: json.p_register_source.trim(), screened_at: json.p_screened_at ?? new Date().toISOString() });
+          for (const x of b2bProspects) if (cPhone(x.phone) === pk) x.phone_screening = json.p_result === 'listed' ? 'opted_out' : 'clear';
+          return send(200, crypto.randomUUID());
+        }
       }
       // ---- B2B ----
       if (name === 'b2b_queries_today') return send(200, b2bJobs.reduce((n, j) => n + j.queries_done, 0));

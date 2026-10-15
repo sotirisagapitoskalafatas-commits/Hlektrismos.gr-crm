@@ -43,6 +43,8 @@ No claim in this document means "production is secure".
 ## SQL: prepared vs applied
 **Applied anywhere: none.** Prepared in `supabase/staged-migrations/phase1/` (01–04; see its README).
 
+> Update (contact-eligibility phase): `contact_permissions` from 02 was replaced, before ever being applied, by `phase3/09_contact_eligibility.sql`, which keys consent, objections and Article 11 screenings to the phone/email. 02 is now `02_outreach_decisions_audit.sql`.
+
 ## Remaining blockers and exact next steps
 1. **Staging Supabase project** (or approval to create one) → apply 01–04, run audit SQL, smoke tests.
 2. **Owner-run live checks** (read-only): `docs/audit/audit-rls-readonly.sql` + `scripts/audit-anon-exposure.mjs`.

@@ -10,6 +10,7 @@ import { can, LEAD_STATUSES, leadSourceInfo, SERVICES } from '@/lib/roles';
 import { convertLeadToCase, fetchEntityActivity, fetchLead, getLeadFileUrl, logAudit, updateLeadStage } from '@/lib/api';
 import { fileSizeText, leadFiles } from '@/lib/lead-files';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
+import ContactEligibility from '@/components/contact/ContactEligibility';
 import type { ActivityLogRow, Lead } from '@/lib/api';
 import { leadStatusDisplay } from '@/lib/lead-status';
 import { leadNextAction } from '@/lib/lead-next';
@@ -220,6 +221,8 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
               <li className="flex items-center gap-2.5"><MapPin size={15} className="text-[var(--atx-muted)]" />{lead.address || '—'}</li>
             </ul>
           </div>
+
+          {!lead.deleted_at && <ContactEligibility subject={{ phone: lead.phone, email: lead.email, leadId: lead.id }} />}
 
           {lead.converted_case_id && (
             <div className="atx-panel" style={{ padding: 20 }}>

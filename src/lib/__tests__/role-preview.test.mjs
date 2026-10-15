@@ -16,6 +16,8 @@ test('preview read-only guard: every write is blocked, reads and auth are not', 
   assert.equal(P.isMutation(`${B}/rest/v1/rpc/staff_update`, 'POST'), true);
   assert.equal(P.isMutation(`${B}/rest/v1/rpc/staff_list`, 'POST'), false);
   assert.equal(P.isMutation(`${B}/rest/v1/rpc/role_preview_event`, 'POST'), false, 'ending the preview must work');
+  assert.equal(P.isMutation(`${B}/rest/v1/rpc/contact_facts`, 'POST'), false, 'reading contact eligibility is allowed');
+  assert.equal(P.isMutation(`${B}/rest/v1/rpc/record_contact_objection`, 'POST'), true, 'recording an objection is a write');
   assert.equal(P.isMutation(`${B}/storage/v1/object/hlektrismos_docs/x.pdf`, 'POST'), true);
   assert.equal(P.isMutation(`${B}/functions/v1/admin-users`, 'POST'), true);
   assert.equal(P.isMutation(`${B}/auth/v1/token?grant_type=refresh_token`, 'POST'), false);

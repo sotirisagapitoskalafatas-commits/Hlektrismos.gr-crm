@@ -14,6 +14,7 @@ import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
 import { useToast } from '@/lib/toast';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
+import ContactEligibility from '@/components/contact/ContactEligibility';
 import { fmtDate, fmtDateTime, fmtMoney } from '@/lib/ui';
 
 const COMMS = ['call', 'email', 'sms', 'whatsapp', 'meeting', 'visit', 'check_in', 'note', 'comment', 'offer', 'send_offer', 'signature', 'document', 'status_change', 'assignment', 'follow_up', 'completed'];
@@ -202,6 +203,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
               </ul>
               {cust.notes && <p className="text-[13px] text-[var(--atx-muted)] mt-3 border-t border-[var(--atx-line)] pt-3">{cust.notes}</p>}
             </div>
+            <ContactEligibility subject={{ phone: cust.phone, email: cust.email, customerId: cust.id }} />
             <div className="atx-panel" style={{ padding: 20 }}>
               <h2 className="atx-section-title mb-3">Με μια ματιά</h2>
               <dl className="grid grid-cols-[1fr_auto] gap-y-2 text-[14px] m-0">

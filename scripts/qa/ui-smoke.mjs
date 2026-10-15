@@ -449,6 +449,107 @@ for (const role of Object.keys(EXPECT)) {
   }
 }
 
+/* ---- 2g. Contact eligibility: «μπορώ να καλέσω;» before any sales contact (phase3/09; display only, nothing is sent) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const MODAL = '.fixed.inset-0.z-50';
+  const openLead = async (page, name) => {
+    await click(page, 'Leads', '#shell-rail nav button');
+    await sleep(1200);
+    await page.evaluate((n) => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === n)?.click(), name);
+    await sleep(1800);
+  };
+  const row = (page, ch) => page.evaluate((c) => { const r = document.querySelector(`[data-contact-eligibility] [data-channel="${c}"]`); return r ? { allowed: r.dataset.allowed, text: r.innerText } : null; }, ch);
+  const cardButton = (page, label) => page.evaluate((l) => [...document.querySelectorAll('[data-contact-eligibility] button')].some((b) => b.textContent.trim() === l), label);
+  const pressCard = (page, label) => page.evaluate((l) => [...document.querySelectorAll('[data-contact-eligibility] button')].find((b) => b.textContent.trim() === l)?.click(), label);
+  const modalInput = (page, idx, v) => page.evaluate((m, i, val) => { const el = [...document.querySelectorAll(`${m} input.field`)][i]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, MODAL, idx, v);
+  const modalButton = (page, label) => page.evaluate((m, l) => { const b = [...document.querySelectorAll(`${m} button`)].find((x) => x.textContent.trim() === l); if (!b) return 'missing'; if (b.disabled) return 'disabled'; b.click(); return 'clicked'; }, MODAL, label);
+  const rpc = async (name) => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.table === name).pop();
+
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openLead(page, 'Δοκιμαστικό Lead 1');
+    const call = await row(page, 'call');
+    check('Contact: lead shows «Επικοινωνία & συγκαταθέσεις»; a sales call needs the Article 11 check first', call?.allowed === 'no' && call.text.includes('μητρώο του Άρθρου 11'));
+    const email = await row(page, 'email');
+    check('Contact: promotional email needs recorded consent; automated sends shown as closed system-wide',
+      email?.allowed === 'no' && email.text.includes('συγκατάθεση') && (await page.evaluate(() => document.querySelector('[data-contact-eligibility]').innerText.includes('κλειστές σε όλο το σύστημα'))));
+    check('Contact: inside sales cannot record consent or register checks', !(await cardButton(page, 'Καταγραφή συγκατάθεσης')) && !(await cardButton(page, 'Έλεγχος Άρθρου 11')));
+    await pressCard(page, 'Δεν θέλει επικοινωνία');
+    await sleep(400);
+    const before = await modalButton(page, 'Καταγραφή');
+    await modalInput(page, 0, 'Μην με ξαναπάρετε για προσφορές');
+    await sleep(150);
+    await modalButton(page, 'Καταγραφή');
+    await sleep(1200);
+    const o = await rpc('record_contact_objection');
+    check('Contact: anyone on staff records «δεν θέλει επικοινωνία» (reason required) through record_contact_objection',
+      before === 'disabled' && o?.body?.p_scope === 'marketing' && o.body.p_channels === null && o.body.p_phone === '+30 6910000010' && o.body.p_lead_id?.endsWith('01'),
+      JSON.stringify({ before, body: o?.body }));
+    const after = await row(page, 'call');
+    check('Contact: the objection shows at once and stops calls', after?.allowed === 'no' && after.text.includes('δεν θέλει επικοινωνία')
+      && (await page.$$('[data-contact-eligibility] [data-objection]')).length === 1
+      && (await page.evaluate(() => document.querySelector('[data-contact-eligibility] [data-objection]').innerText.includes('τηλέφωνο + email'))));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'manager');
+    await openLead(page, 'Δοκιμαστικό Lead 3');
+    await pressCard(page, 'Έλεγχος Άρθρου 11');
+    await sleep(400);
+    await modalButton(page, 'Καταγραφή');
+    await sleep(1200);
+    const a = await rpc('record_article11_screening');
+    const call = await row(page, 'call');
+    check('Contact: manager records an Article 11 screening; the «not screened» block clears', a?.body?.p_result === 'not_listed' && a.body.p_register_source.includes('Άρθρου 11')
+      && !call.text.includes('μητρώο του Άρθρου 11') && (await page.evaluate(() => document.querySelector('[data-contact-eligibility]').innerText.includes('δεν είναι εγγεγραμμένος'))),
+      JSON.stringify({ a: a?.body, call }));
+    await pressCard(page, 'Καταγραφή συγκατάθεσης');
+    await sleep(400);
+    const noEvidence = await modalButton(page, 'Καταγραφή');
+    await page.evaluate((m) => { const sel = document.querySelector(`${m} select.field`); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, 'email'); sel.dispatchEvent(new Event('change', { bubbles: true })); }, MODAL);
+    await modalInput(page, 0, 'Έντυπο 0042');
+    await sleep(150);
+    await modalButton(page, 'Καταγραφή');
+    await sleep(1200);
+    const c = await rpc('record_contact_consent');
+    const email = await row(page, 'email');
+    check('Contact: consent needs evidence; recorded consent for email clears the «no consent» reason', noEvidence === 'disabled' && c?.body?.p_channel === 'email'
+      && c.body.p_evidence_ref === 'Έντυπο 0042' && !email.text.includes('καταγεγραμμένη συγκατάθεση'), JSON.stringify({ noEvidence, c: c?.body, email }));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await openLead(page, 'Δοκιμαστικό Lead 1');
+    await page.evaluate(() => [...document.querySelectorAll('[data-contact-eligibility] [data-objection] button')].find((b) => b.textContent.trim() === 'Άρση')?.click());
+    await sleep(400);
+    await modalInput(page, 0, 'Νέα έγγραφη συγκατάθεση 12/11, αρ. 0042');
+    await sleep(150);
+    await modalButton(page, 'Άρση');
+    await sleep(1200);
+    check('Contact: only the admin lifts an objection, with a reason', (await rpc('lift_contact_objection'))?.body?.p_reason?.length > 3
+      && (await page.$$('[data-contact-eligibility] [data-objection]')).length === 0);
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(390, 844);
+    await signInAs(page, 'field_sales');
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Πελάτες')?.click());
+    await sleep(1200);
+    await page.evaluate(() => document.querySelector('main button.atx-row-main')?.click());
+    await sleep(1800);
+    check('Contact: field sales sees the card on a customer (mobile) but cannot record consent',
+      !!(await row(page, 'call')) && !(await cardButton(page, 'Καταγραφή συγκατάθεσης')) && (await cardButton(page, 'Δεν θέλει επικοινωνία'))
+      && (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)));
+    const log = await (await fetch(`${M}/__log`)).json();
+    check('Contact: nothing was sent while recording (no campaign/SMS/voice/email calls)', !log.some((l) => /send-campaign|send-sms|make-voice-call|send-email|send-offer/.test(l.table ?? '')));
+    await browser.close();
+  }
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);

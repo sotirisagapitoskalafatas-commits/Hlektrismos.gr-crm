@@ -12,6 +12,8 @@ export const ROLE_PREVIEW_HARD_STOP = Date.parse('2026-10-16T00:00:00+03:00');
 export const PREVIEW_READ_RPCS = new Set([
   'role_preview_status', 'role_preview_event', 'staff_list', 'staff_reference_count',
   'get_active_tariff_prices', 'recommend_tariffs', 'field_sales_metrics', 'crm_scraper_settings',
+  // read-only functions of the staged phase2/phase3 migrations
+  'trash_list', 'trash_references', 'case_document_blockers', 'b2b_queries_today', 'contact_facts',
 ]);
 
 /** Would this request change data? (pure, unit-tested) */

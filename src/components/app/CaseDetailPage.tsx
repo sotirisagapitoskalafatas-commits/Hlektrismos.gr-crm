@@ -5,7 +5,7 @@ import CaseDocuments from '@/components/documents/CaseDocuments';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { stageText } from '@/lib/case-flow';
-import { CaseNextStepCard, CaseProgress, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
+import { CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
 import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase } from '@/lib/case-return';
 import { useStaff } from '@/lib/useStaff';
@@ -638,8 +638,10 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
     await reload();
   };
 
+  const [upcomingVersion, setUpcomingVersion] = useState(0);
   const reload = useCallback(async () => {
     const data = await fetchCase(caseId);
+    setUpcomingVersion(v => v + 1);
     if (data) {
       setC(data);
       setLead(data.lead_id ? await fetchLead(data.lead_id) : null);
@@ -660,7 +662,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const checklist = buildChecklist(c, docs);
 
   const tabs: { id: typeof tab; label: string; icon: IconType }[] = [
-    { id: 'timeline', label: 'Χρονολόγιο', icon: CalendarClock },
+    { id: 'timeline', label: 'Ιστορικό', icon: CalendarClock },
     { id: 'followups', label: 'Follow Ups', icon: CalendarClock },
     { id: 'docs', label: 'Έγγραφα', icon: FolderOpen },
     { id: 'visits', label: 'Επισκέψεις', icon: MapPin },
@@ -705,10 +707,11 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
             canChange={canChange} canAssign={can(role, 'assign')} onPick={setStagePending}
             onHandover={() => setHandoverOpen(true)} onDocs={() => setTab('docs')}
             onReturn={canReturnCase(role, c) ? () => setReturnOpen(true) : undefined} />
+          <div className="mt-4"><CaseUpcoming caseId={c.id} version={upcomingVersion} onOpenTab={setTab} /></div>
         </div>
         <Card>
           <div className="flex items-center justify-between gap-2">
-            <Micro>Πελάτης</Micro>
+            <Micro>Στοιχεία επαφής</Micro>
             {canEditContact && (
               editContact
                 ? <button onClick={() => setEditContact(false)} title="Ακύρωση" className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors"><X className="w-3.5 h-3.5" /></button>

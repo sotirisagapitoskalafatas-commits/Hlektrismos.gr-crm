@@ -681,23 +681,45 @@ for (const role of Object.keys(EXPECT)) {
   }
 }
 
+/* ---- 2j. «+ Task» in Σημερινά Tasks ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await sleep(1500);
+  await page.evaluate(() => document.querySelector('[data-add-task]')?.click());
+  await sleep(500);
+  const disabled = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Προσθήκη')?.disabled);
+  await page.evaluate(() => {
+    const m = [...document.querySelectorAll('h2')].find((h) => h.textContent.trim() === 'Νέο task').closest('.card');
+    const inp = m.querySelector('input.field'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, 'Κλήση για τα έγγραφα'); inp.dispatchEvent(new Event('input', { bubbles: true }));
+    const sel = m.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, sel.options[1].value); sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await sleep(200);
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Προσθήκη')?.click());
+  await sleep(1500);
+  const post = (await (await fetch('http://127.0.0.1:54399/__log')).json()).filter((l) => l.method === 'POST' && l.table === 'follow_ups').pop();
+  check('Home: «+ Task» needs a description and a case, then saves a follow-up for me', disabled === true && post?.body?.reason === 'Κλήση για τα έγγραφα' && !!post.body.case_id && post.body.channel === 'other');
+  await browser.close();
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'inside_sales');
   await page.waitForFunction(() => document.querySelectorAll('.atx-kpi-n').length === 5 && !document.querySelector('.atx-kpi-n.is-na'), { timeout: 15000 }).catch(() => {});
   const all = await text(page, '.atx-kpi-n');
-  const stats = all.slice(0, 4); // the 5th card is the recorded value (money or «μη διαθέσιμο»)
-  const [overdue, today, leads, cases] = stats.map(Number);
-  check('Home: stats are numbers (no placeholders/negatives)', all.length === 5 && stats.every((s) => /^\d+$/.test(s)), all.join(','));
-  check('Home: recorded value is money or «μη διαθέσιμο», never a bare 0', /€|μη διαθέσιμο/.test(all[4] ?? ''), all[4]);
+  const tileVal = (k) => page.evaluate((key) => document.querySelector(`[data-tile="${key}"] .atx-kpi-n`)?.textContent.trim() ?? '', k);
+  const labels = await text(page, '.atx-kpi-l');
+  check('Home: the five tiles are Επείγοντα, Follow Up, Προσφορές, Υπογραφές, Νέα Cases with real numbers', all.length === 5 && all.every((x) => /^\d+$/.test(x))
+    && ['Επείγοντα', 'Follow Up σήμερα', 'Προσφορές', 'Υπογραφές', 'Νέα Cases'].every((l, i) => labels[i] === l), `${labels.join('|')} = ${all.join(',')}`);
+  const overdue = Number(((await page.evaluate(() => document.querySelector('[data-tile="urgent"] .atx-chip-s')?.textContent ?? '')).match(/^(\d+) εκπρόθεσμα/) ?? [])[1]);
+  const today = Number(await tileVal('followups'));
+  check('Home: recorded value is money or «μη διαθέσιμο», never a bare 0', /€|μη διαθέσιμο/.test(await page.evaluate(() => document.querySelector('[data-pipe-value]')?.textContent ?? '')));
   await click(page, 'Η εργασία μου', '#shell-rail nav button');
   await sleep(900);
   const chips = await text(page, '[aria-label="Τύπος εργασίας"] button');
   const n = (k) => Number((chips.find((c) => c.startsWith(k)) || '').replace(/\D+/g, ''));
-  check('My Work counts equal Home stats (follow-ups = overdue + today)', n('Follow-ups') === overdue + today, `${n('Follow-ups')} vs ${overdue + today}`);
-  check('My Work leads count equals Home', n('Leads') === leads);
-  check('My Work cases count equals Home', n('Cases') === cases);
+  check('My Work counts equal Home tiles (follow-ups = overdue + today)', n('Follow-ups') === overdue + today, `${n('Follow-ups')} vs ${overdue}+${today}`);
   const fuRows = () => page.$$eval('.atx-row', (rows) => rows.filter((r) => [...r.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Ολοκλήρωση')).length);
   const fu0 = await fuRows();
   await click(page, 'Ολοκλήρωση', 'button');
@@ -936,7 +958,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await sleep(2000);
   const t = await page.evaluate(() => document.querySelector('main').innerText);
   check('Case detail: stepper uses full Greek labels, no 3-letter codes', t.includes('Έλεγχος εγγράφων') && t.includes('Καταχώρηση παρόχου') && !/\bΕΓΓ\b|\bΚΑΤ\b|\bΥΠΓ\b/.test(t));
-  check('Case detail: next step lists missing documents as blockers', /Λείπει: Ταυτότητα/.test(t) && t.includes('Επόμενο βήμα'));
+  check('Case detail: next action lists missing documents as blockers', /Λείπει: Ταυτότητα/.test(t) && t.includes('Επόμενη ενέργεια') && t.includes('Επόμενες ενέργειες') && t.includes('Στοιχεία επαφής'));
   await click(page, 'Παράδοση'); await sleep(500);
   // dialog is portaled to <body>; team defaults to Back Office; pick the first colleague listed
   const opts = await page.evaluate(() => {

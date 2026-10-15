@@ -86,3 +86,25 @@ export function homeInsights(i: { cases: PipeCase[]; leads: PipeLead[]; followUp
 
   return out.slice(0, 4);
 }
+
+/* Dashboard tiles (phase 2): Επείγοντα, Follow Up, Προσφορές, Υπογραφές, Νέα Cases — counts over records already
+   loaded for the user (same RLS-scoped data as the pipeline). Definitions:
+     urgent     = active cases marked high/critical priority + the user's overdue follow-ups
+     followUps  = the user's follow-ups due today (overdue are counted under urgent)
+     offers     = active cases in «Προσφορά»
+     signatures = active cases in «Υπογραφή»
+     newCases   = cases in «Νέο» */
+export interface TileCase { current_stage: string; priority?: string | null }
+export interface DashboardTiles { urgent: number; urgentCases: number; followUps: number; offers: number; signatures: number; newCases: number }
+export function dashboardTiles(cases: TileCase[], overdueFollowUps: number, todayFollowUps: number): DashboardTiles {
+  const active = cases.filter(isActive);
+  const urgentCases = active.filter(c => c.priority === 'high' || c.priority === 'critical').length;
+  return {
+    urgent: urgentCases + overdueFollowUps,
+    urgentCases,
+    followUps: todayFollowUps,
+    offers: active.filter(c => c.current_stage === 'offer').length,
+    signatures: active.filter(c => c.current_stage === 'signed').length,
+    newCases: cases.filter(c => c.current_stage === 'new').length,
+  };
+}

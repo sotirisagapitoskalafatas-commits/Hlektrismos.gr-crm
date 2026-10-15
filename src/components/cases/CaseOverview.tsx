@@ -85,8 +85,9 @@ export function CaseNextStepCard({ c, allowedNext, checklist, staff, canChange, 
       {!n.done && (
         <div className="flex gap-2 flex-wrap mt-4">
           {docBlock && <button className="atx-btn atx-btn-primary" onClick={onDocs}>Δικαιολογητικά</button>}
-          {!docBlock && n.suggestedStage && canChange && (
-            <button className="atx-btn atx-btn-primary" onClick={() => onPick(n.suggestedStage as Stage)}>Μετάβαση σε «{stageText(n.suggestedStage)}»</button>
+          {/* Missing documents warn but do not stop the move (gate mode 'warn'); the stage dialog shows what the server says. */}
+          {n.suggestedStage && canChange && (
+            <button className={`atx-btn ${docBlock ? 'atx-btn-quiet' : 'atx-btn-primary'}`} onClick={() => onPick(n.suggestedStage as Stage)}>Μετάβαση σε «{stageText(n.suggestedStage)}»</button>
           )}
           {canAssign && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={onHandover}><ArrowRightLeft size={14} /> Παράδοση</button>}
           {onReturn && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={onReturn}><Undo2 size={14} /> Επιστροφή για διόρθωση</button>}
@@ -115,7 +116,9 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   }, [stage, c.id]);
   if (!stage) return null;
   const exit = stage === 'lost' || stage === 'cancelled';
-  const blocked = !!blockers && blockers.length > 0;
+  // 'warn' gates (the default) list what is missing but never stop the move; only 'block' gates do.
+  const blocked = !!blockers && blockers.some(b => b.mode !== 'warn');
+  const warnings = !blocked && !!blockers && blockers.length > 0 ? blockers : [];
   const canOverride = role === 'admin' || role === 'manager';
 
   const verify = async (ok: string) => {
@@ -129,11 +132,15 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
     const r = await changeStage(c.id, stage, role, note.trim() || undefined);
     if (r.error) {
       setBusy(false);
-      if (r.error.kind === 'documents') setBlockers(r.error.blockers);
+      if (r.error.kind === 'documents') setBlockers(r.error.blockers.map(b => ({ ...b, mode: 'block' as const })));
       setErr(stageErrorText(r.error));
       return;
     }
-    await verify(`Στάδιο: ${stageText(stage)}`);
+    if (warnings.length) {
+      await addActivity(c.id, { role, activity_type: 'note', title: 'Μετάβαση με ελλείψεις εγγράφων',
+        description: warnings.map(b => `${b.label} — ${BLOCKER_TEXT[b.status]}`).join(' · '), metadata: { stage, missing: warnings } });
+    }
+    await verify(`Στάδιο: ${stageText(stage)}${warnings.length ? ' — με ελλείψεις εγγράφων (καταγράφηκαν)' : ''}`);
   };
   const submitOverride = async () => {
     setBusy(true); setErr(null);
@@ -156,6 +163,15 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
           <span className="block text-[12px] mt-1.5 opacity-80">Ελέγχεται από τον server· ανεβάστε/ελέγξτε τα έγγραφα στην καρτέλα «Έγγραφα».</span>
         </div>
       )}
+      {warnings.length > 0 && (
+        <div className="atx-notice mb-3" role="status" data-doc-warnings="true">
+          <strong className="flex items-center gap-1.5"><AlertTriangle size={15} aria-hidden="true" /> Λείπουν έγγραφα — η μετάβαση επιτρέπεται</strong>
+          <ul className="m-0 mt-1.5 p-0 list-none space-y-1">
+            {warnings.map(b => <li key={b.label} className="text-[13.5px]">{b.label} — <span className="font-medium">{BLOCKER_TEXT[b.status]}</span></li>)}
+          </ul>
+          <span className="block text-[12px] mt-1.5 opacity-80">Οι ελλείψεις καταγράφονται στο ιστορικό του case, για να τις συμπληρώσει το Back Office.</span>
+        </div>
+      )}
       {!blocked && (
         <textarea className="field" rows={3} value={note} onChange={e => setNote(e.target.value)}
           placeholder={exit ? 'Αιτία (απαιτείται), π.χ. «Επέλεξε άλλον πάροχο»' : 'Σημείωση (προαιρετική)'} aria-label={exit ? 'Αιτία' : 'Σημείωση'} />
@@ -173,7 +189,7 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
         {blocked && canOverride && (
           <button className="atx-btn atx-btn-quiet" disabled={busy || override.trim().length < 10} onClick={() => void submitOverride()}>{busy ? '…' : 'Παράκαμψη & μετάβαση'}</button>
         )}
-        {!blocked && <button className="atx-btn atx-btn-primary" disabled={busy || (exit && note.trim().length < 3)} onClick={() => void submit()}>{busy ? '…' : 'Επιβεβαίωση'}</button>}
+        {!blocked && <button className="atx-btn atx-btn-primary" disabled={busy || (exit && note.trim().length < 3)} onClick={() => void submit()}>{busy ? '…' : warnings.length ? 'Συνέχεια με ελλείψεις' : 'Επιβεβαίωση'}</button>}
       </div>
     </Modal>
   );

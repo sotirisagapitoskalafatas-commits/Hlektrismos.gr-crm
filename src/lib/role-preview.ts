@@ -10,6 +10,7 @@ export const ROLE_PREVIEW_HARD_STOP = Date.parse('2026-10-16T00:00:00+03:00');
 
 /** RPCs that only read and may run during a preview. Everything else that is not GET/HEAD counts as a write. */
 export const PREVIEW_READ_RPCS = new Set([
+  'field_checkins_for_review', // staged phase4/10 (read-only)
   'role_preview_status', 'role_preview_event', 'staff_list', 'staff_reference_count',
   'get_active_tariff_prices', 'recommend_tariffs', 'field_sales_metrics', 'crm_scraper_settings',
   // read-only functions of the staged phase2/phase3 migrations

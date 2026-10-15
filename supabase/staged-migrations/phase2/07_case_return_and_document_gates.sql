@@ -1,9 +1,12 @@
 -- STAGED — apply on STAGING first, then production only with the owner's approval and a backup.
 -- Phase 2 / 07: server-enforced case workflow.
---   A) Document gates — a stage change is REJECTED by the database when the case's required documents are missing,
---      rejected or (for later stages) not yet verified. Enforced by a trigger on cases.current_stage for every
---      direct API write, so the UI cannot bypass it. Only an admin/manager can override, with a written reason,
---      through change_case_stage_override (audited on the timeline and in activity_log).
+--   A) Document gates — per stage, a setting: 'warn' (DEFAULT) or 'block'.
+--      warn : missing / rejected / unverified documents are reported (checklist + stage dialog) but never stop a
+--             stage change or a handover to Back Office (meeting decision, 15/10/2026).
+--      block: the database REJECTS the stage change (trigger on cases.current_stage, so the UI cannot bypass it);
+--             only an admin/manager can override, with a written reason, through change_case_stage_override.
+--      Every gate ships as 'warn'. Switching a stage to 'block' (e.g. Καταχώρηση Παρόχου) is an owner decision,
+--      made by an admin with set_stage_gate_mode (audited).
 --   B) Allowed transitions — the same matrix as the app (src/lib/roles.ts STAGE_TRANSITIONS), enforced for direct
 --      API writes. Overrides do not skip it.
 --   C) «Επιστροφή για διόρθωση» — Back Office (and admin/manager) return a case in a Back Office stage to Inside or
@@ -28,8 +31,10 @@ create table if not exists public.document_requirements (
 create table if not exists public.stage_document_gates (
   stage text primary key,
   min_status text not null check (min_status in ('received', 'verified')),
-  enabled boolean not null default true
+  enabled boolean not null default true,
+  mode text not null default 'warn' check (mode in ('warn', 'block'))
 );
+alter table public.stage_document_gates add column if not exists mode text not null default 'warn';
 alter table public.document_requirements enable row level security;
 alter table public.stage_document_gates enable row level security;
 drop policy if exists "staff read document requirements" on public.document_requirements;
@@ -82,7 +87,7 @@ insert into public.case_stage_transitions (from_stage, to_stage) values
   ('lost', 'new'), ('cancelled', 'new')
 on conflict do nothing;
 
--- What blocks moving this case to p_stage: [{label, status: missing|rejected|unverified, any_of}] (empty = allowed).
+-- What is missing for p_stage: [{label, status: missing|rejected|unverified, any_of, mode: warn|block}] (empty = nothing).
 create or replace function public.case_document_blockers(p_case uuid, p_stage text)
 returns jsonb
 language plpgsql
@@ -90,12 +95,12 @@ stable
 security definer
 set search_path = public
 as $$
-declare c record; g text; r record; st text; out jsonb := '[]'::jsonb; biz boolean;
+declare c record; g text; gm text; r record; st text; out jsonb := '[]'::jsonb; biz boolean;
 begin
   if auth.uid() is not null and not public.is_staff() then raise exception 'not allowed' using errcode = '42501'; end if;
   select service_type, property_type, case_type into c from public.cases where id = p_case;
   if not found then return out; end if;
-  select min_status into g from public.stage_document_gates where stage = p_stage and enabled;
+  select min_status, mode into g, gm from public.stage_document_gates where stage = p_stage and enabled;
   if g is null then return out; end if;
   biz := coalesce(c.property_type, '') in ('Κατάστημα', 'Γραφείο') or coalesce(c.case_type, '') ~* '(b2b|business|επιχειρ)';
   for r in
@@ -110,7 +115,7 @@ begin
       from public.case_documents x
      where x.case_id = p_case and (x.category = any(r.any_of) or x.category = any(r.legacy_any_of));
     if st in ('missing', 'rejected') or (g = 'verified' and st <> 'verified') then
-      out := out || jsonb_build_array(jsonb_build_object('label', r.label, 'status', case when st = 'received' then 'unverified' else st end, 'any_of', to_jsonb(r.any_of)));
+      out := out || jsonb_build_array(jsonb_build_object('label', r.label, 'status', case when st = 'received' then 'unverified' else st end, 'any_of', to_jsonb(r.any_of), 'mode', gm));
     end if;
   end loop;
   return out;
@@ -133,7 +138,8 @@ begin
       raise exception 'stage_transition_not_allowed: % -> %', old.current_stage, new.current_stage using errcode = 'P0001', hint = 'transition';
     end if;
     b := public.case_document_blockers(new.id, new.current_stage);
-    if jsonb_array_length(b) > 0 then
+    -- Only a gate set to 'block' stops the change; 'warn' gates are shown in the app and never block.
+    if jsonb_array_length(b) > 0 and exists (select 1 from public.stage_document_gates g where g.stage = new.current_stage and g.enabled and g.mode = 'block') then
       raise exception 'stage_blocked: required documents' using errcode = 'P0001', detail = b::text, hint = 'document_blockers';
     end if;
   end if;
@@ -142,6 +148,28 @@ end;
 $$;
 drop trigger if exists cases_stage_guard on public.cases;
 create trigger cases_stage_guard before update of current_stage on public.cases for each row execute function public.cases_stage_guard();
+
+-- Admin switches a stage's document gate between 'warn' and 'block' (audited). Default for every stage: 'warn'.
+create or replace function public.set_stage_gate_mode(p_stage text, p_mode text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_old text;
+begin
+  if not public.is_role('admin') then raise exception 'gate mode: not allowed' using errcode = '42501'; end if;
+  if coalesce(p_mode, '') not in ('warn', 'block') then raise exception 'gate mode: invalid mode' using errcode = '22023'; end if;
+  select mode into v_old from public.stage_document_gates where stage = p_stage;
+  if not found then raise exception 'gate mode: no document gate for this stage' using errcode = 'P0002'; end if;
+  update public.stage_document_gates set mode = p_mode where stage = p_stage;
+  insert into public.activity_log (entity_type, entity_id, action, details)
+  values ('settings', null, 'stage_gate_mode', jsonb_build_object('stage', p_stage, 'from', v_old, 'to', p_mode, 'by', auth.uid()));
+  return true;
+end;
+$$;
+revoke all on function public.set_stage_gate_mode(text, text) from public, anon;
+grant execute on function public.set_stage_gate_mode(text, text) to authenticated;
 
 -- Admin / manager override of DOCUMENT blockers only (the transition must still be allowed); reason required.
 create or replace function public.change_case_stage_override(p_case uuid, p_stage text, p_reason text)

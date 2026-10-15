@@ -20,7 +20,8 @@ export const canResubmit = (role: Role | null | undefined, uid: string | null | 
 export const defaultReturnTeam = (items: string[]): ReturnTeam => (items.some(i => /υπογ/i.test(i)) ? 'field_sales' : 'inside_sales');
 
 export type BlockerStatus = 'missing' | 'rejected' | 'unverified';
-export interface StageBlocker { label: string; status: BlockerStatus }
+/** mode: 'warn' (default — shown, never blocks) or 'block' (the database refuses the move). Absent = an older server: treat as block. */
+export interface StageBlocker { label: string; status: BlockerStatus; mode?: 'warn' | 'block' }
 export type StageError = { kind: 'documents'; blockers: StageBlocker[] } | { kind: 'transition' } | { kind: 'other'; message: string };
 
 export const BLOCKER_TEXT: Record<BlockerStatus, string> = { missing: 'λείπει', rejected: 'απορρίφθηκε', unverified: 'δεν έχει ελεγχθεί' };

@@ -208,8 +208,9 @@ for (const role of Object.keys(EXPECT)) {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'admin');
   await leadsAll(page);
+  await page.waitForSelector('button[aria-label="Διαγραφή Δοκιμαστικό Lead 2"]', { timeout: 10000 }).catch(() => {});
   await page.evaluate(() => document.querySelector('button[aria-label="Διαγραφή Δοκιμαστικό Lead 2"]')?.click());
-  await sleep(500);
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.includes('Μεταφορά στον κάδο')), { timeout: 10000 }).catch(() => {});
   await fill(page, 'Διπλότυπο');
   await btn(page, 'Μεταφορά στον κάδο');
   await sleep(1500);
@@ -1074,6 +1075,82 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
   check('Ops: ready case advanced through the confirmed stage change', log.some((l) => l.method === 'PATCH' && l.table === 'cases' && l.body.current_stage === 'completed'));
   await browser.close();
+}
+
+/* ---- 13. Field outcomes: Νέο Sale → Back Office, manager follow-up, Back Office exception (phase 2) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const logOf = async () => (await (await fetch(`${M}/__log`)).json());
+  const myDay = async (page) => { await page.evaluate(() => [...document.querySelectorAll('nav button')].find((b) => b.textContent.includes('Ημέρα μου'))?.click()); await sleep(2000); };
+  const pick = (page, label) => page.evaluate((l) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent.trim() === l)?.click(), label);
+  const btnState = (page, re) => page.evaluate((r) => { const b = [...document.querySelectorAll('button')].find((x) => new RegExp(r).test(x.textContent.trim()) && x.offsetParent); return b ? (b.disabled ? 'disabled' : 'enabled') : 'missing'; }, re);
+  await fetch(`${M}/rest/v1/rpc/set_default_backoffice_assignee`, { method: 'POST', headers: { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' }, body: JSON.stringify({ p_user: '10000000-0000-4000-8000-000000000005' }) });
+  {
+    const s = await launch(390, 844);
+    await s.browser.defaultBrowserContext().overridePermissions('http://localhost:5199', ['geolocation']);
+    await s.page.setGeolocation({ latitude: 37.9838, longitude: 23.7275, accuracy: 12 });
+    await signInAs(s.page, 'field_sales');
+    await myDay(s.page);
+    // the visit in progress from section 11 → «Νέο Sale»
+    await pick(s.page, 'Δεν ενδιαφέρεται');
+    await sleep(200);
+    const needsReason = await btnState(s.page, '^Επιλέξτε αιτία');
+    await pick(s.page, 'Νέο Sale');
+    await sleep(200);
+    await click(s.page, 'Check Out'); await sleep(2200);
+    const panel = await s.page.evaluate(() => document.querySelector('[data-new-sale]')?.innerText ?? '');
+    check('Field: «Δεν ενδιαφέρεται» needs a reason; «Νέο Sale» opens customer → documents → handover', needsReason === 'disabled' && panel.includes('Στοιχεία πελάτη') && panel.includes('Έγγραφα') && panel.includes('Παράδοση στο Back Office'), needsReason);
+    await s.page.evaluate(() => [...document.querySelectorAll('[data-new-sale] button')].find((b) => b.textContent.trim() === 'Παράδοση στο Back Office')?.click());
+    await sleep(1800);
+    const hand = (await logOf()).filter((l) => l.method === 'PATCH' && l.table === 'cases' && /Παραλαβή από Sales/.test(l.body.next_action ?? '')).pop();
+    check('Field: Νέο Sale hands over to the Back Office assignee and keeps the agent as originator', hand?.body?.back_office_owner === '10000000-0000-4000-8000-000000000005' && !!hand.body.field_sales_owner, JSON.stringify(hand?.body ?? null));
+    // next visit → «Follow-up από υπεύθυνο»
+    await s.page.evaluate(() => [...document.querySelectorAll('[data-new-sale] button')].find((b) => b.textContent.trim() === 'Κλείσιμο')?.click());
+    // a planned visit for «now» (the fixture's times are relative to the hour and may fall on tomorrow late in the day)
+    const existing = (await (await fetch(`${M}/rest/v1/case_visits?select=*`, { headers: { Authorization: 'Bearer mock-field_sales' } })).json())[0];
+    await fetch(`${M}/rest/v1/case_visits`, { method: 'POST', headers: { Authorization: 'Bearer mock-field_sales', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...existing, id: '80000000-0000-4000-8000-0000000000f1', status: 'planned', scheduled_at: new Date(Date.now() + 5 * 60_000).toISOString(), started_at: null, ended_at: null, purpose: 'Επίσκεψη για υπεύθυνο' }) });
+    await s.page.reload({ waitUntil: 'domcontentloaded' }); await sleep(2500);
+    await myDay(s.page);
+    for (let i = 0; i < 20 && (await btnState(s.page, '^Check In')) !== 'enabled'; i++) await sleep(250);
+    await click(s.page, 'Check In');
+    if (!(await s.page.waitForSelector('[aria-label="Σημειώσεις επίσκεψης"]', { timeout: 10000 }).catch(() => null))) {
+      await click(s.page, 'Check In');
+      await s.page.waitForSelector('[aria-label="Σημειώσεις επίσκεψης"]', { timeout: 10000 }).catch(() => null);
+    }
+    await pick(s.page, 'Follow-up από υπεύθυνο');
+    await s.page.type('[aria-label="Σημειώσεις επίσκεψης"]', 'Θέλει έκπτωση πάνω από 10%');
+    await click(s.page, 'Check Out'); await sleep(2500);
+    const fu = (await logOf()).filter((l) => l.method === 'POST' && l.table === 'follow_ups').pop();
+    check('Field: manager follow-up is created for the Back Office queue (flag + text) with the agent note', fu?.body?.kind === 'manager' && /^Follow-up από υπεύθυνο — Θέλει έκπτωση/.test(fu.body.reason) && fu.body.assignee_id === '10000000-0000-4000-8000-000000000005', JSON.stringify(fu?.body ?? null));
+    await s.browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    check('Ops: «Follow-ups για υπεύθυνο» lists the manager follow-up', await page.evaluate(() => (document.querySelector('[data-manager-followups]')?.innerText ?? '').includes('Θέλει έκπτωση')));
+    check('Ops: «Από Sales» filter counts the Νέο Sale case', await page.evaluate(() => { const t = [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.startsWith('Από Sales')); return !!t && Number(t.textContent.replace(/\D+/g, '')) >= 1; }));
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === 'CS-2026-006' && e.offsetParent)[0]; el && el.click(); });
+    await sleep(1600);
+    await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === 'Back Office')?.click());
+    await sleep(800);
+    await page.evaluate(() => { const sel = document.querySelector('[data-case-exception] select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, 'provider_rejected'); sel.dispatchEvent(new Event('change', { bubbles: true })); });
+    await sleep(200);
+    const noNote = await page.evaluate(() => [...document.querySelectorAll('[data-case-exception] button')].find((b) => b.textContent.trim() === 'Αποθήκευση')?.disabled);
+    await page.evaluate(() => { const i = document.querySelector('[data-case-exception] input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Λάθος αριθμός παροχής'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+    await sleep(150);
+    await page.evaluate(() => [...document.querySelectorAll('[data-case-exception] button')].find((b) => b.textContent.trim() === 'Αποθήκευση')?.click());
+    await sleep(1500);
+    const ex = (await logOf()).filter((l) => l.table === 'set_case_exception').pop();
+    check('Case: Back Office exception needs a note and goes through set_case_exception', noNote === true && ex?.body?.p_state === 'provider_rejected' && ex.body.p_note === 'Λάθος αριθμός παροχής'
+      && (await page.evaluate(() => document.querySelector('[data-case-exception]').innerText.includes('Απόρριψη από τον πάροχο'))));
+    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    await click(page, 'Εξαιρέσεις', '[role="tab"]'); await sleep(400);
+    check('Ops: «Εξαιρέσεις» shows the case with the reason first', await page.evaluate(() => [...document.querySelectorAll('main li.atx-row')].some((r) => r.innerText.includes('Απόρριψη από τον πάροχο'))));
+    await browser.close();
+  }
 }
 
 const failed = results.filter((r) => !r.ok);

@@ -24,3 +24,29 @@
 - **The app already handles both server versions.** With the live (old) function, a refused check-in still offers the labelled «Καταγραφή χωρίς GPS» case note.
 - **Local evidence:** `node --test supabase/tests/field-checkin.test.mjs`, 5/5. It is applied on top of the real live migration, and a sanity check first confirms that the old version rejects.
 - **Rollback:** re-run the `field_checkin` definition from `20260911010000…` and drop the two review functions. The columns and the setting can stay.
+
+## 11 — Customer first / last name (additive)
+- Adds nullable `customers.first_name` and `customers.last_name`. Existing rows are not rewritten.
+- `full_name` stays the display name, and the app keeps it equal to first + last.
+- Until applied, the customer form shows the single «Ονοματεπώνυμο» field (the app checks once whether the columns exist).
+
+## 12 — Default Back Office assignee (additive)
+- A setting `crm_settings.default_backoffice_assignee` that points to a user id, never a hardcoded name. It is set by an admin, must be an active Back Office user, and changes are audited.
+- `route_lead_to_backoffice(lead)` assigns a lead created with documents to that user, notifies them, and keeps the creator.
+- Until applied:
+  - the admin card says it activates after the migration;
+  - leads with documents stay with their creator;
+  - the creator is told the routing is not active yet.
+
+## 13 — Case exception state (additive)
+- Adds `cases.exception_state` (`offer_declined` / `no_response` / `unsigned` / `provider_rejected`), with a note, time and author.
+- `set_case_exception(case, state, note)` requires a note, writes the timeline and the audit log, and never moves or closes the case.
+- Missing information still uses «Επιστροφή για διόρθωση».
+- Until applied, the picker on the case shows «ενεργοποιείται μετά την εφαρμογή…» and the «Εξαιρέσεις» filter counts only returned cases.
+
+## 14 — Follow-up kind (additive + fills nulls)
+- Adds `follow_ups.kind` (`manager`) for follow-ups escalated from a field visit.
+- Marks existing follow-ups whose reason starts with «Follow-up από υπεύθυνο». It only fills nulls.
+- Until applied, the app does not send `kind` and recognises these follow-ups by that text prefix.
+
+**Apply order:** phase2/07 → phase4/10 → 11 → 12 → 13 → 14, on staging first. They are independent of each other except that all expect the live schema.

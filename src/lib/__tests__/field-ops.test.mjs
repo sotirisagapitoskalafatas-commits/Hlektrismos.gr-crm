@@ -97,3 +97,13 @@ test('ops queue: exception states show first among blockers; returned = missing 
   assert.equal(by.ret.exception, 'missing_info');
   assert.equal(by.sale.fromSales, true); assert.equal(by.plain.fromSales, false);
 });
+
+test('ops queue: a Νέο Sale handed over while still in «Προσφορά» is in the queue; closed ones are not', () => {
+  const q = O.buildOpsQueue([
+    kase('offer-sale', { current_stage: 'offer', next_action: 'Παραλαβή από Sales — Νέο Sale' }),
+    kase('lost-sale', { current_stage: 'lost', next_action: 'Παραλαβή από Sales — Νέο Sale' }),
+    kase('offer-plain', { current_stage: 'offer' }),
+  ], {}, 'me', NOW);
+  assert.deepEqual(q.map((x) => x.id), ['offer-sale']);
+  assert.equal(q[0].fromSales, true);
+});

@@ -364,6 +364,15 @@ http.createServer((req, res) => {
         l.assigned_to_user_id = p.id; l.assigned_to = { full_name: p.full_name };
         return send(200, { id: p.id, full_name: p.full_name });
       }
+      if (name === 'set_case_exception') { // staged phase4/13
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!u) return deny('case exception: not allowed');
+        if (json.p_state && String(json.p_note ?? '').trim().length < 3) return send(400, { code: '22023', message: 'case exception: a note is required' });
+        const c = caseRows.find((x) => x.id === json.p_case);
+        if (!c) return send(404, { code: 'P0002', message: 'case exception: case not found' });
+        Object.assign(c, { exception_state: json.p_state ?? null, exception_note: json.p_state ? json.p_note : null });
+        return send(200, true);
+      }
       // ---- Check-in review (staged phase4/10) ----
       if (name === 'field_checkins_for_review') {
         if (!['admin', 'manager', 'back_office'].includes(u?.role)) return deny('checkin review: not allowed');
@@ -617,7 +626,8 @@ http.createServer((req, res) => {
         if (col) return send(400, { code: '23502', message: `null value in column "${col}" of relation "leads" violates not-null constraint`, details: 'Failing row contains (...)', hint: null });
       }
     }
-    const rowsIn = (Array.isArray(json) ? json : [json]).map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: stamp, occurred_at: stamp, ...r }));
+    const tableDefaults = table === 'follow_ups' ? { status: 'pending' } : {}; // DB column defaults the app relies on
+    const rowsIn = (Array.isArray(json) ? json : [json]).map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: stamp, occurred_at: stamp, ...tableDefaults, ...r }));
     tbl.push(...rowsIn);
     // .single() asks for one object (Accept: application/vnd.pgrst.object+json), like real PostgREST
     return send(201, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? rowsIn[0] : rowsIn);

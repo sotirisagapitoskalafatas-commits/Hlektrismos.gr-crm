@@ -11,7 +11,7 @@ import { STAGE_TRANSITIONS, can } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
 import { fetchCases, fetchDocumentsForCases } from '@/lib/api';
 import type { Case, CaseDocument } from '@/lib/api';
-import { buildOpsQueue, OPS_STAGES } from '@/lib/ops-queue';
+import { buildOpsQueue, inOpsQueue, OPS_STAGES } from '@/lib/ops-queue';
 import { stageText } from '@/lib/case-flow';
 import { useStaff } from '@/lib/useStaff';
 import { StageChangeDialog } from '@/components/cases/CaseOverview';
@@ -37,7 +37,7 @@ export default function BackOfficePage() {
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
-    const list = (await fetchCases()).filter(c => (OPS_STAGES as readonly string[]).includes(c.current_stage));
+    const list = (await fetchCases()).filter(inOpsQueue);
     setCases(list);
     setDocs(await fetchDocumentsForCases(list.map(c => c.id)));
     setLoading(false);

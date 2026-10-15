@@ -50,9 +50,14 @@ export interface OpsItem {
 const DAY = 86_400_000;
 const DOC_STAGES = ['application', 'signed', 'document_check', 'submitted'];
 
+/** In the Back Office queue: Back Office stages, plus anything handed over from Sales (a «Νέο Sale» may still be in a
+    sales stage); never closed cases. */
+export const inOpsQueue = (c: Pick<OpsCase, 'current_stage' | 'next_action' | 'back_office_owner'>) =>
+  (OPS_STAGES as readonly string[]).includes(c.current_stage) || (fromSales(c) && !['completed', 'lost', 'cancelled'].includes(c.current_stage));
+
 export function buildOpsQueue(cases: OpsCase[], docsByCase: Record<string, { category: string; status: string }[]>, uid: string, now: number): OpsItem[] {
   return cases
-    .filter(c => (OPS_STAGES as readonly string[]).includes(c.current_stage))
+    .filter(inOpsQueue)
     .map(c => {
       const since = new Date(c.stage_entered_at ?? c.updated_at).getTime();
       const blockers: string[] = [];

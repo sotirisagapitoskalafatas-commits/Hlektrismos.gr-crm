@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { RoutePlan, RouteStop } from '@/lib/routing/types';
 import { planRoute } from '@/lib/routing/routing-provider';
+import { getOrderingProvider } from '@/lib/routing/ordering';
 import { formatDistance, formatDuration } from '@/lib/geo/distance';
 import NavigationButton from '@/components/navigation/NavigationButton';
 import { Btn, Card, Micro, Spinner } from '@/lib/ui';
@@ -28,15 +29,14 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ordered = useMemo(() => {
-    const withCoords = stops.filter(s => s.lat != null && s.lng != null && !Number.isNaN(s.lat));
-    return [...withCoords].sort((a, b) => {
-      if (a.scheduledAt && b.scheduledAt) return +new Date(a.scheduledAt) - +new Date(b.scheduledAt);
-      if (a.scheduledAt) return -1;
-      if (b.scheduledAt) return 1;
-      return 0;
-    });
-  }, [stops]);
+  const withCoords = useMemo(() => stops.filter(s => s.lat != null && s.lng != null && !Number.isNaN(s.lat)), [stops]);
+  // Ordering goes through the provider interface (lib/routing/ordering.ts); default keeps the scheduled-time order.
+  const [ordered, setOrdered] = useState<RouteStopInput[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void getOrderingProvider().order(withCoords).then(r => { if (alive) setOrdered(r.stops); });
+    return () => { alive = false; };
+  }, [withCoords]);
 
   useEffect(() => {
     let alive = true;

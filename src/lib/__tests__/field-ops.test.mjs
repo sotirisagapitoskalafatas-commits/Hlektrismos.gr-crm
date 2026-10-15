@@ -80,7 +80,9 @@ test('visit outcomes: Νέο Sale and manager follow-up branch; no sale / not in
   assert.equal(F.checkoutReady('Νέο Sale', ''), true);
   assert.equal(F.checkoutReady('', ''), false);
   assert.equal(F.checkoutNote('Χωρίς πώληση', '', 'Τιμή / κόστος'), 'Αποτέλεσμα: Χωρίς πώληση — Τιμή / κόστος');
-  assert.ok(F.isManagerFollowUp('Follow-up από υπεύθυνο — τιμολόγηση'));
+  assert.ok(F.isManagerFollowUp({ reason: 'Follow-up από υπεύθυνο — τιμολόγηση' }), 'fallback before phase4/14');
+  assert.ok(F.isManagerFollowUp({ kind: 'manager', reason: 'οτιδήποτε' }), 'the flag wins');
+  assert.ok(!F.isManagerFollowUp({ kind: null, reason: 'Κλήση' }));
 });
 
 test('ops queue: exception states show first among blockers; returned = missing info; «Από Sales» flag', () => {

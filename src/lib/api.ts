@@ -103,6 +103,8 @@ export type FollowUp = {
   priority: string;
   assignee_id: string | null;
   created_by?: string | null;
+  /** 'manager' = escalated from a field visit (staged phase4/14); absent until applied. */
+  kind?: string | null;
   status: 'pending' | 'completed' | 'cancelled' | 'snoozed';
   notes: string;
   snoozed_until: string | null;
@@ -353,6 +355,14 @@ export async function fetchCustomer(id: string): Promise<Customer | null> {
   const { data, error } = await supabase.from('customers').select('*').eq('id', id).maybeSingle();
   if (error) { logError('fetchCustomer', error); return null; }
   return (data ?? null) as Customer | null;
+}
+
+/** Does follow_ups.kind exist yet (staged phase4/14)? Checked once per session. */
+let followUpKindProbe: Promise<boolean> | null = null;
+export function followUpKindAvailable(): Promise<boolean> {
+  if (!supabase) return Promise.resolve(false);
+  followUpKindProbe ??= Promise.resolve(supabase.from('follow_ups').select('kind').limit(1)).then(r => !r.error, () => false);
+  return followUpKindProbe;
 }
 
 /** Do customers have first_name / last_name yet (staged phase4/11)? Checked once per session. */
@@ -661,6 +671,7 @@ export async function createFollowUp(input: {
   priority: string;
   notes?: string;
   assignee_id?: string;
+  kind?: 'manager';
 }): Promise<FollowUp | null> {
   if (!supabase) return null;
   try {
@@ -675,6 +686,7 @@ export async function createFollowUp(input: {
         priority: input.priority,
         notes: input.notes ?? '',
         assignee_id: input.assignee_id ?? profile?.id ?? null,
+        ...(input.kind && await followUpKindAvailable() ? { kind: input.kind } : {}),
         created_by: profile?.id ?? null,
       })
       .select()

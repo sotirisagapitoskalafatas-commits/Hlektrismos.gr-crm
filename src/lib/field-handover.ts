@@ -37,7 +37,7 @@ export async function managerFollowUp(caseId: string, note: string): Promise<{ o
   const bo = await fetchDefaultBackofficeAssignee();
   const due = new Date(); due.setDate(due.getDate() + 1); due.setHours(10, 0, 0, 0);
   const f = await createFollowUp({
-    case_id: caseId, due_at: due.toISOString(), channel: 'other', priority: 'high',
+    case_id: caseId, due_at: due.toISOString(), channel: 'other', priority: 'high', kind: 'manager',
     reason: `${MANAGER_FOLLOWUP_PREFIX} — ${note.trim() || 'από επίσκεψη πεδίου'}`,
     ...(bo ? { assignee_id: bo.id } : {}),
   });

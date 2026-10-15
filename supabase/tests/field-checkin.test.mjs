@@ -107,3 +107,13 @@ test('review: manager / back office list flagged check-ins and mark them reviewe
   await su();
   assert.equal((await db.query("select setting_value from public.crm_settings where setting_key = 'arrival_prompt_radius_m'")).rows[0].setting_value, 75);
 });
+
+test('rollback file docs/ops/rollback_phase4_10_field_checkin.sql restores the old rejecting check-in', async () => {
+  await su();
+  await db.exec(read('../../docs/ops/rollback_phase4_10_field_checkin.sql'));
+  await db.exec(`update public.case_visits set status = 'planned' where id = '${V(6)}'`);
+  const r = (await checkin(FIELD, V(6), HOME.lat + 0.01, HOME.lng, 10)).rows[0].r;
+  assert.equal(r.accepted, false); assert.equal(r.code, 'OUTSIDE_RADIUS');
+  await su();
+  assert.equal((await db.query("select count(*)::int n from pg_proc where proname = 'field_checkins_for_review'")).rows[0].n, 0);
+});

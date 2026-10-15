@@ -298,7 +298,7 @@ export default function FieldModePage() {
     const res = await fieldCheckin(v.id, coords);
     setBusyId(null);
     if (res.accepted || res.code === 'IDEMPOTENT') {
-      toast(res.code === 'IDEMPOTENT' ? res.message ?? 'Έχει ήδη γίνει Check In.' : (res.message ?? `Check In ✓${coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : ''}`), 'ok');
+      toast(res.code === 'IDEMPOTENT' ? res.message ?? 'Έχει ήδη γίνει Check In.' : (res.message ?? `Check In ✓${coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : ''}`), res.flag ? 'warn' : 'ok');
       await load();
     } else {
       toast(res.message ?? 'Το Check In δεν έγινε αποδεκτό.', 'warn');

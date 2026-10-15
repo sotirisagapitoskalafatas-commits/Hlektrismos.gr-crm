@@ -49,6 +49,28 @@ export function groupVisits<V extends VisitLike>(visits: V[], now: number): DayG
   return { today, overdue, upcoming, doneToday, next };
 }
 
+export const DEFAULT_ARRIVAL_RADIUS_M = 75;
+
+/** «Φτάσατε στο…;» — the planned visit whose stored location is within radiusM of the current position (closest first).
+    Display only: the app asks, the agent taps Check In. Nothing about the position is stored. No prompt when the GPS
+    accuracy is worse than twice the radius. */
+export function arrivalCandidate<V extends VisitLike>(
+  visits: V[], pos: (v: V) => { lat: number; lng: number } | null,
+  here: { lat: number; lng: number; accuracy?: number | null } | null, radiusM: number, dismissed: ReadonlySet<string> = new Set(),
+): { visit: V; meters: number } | null {
+  if (!here || !(radiusM > 0)) return null;
+  if (here.accuracy != null && here.accuracy > radiusM * 2) return null;
+  let best: { visit: V; meters: number } | null = null;
+  for (const v of visits) {
+    if (v.status !== 'planned' || dismissed.has(v.id)) continue;
+    const p = pos(v);
+    if (!p) continue;
+    const m = distanceKm(here, p) * 1000;
+    if (m <= radiusM && (!best || m < best.meters)) best = { visit: v, meters: m };
+  }
+  return best;
+}
+
 /** Cases with stored coordinates, nearest first when the position is known; never invents coordinates. */
 export function nearestCases<C extends { lat: number | null; lng: number | null }>(cases: C[], here: { lat: number; lng: number } | null, limit = 6) {
   const located = cases.filter(c => c.lat != null && c.lng != null) as (C & { lat: number; lng: number })[];

@@ -36,23 +36,24 @@ serve(async (req: any) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
       }
       
-      const { error: insertError } = await supabaseClient
-        .from('hlektrismos_leads')
-        .insert({
-          first_name: name?.split(' ')[0] || '',
-          last_name: name?.split(' ').slice(1).join(' ') || '',
-          phone: phone || '',
-          email: email || '',
-          customer_type: 'individual',
-          region: 'Αττική',
-          status: 'new',
-          consent: true,
+      // Stored in public.leads (the table the CRM shows) through the same public intake RPC as the website form,
+      // which re-checks consent and 18+ in the database. Previously this wrote to the legacy hlektrismos_leads table,
+      // which the CRM does not list, so chatbot callback requests never reached the team.
+      const fullName = String(name ?? '').trim().replace(/\s+/g, ' ');
+      const { error: insertError } = await supabaseClient.rpc('insert_website_lead', {
+        p_source: 'website',
+        p_payload: {
+          full_name: fullName || null,
+          first_name: fullName ? fullName.split(' ')[0] : null,
+          last_name: fullName ? fullName.split(' ').slice(1).join(' ') : null,
+          phone: phone || null,
+          email: email || null,
+          comments: message || `Αίτημα κλήσης από το chatbot. Τρέχων λογαριασμός: ${billAmount || 'Δεν δόθηκε'}€. Πάροχος: ${currentProvider || 'Δεν δόθηκε'}. Κατανάλωση: ${consumption || 'Δεν δόθηκε'} kWh.`,
+          gdpr_consent: true,
           age_confirmed: true,
-          lawful_basis: 'consent',
-          customer_category: 'b2c',
-          property_type: 'apartment',
-          comments: message || `Κλήση από chatbot. Τρέχονς λογαριασμός: ${billAmount || 'Δεν δόθηκε'}€. Πάροχος: ${currentProvider || 'Δεν δόθηκε'}. Κατανάλωση: ${consumption || 'Δεν δόθηκε'} kWh.`,
-        })
+          campaign_name: 'Chatbot',
+        },
+      })
 
       if (insertError) throw insertError;
 

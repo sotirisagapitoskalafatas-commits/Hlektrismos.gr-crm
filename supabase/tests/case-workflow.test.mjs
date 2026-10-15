@@ -14,6 +14,7 @@ const INSIDE = 'aaaaaaaa-0000-4000-8000-000000000003';
 const FIELD = 'aaaaaaaa-0000-4000-8000-000000000004';
 const BO = 'aaaaaaaa-0000-4000-8000-000000000005';
 const CASE = 'cccccccc-0000-4000-8000-000000000001';
+const WARN = 'cccccccc-0000-4000-8000-0000000000aa';
 const BIZ = 'cccccccc-0000-4000-8000-000000000002';
 
 async function as(uid) {
@@ -53,6 +54,34 @@ before(async () => {
     insert into public.cases (id, title, current_stage, property_type) values ('${BIZ}', 'Κατάστημα', 'signed', 'Κατάστημα');
   `);
   await db.exec(read('../staged-migrations/phase2/07_case_return_and_document_gates.sql'));
+});
+
+test('gate mode: every stage ships as «warn»; a move with missing documents goes through and reports them', async () => {
+  await su();
+  const modes = (await db.query('select stage, mode from public.stage_document_gates order by stage')).rows;
+  assert.ok(modes.length >= 4 && modes.every((m) => m.mode === 'warn'), JSON.stringify(modes));
+  await db.exec(`insert into public.cases (id, title, current_stage, inside_sales_owner) values ('${WARN}', 'Warn', 'signed', '${INSIDE}')`);
+  await as(INSIDE);
+  const b = (await run("select public.case_document_blockers($1, 'document_check') b", [WARN])).rows[0].b;
+  assert.ok(b.length === 4 && b.every((x) => x.mode === 'warn'), 'the app still sees what is missing, marked warn');
+  assert.equal((await setStage(INSIDE, 'document_check', WARN)).ok, true, 'handover to Back Office is not blocked');
+  assert.equal(await stage(WARN), 'document_check');
+  assert.equal((await setStage(BO, 'completed', WARN)).hint, 'transition', 'the allowed-transition rule still applies');
+});
+
+test('gate mode: only an admin switches a stage to «block», and it is audited', async () => {
+  await as(MANAGER);
+  assert.equal((await run("select public.set_stage_gate_mode('document_check', 'block')")).ok, false, 'manager cannot');
+  await as(ADMIN);
+  assert.equal((await run("select public.set_stage_gate_mode('document_check', 'stop')")).ok, false, 'invalid mode');
+  assert.equal((await run("select public.set_stage_gate_mode('offer', 'block')")).ok, false, 'no gate on that stage');
+  for (const st of ['document_check', 'submitted', 'activation', 'completed']) {
+    assert.equal((await run('select public.set_stage_gate_mode($1, $2)', [st, 'block'])).ok, true, st);
+  }
+  await su();
+  const a = (await db.query("select details from public.activity_log where action = 'stage_gate_mode' and details->>'stage' = 'document_check'")).rows[0];
+  assert.equal(a.details.from, 'warn'); assert.equal(a.details.to, 'block'); assert.equal(a.details.by, ADMIN);
+  // the following tests exercise «block» mode
 });
 
 test('gate: cannot enter «Έλεγχος εγγράφων» with required documents missing; the error lists them', async () => {

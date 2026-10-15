@@ -8,6 +8,7 @@ import { JOURNEY, TEAM_LABEL, stageText, teamForStage } from '@/lib/case-flow';
 import { DOC_GROUP_LABEL, requiredDocs, uploadableDocTypes } from '@/lib/documents';
 import type { DocGroup } from '@/lib/documents';
 import { ROLE_DESCRIPTION, manageableRoles } from '@/lib/staff-admin';
+import GateModes from './GateModes';
 
 const GROUPS: { label: string; items: [CaseAction, string][] }[] = [
   { label: 'Cases', items: [['create_case', 'Δημιουργία case'], ['edit_case', 'Επεξεργασία case'], ['change_stage', 'Αλλαγή σταδίου'], ['assign', 'Ανάθεση / παράδοση'], ['delete', 'Διαγραφή']] },
@@ -99,6 +100,7 @@ export function DocumentsTab() {
   ];
   return (
     <div className="space-y-4">
+      <GateModes />
       <div className="atx-notice">Ενδεικτικές λίστες της εφαρμογής για παρόχους ενέργειας στην Ελλάδα. Τα ακριβή δικαιολογητικά διαφέρουν ανά πάροχο — χρειάζεται επιβεβαίωση από την επιχείρηση πριν γίνουν κανόνες του server.</div>
       <div className="grid lg:grid-cols-3 gap-3">
         {sample.map(x => (

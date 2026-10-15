@@ -1,8 +1,10 @@
 /* Ημέρα μου — mobile-first field workflow: next visit → navigate / call → Check In → outcome + notes →
-   next follow-up → Check Out. Check-in/out use the existing server-validated RPCs (geofence, idempotency, audit);
-   success is shown only when the server accepts. Offline actions keep using the existing queue.
-   GPS fallback: the server does not accept a check-in without GPS, so the fallback is an explicitly labelled
-   case note («Επίσκεψη χωρίς επιβεβαίωση GPS»), never a fake check-in. */
+   next follow-up → Check Out. Check-in/out use the server RPCs (idempotency, audit); success is shown only when the
+   server accepts. Offline actions keep using the existing queue.
+   Check-in (staged phase4/10): a manual check-in is always accepted; far from the stored address / no GPS / poor
+   accuracy are recorded with a review flag for the manager. «Φτάσατε στο…;» appears within arrival_prompt_radius_m
+   (75 m) while this page is open and location permission is already granted — no background tracking, nothing stored.
+   The «χωρίς GPS» case-note fallback below is kept only for the older live server, which still refuses such check-ins. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, LogIn, LogOut, MapPin, Navigation, Phone, RefreshCw, Route } from 'lucide-react';
@@ -10,17 +12,17 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { SERVICES, can } from '@/lib/roles';
 import {
-  addActivity, createFollowUp, fetchCases, fetchFollowUps, fetchTimeline, fetchVisits, fieldCheckin, fieldCheckout, updateVisitNotes,
+  addActivity, createFollowUp, fetchArrivalRadius, fetchCases, fetchFollowUps, fetchTimeline, fetchVisits, fieldCheckin, fieldCheckout, updateVisitNotes,
 } from '@/lib/api';
 import type { Case, CaseVisit, FollowUp } from '@/lib/api';
-import { GEO_ERRORS, getCurrentLocation } from '@/lib/geo/location';
+import { GEO_ERRORS, getCurrentLocation, watchCurrentLocation } from '@/lib/geo/location';
 import type { GeoErrorCode, UserLocation } from '@/lib/geo/location';
 import { formatDistance, durationMinutes, distanceKm } from '@/lib/geo/distance';
 import { enqueue, countQueue, isOnline } from '@/lib/offline/queue';
 import { flushQueue } from '@/lib/offline/sync';
 import { useToast } from '@/lib/toast';
 import { fmtTime, todayLabel } from '@/lib/ui';
-import { checkoutNote, groupVisits, nearestCases, VISIT_OUTCOMES } from '@/lib/field-day';
+import { arrivalCandidate, checkoutNote, DEFAULT_ARRIVAL_RADIUS_M, groupVisits, nearestCases, VISIT_OUTCOMES } from '@/lib/field-day';
 import { isOpenFollowUpFor } from '@/lib/work';
 import { formatWhen } from '@/lib/work-format';
 import { stageText } from '@/lib/case-flow';
@@ -46,6 +48,8 @@ export default function MyDayPage() {
   const [form, setForm] = useState({ outcome: '', notes: '', fuAt: '', fuReason: '' });
   const [fallback, setFallback] = useState<Fallback | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [arrivalRadius, setArrivalRadius] = useState(DEFAULT_ARRIVAL_RADIUS_M);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
     const [v, f, c] = await Promise.all([fetchVisits({ user: true }), fetchFollowUps({ status: 'all' }), fetchCases()]);
@@ -65,6 +69,26 @@ export default function MyDayPage() {
     } finally { setLocBusy(false); }
   }, [toast]);
   useEffect(() => { void locate(true); }, [locate]);
+  useEffect(() => { void fetchArrivalRadius().then(r => { if (r) setArrivalRadius(r); }); }, []);
+
+  // While this page is open and visible, follow the position ONLY if permission was already granted (no new prompt).
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions?.query) return;
+    let stopWatch: (() => void) | null = null;
+    let alive = true;
+    const start = () => {
+      if (stopWatch || document.visibilityState !== 'visible') return;
+      stopWatch = watchCurrentLocation(setLoc, () => { /* keep the last position; manual check-in still works */ });
+    };
+    const stop = () => { stopWatch?.(); stopWatch = null; };
+    const onVis = () => (document.visibilityState === 'visible' ? start() : stop());
+    void navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(st => {
+      if (!alive || st.state !== 'granted') return;
+      start();
+      document.addEventListener('visibilitychange', onVis);
+    }).catch(() => {});
+    return () => { alive = false; stop(); document.removeEventListener('visibilitychange', onVis); };
+  }, []);
 
   const caseById = useMemo(() => new Map(cases.map(c => [c.id, c])), [cases]);
   const coords = useCallback((v: CaseVisit) => {
@@ -82,8 +106,14 @@ export default function MyDayPage() {
       .sort((a, b) => +new Date(a.due_at) - +new Date(b.due_at));
   }, [followUps, user?.id, now]);
   const near = useMemo(() => nearestCases(cases, loc), [cases, loc]);
+  const arrival = useMemo(() => (can(role, 'check_in') ? arrivalCandidate(visits, coords, loc, arrivalRadius, dismissed) : null),
+    [visits, coords, loc, arrivalRadius, dismissed, role]);
 
-  const getCoords = async () => { try { return await getCurrentLocation(); } catch { return undefined; } };
+  // A position the page already holds (≤30 s old, e.g. from the arrival watch) is used as is; otherwise ask once.
+  const getCoords = async () => {
+    if (loc && Date.now() - loc.timestamp < 30_000) return { lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy };
+    try { return await getCurrentLocation(); } catch { return undefined; }
+  };
 
   const checkIn = async (v: CaseVisit) => {
     setBusyId(v.id);
@@ -96,7 +126,10 @@ export default function MyDayPage() {
     const res = await fieldCheckin(v.id, c);
     setBusyId(null);
     if (res.accepted) {
-      toast(res.code === 'IDEMPOTENT' ? (res.message ?? 'Έχει ήδη γίνει Check In.') : 'Check In ✓', 'ok');
+      if (res.code === 'IDEMPOTENT') toast(res.message ?? 'Έχει ήδη γίνει Check In.', 'ok');
+      else if (res.flag) toast(res.message ?? 'Check In ✓ — καταγράφηκε για έλεγχο από τον υπεύθυνο.', 'warn');
+      else toast('Check In ✓', 'ok');
+      setFallback(null);
       setOpenId(v.id); setForm({ outcome: '', notes: '', fuAt: '', fuReason: '' }); void load();
     } else {
       toast(res.message ?? 'Το Check In δεν έγινε αποδεκτό.', 'warn');
@@ -250,6 +283,19 @@ export default function MyDayPage() {
       </div>
 
       {loading && <div className="atx-panel mt-5">{[0, 1, 2].map(i => <div key={i} className="atx-skeleton" />)}</div>}
+
+      {!loading && arrival && (
+        <div className="atx-notice mt-4 flex items-center gap-3 flex-wrap" role="status" data-arrival>
+          <MapPin size={16} className="shrink-0" aria-hidden="true" />
+          <span className="flex-1 min-w-[180px]">
+            <strong>Φτάσατε στο «{arrival.visit.case?.customer?.full_name ?? arrival.visit.case?.title ?? 'πελάτη'}»;</strong>
+            <span className="block text-[12.5px] opacity-80">Περίπου {Math.round(arrival.meters)} μ από την αποθηκευμένη διεύθυνση.</span>
+          </span>
+          <button className="atx-btn atx-btn-primary inline-flex items-center gap-1.5" style={{ height: 40 }} disabled={busyId === arrival.visit.id}
+            onClick={() => void checkIn(arrival.visit)}><LogIn size={15} /> Check In</button>
+          <button className="atx-btn atx-btn-quiet" style={{ height: 40 }} onClick={() => setDismissed(d => new Set(d).add(arrival.visit.id))}>Όχι ακόμη</button>
+        </div>
+      )}
 
       {!loading && (
         <>

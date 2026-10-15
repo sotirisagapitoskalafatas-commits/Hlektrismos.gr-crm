@@ -451,7 +451,7 @@ export default function MapPage() {
     const res = await fieldCheckin(v.id, coords);
     setCheckInBusy(null);
     if (res.accepted || res.code === 'IDEMPOTENT') {
-      toast(res.code === 'IDEMPOTENT' ? res.message ?? 'Έχει ήδη γίνει Check In.' : (res.message ?? 'Check In ✓'), 'ok');
+      toast(res.code === 'IDEMPOTENT' ? res.message ?? 'Έχει ήδη γίνει Check In.' : (res.message ?? 'Check In ✓'), res.flag ? 'warn' : 'ok');
       setSelectedId(null);
       await reload();
     } else {

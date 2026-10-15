@@ -15,6 +15,7 @@ import { buildOpsQueue, OPS_STAGES } from '@/lib/ops-queue';
 import { stageText } from '@/lib/case-flow';
 import { useStaff } from '@/lib/useStaff';
 import { StageChangeDialog } from '@/components/cases/CaseOverview';
+import CheckinReview from '@/components/field-sales/CheckinReview';
 
 type Filter = 'all' | 'mine' | 'blocked' | 'ready';
 
@@ -104,9 +105,11 @@ export default function BackOfficePage() {
                       : <span className="block text-[13px] mt-1" style={{ color: 'var(--atx-green)' }}>{i.nextAction || 'Χωρίς εκκρεμότητες'}</span>}
                   </button>
                   <span className="atx-row-act flex items-center gap-2">
-                    {!blocked && forward && canChange
-                      ? <button className="atx-btn atx-btn-primary inline-flex items-center gap-1" onClick={() => setPending({ c, to: forward })}>{stageText(forward)} <ChevronRight size={14} /></button>
-                      : <button className="atx-btn atx-btn-quiet" onClick={() => openCase(i.id)}>{blocked ? 'Επίλυση' : 'Άνοιγμα'}</button>}
+                    {blocked && <button className="atx-btn atx-btn-quiet" onClick={() => openCase(i.id)}>Επίλυση</button>}
+                    {/* Missing documents warn but do not stop the move (gate mode 'warn'); the dialog shows the server's view. */}
+                    {forward && canChange
+                      ? <button className={`atx-btn ${blocked ? 'atx-btn-quiet' : 'atx-btn-primary'} inline-flex items-center gap-1`} onClick={() => setPending({ c, to: forward })}>{stageText(forward)} <ChevronRight size={14} /></button>
+                      : !blocked && <button className="atx-btn atx-btn-quiet" onClick={() => openCase(i.id)}>Άνοιγμα</button>}
                   </span>
                 </li>
               );
@@ -115,6 +118,8 @@ export default function BackOfficePage() {
         )}
       </div>
       <p className="text-[12px] text-[var(--atx-faint)] mt-3">Οι εκκρεμότητες εγγράφων βασίζονται στην ενδεικτική λίστα δικαιολογητικών· επιβεβαιώστε με τον πάροχο.</p>
+
+      <CheckinReview />
 
       {pending && (
         <StageChangeDialog c={pending.c} stage={pending.to} role={role} onClose={() => setPending(null)}

@@ -118,6 +118,8 @@ const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.fiel
 const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 // ---- B2B pipeline (mirrors staged-migrations/phase3/08 + scrape-b2b; synthetic, never calls SerpApi) ----
 // ---- Contact eligibility (mirrors staged-migrations/phase3/09; synthetic) ----
+const flaggedCheckins = [];
+let leadFail = null; // GET /__leadfail?code=42501 → the next POST to leads fails with that code (error-display test)
 const contactObjections = [];
 const contactConsents = [];
 const article11 = [];
@@ -130,8 +132,10 @@ const b2bJobs = [];
 const b2bProfiles = [];
 const B2B_SEARCH = ['admin', 'manager', 'inside_sales', 'back_office'];
 const B2B_REVIEW = ['admin', 'manager', 'back_office'];
-let gatesOn = process.env.MOCK_GATES === 'on'; // GET /__gates?state=on|off
+let gatesOn = process.env.MOCK_GATES === 'on'; // GET /__gates?state=on|off[&mode=warn|block]
 const GATES = { document_check: 'received', submitted: 'verified', activation: 'verified', completed: 'verified' };
+// Per-stage gate mode (staged phase2/07): 'warn' by default — blockers are reported, the move is allowed.
+const gateMode = Object.fromEntries(Object.keys(GATES).map((k) => [k, 'warn']));
 const ALLOWED = { new: ['contacted', 'lost', 'cancelled'], contacted: ['offer', 'application', 'lost', 'cancelled'], offer: ['application', 'signed', 'lost', 'cancelled'],
   application: ['signed', 'document_check', 'lost', 'cancelled'], signed: ['document_check', 'lost', 'cancelled'], document_check: ['submitted', 'application', 'lost', 'cancelled'],
   submitted: ['activation', 'document_check', 'lost', 'cancelled'], activation: ['completed', 'submitted', 'lost', 'cancelled'], lost: ['new'], cancelled: ['new'] };
@@ -153,7 +157,7 @@ const blockersFor = (caseId, stage) => {
   return reqsFor(c).flatMap((r) => {
     const f = docs.filter((d) => r.any.includes(d.category));
     const st = f.some((d) => d.status === 'verified') ? 'verified' : f.some((d) => d.status !== 'rejected') ? 'received' : f.length ? 'rejected' : 'missing';
-    return st === 'missing' || st === 'rejected' || (g === 'verified' && st !== 'verified') ? [{ label: r.label, status: st === 'received' ? 'unverified' : st }] : [];
+    return st === 'missing' || st === 'rejected' || (g === 'verified' && st !== 'verified') ? [{ label: r.label, status: st === 'received' ? 'unverified' : st, mode: gateMode[stage] ?? 'warn' }] : [];
   });
 };
 let previewState = process.env.MOCK_PREVIEW ?? 'on'; // switch at runtime: GET /__preview?state=expired|on
@@ -164,6 +168,7 @@ const TABLES = { b2b_prospects: b2bProspects, b2b_search_jobs: b2bJobs, b2b_sear
     { id: '70000000-0000-4000-8000-000000000001', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'call', title: 'Τηλεφωνική επικοινωνία', description: 'Ενδιαφέρεται για πρόγραμμα ρεύματος', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: { id: U('inside_sales'), full_name: USERS.inside_sales.full_name, role: 'inside_sales' } },
     { id: '70000000-0000-4000-8000-000000000002', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'email', title: 'Αποστολή προσφοράς', description: '', user_id: U('inside_sales'), occurred_at: iso(-1 * D), location: null, metadata: {}, user: null },
   ] };
+Object.defineProperty(TABLES, 'stage_document_gates', { enumerable: true, get: () => Object.entries(GATES).map(([stage, min_status]) => ({ stage, min_status, mode: gateMode[stage], enabled: true })) });
 const log = [];
 
 function applyFilters(rows, params) {
@@ -212,7 +217,13 @@ http.createServer((req, res) => {
     const send = (code, obj, extra = {}) => { res.writeHead(code, { ...cors, ...extra }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
-    if (url.pathname === '/__gates') { gatesOn = url.searchParams.get('state') === 'on'; return send(200, { gatesOn }); }
+    if (url.pathname === '/__leadfail') { leadFail = url.searchParams.get('code') || null; return send(200, { leadFail }); } // next leads POST fails once
+    if (url.pathname === '/__gates') {
+      gatesOn = url.searchParams.get('state') === 'on';
+      const m = url.searchParams.get('mode');
+      if (m === 'warn' || m === 'block') for (const k of Object.keys(gateMode)) gateMode[k] = m;
+      return send(200, { gatesOn, gateMode });
+    }
     if (url.pathname === '/__preview') { previewState = url.searchParams.get('state') ?? 'on'; return send(200, { previewState }); }
 
     if (url.pathname.startsWith('/auth/v1/')) {
@@ -232,9 +243,14 @@ http.createServer((req, res) => {
       const v = visits.find((x) => x.id === json.p_visit_id);
       if (!v) return send(200, { accepted: false, code: 'NO_VISIT', message: 'Η επίσκεψη δεν βρέθηκε.' });
       if (out) { v.status = 'completed'; v.ended_at = new Date().toISOString(); v.notes = json.p_notes; return send(200, { accepted: true, code: 'CHECKOUT' }); }
-      if (json.p_lat == null) return send(200, { accepted: false, code: 'GPS_UNCERTAIN', visitId: v.id, message: 'Η θέση σας δεν είναι διαθέσιμη ή δεν έχει αρκετή ακρίβεια.' });
+      if (v.status === 'in_progress' || v.status === 'completed') return send(200, { accepted: true, code: 'IDEMPOTENT', already: true, visitId: v.id, message: 'Η επίσκεψη έχει ήδη καταχωρηθεί.' });
       v.status = 'in_progress'; v.started_at = new Date().toISOString();
-      return send(200, { accepted: true, code: 'INSIDE_RADIUS', visitId: v.id });
+      if (json.p_lat == null) { // staged phase4/10: accepted, flagged for review
+        flaggedCheckins.unshift({ id: crypto.randomUUID(), created_at: new Date().toISOString(), agent: USERS.field_sales.full_name, case_id: v.case_id, case_no: v.case?.case_no ?? null,
+          customer: v.case?.customer?.full_name ?? null, review_flag: 'no_gps', distance_m: null, accuracy_m: null, radius_m: 150, reviewed: false });
+        return send(200, { accepted: true, code: 'NO_GPS', flag: 'no_gps', visitId: v.id, message: 'Check In ✓ χωρίς θέση GPS — θα το δει ο υπεύθυνος.' });
+      }
+      return send(200, { accepted: true, code: 'INSIDE_RADIUS', flag: null, visitId: v.id });
     }
     if (url.pathname === '/rest/v1/rpc/convert_lead_to_case') {
       log.push({ method: 'RPC', table: 'convert_lead_to_case', body: json });
@@ -326,6 +342,24 @@ http.createServer((req, res) => {
           next_action_owner_id: c.back_office_owner, next_action: 'Επανέλεγχος μετά τη διόρθωση' });
         TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'resubmitted', title: 'Επανυποβολή στο Back Office', description: json.p_note ?? '', user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
         return send(200, null);
+      }
+      // ---- Check-in review (staged phase4/10) ----
+      if (name === 'field_checkins_for_review') {
+        if (!['admin', 'manager', 'back_office'].includes(u?.role)) return deny('checkin review: not allowed');
+        return send(200, flaggedCheckins.filter((x) => !x.reviewed));
+      }
+      if (name === 'review_field_checkin') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!['admin', 'manager', 'back_office'].includes(u?.role)) return deny('checkin review: not allowed');
+        const x = flaggedCheckins.find((y) => y.id === json.p_id && !y.reviewed);
+        if (!x) return send(200, false);
+        x.reviewed = true; return send(200, true);
+      }
+      if (name === 'set_stage_gate_mode') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (u?.role !== 'admin') return deny('gate mode: not allowed');
+        if (!['warn', 'block'].includes(json.p_mode) || !(json.p_stage in gateMode)) return send(400, { code: '22023', message: 'gate mode: invalid' });
+        gateMode[json.p_stage] = json.p_mode; return send(200, true);
       }
       // ---- Contact eligibility ----
       if (['contact_facts', 'record_contact_objection', 'lift_contact_objection', 'record_contact_consent', 'withdraw_contact_consent', 'record_article11_screening'].includes(name)) {
@@ -539,8 +573,12 @@ http.createServer((req, res) => {
           if (r.current_stage === json.current_stage) continue;
           if (!(ALLOWED[r.current_stage] ?? []).includes(json.current_stage)) return send(400, { code: 'P0001', message: `stage_transition_not_allowed: ${r.current_stage} -> ${json.current_stage}`, details: null, hint: 'transition' });
           const b = blockersFor(r.id, json.current_stage);
-          if (b.length) return send(400, { code: 'P0001', message: 'stage_blocked: required documents', details: JSON.stringify(b), hint: 'document_blockers' });
+          if (b.length && gateMode[json.current_stage] === 'block') return send(400, { code: 'P0001', message: 'stage_blocked: required documents', details: JSON.stringify(b), hint: 'document_blockers' });
         }
+      }
+      if (table === 'leads') {
+        const col = ['client_name', 'client_contact', 'first_name'].find((c) => c in json && json[c] === null);
+        if (col) return send(400, { code: '23502', message: `null value in column "${col}" of relation "leads" violates not-null constraint`, hint: null });
       }
       for (const r of hit) Object.assign(r, json);
       return send(200, hit);
@@ -551,6 +589,13 @@ http.createServer((req, res) => {
       return send(204);
     }
     const stamp = new Date().toISOString(); // emulate DB defaults
+    if (table === 'leads' && leadFail) { const code = leadFail; leadFail = null; return send(code === '42501' ? 403 : 400, { code, message: code === '42501' ? 'new row violates row-level security policy for table "leads"' : 'mock failure', details: 'Failing row contains (...)' }); }
+    if (table === 'leads') { // the real table: first_name / client_name / client_contact are NOT NULL (an explicit null is rejected)
+      for (const r of Array.isArray(json) ? json : [json]) {
+        const col = ['client_name', 'client_contact', 'first_name'].find((c) => c in r && r[c] === null) ?? (!('client_name' in r) ? 'client_name' : null);
+        if (col) return send(400, { code: '23502', message: `null value in column "${col}" of relation "leads" violates not-null constraint`, details: 'Failing row contains (...)', hint: null });
+      }
+    }
     const rowsIn = (Array.isArray(json) ? json : [json]).map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: stamp, occurred_at: stamp, ...r }));
     tbl.push(...rowsIn);
     return send(201, rowsIn);

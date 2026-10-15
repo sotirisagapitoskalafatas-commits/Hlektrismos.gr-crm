@@ -6,6 +6,7 @@ import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 import { notTrashed } from './trash';
 import { parseStageError } from './case-return';
+import { leadIdentityColumns, leadNamePatch, leadWriteErrorText, safeDiagnostics } from './lead-payload';
 import type { ReturnTeam, StageBlocker, StageError } from './case-return';
 
 export type Customer = {
@@ -527,7 +528,24 @@ export async function fetchStageBlockers(caseId: string, stage: Stage): Promise<
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('case_document_blockers', { p_case: caseId, p_stage: stage });
   if (error || !Array.isArray(data)) return null;
-  return (data as { label: string; status: StageBlocker['status'] }[]).map(b => ({ label: b.label, status: b.status }));
+  return (data as { label: string; status: StageBlocker['status']; mode?: StageBlocker['mode'] }[]).map(b => ({ label: b.label, status: b.status, mode: b.mode }));
+}
+
+/* Document gate per stage (staged phase2/07): 'warn' (default) or 'block'. null = not available yet. */
+export type StageGate = { stage: Stage; min_status: 'received' | 'verified'; mode: 'warn' | 'block'; enabled: boolean };
+export async function fetchStageGates(): Promise<StageGate[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('stage_document_gates').select('stage, min_status, mode, enabled').order('stage');
+  if (error) return null;
+  return (data ?? []) as StageGate[];
+}
+export async function setStageGateMode(stage: Stage, mode: 'warn' | 'block'): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('set_stage_gate_mode', { p_stage: stage, p_mode: mode });
+  if (!error) return null;
+  if (/not allowed|42501/i.test(error.message)) return 'Μόνο ο διαχειριστής αλλάζει αυτή τη ρύθμιση.';
+  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Η ρύθμιση ενεργοποιείται μετά την εφαρμογή της migration phase2/07.';
+  return 'Η αλλαγή δεν αποθηκεύτηκε.';
 }
 
 export async function overrideStage(caseId: string, stage: Stage, reason: string): Promise<{ error: StageError | null }> {
@@ -1133,7 +1151,10 @@ export async function markNotificationsRead(): Promise<void> {
 /* ---------------- Field Sales — server-validated check-in / check-out ---------------- */
 export type FieldCheckinResult = {
   accepted: boolean;
-  code: 'INSIDE_RADIUS' | 'OUTSIDE_RADIUS' | 'GPS_UNCERTAIN' | 'NO_TARGET' | 'NO_VISIT' | 'IDEMPOTENT';
+  // phase4/10: every check-in is accepted; FAR_FROM_ADDRESS / NO_GPS / GPS_UNCERTAIN / NO_TARGET carry a review flag.
+  // OUTSIDE_RADIUS (and accepted:false for GPS_UNCERTAIN / NO_TARGET) come only from the older live server.
+  code: 'INSIDE_RADIUS' | 'OUTSIDE_RADIUS' | 'FAR_FROM_ADDRESS' | 'NO_GPS' | 'GPS_UNCERTAIN' | 'NO_TARGET' | 'NO_VISIT' | 'IDEMPOTENT';
+  flag?: 'far_from_address' | 'gps_uncertain' | 'no_gps' | 'no_target' | null;
   visitId?: string;
   caseId?: string;
   message?: string;
@@ -1160,6 +1181,15 @@ export async function fieldCheckin(
   });
   if (error) { logError('fieldCheckin', error); return { accepted: false, code: 'NO_VISIT', message: 'Σφάλμα κλήσης Check-in.' }; }
   return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
+}
+
+/** Radius for the «Φτάσατε;» prompt (crm_settings.arrival_prompt_radius_m, staged phase4/10). null = not set / not readable. */
+export async function fetchArrivalRadius(): Promise<number | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('crm_settings').select('setting_value').eq('setting_key', 'arrival_prompt_radius_m').maybeSingle();
+  if (error || !data) return null;
+  const n = Number(typeof data.setting_value === 'string' ? data.setting_value.replace(/"/g, '') : data.setting_value);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export async function fieldCheckout(
@@ -1344,26 +1374,19 @@ export type LeadInput = {
   location_source?: string | null;
 };
 
-/* Staff-managed lead entry. Public intake stays on insert_website_lead(). */
-export async function createLead(input: LeadInput): Promise<Lead | null> {
-  if (!supabase) return null;
+/* Staff-managed lead entry. Public intake stays on insert_website_lead().
+   Name-only «quick leads» are valid; the program/provider is optional (chosen later, at the offer). */
+export async function createLead(input: LeadInput): Promise<{ lead: Lead | null; error: string | null }> {
+  if (!supabase) return { lead: null, error: 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.' };
   const profile = await ensureProfile();
-  const first = input.first_name ?? null;
-  const last = input.last_name ?? null;
-  const full = input.full_name ?? ([first, last].filter(Boolean).join(' ') || 'Νέο lead');
+  const identity = leadIdentityColumns(input);
   const catalog = await loadCatalog();
   const providerId = resolveProviderId(input.provider, catalog);
   const productId = resolveProductId(input.program, providerId, catalog);
   const { data, error } = await supabase
     .from('leads')
     .insert({
-      full_name: full,
-      first_name: first,
-      last_name: last,
-      client_name: full,
-      client_contact: input.email ?? input.phone ?? null,
-      phone: input.phone ?? null,
-      email: input.email ?? null,
+      ...identity,
       region: input.region ?? null,
       property_type: input.property_type ?? null,
       service_category: input.service_category ?? null,
@@ -1388,8 +1411,12 @@ export async function createLead(input: LeadInput): Promise<Lead | null> {
     })
     .select()
     .single();
-  if (error) { logError('createLead', error); return null; }
-  return (data ?? null) as Lead | null;
+  if (error) {
+    // Safe diagnostics only: PostgreSQL `details` can contain the whole row (names, phones) — never logged.
+    console.error('[atlas.api] createLead failed', safeDiagnostics('createLead', error));
+    return { lead: null, error: leadWriteErrorText(error) };
+  }
+  return { lead: (data ?? null) as Lead | null, error: null };
 }
 
 export async function updateLeadStage(id: string, status: string): Promise<boolean> {
@@ -1405,28 +1432,41 @@ export async function updateLeadStage(id: string, status: string): Promise<boole
 
 /* Update a lead's contact / location fields (full_name, phone, email, address,
    lat/lng, property_type, region, comments). Whitelist only. */
-export async function updateLead(id: string, patch: Partial<Pick<Lead, 'full_name' | 'phone' | 'email' | 'address' | 'lat' | 'lng' | 'property_type' | 'comments'>>): Promise<boolean> {
-  if (!supabase) return false;
-  const upd: Record<string, unknown> = {
-    first_name: null,
-    last_name: null,
-    client_name: null,
-  };
+export type LeadPatch = {
+  full_name?: string | null; phone?: string | null; email?: string | null; address?: string | null;
+  lat?: number | null; lng?: number | null; property_type?: string | null; comments?: string | null;
+};
+export async function updateLead(id: string, patch: LeadPatch): Promise<boolean> {
+  return (await updateLeadChecked(id, patch)) === null;
+}
+
+/** Same as updateLead, but returns a Greek error message (null = saved). Only the fields being edited are sent:
+    previously every edit also wrote first_name/client_name = null unless the name was edited, which the NOT NULL
+    columns reject (e.g. saving only a location failed). */
+export async function updateLeadChecked(id: string, patch: LeadPatch): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const upd: Record<string, unknown> = {};
   if (patch.full_name !== undefined) {
-    const parts = String(patch.full_name ?? '').trim().split(' ');
-    upd.full_name = patch.full_name ?? null;
-    upd.first_name = parts[0] ?? null;
-    upd.last_name = parts.slice(1).join(' ');
-    upd.client_name = patch.full_name;
+    if (!String(patch.full_name ?? '').trim()) return 'Το όνομα δεν μπορεί να είναι κενό.';
+    Object.assign(upd, leadNamePatch(String(patch.full_name)));
   }
   for (const k of ['phone', 'email', 'address', 'lat', 'lng', 'property_type', 'comments'] as const) {
-    if (patch[k] !== undefined) upd[k] = patch[k] ?? null;
+    if (patch[k] !== undefined) upd[k] = typeof patch[k] === 'string' ? ((patch[k] as string).trim() || null) : patch[k] ?? null;
   }
-  if (Object.keys(upd).filter(k => !['first_name', 'last_name', 'client_name'].includes(k)).length === 0
-      && patch.full_name === undefined) return true;
+  if ('phone' in upd || 'email' in upd) {
+    // keep the legacy single contact column consistent (NOT NULL, '' when unknown)
+    const cur = await supabase.from('leads').select('phone, email').eq('id', id).maybeSingle();
+    const phone = 'phone' in upd ? upd.phone as string | null : (cur.data?.phone as string | null) ?? null;
+    const email = 'email' in upd ? upd.email as string | null : (cur.data?.email as string | null) ?? null;
+    upd.client_contact = email ?? phone ?? '';
+  }
+  if (Object.keys(upd).length === 0) return null;
   const { error } = await supabase.from('leads').update(upd).eq('id', id);
-  if (error) { logError('updateLead', error); return false; }
-  return true;
+  if (error) {
+    console.error('[atlas.api] updateLead failed', safeDiagnostics('updateLead', error));
+    return leadWriteErrorText(error);
+  }
+  return null;
 }
 
 /* Single-write conversion RPC (SECURITY DEFINER) — preserves attribution + lineage. */

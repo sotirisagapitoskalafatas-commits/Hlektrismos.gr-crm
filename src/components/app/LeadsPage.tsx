@@ -4,7 +4,8 @@ import { useNav } from '@/lib/nav';
 import LeadDetail from '@/components/leads/LeadDetail';
 import { TrashButton } from '@/components/trash/TrashControls';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
-import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLead, updateLeadStage } from '@/lib/api';
+import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLeadChecked, updateLeadStage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Users } from 'lucide-react';
@@ -31,8 +32,15 @@ export default function LeadsPage() {
     full_name: '', phone: '', email: '', address: '', lat: '', lng: '', comments: '',
   });
   const [locating, setLocating] = useState(false);
+  // Errors are shown INSIDE the dialog that caused them (the page-level message was hidden behind the open modal).
+  const [createErr, setCreateErr] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [editErr, setEditErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   const openEdit = (l: Lead) => {
+    setEditErr('');
     setEditing(l);
     setEditForm({
       full_name: l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '',
@@ -53,8 +61,9 @@ export default function LeadsPage() {
   };
 
   const saveEdit = async () => {
-    if (!editing) return;
-    const ok = await updateLead(editing.id, {
+    if (!editing || saving) return;
+    setSaving(true); setEditErr('');
+    const e = await updateLeadChecked(editing.id, {
       full_name: editForm.full_name || null,
       phone: editForm.phone || null,
       email: editForm.email || null,
@@ -63,8 +72,10 @@ export default function LeadsPage() {
       lng: editForm.lng === '' ? null : Number(editForm.lng),
       comments: editForm.comments || null,
     });
-    if (!ok) setErr('Αποτυχία ενημέρωσης lead.');
-    else { setEditing(null); await load(); setDetailVersion(v => v + 1); }
+    setSaving(false);
+    if (e) { setEditErr(e); return; }
+    setEditing(null); await load(); setDetailVersion(v => v + 1);
+    toast('Το lead ενημερώθηκε.', 'ok');
   };
 
   const load = useCallback(async () => {
@@ -101,7 +112,9 @@ export default function LeadsPage() {
   };
 
   const submitLead = async () => {
-    const lead = await createLead({
+    if (creating) return; // no double submit
+    setCreating(true); setCreateErr('');
+    const { lead, error } = await createLead({
       full_name: form.full_name.trim() || null,
       phone: form.phone.trim() || null,
       email: form.email.trim() || null,
@@ -114,12 +127,14 @@ export default function LeadsPage() {
       provider: form.provider || null,
       program: form.program || null,
     });
-    if (!lead) { setErr('Δεν ήταν δυνατή η δημιουργία του lead.'); return; }
+    setCreating(false);
+    if (error || !lead) { setCreateErr(error ?? 'Η δημιουργία απέτυχε. Δοκιμάστε ξανά.'); return; }
     setModal(false);
     setForm(EMPTY_FORM);
     setErr('');
     await load();
     setTab(lead.status ?? 'new');
+    toast(`Δημιουργήθηκε το lead «${lead.full_name ?? form.full_name.trim()}».`, 'ok');
   };
 
   const tabs = [{ id: 'all', label: 'Όλα', emoji: '🗂️', short: 'Όλα' }, ...LEAD_STATUSES];
@@ -272,15 +287,17 @@ export default function LeadsPage() {
             <textarea className="field" rows={2} value={editForm.comments ?? ''} onChange={e => setEditForm(f => ({ ...f, comments: e.target.value }))} />
           </Field>
         </div>
+        {editErr && <div className="atx-notice mt-4" role="alert" data-lead-error>{editErr}</div>}
         <div className="flex justify-end gap-2 mt-5">
           <Btn variant="ghost" onClick={() => setEditing(null)}>Ακύρωση</Btn>
-          <Btn onClick={saveEdit} disabled={!editForm.full_name?.trim()}>Αποθήκευση</Btn>
+          <Btn onClick={saveEdit} disabled={saving || !editForm.full_name?.trim()}>{saving ? <Spinner /> : null} Αποθήκευση</Btn>
         </div>
       </Modal>
 
-      <Modal open={modal} onClose={() => setModal(false)} title="Νέο Lead" micro="Χειροκίνητη εισαγωγή">
+      <Modal open={modal} onClose={() => { if (!creating) { setModal(false); setCreateErr(''); } }} title="Νέο Lead" micro="Χειροκίνητη εισαγωγή">
         <div className="space-y-4">
-          <Field label="Ονοματεπώνυμο">
+          <p className="text-[12.5px] text-ink/55 -mt-1">Αρκεί το όνομα. Τηλέφωνο, email και πρόγραμμα συμπληρώνονται και αργότερα.</p>
+          <Field label="Ονοματεπώνυμο ή επωνυμία (υποχρεωτικό)">
             <input className="field" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Όνομα πελάτη" />
           </Field>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -326,15 +343,16 @@ export default function LeadsPage() {
             service={form.service_category}
             customerType={form.lead_type === 'B2B' ? 'B2B' : 'B2C'}
             onChange={next => setForm(f => ({ ...f, provider: next.provider, program: next.program }))}
-            labels={{ provider: 'Πάροχος ενδιαφέροντος', program: 'Πρόγραμμα' }}
+            labels={{ provider: 'Πάροχος ενδιαφέροντος (προαιρετικό)', program: 'Πρόγραμμα (προαιρετικό — επιλέγεται στην προσφορά)' }}
           />
           <Field label="Σχόλια">
             <textarea className="field" rows={2} value={form.comments} onChange={e => setForm(f => ({ ...f, comments: e.target.value }))} placeholder="Λεπτομέρειες ενδιαφέροντος…" />
           </Field>
         </div>
+        {createErr && <div className="atx-notice mt-4" role="alert" data-lead-error>{createErr}</div>}
         <div className="flex justify-end gap-2 mt-5">
-          <Btn variant="ghost" onClick={() => setModal(false)}>Ακύρωση</Btn>
-          <Btn onClick={submitLead} disabled={!form.full_name.trim()}><Plus className="w-3.5 h-3.5" /> Δημιουργία</Btn>
+          <Btn variant="ghost" disabled={creating} onClick={() => { setModal(false); setCreateErr(''); }}>Ακύρωση</Btn>
+          <Btn onClick={submitLead} disabled={creating || !form.full_name.trim()}>{creating ? <Spinner /> : <Plus className="w-3.5 h-3.5" />} Δημιουργία</Btn>
         </div>
       </Modal>
     </div>

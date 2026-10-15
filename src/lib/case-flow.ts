@@ -84,7 +84,7 @@ export function caseNextStep(c: CaseLikeForFlow, allowedNext: readonly string[],
     : blockers.length ? 'Συμπληρώστε τα δικαιολογητικά'
     : forward ? `Προετοιμασία για «${stageText(forward)}»` : 'Ελέγξτε το case';
   const reason = blockers.length
-    ? `Υπάρχουν ${blockers.length === 1 ? '1 εκκρεμότητα' : `${blockers.length} εκκρεμότητες`} πριν προχωρήσει το case.`
+    ? `${blockers.length === 1 ? 'Υπάρχει 1 εκκρεμότητα' : `Υπάρχουν ${blockers.length} εκκρεμότητες`} για το case.`
     : forward ? `Το case είναι στο στάδιο «${stageText(c.current_stage)}». Το επόμενο βήμα είναι «${stageText(forward)}».`
     : `Το case είναι στο στάδιο «${stageText(c.current_stage)}».`;
 

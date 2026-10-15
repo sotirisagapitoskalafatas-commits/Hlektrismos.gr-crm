@@ -2,10 +2,21 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { timingSafeEqual } from "../_shared/signed-link.ts";
 
+// Ad-platform / Zapier lead intake → public.leads (the table the CRM lists).
+// Previously this wrote to the legacy hlektrismos_leads table, which the new CRM does not show, so ad-form leads never
+// reached the team. Only what the form sent is stored: no invented provider, region or customer category.
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-source",
 };
+
+const LABEL: Record<string, string> = {
+  facebook: "Facebook Lead Ads", fb: "Facebook Lead Ads", google: "Google Ads", instagram: "Instagram", linkedin: "LinkedIn Lead Gen Forms",
+};
+
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim());
+const yes = (v: unknown) => v === true || /^(true|yes|ναι|1)$/i.test(str(v));
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,174 +40,81 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const source = (req.headers.get("x-source") || body.source || "webhook").toLowerCase();
-
-    let leadData: Record<string, unknown> = {};
-
-    switch (source) {
-      case "facebook":
-      case "fb":
-        leadData = {
-          first_name: body.first_name || body.firstName || "",
-          last_name: body.last_name || body.lastName || "",
-          email: body.email || "",
-          phone: body.phone || body.phone_number || "",
-          region: body.city || body.state || "",
-          customer_type: "B2C",
-          provider: "Unknown",
-          status: "new",
-          source: "Facebook Lead Ads",
-          lawful_basis: "consent",
-          customer_category: "residential",
-          comments: `Facebook lead: ${JSON.stringify(body.custom_questions || {})}`,
-        };
-        break;
-
-      case "google":
-        leadData = {
-          first_name: body.first_name || "",
-          last_name: body.last_name || "",
-          email: body.email || "",
-          phone: body.phone_number || "",
-          region: body.city || body.location || "",
-          customer_type: "B2C",
-          provider: "Unknown",
-          status: "new",
-          source: "Google Ads",
-          lawful_basis: "consent",
-          customer_category: "residential",
-          comments: `Google Ads lead from campaign: ${body.campaign || "unknown"}`,
-        };
-        break;
-
-      case "instagram":
-        leadData = {
-          first_name: body.first_name || "",
-          last_name: body.last_name || "",
-          email: body.email || "",
-          phone: body.phone || "",
-          region: body.city || "",
-          customer_type: "B2C",
-          provider: "Unknown",
-          status: "new",
-          source: "Instagram",
-          lawful_basis: "consent",
-          customer_category: "residential",
-          comments: `Instagram lead via DM automation`,
-        };
-        break;
-
-      case "linkedin":
-        leadData = {
-          first_name: body.first_name || "",
-          last_name: body.last_name || "",
-          email: body.email || "",
-          phone: body.phone || "",
-          region: body.location || "",
-          customer_type: "B2B",
-          provider: "Unknown",
-          status: "new",
-          source: "LinkedIn Lead Gen Forms",
-          lawful_basis: "legitimate_interest",
-          customer_category: "business",
-          company: body.company || "",
-          job_title: body.job_title || "",
-          comments: `LinkedIn lead: company=${body.company || "N/A"}`,
-        };
-        break;
-
-      default:
-        // Generic webhook — accept any fields
-        leadData = {
-          first_name: body.first_name || body.name?.split(" ")[0] || "",
-          last_name: body.last_name || body.name?.split(" ").slice(1).join(" ") || "",
-          email: body.email || "",
-          phone: body.phone || body.phone_number || "",
-          region: body.region || body.city || "",
-          customer_type: body.customer_type || "B2C",
-          provider: body.provider || "Unknown",
-          status: "new",
-          source: body.source || source || "Webhook",
-          lawful_basis: body.lawful_basis || "consent",
-          customer_category: body.customer_category || "residential",
-          comments: body.comments || "",
-        };
-    }
+    const source = str(req.headers.get("x-source") || body.source || "webhook").toLowerCase();
+    const q = (body.custom_questions ?? {}) as Record<string, unknown>;
 
     // Age gate: the source form must ask "I am 18 or older" and pass it as
     // age_confirmed (true / "yes" / "ναι"). Without it nothing is stored.
-    const ageRaw = body.age_confirmed ?? body.custom_questions?.age_confirmed;
-    const adult = ageRaw === true || /^(true|yes|ναι|1)$/i.test(String(ageRaw ?? "").trim());
-    if (!adult) {
+    if (!yes(body.age_confirmed ?? q.age_confirmed)) {
       return new Response(
         JSON.stringify({ error: "age_confirmed (18+) is required; lead not stored" }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    leadData.age_confirmed = true;
 
-    // Validate required fields
-    if (!leadData.email && !leadData.phone) {
+    const first = str(body.first_name ?? body.firstName) || str(body.name).split(/\s+/)[0] || "";
+    const last = str(body.last_name ?? body.lastName) || str(body.name).split(/\s+/).slice(1).join(" ");
+    const email = str(body.email);
+    const phone = str(body.phone ?? body.phone_number);
+    if (!email && !phone) {
       return new Response(
         JSON.stringify({ error: "At least email or phone is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const full = [first, last].filter(Boolean).join(" ") || email || phone;
+    // Consent to be contacted about the request, only when the form actually asked and the person ticked it.
+    const consent = yes(body.consent ?? body.gdpr_consent ?? q.consent);
+    const label = LABEL[source] ?? (str(body.source_label) || "Webhook");
+    const extra = Object.keys(q).length ? `Απαντήσεις φόρμας: ${JSON.stringify(q).slice(0, 1500)}` : "";
 
-    // Insert lead
-    const { data: lead, error: insertError } = await supabase
-      .from("hlektrismos_leads")
-      .insert(leadData)
-      .select("id, first_name, last_name")
-      .single();
+    const row = {
+      full_name: full,
+      first_name: first || full,
+      last_name: last,
+      client_name: full,
+      client_contact: email || phone,
+      email: email || null,
+      phone: phone || null,
+      region: str(body.city ?? body.region ?? body.location ?? body.state) || null,
+      company: str(body.company) || null,
+      lead_type: source === "linkedin" ? "B2B" : null,
+      source: "campaign",
+      source_label: label,
+      campaign_name: str(body.campaign ?? body.campaign_name) || null,
+      campaign_id: str(body.campaign_id) || null,
+      status: "new",
+      comments: [str(body.comments), extra].filter(Boolean).join("\n") || null,
+      age_confirmed: true,
+      gdpr_consent: consent,
+      consent_granted_at: consent ? new Date().toISOString() : null,
+      consent_source: consent ? source : null,
+    };
 
+    const { data: lead, error: insertError } = await supabase.from("leads").insert(row).select("id").single();
     if (insertError) {
-      throw new Error(`Insert failed: ${insertError.message}`);
+      // Safe diagnostics only (no payload / personal data).
+      console.error("Webhook insert failed", { code: insertError.code, source });
+      return new Response(JSON.stringify({ error: "Insert failed", code: insertError.code ?? null }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Log the webhook
-    await supabase.from("lead_notes").insert({
-      lead_id: lead.id,
-      content: `📥 Lead received via ${source.toUpperCase()} webhook`,
-      author: "System",
-      note_type: "system",
+    await supabase.from("activity_log").insert({
+      entity_type: "lead", entity_id: lead.id, action: "created", details: { via: "webhook", source: label },
     });
 
-    // Automated (AI) calls need the person's PRIOR consent to automated calls
-    // (Greek law 3471/2006 art. 11, ePrivacy Directive art. 13). A lead-form
-    // consent to "be contacted" is not that, so auto-calling is OFF unless
-    // AUTO_VOICE_CALLS=on is set deliberately after a legal review.
-    const autoCallSources = Deno.env.get("AUTO_VOICE_CALLS") === "on" ? ["facebook", "google", "linkedin", "fb"] : [];
-    if (autoCallSources.includes(source)) {
-      try {
-        await supabase.functions.invoke("make-voice-call", {
-          body: { lead_id: lead.id },
-        });
-      } catch (callErr) {
-        console.log(`Auto-call failed for lead ${lead.id}:`, callErr);
-      }
-    }
-
+    // No automated call is triggered from here: any outreach goes through the central eligibility gate
+    // (consent per channel, Article 11 screening, legal approval) — see supabase/functions/_shared/eligibility.ts.
     return new Response(
-      JSON.stringify({
-        success: true,
-        lead_id: lead.id,
-        name: `${lead.first_name} ${lead.last_name}`,
-        auto_call: autoCallSources.includes(source),
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: true, lead_id: lead.id }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("Webhook error:", err);
+    console.error("Webhook error:", err instanceof Error ? err.name : "unknown");
     return new Response(
-      JSON.stringify({ error: err.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: "Webhook failed" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

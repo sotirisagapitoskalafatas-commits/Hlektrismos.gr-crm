@@ -50,7 +50,8 @@ grant insert, update, delete on public.document_requirements, public.stage_docum
 
 insert into public.document_requirements (service_type, business_only, any_of, legacy_any_of, label, required, sort)
 select * from (values
-  (null::text, false, array['id_card'], array['identity'], 'Ταυτότητα ή διαβατήριο', true, 10),
+  (null::text, false, array['id_front', 'id_card'], array['identity'], 'Ταυτότητα — εμπρός όψη', true, 10),
+  (null::text, false, array['id_back', 'id_card'], array['identity'], 'Ταυτότητα — πίσω όψη', true, 11),
   ('energy', false, array['bill_electricity'], array['bill'], 'Λογαριασμός ρεύματος', true, 20),
   ('energy', false, array['e9', 'lease', 'free_use'], array[]::text[], 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)', true, 30),
   ('gas', false, array['bill_gas'], array['bill'], 'Λογαριασμός φυσικού αερίου', true, 20),

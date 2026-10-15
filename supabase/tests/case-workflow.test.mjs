@@ -63,7 +63,7 @@ test('gate mode: every stage ships as «warn»; a move with missing documents go
   await db.exec(`insert into public.cases (id, title, current_stage, inside_sales_owner) values ('${WARN}', 'Warn', 'signed', '${INSIDE}')`);
   await as(INSIDE);
   const b = (await run("select public.case_document_blockers($1, 'document_check') b", [WARN])).rows[0].b;
-  assert.ok(b.length === 4 && b.every((x) => x.mode === 'warn'), 'the app still sees what is missing, marked warn');
+  assert.ok(b.length === 5 && b.every((x) => x.mode === 'warn'), 'the app still sees what is missing, marked warn');
   assert.equal((await setStage(INSIDE, 'document_check', WARN)).ok, true, 'handover to Back Office is not blocked');
   assert.equal(await stage(WARN), 'document_check');
   assert.equal((await setStage(BO, 'completed', WARN)).hint, 'transition', 'the allowed-transition rule still applies');
@@ -89,7 +89,7 @@ test('gate: cannot enter «Έλεγχος εγγράφων» with required docum
   assert.equal(r.ok, false);
   assert.equal(r.hint, 'document_blockers');
   const missing = JSON.parse(r.detail).map((b) => b.label);
-  assert.deepEqual(missing, ['Ταυτότητα ή διαβατήριο', 'Λογαριασμός ρεύματος', 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)', 'Υπογεγραμμένη σύμβαση / αίτηση']);
+  assert.deepEqual(missing, ['Ταυτότητα — εμπρός όψη', 'Ταυτότητα — πίσω όψη', 'Λογαριασμός ρεύματος', 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)', 'Υπογεγραμμένη σύμβαση / αίτηση']);
   assert.equal(await stage(), 'signed');
 });
 

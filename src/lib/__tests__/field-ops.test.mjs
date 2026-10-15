@@ -56,7 +56,7 @@ test('ops queue: only back-office stages; urgent first, then blocked, then oldes
   ], { 'ok-old': FULL, urgent: FULL }, 'me', NOW);
   assert.deepEqual(q.map((x) => x.id), ['urgent', 'blocked', 'ok-old', 'act']);
   assert.equal(q.find((x) => x.id === 'ok-old').daysInStage, 9);
-  assert.ok(q.find((x) => x.id === 'blocked').blockers.includes('Λείπει: Ταυτότητα ή διαβατήριο'));
+  assert.ok(q.find((x) => x.id === 'blocked').blockers.includes('Λείπει: Ταυτότητα — εμπρός όψη'));
   assert.equal(q.find((x) => x.id === 'act').blockers.length, 0, 'activation is not blocked by documents');
 });
 test('ops queue: a returned case shows who it waits on, first', () => {
@@ -65,7 +65,7 @@ test('ops queue: a returned case shows who it waits on, first', () => {
 });
 test('ops queue: received-but-unverified documents are "to check" during document check; owner and overdue follow-up', () => {
   const q = O.buildOpsQueue([kase('k', { back_office_owner: 'me', next_follow_up_at: at(-2) })], { k: [{ category: 'id_card', status: 'received' }] }, 'me', NOW);
-  assert.ok(q[0].blockers.includes('Προς έλεγχο: Ταυτότητα ή διαβατήριο'));
+  assert.ok(q[0].blockers.includes('Προς έλεγχο: Ταυτότητα — πίσω όψη'));
   assert.ok(q[0].blockers.includes('Εκπρόθεσμο follow-up'));
   assert.equal(q[0].mine, true); assert.equal(q[0].stageLabel, 'Έλεγχος εγγράφων');
 });

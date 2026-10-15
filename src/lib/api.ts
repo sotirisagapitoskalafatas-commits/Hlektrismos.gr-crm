@@ -12,6 +12,9 @@ import type { ReturnTeam, StageBlocker, StageError } from './case-return';
 export type Customer = {
   id: string;
   full_name: string;
+  /** Staged phase4/11 — absent until the migration is applied. */
+  first_name?: string | null;
+  last_name?: string | null;
   /** Set when the customer is in the trash (staged migration phase2/06). */
   deleted_at?: string | null;
   email: string | null;
@@ -346,9 +349,22 @@ export async function fetchCustomer(id: string): Promise<Customer | null> {
   return (data ?? null) as Customer | null;
 }
 
-export async function updateCustomer(id: string, patch: Partial<Pick<Customer, 'full_name' | 'phone' | 'email' | 'company' | 'address' | 'city' | 'postal_code' | 'notes' | 'lat' | 'lng'>>): Promise<boolean> {
+/** Do customers have first_name / last_name yet (staged phase4/11)? Checked once per session. */
+let customerNamesProbe: Promise<boolean> | null = null;
+export function customerNamesAvailable(): Promise<boolean> {
+  if (!supabase) return Promise.resolve(false);
+  customerNamesProbe ??= Promise.resolve(supabase.from('customers').select('first_name, last_name').limit(1)).then(r => !r.error, () => false);
+  return customerNamesProbe;
+}
+
+export async function updateCustomer(id: string, patch: Partial<Pick<Customer, 'full_name' | 'first_name' | 'last_name' | 'phone' | 'email' | 'company' | 'address' | 'city' | 'postal_code' | 'notes' | 'lat' | 'lng'>>): Promise<boolean> {
   if (!supabase) return false;
   const upd: Record<string, unknown> = {};
+  // first/last are sent only when the columns exist; full_name (the display name) is always kept in step.
+  if ((patch.first_name !== undefined || patch.last_name !== undefined) && await customerNamesAvailable()) {
+    if (patch.first_name !== undefined) upd.first_name = patch.first_name?.trim() || null;
+    if (patch.last_name !== undefined) upd.last_name = patch.last_name?.trim() || null;
+  }
   for (const k of ['full_name', 'phone', 'email', 'company', 'address', 'city', 'postal_code', 'notes', 'lat', 'lng'] as const) {
     if (patch[k] !== undefined) upd[k] = patch[k] ?? null;
   }

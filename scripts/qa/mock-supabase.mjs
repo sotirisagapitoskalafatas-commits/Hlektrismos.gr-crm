@@ -141,7 +141,7 @@ const ALLOWED = { new: ['contacted', 'lost', 'cancelled'], contacted: ['offer', 
   submitted: ['activation', 'document_check', 'lost', 'cancelled'], activation: ['completed', 'submitted', 'lost', 'cancelled'], lost: ['new'], cancelled: ['new'] };
 const reqsFor = (c) => {
   const svc = c.service_type ?? 'energy';
-  const l = [{ any: ['id_card', 'identity'], label: 'Ταυτότητα ή διαβατήριο' }];
+  const l = [{ any: ['id_front', 'id_card', 'identity'], label: 'Ταυτότητα — εμπρός όψη' }, { any: ['id_back', 'id_card', 'identity'], label: 'Ταυτότητα — πίσω όψη' }];
   if (svc === 'energy' || svc === 'gas') {
     l.push(svc === 'gas' ? { any: ['bill_gas', 'bill'], label: 'Λογαριασμός φυσικού αερίου' } : { any: ['bill_electricity', 'bill'], label: 'Λογαριασμός ρεύματος' });
     l.push({ any: ['e9', 'lease', 'free_use'], label: 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)' });

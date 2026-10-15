@@ -304,7 +304,7 @@ for (const role of Object.keys(EXPECT)) {
     await sleep(900);
     const t = await body(page);
     const go = await page.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Συνέχεια με ελλείψεις' && !b.disabled));
-    check('Gates (warn, default): missing documents listed but the handover to Back Office is allowed', t.includes('Λείπουν έγγραφα — η μετάβαση επιτρέπεται') && t.includes('Ταυτότητα ή διαβατήριο — λείπει') && go && !t.includes('Δεν μπορεί να προχωρήσει ακόμη'));
+    check('Gates (warn, default): missing documents listed but the handover to Back Office is allowed', t.includes('Λείπουν έγγραφα — η μετάβαση επιτρέπεται') && t.includes('Ταυτότητα — εμπρός όψη — λείπει') && go && !t.includes('Δεν μπορεί να προχωρήσει ακόμη'));
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Άκυρο')?.click());
     await browser.close();
   }
@@ -334,7 +334,7 @@ for (const role of Object.keys(EXPECT)) {
     await sleep(900);
     const t = await body(page);
     check('Gates: the stage action exists for Back Office', opened);
-    check('Gates: moving to «Έλεγχος εγγράφων» without documents shows the server blockers', t.includes('Δεν μπορεί να προχωρήσει ακόμη') && t.includes('Ταυτότητα ή διαβατήριο — λείπει'));
+    check('Gates: moving to «Έλεγχος εγγράφων» without documents shows the server blockers', t.includes('Δεν μπορεί να προχωρήσει ακόμη') && t.includes('Ταυτότητα — εμπρός όψη — λείπει'));
     check('Gates: no confirm and no override for Back Office', await page.evaluate(() => ![...document.querySelectorAll('button')].some((b) => ['Επιβεβαίωση', 'Παράκαμψη & μετάβαση'].includes(b.textContent.trim()))));
     await browser.close();
   }
@@ -786,7 +786,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await click(page, 'Έγγραφα');
   await sleep(1200);
   const t0 = await page.evaluate(() => document.body.innerText);
-  check('Documents: checklist lists ID, bill and proof of use', t0.includes('Ταυτότητα ή διαβατήριο') && t0.includes('Λογαριασμός ρεύματος') && /Ε9, μισθωτήριο/.test(t0));
+  check('Documents: checklist lists ID, bill and proof of use', t0.includes('Ταυτότητα — εμπρός όψη') && t0.includes('Ταυτότητα — πίσω όψη') && t0.includes('Λογαριασμός ρεύματος') && /Ε9, μισθωτήριο/.test(t0));
   await click(page, 'Προσθήκη εγγράφου');
   await sleep(500);
   const disabledBefore = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Επιλογή αρχείου')).disabled);

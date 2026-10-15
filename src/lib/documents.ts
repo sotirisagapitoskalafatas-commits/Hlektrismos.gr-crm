@@ -14,7 +14,9 @@ export const DOC_GROUP_LABEL: Record<DocGroup, string> = {
 };
 
 export const DOC_TYPES: DocType[] = [
-  { key: 'id_card', label: 'Ταυτότητα ή διαβατήριο', hint: 'Του δικαιούχου της παροχής (και των δύο όψεων)', group: 'identity' },
+  { key: 'id_front', label: 'Ταυτότητα — εμπρός όψη', hint: 'Του δικαιούχου της παροχής', group: 'identity' },
+  { key: 'id_back', label: 'Ταυτότητα — πίσω όψη', hint: 'Του δικαιούχου της παροχής', group: 'identity' },
+  { key: 'id_card', label: 'Ταυτότητα (και οι δύο όψεις) ή διαβατήριο', hint: 'Ένα αρχείο με όλο το έγγραφο', group: 'identity' },
   { key: 'tax_id_proof', label: 'Αποδεικτικό ΑΦΜ', hint: 'Π.χ. εκκαθαριστικό ή βεβαίωση από TAXISnet', group: 'identity' },
   { key: 'e9', label: 'Ε9 (ιδιοκτησία)', hint: 'Όταν ο πελάτης είναι ιδιοκτήτης του ακινήτου', group: 'property' },
   { key: 'lease', label: 'Μισθωτήριο', hint: 'Όταν ο πελάτης είναι ενοικιαστής — δηλωμένο στο TAXISnet', group: 'property' },
@@ -64,7 +66,9 @@ export function isBusinessCase(c: ChecklistInput): boolean {
 export function requiredDocs(c: ChecklistInput): { anyOf: string[]; label: string; required: boolean }[] {
   const svc = c.service_type ?? 'energy';
   const list: { anyOf: string[]; label: string; required: boolean }[] = [
-    { anyOf: ['id_card'], label: 'Ταυτότητα ή διαβατήριο', required: true },
+    // Front and back are separate items; one full scan (id_card) or a passport covers both.
+    { anyOf: ['id_front', 'id_card'], label: 'Ταυτότητα — εμπρός όψη', required: true },
+    { anyOf: ['id_back', 'id_card'], label: 'Ταυτότητα — πίσω όψη', required: true },
   ];
   if (svc === 'energy' || svc === 'gas') {
     list.push({ anyOf: svc === 'gas' ? ['bill_gas'] : ['bill_electricity'], label: svc === 'gas' ? 'Λογαριασμός φυσικού αερίου' : 'Λογαριασμός ρεύματος', required: true });

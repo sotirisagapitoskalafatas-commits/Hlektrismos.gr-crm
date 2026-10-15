@@ -22,7 +22,8 @@ import { enqueue, countQueue, isOnline } from '@/lib/offline/queue';
 import { flushQueue } from '@/lib/offline/sync';
 import { useToast } from '@/lib/toast';
 import { fmtTime, todayLabel } from '@/lib/ui';
-import { arrivalCandidate, checkoutNote, DEFAULT_ARRIVAL_RADIUS_M, groupVisits, nearestCases, VISIT_OUTCOMES } from '@/lib/field-day';
+import { arrivalCandidate, checkoutNote, checkoutReady, DEFAULT_ARRIVAL_RADIUS_M, groupVisits, nearestCases, OUTCOMES, outcomeByLabel } from '@/lib/field-day';
+import { handoverNewSale, managerFollowUp } from '@/lib/field-handover';
 import { isOpenFollowUpFor } from '@/lib/work';
 import { formatWhen } from '@/lib/work-format';
 import { stageText } from '@/lib/case-flow';
@@ -45,7 +46,9 @@ export default function MyDayPage() {
   const [queued, setQueued] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [form, setForm] = useState({ outcome: '', notes: '', fuAt: '', fuReason: '' });
+  const [form, setForm] = useState({ outcome: '', reason: '', notes: '', fuAt: '', fuReason: '' });
+  // «Νέο Sale» steps for the visit just checked out (customer details → documents → handover to Back Office).
+  const [sale, setSale] = useState<{ caseId: string; customerId: string | null; name: string; handedOver: string | null } | null>(null);
   const [fallback, setFallback] = useState<Fallback | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [arrivalRadius, setArrivalRadius] = useState(DEFAULT_ARRIVAL_RADIUS_M);
@@ -130,7 +133,7 @@ export default function MyDayPage() {
       else if (res.flag) toast(res.message ?? 'Check In ✓ — καταγράφηκε για έλεγχο από τον υπεύθυνο.', 'warn');
       else toast('Check In ✓', 'ok');
       setFallback(null);
-      setOpenId(v.id); setForm({ outcome: '', notes: '', fuAt: '', fuReason: '' }); void load();
+      setOpenId(v.id); setForm({ outcome: '', reason: '', notes: '', fuAt: '', fuReason: '' }); void load();
     } else {
       toast(res.message ?? 'Το Check In δεν έγινε αποδεκτό.', 'warn');
       if (res.code === 'GPS_UNCERTAIN' || res.code === 'NO_TARGET' || res.code === 'OUTSIDE_RADIUS') {
@@ -143,7 +146,8 @@ export default function MyDayPage() {
     if (!form.outcome) return;
     setBusyId(v.id);
     const c = await getCoords();
-    const note = checkoutNote(form.outcome, form.notes);
+    const out = outcomeByLabel(form.outcome);
+    const note = checkoutNote(form.outcome, form.notes, out?.reasons ? form.reason : undefined);
     if (!isOnline()) {
       enqueue('check_out', { visitId: v.id, coords: c, notes: note });
       toast(`Εκτός σύνδεσης — το Check Out θα σταλεί αργότερα.${form.fuAt ? ' Το follow-up δεν αποθηκεύτηκε· καταχωρήστε το όταν έχετε σύνδεση.' : ''}`, 'warn');
@@ -151,14 +155,20 @@ export default function MyDayPage() {
     }
     const res = await fieldCheckout(v.id, c, note);
     if (!res.accepted) { setBusyId(null); toast(res.message ?? 'Το Check Out απέτυχε. Δοκιμάστε ξανά.', 'bad'); return; }
-    await updateVisitNotes(v.id, form.notes.trim(), form.outcome);
+    await updateVisitNotes(v.id, form.notes.trim(), out?.reasons ? `${form.outcome} — ${form.reason}` : form.outcome);
+    let branchMsg = '';
+    if (out?.next === 'sale') setSale({ caseId: v.case_id, customerId: v.case?.customer?.id ?? null, name: v.case?.customer?.full_name ?? v.case?.title ?? 'Πελάτης', handedOver: null });
+    if (out?.next === 'manager') {
+      const m = await managerFollowUp(v.case_id, form.notes);
+      branchMsg = m.ok ? ` Follow-up για υπεύθυνο${m.assignee ? ` (${m.assignee})` : ''} στις Λειτουργίες.` : ' Το follow-up για υπεύθυνο δεν αποθηκεύτηκε — δοκιμάστε από το case.';
+    }
     let fuOk = true;
     if (form.fuAt) {
       const fu = await createFollowUp({ case_id: v.case_id, due_at: new Date(form.fuAt).toISOString(), channel: 'phone', reason: form.fuReason.trim() || `Μετά την επίσκεψη: ${form.outcome}`, priority: 'normal' });
       fuOk = !!fu;
     }
     setBusyId(null); setOpenId(null);
-    toast(fuOk ? 'Check Out ✓ — η επίσκεψη ολοκληρώθηκε' : 'Check Out ✓ — αλλά το follow-up δεν αποθηκεύτηκε, δοκιμάστε από το case.', fuOk ? 'ok' : 'warn');
+    toast((fuOk ? 'Check Out ✓ — η επίσκεψη ολοκληρώθηκε' : 'Check Out ✓ — αλλά το follow-up δεν αποθηκεύτηκε, δοκιμάστε από το case.') + branchMsg, fuOk ? 'ok' : 'warn');
     void load();
   };
 
@@ -234,11 +244,22 @@ export default function MyDayPage() {
               <div className="atx-panel grid gap-3" style={{ padding: 14 }}>
                 <div className="text-[14px] font-semibold">Ολοκλήρωση επίσκεψης</div>
                 <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Αποτέλεσμα επίσκεψης">
-                  {VISIT_OUTCOMES.map(o => (
-                    <button key={o} role="radio" aria-checked={form.outcome === o} className="atx-chip" aria-pressed={form.outcome === o} style={{ height: 38 }}
-                      onClick={() => setForm(f => ({ ...f, outcome: o }))}>{o}</button>
+                  {OUTCOMES.map(o => (
+                    <button key={o.key} role="radio" aria-checked={form.outcome === o.label} className="atx-chip" aria-pressed={form.outcome === o.label} style={{ height: 38 }}
+                      onClick={() => setForm(f => ({ ...f, outcome: o.label, reason: '' }))}>{o.label}</button>
                   ))}
                 </div>
+                {outcomeByLabel(form.outcome)?.reasons && (
+                  <label className="text-[13px] font-medium">Αιτία (υποχρεωτικό)
+                    <select className="field mt-1" value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} aria-label="Αιτία αποτελέσματος">
+                      <option value="">— Επιλέξτε —</option>
+                      {outcomeByLabel(form.outcome)!.reasons!.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </label>
+                )}
+                {form.reason === 'Δεν θέλει επικοινωνία' && <div className="atx-notice text-[13px]">Καταγράψτε το και στο «Επικοινωνία & συγκαταθέσεις» του πελάτη, ώστε να μην ξανακληθεί.</div>}
+                {outcomeByLabel(form.outcome)?.next === 'sale' && <div className="atx-notice text-[13px]">Μετά το Check Out: στοιχεία πελάτη → έγγραφα → παράδοση στο Back Office.</div>}
+                {outcomeByLabel(form.outcome)?.next === 'manager' && <div className="atx-notice text-[13px]">Θα δημιουργηθεί follow-up για τον υπεύθυνο (ουρά Λειτουργιών), με τις σημειώσεις σας.</div>}
                 <textarea className="field" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Σημειώσεις επίσκεψης (έγγραφα που συλλέχθηκαν, τι συμφωνήθηκε…)" aria-label="Σημειώσεις επίσκεψης" />
                 <div className="grid sm:grid-cols-2 gap-2">
                   <label className="text-[13px] font-medium">Επόμενο follow-up (προαιρετικό)
@@ -248,8 +269,8 @@ export default function MyDayPage() {
                     <input className="field mt-1" value={form.fuReason} onChange={e => setForm(f => ({ ...f, fuReason: e.target.value }))} placeholder="π.χ. Αποστολή υπογεγραμμένης αίτησης" />
                   </label>
                 </div>
-                <button className="atx-btn atx-btn-primary inline-flex items-center gap-1.5 justify-center" style={{ height: 44 }} disabled={!form.outcome || busyId === v.id} onClick={() => void checkOut(v)}>
-                  <LogOut size={15} /> {busyId === v.id ? 'Αποστολή…' : form.outcome ? 'Check Out' : 'Επιλέξτε αποτέλεσμα'}
+                <button className="atx-btn atx-btn-primary inline-flex items-center gap-1.5 justify-center" style={{ height: 44 }} disabled={!checkoutReady(form.outcome, form.reason) || busyId === v.id} onClick={() => void checkOut(v)}>
+                  <LogOut size={15} /> {busyId === v.id ? 'Αποστολή…' : !form.outcome ? 'Επιλέξτε αποτέλεσμα' : !checkoutReady(form.outcome, form.reason) ? 'Επιλέξτε αιτία' : 'Check Out'}
                 </button>
               </div>
             )}
@@ -283,6 +304,28 @@ export default function MyDayPage() {
       </div>
 
       {loading && <div className="atx-panel mt-5">{[0, 1, 2].map(i => <div key={i} className="atx-skeleton" />)}</div>}
+
+      {sale && (
+        <div className="atx-panel mt-4 grid gap-2" style={{ padding: 16 }} data-new-sale>
+          <div className="text-[15px] font-semibold">Νέο Sale — {sale.name}</div>
+          <ol className="m-0 pl-5 text-[13.5px] space-y-1">
+            <li>Στοιχεία πελάτη {sale.customerId && <button className="atx-link !p-0" onClick={() => go('customers', { customer: sale.customerId! })}>Άνοιγμα →</button>}</li>
+            <li>Έγγραφα (ταυτότητα, λογαριασμός, Ε9…) <button className="atx-link !p-0" onClick={() => openCase(sale.caseId)}>Άνοιγμα case →</button></li>
+            <li>Παράδοση στο Back Office {sale.handedOver !== null && <strong>✓ {sale.handedOver || 'έγινε'}</strong>}</li>
+          </ol>
+          {sale.handedOver === null && (
+            <button className="atx-btn atx-btn-primary" style={{ height: 42 }} disabled={busyId === sale.caseId} onClick={async () => {
+              setBusyId(sale.caseId);
+              const r = await handoverNewSale(sale.caseId, { id: user?.id ?? '', role }, '');
+              setBusyId(null);
+              if (!r.ok) { toast('Η παράδοση δεν αποθηκεύτηκε. Δοκιμάστε από το case.', 'bad'); return; }
+              setSale(x => x && { ...x, handedOver: r.assignee ?? 'χωρίς ορισμένο υπεύθυνο' });
+              toast(r.assignee ? `Παραδόθηκε στο Back Office: ${r.assignee}.` : 'Παραδόθηκε στο Back Office (δεν έχει οριστεί υπεύθυνος — το βλέπει όλη η ομάδα).', r.assignee ? 'ok' : 'warn');
+            }}>Παράδοση στο Back Office</button>
+          )}
+          <button className="atx-btn atx-btn-quiet" onClick={() => setSale(null)}>Κλείσιμο</button>
+        </div>
+      )}
 
       {!loading && arrival && (
         <div className="atx-notice mt-4 flex items-center gap-3 flex-wrap" role="status" data-arrival>

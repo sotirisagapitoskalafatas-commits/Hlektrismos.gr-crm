@@ -38,3 +38,12 @@ test('insights: team items hidden for individual roles; nothing invented on an e
   assert.deepEqual(H.homeInsights({ cases: [], leads: [], followUps: [], now: NOW, teamView: true }), []);
   assert.equal(H.isOpenLead({ status: 'converted' }), false); assert.equal(H.isOpenLead({ status: 'contacted' }), true);
 });
+
+test('dashboard tiles: urgent = high/critical active cases + overdue follow-ups; stage counts ignore closed cases', () => {
+  const cs = [
+    { current_stage: 'new' }, { current_stage: 'new', priority: 'high' }, { current_stage: 'offer' }, { current_stage: 'offer', priority: 'critical' },
+    { current_stage: 'signed' }, { current_stage: 'lost', priority: 'high' }, { current_stage: 'completed' },
+  ];
+  const t = H.dashboardTiles(cs, 3, 2);
+  assert.deepEqual(t, { urgent: 5, urgentCases: 2, followUps: 2, offers: 2, signatures: 1, newCases: 2 });
+});

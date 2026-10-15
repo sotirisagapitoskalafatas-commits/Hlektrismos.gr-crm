@@ -9,6 +9,7 @@ import { DOC_GROUP_LABEL, requiredDocs, uploadableDocTypes } from '@/lib/documen
 import type { DocGroup } from '@/lib/documents';
 import { ROLE_DESCRIPTION, manageableRoles } from '@/lib/staff-admin';
 import GateModes from './GateModes';
+import BackofficeAssignee from './BackofficeAssignee';
 
 const GROUPS: { label: string; items: [CaseAction, string][] }[] = [
   { label: 'Cases', items: [['create_case', 'Δημιουργία case'], ['edit_case', 'Επεξεργασία case'], ['change_stage', 'Αλλαγή σταδίου'], ['assign', 'Ανάθεση / παράδοση'], ['delete', 'Διαγραφή']] },
@@ -59,6 +60,7 @@ export function PermissionsTab() {
 export function WorkflowTab() {
   return (
     <div className="space-y-4">
+      <BackofficeAssignee />
       <div className="atx-panel">
         <div className="atx-card-head"><h2 className="atx-section-title">Στάδια, υπεύθυνη ομάδα και επιτρεπτές μεταβάσεις</h2></div>
         <table className="atx-table">

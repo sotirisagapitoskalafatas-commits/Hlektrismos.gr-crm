@@ -12,6 +12,9 @@ import type { ReturnTeam, StageBlocker, StageError } from './case-return';
 export type Customer = {
   id: string;
   full_name: string;
+  /** Staged phase4/11 — absent until the migration is applied. */
+  first_name?: string | null;
+  last_name?: string | null;
   /** Set when the customer is in the trash (staged migration phase2/06). */
   deleted_at?: string | null;
   email: string | null;
@@ -36,6 +39,10 @@ export type Case = {
   return_reason?: string | null;
   return_items?: string[] | null;
   return_to_team?: 'inside_sales' | 'field_sales' | null;
+  /** Back Office exception (staged phase4/13). */
+  exception_state?: 'offer_declined' | 'no_response' | 'unsigned' | 'provider_rejected' | null;
+  exception_note?: string | null;
+  exception_at?: string | null;
   return_from_stage?: string | null;
   customer_id: string | null;
   source: string;
@@ -95,6 +102,7 @@ export type FollowUp = {
   reason: string;
   priority: string;
   assignee_id: string | null;
+  created_by?: string | null;
   status: 'pending' | 'completed' | 'cancelled' | 'snoozed';
   notes: string;
   snoozed_until: string | null;
@@ -212,6 +220,7 @@ export type Lead = {
   assigned_to?: { full_name: string } | null;
   /** Files attached on the public contact form (jsonb; see lib/lead-files). */
   attached_files?: unknown;
+  partner?: string | null;
   /** Set when the lead is in the trash (staged migration phase2/06). */
   deleted_at?: string | null;
 };
@@ -346,9 +355,22 @@ export async function fetchCustomer(id: string): Promise<Customer | null> {
   return (data ?? null) as Customer | null;
 }
 
-export async function updateCustomer(id: string, patch: Partial<Pick<Customer, 'full_name' | 'phone' | 'email' | 'company' | 'address' | 'city' | 'postal_code' | 'notes' | 'lat' | 'lng'>>): Promise<boolean> {
+/** Do customers have first_name / last_name yet (staged phase4/11)? Checked once per session. */
+let customerNamesProbe: Promise<boolean> | null = null;
+export function customerNamesAvailable(): Promise<boolean> {
+  if (!supabase) return Promise.resolve(false);
+  customerNamesProbe ??= Promise.resolve(supabase.from('customers').select('first_name, last_name').limit(1)).then(r => !r.error, () => false);
+  return customerNamesProbe;
+}
+
+export async function updateCustomer(id: string, patch: Partial<Pick<Customer, 'full_name' | 'first_name' | 'last_name' | 'phone' | 'email' | 'company' | 'address' | 'city' | 'postal_code' | 'notes' | 'lat' | 'lng'>>): Promise<boolean> {
   if (!supabase) return false;
   const upd: Record<string, unknown> = {};
+  // first/last are sent only when the columns exist; full_name (the display name) is always kept in step.
+  if ((patch.first_name !== undefined || patch.last_name !== undefined) && await customerNamesAvailable()) {
+    if (patch.first_name !== undefined) upd.first_name = patch.first_name?.trim() || null;
+    if (patch.last_name !== undefined) upd.last_name = patch.last_name?.trim() || null;
+  }
   for (const k of ['full_name', 'phone', 'email', 'company', 'address', 'city', 'postal_code', 'notes', 'lat', 'lng'] as const) {
     if (patch[k] !== undefined) upd[k] = patch[k] ?? null;
   }
@@ -552,6 +574,17 @@ export async function overrideStage(caseId: string, stage: Stage, reason: string
   if (!supabase) return { error: { kind: 'other', message: 'Database not configured' } };
   const { error } = await supabase.rpc('change_case_stage_override', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
   return { error: parseStageError(error) };
+}
+
+/** Set or clear (state null) a Back Office exception on a case (staged phase4/13). Returns a Greek error or null. */
+export async function setCaseException(caseId: string, state: Case['exception_state'], note: string): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('set_case_exception', { p_case: caseId, p_state: state ?? null, p_note: note.trim() || null });
+  if (!error) return null;
+  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Οι εξαιρέσεις ενεργοποιούνται μετά την εφαρμογή της migration phase4/13.';
+  if (/a note is required/i.test(error.message)) return 'Γράψτε σύντομα τι συνέβη.';
+  if (/not allowed|42501/i.test(error.message)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
+  return 'Η αλλαγή δεν αποθηκεύτηκε.';
 }
 
 export async function returnCase(caseId: string, input: { reason: string; items: string[]; toTeam: ReturnTeam }): Promise<{ error: StageError | null; toUser: string | null }> {
@@ -1372,6 +1405,8 @@ export type LeadInput = {
   lat?: number | null;
   lng?: number | null;
   location_source?: string | null;
+  /** Partner who brought the customer (existing leads.partner column; no commission logic). */
+  partner?: string | null;
 };
 
 /* Staff-managed lead entry. Public intake stays on insert_website_lead().
@@ -1402,6 +1437,7 @@ export async function createLead(input: LeadInput): Promise<{ lead: Lead | null;
       location_source: input.location_source ?? null,
       campaign_id: input.campaign_id ?? null,
       campaign_name: input.campaign_name ?? null,
+      ...(input.partner ? { partner: input.partner } : {}),
       provider: input.provider ?? null,
       program: input.program ?? null,
       provider_id: providerId,

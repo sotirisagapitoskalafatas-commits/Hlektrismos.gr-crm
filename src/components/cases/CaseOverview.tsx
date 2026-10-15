@@ -3,8 +3,9 @@
    success is claimed only after re-reading the case from the server. */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRightLeft, Check, ChevronRight, ShieldAlert, Sparkles, Undo2 } from 'lucide-react';
-import { addActivity, changeStage, fetchCase, fetchStageBlockers, overrideStage, updateCase } from '@/lib/api';
+import { AlertTriangle, ArrowRightLeft, CalendarClock, Check, ChevronRight, MapPin, ShieldAlert, Sparkles, Undo2 } from 'lucide-react';
+import { addActivity, changeStage, fetchCase, fetchFollowUps, fetchStageBlockers, fetchVisits, overrideStage, setCaseException, updateCase } from '@/lib/api';
+import { EXCEPTION_TEXT } from '@/lib/ops-queue';
 import type { Case, StaffProfile } from '@/lib/api';
 import type { Role, Stage } from '@/lib/roles';
 import { Modal } from '@/lib/ui';
@@ -69,7 +70,7 @@ export function CaseNextStepCard({ c, allowedNext, checklist, staff, canChange, 
   const docBlock = n.blockers.some(b => b.startsWith('Λείπει') || b.startsWith('Απορρίφθηκε'));
   return (
     <div className="atx-panel" style={{ padding: 20, background: n.done ? undefined : 'linear-gradient(180deg, rgba(22,119,255,.06), #fff)' }}>
-      <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: 'var(--atx-blue)' }}><Sparkles size={14} aria-hidden="true" /> Επόμενο βήμα</div>
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: 'var(--atx-blue)' }}><Sparkles size={14} aria-hidden="true" /> Επόμενη ενέργεια</div>
       <h2 className="text-[18px] font-semibold mt-1.5">{n.title}</h2>
       <p className="text-[14px] text-[var(--atx-muted)] mt-1">{n.reason}</p>
       {ownerText && <p className="text-[13px] mt-2"><span className="text-[var(--atx-muted)]">Υπεύθυνος: </span><strong>{ownerText}</strong></p>}
@@ -258,5 +259,81 @@ export function HandoverDialog({ c, open, staff, role, onClose, onDone }: {
         <button className="atx-btn atx-btn-primary" disabled={busy || !person || need.trim().length < 3} onClick={() => void submit()}>{busy ? '…' : 'Παράδοση'}</button>
       </div>
     </Modal>
+  );
+}
+
+/** «Επόμενες ενέργειες» on the case overview: open follow-ups and planned visits of this case, soonest first. */
+export function CaseUpcoming({ caseId, version, onOpenTab }: { caseId: string; version: number; onOpenTab: (t: 'followups' | 'visits') => void }) {
+  const [items, setItems] = useState<{ id: string; at: string | null; kind: 'followup' | 'visit'; text: string; overdue: boolean }[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([fetchFollowUps({ status: 'all' }), fetchVisits({ caseId })]).then(([f, v]) => {
+      if (!alive) return;
+      const now = Date.now();
+      const fu = f.filter(x => x.case_id === caseId && (x.status === 'pending' || x.status === 'snoozed'))
+        .map(x => ({ id: x.id, at: x.due_at, kind: 'followup' as const, text: x.reason || 'Follow-up', overdue: new Date(x.due_at).getTime() < now }));
+      const vi = v.filter(x => x.status === 'planned')
+        .map(x => ({ id: x.id, at: x.scheduled_at, kind: 'visit' as const, text: x.purpose || 'Επίσκεψη', overdue: !!x.scheduled_at && new Date(x.scheduled_at).getTime() < now }));
+      setItems([...fu, ...vi].sort((a, b) => (a.at ? +new Date(a.at) : Infinity) - (b.at ? +new Date(b.at) : Infinity)));
+    });
+    return () => { alive = false; };
+  }, [caseId, version]);
+  return (
+    <div className="atx-panel" style={{ padding: 20 }} data-case-upcoming>
+      <h2 className="atx-section-title mb-2">Επόμενες ενέργειες</h2>
+      {items === null && <div className="atx-skeleton" />}
+      {items?.length === 0 && <p className="text-[13.5px] text-[var(--atx-muted)] m-0">Δεν υπάρχει προγραμματισμένο follow-up ή επίσκεψη.</p>}
+      {items && items.length > 0 && (
+        <ul className="m-0 p-0 list-none space-y-2">
+          {items.slice(0, 5).map(i => (
+            <li key={`${i.kind}-${i.id}`}>
+              <button className="w-full text-left flex items-start gap-2 text-[13.5px]" onClick={() => onOpenTab(i.kind === 'visit' ? 'visits' : 'followups')}>
+                {i.kind === 'visit' ? <MapPin size={15} className="shrink-0 mt-0.5 text-[var(--atx-muted)]" aria-hidden="true" /> : <CalendarClock size={15} className="shrink-0 mt-0.5 text-[var(--atx-muted)]" aria-hidden="true" />}
+                <span className="flex-1 min-w-0">
+                  <span className="block font-medium truncate">{i.text}</span>
+                  <span className="block text-[12.5px]" style={{ color: i.overdue ? 'var(--atx-red)' : 'var(--atx-muted)' }}>
+                    {i.kind === 'visit' ? 'Επίσκεψη' : 'Follow-up'} · {i.at ? new Date(i.at).toLocaleString('el-GR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'χωρίς ώρα'}{i.overdue ? ' · εκπρόθεσμο' : ''}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Back Office exception on the case (staged phase4/13): offer declined, no response, unsigned, provider rejection.
+    It does not move or close the case; missing information uses «Επιστροφή για διόρθωση». */
+export function CaseExceptionCard({ c, onChanged }: { c: Case; onChanged: () => void }) {
+  const { toast } = useToast();
+  const [state, setState] = useState<string>(c.exception_state ?? '');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setState(c.exception_state ?? ''); setNote(''); }, [c.exception_state]);
+  const save = async (next: string) => {
+    setBusy(true);
+    const e = await setCaseException(c.id, (next || null) as Case['exception_state'], note);
+    setBusy(false);
+    if (e) { toast(e, 'bad'); return; }
+    toast(next ? `Εξαίρεση: ${EXCEPTION_TEXT[next]}` : 'Η εξαίρεση έκλεισε.', 'ok');
+    onChanged();
+  };
+  return (
+    <div className="atx-panel mb-4" style={{ padding: 16 }} data-case-exception>
+      <h3 className="text-[14px] font-semibold mb-1">Εξαίρεση</h3>
+      {c.exception_state
+        ? <p className="text-[13.5px] m-0 mb-2"><strong style={{ color: 'var(--atx-red)' }}>{EXCEPTION_TEXT[c.exception_state]}</strong>{c.exception_note ? ` — ${c.exception_note}` : ''}</p>
+        : <p className="text-[13px] text-[var(--atx-muted)] m-0 mb-2">Χωρίς εξαίρεση. Για ελλείψεις στοιχείων χρησιμοποιήστε «Επιστροφή για διόρθωση».</p>}
+      <div className="flex gap-2 flex-wrap items-center">
+        <select className="field max-w-xs" value={state} onChange={e => setState(e.target.value)} aria-label="Εξαίρεση">
+          <option value="">— Καμία —</option>
+          {Object.entries(EXCEPTION_TEXT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        {state && state !== (c.exception_state ?? '') && <input className="field max-w-sm" value={note} onChange={e => setNote(e.target.value)} placeholder="Τι συνέβη (υποχρεωτικό)" aria-label="Σημείωση εξαίρεσης" />}
+        <button className="atx-btn atx-btn-quiet" disabled={busy || state === (c.exception_state ?? '') || (!!state && note.trim().length < 3)} onClick={() => void save(state)}>Αποθήκευση</button>
+      </div>
+    </div>
   );
 }

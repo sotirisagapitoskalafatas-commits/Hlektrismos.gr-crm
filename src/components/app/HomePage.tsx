@@ -9,14 +9,15 @@
    Cards are <div role="region">, not <section>: the landing-page CSS pads every <section> on phones. */
 
 import { useMemo, useState } from 'react';
-import { AlarmClock, Briefcase, CalendarCheck, CheckCircle2, ChevronRight, Sparkles, UserPlus, Users, Wallet } from 'lucide-react';
+import { AlarmClock, Briefcase, CalendarCheck, CheckCircle2, ChevronRight, FileText, PenLine, Plus, Sparkles, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useNav } from '@/lib/nav';
 import { useWorkData } from '@/lib/useWorkData';
 import { fmtMoney, todayLabel, Spinner } from '@/lib/ui';
 import { stageText } from '@/lib/case-flow';
 import { ACTIVE_STAGES } from '@/lib/roles';
-import { homeInsights, pipelineStats } from '@/lib/home-insights';
+import { dashboardTiles, homeInsights, pipelineStats } from '@/lib/home-insights';
+import TaskQuickAdd from '@/components/work/TaskQuickAdd';
 import type { Insight } from '@/lib/home-insights';
 import { WorkRow } from '@/components/work/WorkRow';
 import { useDashboardData } from '@/components/dashboards/data';
@@ -37,12 +38,12 @@ const DETAIL_KEY = 'atlas.home.detail';
 const NA = 'μη διαθέσιμο';
 const ROLE_GROUPS: [string, string][] = [['admin', 'Διαχειριστές'], ['manager', 'Διευθυντές'], ['inside_sales', 'Inside Sales'], ['field_sales', 'Field Sales'], ['back_office', 'Back Office']];
 
-function Kpi({ icon: Icon, tone, value, label, sub, subTone, alert, onClick }: {
-  icon: LucideIcon; tone: string; value: number | string | null; label: string; sub?: string; subTone?: 'red' | 'green' | 'blue' | 'gray'; alert?: boolean; onClick: () => void;
+function Kpi({ icon: Icon, tone, value, label, sub, subTone, alert, onClick, tile }: {
+  icon: LucideIcon; tone: string; value: number | string | null; label: string; sub?: string; subTone?: 'red' | 'green' | 'blue' | 'gray'; alert?: boolean; onClick: () => void; tile?: string;
 }) {
   const na = value === null || value === NA;
   return (
-    <button type="button" className="atx-kpi" onClick={onClick}>
+    <button type="button" className="atx-kpi" onClick={onClick} data-tile={tile}>
       <span className="atx-kpi-icon" style={{ color: tone, background: `color-mix(in srgb, ${tone} 13%, transparent)` }} aria-hidden="true"><Icon size={17} /></span>
       <span className={`atx-kpi-n ${na ? 'is-na' : alert && typeof value === 'number' && value > 0 ? 'is-alert' : ''}`}>{value === null ? NA : value}</span>
       <span className="atx-kpi-l">{label}</span>
@@ -62,6 +63,8 @@ export default function HomePage() {
   const teamView = role === 'admin' || role === 'manager';
   const isAdmin = role === 'admin';
   const pipe = useMemo(() => pipelineStats(cases), [cases]);
+  const tiles = useMemo(() => dashboardTiles(cases, summary?.overdue ?? 0, summary?.today ?? 0), [cases, summary]);
+  const [taskOpen, setTaskOpen] = useState(false);
   const insights = useMemo(() => homeInsights({ cases, leads, followUps, now, teamView }), [cases, leads, followUps, now, teamView]);
   const staff = d?.staff ?? [];
   const staffing = isAdmin ? ROLE_GROUPS.map(([r, label]) => ({ r, label, n: staff.filter(s => s.role === r).length })).filter(x => x.n > 0) : [];
@@ -115,21 +118,24 @@ export default function HomePage() {
 
       <div className={`atx-cc ${teamView ? 'has-team' : ''}`}>
         <div role="region" aria-label="Σύνοψη" className="cc-kpis">
-          <Kpi icon={AlarmClock} tone="#d1342f" alert value={v(summary?.overdue)} label="Εκπρόθεσμα follow-ups"
-            sub={summary ? `${summary.today} σήμερα` : undefined} subTone={summary?.overdue ? 'red' : 'gray'} onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
-          <Kpi icon={CalendarCheck} tone="#1677ff" value={v(summary?.today)} label="Follow-ups σήμερα" onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
-          <Kpi icon={UserPlus} tone="#0e7490" value={v(summary?.awaitingFirstContact)} label="Leads για πρώτη επικοινωνία" onClick={() => go('mywork', { tab: 'today', kind: 'lead' })} />
-          <Kpi icon={Briefcase} tone="#15803d" value={v(summary?.casesNeedingMyAction)} label="Cases που περιμένουν εσάς"
-            sub={loading ? undefined : `${pipe.active} ενεργά`} subTone="green" onClick={() => go('mywork', { tab: 'today', kind: 'case' })} />
-          <Kpi icon={Wallet} tone="#7c3aed" value={loading ? null : pipe.known === null ? NA : fmtMoney(pipe.known)} label="Καταγεγραμμένη αξία ενεργών cases"
-            sub={loading ? undefined : pipe.withoutValue ? `${plural(pipe.withoutValue, 'case', 'cases')} χωρίς αξία εκτός` : 'Όλα τα ενεργά έχουν αξία'} onClick={() => go('cases', { status: 'active' })} />
+          <Kpi tile="urgent" icon={AlarmClock} tone="#d1342f" alert value={v(summary ? tiles.urgent : undefined)} label="Επείγοντα"
+            sub={summary ? `${summary.overdue} εκπρόθεσμα follow-ups · ${tiles.urgentCases} υψηλής προτεραιότητας` : undefined} subTone={tiles.urgent ? 'red' : 'gray'}
+            onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
+          <Kpi tile="followups" icon={CalendarCheck} tone="#1677ff" value={v(summary?.today)} label="Follow Up σήμερα" onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
+          <Kpi tile="offers" icon={FileText} tone="#0e7490" value={v(loading ? undefined : tiles.offers)} label="Προσφορές" sub="cases στο στάδιο «Προσφορά»" onClick={() => go('cases', { stage: 'offer' })} />
+          <Kpi tile="signatures" icon={PenLine} tone="#7c3aed" value={v(loading ? undefined : tiles.signatures)} label="Υπογραφές" sub="cases στο στάδιο «Υπογραφή»" onClick={() => go('cases', { stage: 'signed' })} />
+          <Kpi tile="new" icon={Briefcase} tone="#15803d" value={v(loading ? undefined : tiles.newCases)} label="Νέα Cases"
+            sub={loading ? undefined : `${pipe.active} ενεργά συνολικά`} subTone="green" onClick={() => go('cases', { stage: 'new' })} />
         </div>
 
         {/* Τι να κάνετε τώρα */}
-        <div role="region" className="cc-work atx-panel atx-card" aria-label="Τι να κάνετε τώρα" aria-busy={loading}>
+        <div role="region" className="cc-work atx-panel atx-card" aria-label="Σημερινά Tasks" aria-busy={loading}>
           <div className="atx-card-head">
-            <h2 className="atx-section-title">Τι να κάνετε τώρα</h2>
-            <button className="atx-link" onClick={() => go('mywork')}>Όλη η εργασία{!loading && attention.length ? ` (${attention.length})` : ''} →</button>
+            <h2 className="atx-section-title">Σημερινά Tasks</h2>
+            <span className="flex items-center gap-3">
+              <button className="atx-btn atx-btn-quiet !h-8 inline-flex items-center gap-1" onClick={() => setTaskOpen(true)} data-add-task><Plus size={14} /> Task</button>
+              <button className="atx-link" onClick={() => go('mywork')}>Όλη η εργασία{!loading && attention.length ? ` (${attention.length})` : ''} →</button>
+            </span>
           </div>
           <div className="atx-scroll">
             {loading && [0, 1, 2].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
@@ -160,6 +166,7 @@ export default function HomePage() {
                 <span className={pipe.weighted === null ? 'is-na' : ''}>{loading ? '–' : pipe.weighted === null ? NA : fmtMoney(pipe.weighted)}</span>
                 <small>πιθανολογούμενη αξία (σταθμισμένη){!loading && pipe.withoutValue ? ` · ${pipe.withoutValue} χωρίς αξία εκτός` : ''}</small>
               </div>
+              <p className="text-[12.5px] text-[var(--atx-muted)] -mt-1 mb-2" data-pipe-value>Καταγεγραμμένη αξία ενεργών cases: <b className="text-[var(--atx-ink,#0f172a)]">{loading ? '–' : pipe.known === null ? NA : fmtMoney(pipe.known)}</b></p>
               <div className="atx-pipe">
                 {ACTIVE_STAGES.map((s, idx) => {
                   const n = pipe.byStage[s] ?? 0;
@@ -250,6 +257,7 @@ export default function HomePage() {
           )
         )}
       </div>
+      <TaskQuickAdd open={taskOpen} cases={cases} onClose={() => setTaskOpen(false)} onSaved={() => { setTaskOpen(false); void reload(); }} />
     </div>
   );
 }

@@ -81,15 +81,42 @@ export function nearestCases<C extends { lat: number | null; lng: number | null 
   };
 }
 
-export const VISIT_OUTCOMES = [
-  'Ενδιαφέρεται — συνέχεια',
-  'Υπογραφή / συλλογή εγγράφων',
-  'Χρειάζεται νέα επίσκεψη',
-  'Δεν ενδιαφέρεται',
-  'Ο πελάτης δεν βρέθηκε',
-] as const;
+/* Visit outcomes — still defined in code (phase 2). The label is what is stored on the visit (case_visits.result)
+   and in the check-out note, so existing records stay readable. `next` says what the app does after check-out:
+     sale     → «Νέο Sale»: customer details → documents → handover to Back Office (the agent stays the originator)
+     manager  → a follow-up for the Back Office queue, keeping the agent and the visit
+     followup → the agent's own next follow-up (date asked)
+   Reasons are fixed lists for now (the owner may change them later). */
+export type OutcomeNext = 'sale' | 'manager' | 'followup' | 'none';
+export interface VisitOutcome { key: string; label: string; next: OutcomeNext; reasons?: readonly string[] }
+
+export const NO_SALE_REASONS = ['Τιμή / κόστος', 'Δέσμευση με τον τρέχοντα πάροχο', 'Λείπουν στοιχεία ή έγγραφα', 'Δεν αποφασίζει ο ίδιος', 'Άλλο'] as const;
+export const NOT_INTERESTED_REASONS = ['Ικανοποιημένος με τον πάροχο', 'Δεν θέλει αλλαγή τώρα', 'Κακή προηγούμενη εμπειρία', 'Δεν θέλει επικοινωνία', 'Άλλο'] as const;
+
+export const OUTCOMES: readonly VisitOutcome[] = [
+  { key: 'new_sale', label: 'Νέο Sale', next: 'sale' },
+  { key: 'interested', label: 'Ενδιαφέρεται — συνέχεια', next: 'followup' },
+  { key: 'documents', label: 'Υπογραφή / συλλογή εγγράφων', next: 'followup' },
+  { key: 'revisit', label: 'Χρειάζεται νέα επίσκεψη', next: 'followup' },
+  { key: 'manager', label: 'Follow-up από υπεύθυνο', next: 'manager' },
+  { key: 'no_sale', label: 'Χωρίς πώληση', next: 'none', reasons: NO_SALE_REASONS },
+  { key: 'not_interested', label: 'Δεν ενδιαφέρεται', next: 'none', reasons: NOT_INTERESTED_REASONS },
+  { key: 'not_found', label: 'Ο πελάτης δεν βρέθηκε', next: 'followup' },
+];
+export const VISIT_OUTCOMES = OUTCOMES.map(o => o.label);
+export const outcomeByLabel = (label: string) => OUTCOMES.find(o => o.label === label) ?? null;
+
+/** Prefix that marks a follow-up as «for the manager / Back Office» (a convention in code until workflows are configurable). */
+export const MANAGER_FOLLOWUP_PREFIX = 'Follow-up από υπεύθυνο';
+export const isManagerFollowUp = (reason: string | null | undefined) => (reason ?? '').startsWith(MANAGER_FOLLOWUP_PREFIX);
 
 /** Text stored with the check-out, so the outcome survives even when the visit is queued offline. */
-export function checkoutNote(outcome: string, notes: string): string {
-  return [`Αποτέλεσμα: ${outcome}`, notes.trim()].filter(Boolean).join('\n');
+export function checkoutNote(outcome: string, notes: string, reason?: string): string {
+  return [`Αποτέλεσμα: ${outcome}${reason ? ` — ${reason}` : ''}`, notes.trim()].filter(Boolean).join('\n');
+}
+
+/** Can the check-out be sent? An outcome is required; outcomes with reasons need one of the listed reasons. */
+export function checkoutReady(outcomeLabel: string, reason: string): boolean {
+  const o = outcomeByLabel(outcomeLabel);
+  return !!o && (!o.reasons || o.reasons.includes(reason));
 }

@@ -304,7 +304,7 @@ for (const role of Object.keys(EXPECT)) {
     await sleep(900);
     const t = await body(page);
     const go = await page.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Συνέχεια με ελλείψεις' && !b.disabled));
-    check('Gates (warn, default): missing documents listed but the handover to Back Office is allowed', t.includes('Λείπουν έγγραφα — η μετάβαση επιτρέπεται') && t.includes('Ταυτότητα ή διαβατήριο — λείπει') && go && !t.includes('Δεν μπορεί να προχωρήσει ακόμη'));
+    check('Gates (warn, default): missing documents listed but the handover to Back Office is allowed', t.includes('Λείπουν έγγραφα — η μετάβαση επιτρέπεται') && t.includes('Ταυτότητα — εμπρός όψη — λείπει') && go && !t.includes('Δεν μπορεί να προχωρήσει ακόμη'));
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Άκυρο')?.click());
     await browser.close();
   }
@@ -334,7 +334,7 @@ for (const role of Object.keys(EXPECT)) {
     await sleep(900);
     const t = await body(page);
     check('Gates: the stage action exists for Back Office', opened);
-    check('Gates: moving to «Έλεγχος εγγράφων» without documents shows the server blockers', t.includes('Δεν μπορεί να προχωρήσει ακόμη') && t.includes('Ταυτότητα ή διαβατήριο — λείπει'));
+    check('Gates: moving to «Έλεγχος εγγράφων» without documents shows the server blockers', t.includes('Δεν μπορεί να προχωρήσει ακόμη') && t.includes('Ταυτότητα — εμπρός όψη — λείπει'));
     check('Gates: no confirm and no override for Back Office', await page.evaluate(() => ![...document.querySelectorAll('button')].some((b) => ['Επιβεβαίωση', 'Παράκαμψη & μετάβαση'].includes(b.textContent.trim()))));
     await browser.close();
   }
@@ -621,23 +621,105 @@ for (const role of Object.keys(EXPECT)) {
   await browser.close();
 }
 
+/* ---- 2i. Lead with documents → default Back Office assignee (a setting, staged phase4/12); partner field ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await click(page, 'Διαχείριση', '#shell-rail nav button');
+    await sleep(1200);
+    await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim().startsWith('Cases & Ροή'))?.click());
+    await sleep(1200);
+    const unset = await page.evaluate(() => document.querySelector('[data-bo-assignee] select')?.value === '');
+    await page.evaluate(() => { const sel = document.querySelector('[data-bo-assignee] select'); const o = [...sel.options].find((x) => x.textContent.includes('Κατερίνα')); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, o.value); sel.dispatchEvent(new Event('change', { bubbles: true })); });
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('[data-bo-assignee] button')].find((b) => b.textContent.trim() === 'Αποθήκευση')?.click());
+    await sleep(1200);
+    const log = await (await fetch(`${M}/__log`)).json();
+    check('Leads+docs: the Back Office assignee is a setting pointing to a user (admin picks from Back Office users)', unset && log.some((l) => l.table === 'set_default_backoffice_assignee' && l.body.p_user === '10000000-0000-4000-8000-000000000005'));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await click(page, 'Leads', '#shell-rail nav button');
+    await sleep(1200);
+    await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Νέο Lead')?.click());
+    await sleep(500);
+    await page.evaluate(() => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent.trim() === 'Lead με έγγραφα')?.click());
+    await sleep(300);
+    const set = (idx, v) => page.evaluate((i, val) => { const el = [...document.querySelectorAll('.fixed.inset-0.z-50 input.field:not([type="file"])')][i]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, idx, v);
+    await set(0, 'Φούρνος Δοκιμή');
+    await set(3, 'Γιώργος Συνεργάτης'); // name, phone, email, partner
+    const input = await page.$('[data-lead-files]');
+    await input.uploadFile('C:/Users/kalaf/hlek/docs/product/screenshots/after/inside_sales-home-1440.jpg');
+    await sleep(400);
+    await page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.click());
+    let route = null;
+    for (let i = 0; i < 30 && !route; i++) { await sleep(250); route = (await (await fetch(`${M}/__log`)).json()).find((l) => l.table === 'route_lead_to_backoffice'); }
+    await sleep(600);
+    const log = await (await fetch(`${M}/__log`)).json();
+    const post = log.filter((l) => l.method === 'POST' && l.table === 'leads').pop();
+    const patch = log.filter((l) => l.method === 'PATCH' && l.table === 'leads' && l.body.attached_files).pop();
+    check('Leads+docs: lead saved with the partner, file uploaded under the lead, then routed to Back Office', post?.body?.partner === 'Γιώργος Συνεργάτης'
+      && patch?.body?.attached_files?.some((f) => f.path.startsWith('leads/')) && !!route, JSON.stringify({ partner: post?.body?.partner, files: patch?.body?.attached_files?.length, route: !!route }));
+    check('Leads+docs: the user is told who received it', await page.evaluate(() => document.body.innerText.includes('Στάλθηκε στο Back Office: Κατερίνα')));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await click(page, 'Λειτουργίες', '#shell-rail nav button');
+    await sleep(1800);
+    check('Leads+docs: the assignee sees it in «Νέα leads με έγγραφα» in Λειτουργίες', await page.evaluate(() => (document.querySelector('[data-bo-leads]')?.innerText ?? '').includes('Φούρνος Δοκιμή')));
+    await page.evaluate(() => [...document.querySelectorAll('[data-bo-leads] button')].find((b) => b.textContent.trim() === 'Άνοιγμα')?.click());
+    await sleep(1500);
+    const t = await page.evaluate(() => document.querySelector('main').innerText);
+    check('Leads+docs: Back Office opens the lead, sees the partner and can convert it', t.includes('Γιώργος Συνεργάτης') && t.includes('Φούρνος Δοκιμή'));
+    await browser.close();
+  }
+}
+
+/* ---- 2j. «+ Task» in Σημερινά Tasks ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await sleep(1500);
+  await page.evaluate(() => document.querySelector('[data-add-task]')?.click());
+  await sleep(500);
+  const disabled = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Προσθήκη')?.disabled);
+  await page.evaluate(() => {
+    const m = [...document.querySelectorAll('h2')].find((h) => h.textContent.trim() === 'Νέο task').closest('.card');
+    const inp = m.querySelector('input.field'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, 'Κλήση για τα έγγραφα'); inp.dispatchEvent(new Event('input', { bubbles: true }));
+    const sel = m.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, sel.options[1].value); sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await sleep(200);
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Προσθήκη')?.click());
+  await sleep(1500);
+  const post = (await (await fetch('http://127.0.0.1:54399/__log')).json()).filter((l) => l.method === 'POST' && l.table === 'follow_ups').pop();
+  check('Home: «+ Task» needs a description and a case, then saves a follow-up for me', disabled === true && post?.body?.reason === 'Κλήση για τα έγγραφα' && !!post.body.case_id && post.body.channel === 'other');
+  await browser.close();
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'inside_sales');
   await page.waitForFunction(() => document.querySelectorAll('.atx-kpi-n').length === 5 && !document.querySelector('.atx-kpi-n.is-na'), { timeout: 15000 }).catch(() => {});
   const all = await text(page, '.atx-kpi-n');
-  const stats = all.slice(0, 4); // the 5th card is the recorded value (money or «μη διαθέσιμο»)
-  const [overdue, today, leads, cases] = stats.map(Number);
-  check('Home: stats are numbers (no placeholders/negatives)', all.length === 5 && stats.every((s) => /^\d+$/.test(s)), all.join(','));
-  check('Home: recorded value is money or «μη διαθέσιμο», never a bare 0', /€|μη διαθέσιμο/.test(all[4] ?? ''), all[4]);
+  const tileVal = (k) => page.evaluate((key) => document.querySelector(`[data-tile="${key}"] .atx-kpi-n`)?.textContent.trim() ?? '', k);
+  const labels = await text(page, '.atx-kpi-l');
+  check('Home: the five tiles are Επείγοντα, Follow Up, Προσφορές, Υπογραφές, Νέα Cases with real numbers', all.length === 5 && all.every((x) => /^\d+$/.test(x))
+    && ['Επείγοντα', 'Follow Up σήμερα', 'Προσφορές', 'Υπογραφές', 'Νέα Cases'].every((l, i) => labels[i] === l), `${labels.join('|')} = ${all.join(',')}`);
+  const overdue = Number(((await page.evaluate(() => document.querySelector('[data-tile="urgent"] .atx-chip-s')?.textContent ?? '')).match(/^(\d+) εκπρόθεσμα/) ?? [])[1]);
+  const today = Number(await tileVal('followups'));
+  check('Home: recorded value is money or «μη διαθέσιμο», never a bare 0', /€|μη διαθέσιμο/.test(await page.evaluate(() => document.querySelector('[data-pipe-value]')?.textContent ?? '')));
   await click(page, 'Η εργασία μου', '#shell-rail nav button');
   await sleep(900);
   const chips = await text(page, '[aria-label="Τύπος εργασίας"] button');
   const n = (k) => Number((chips.find((c) => c.startsWith(k)) || '').replace(/\D+/g, ''));
-  check('My Work counts equal Home stats (follow-ups = overdue + today)', n('Follow-ups') === overdue + today, `${n('Follow-ups')} vs ${overdue + today}`);
-  check('My Work leads count equals Home', n('Leads') === leads);
-  check('My Work cases count equals Home', n('Cases') === cases);
+  check('My Work counts equal Home tiles (follow-ups = overdue + today)', n('Follow-ups') === overdue + today, `${n('Follow-ups')} vs ${overdue}+${today}`);
   const fuRows = () => page.$$eval('.atx-row', (rows) => rows.filter((r) => [...r.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Ολοκλήρωση')).length);
   const fu0 = await fuRows();
   await click(page, 'Ολοκλήρωση', 'button');
@@ -786,7 +868,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await click(page, 'Έγγραφα');
   await sleep(1200);
   const t0 = await page.evaluate(() => document.body.innerText);
-  check('Documents: checklist lists ID, bill and proof of use', t0.includes('Ταυτότητα ή διαβατήριο') && t0.includes('Λογαριασμός ρεύματος') && /Ε9, μισθωτήριο/.test(t0));
+  check('Documents: checklist lists ID, bill and proof of use', t0.includes('Ταυτότητα — εμπρός όψη') && t0.includes('Ταυτότητα — πίσω όψη') && t0.includes('Λογαριασμός ρεύματος') && /Ε9, μισθωτήριο/.test(t0));
   await click(page, 'Προσθήκη εγγράφου');
   await sleep(500);
   const disabledBefore = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Επιλογή αρχείου')).disabled);
@@ -876,7 +958,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await sleep(2000);
   const t = await page.evaluate(() => document.querySelector('main').innerText);
   check('Case detail: stepper uses full Greek labels, no 3-letter codes', t.includes('Έλεγχος εγγράφων') && t.includes('Καταχώρηση παρόχου') && !/\bΕΓΓ\b|\bΚΑΤ\b|\bΥΠΓ\b/.test(t));
-  check('Case detail: next step lists missing documents as blockers', /Λείπει: Ταυτότητα/.test(t) && t.includes('Επόμενο βήμα'));
+  check('Case detail: next action lists missing documents as blockers', /Λείπει: Ταυτότητα/.test(t) && t.includes('Επόμενη ενέργεια') && t.includes('Επόμενες ενέργειες') && t.includes('Στοιχεία επαφής'));
   await click(page, 'Παράδοση'); await sleep(500);
   // dialog is portaled to <body>; team defaults to Back Office; pick the first colleague listed
   const opts = await page.evaluate(() => {

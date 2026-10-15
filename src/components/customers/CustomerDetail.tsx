@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { activityLabel, can, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
-import { fetchCases, fetchCustomer, fetchDocuments, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
+import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
 import type { Case, CaseDocument, Customer, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
@@ -33,7 +33,9 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const [events, setEvents] = useState<(TimelineEvent & { case_no: string })[]>([]);
   const [tab, setTab] = useState<Tab>('overview');
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', notes: '', lat: '', lng: '' });
+  const [names, setNames] = useState(false);
+  useEffect(() => { void customerNamesAvailable().then(setNames); }, []);
+  const [form, setForm] = useState({ first_name: '', last_name: '', full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', notes: '', lat: '', lng: '' });
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [now] = useState(() => Date.now());
@@ -78,13 +80,16 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   }
 
   const openEdit = () => {
-    setForm({ full_name: cust.full_name ?? '', phone: cust.phone ?? '', email: cust.email ?? '', address: cust.address ?? '', city: cust.city ?? '', postal_code: cust.postal_code ?? '', notes: cust.notes ?? '', lat: cust.lat != null ? String(cust.lat) : '', lng: cust.lng != null ? String(cust.lng) : '' });
+    const parts = (cust.full_name ?? '').trim().split(/\s+/);
+    setForm({ first_name: cust.first_name ?? parts[0] ?? '', last_name: cust.last_name ?? parts.slice(1).join(' '), full_name: cust.full_name ?? '', phone: cust.phone ?? '', email: cust.email ?? '', address: cust.address ?? '', city: cust.city ?? '', postal_code: cust.postal_code ?? '', notes: cust.notes ?? '', lat: cust.lat != null ? String(cust.lat) : '', lng: cust.lng != null ? String(cust.lng) : '' });
     setEditing(true);
   };
   const save = async () => {
     setSaving(true);
+    const composed = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ');
     const ok = await updateCustomer(cust.id, {
-      full_name: form.full_name.trim() || cust.full_name, phone: form.phone || null, email: form.email || null,
+      ...(names ? { first_name: form.first_name, last_name: form.last_name } : {}),
+      full_name: (names ? composed : form.full_name.trim()) || cust.full_name, phone: form.phone || null, email: form.email || null,
       address: form.address || null, city: form.city || null, postal_code: form.postal_code || null, notes: form.notes,
       lat: form.lat.trim() === '' ? null : Number(form.lat), lng: form.lng.trim() === '' ? null : Number(form.lng),
     });
@@ -138,7 +143,12 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
         <div className="atx-panel" style={{ padding: 20 }}>
           <h2 className="atx-section-title mb-3">Επεξεργασία στοιχείων</h2>
           <div className="grid sm:grid-cols-2 gap-3">
-            {([['full_name', 'Ονοματεπώνυμο'], ['phone', 'Τηλέφωνο'], ['email', 'Email'], ['address', 'Διεύθυνση'], ['city', 'Πόλη'], ['postal_code', 'Τ.Κ.']] as const).map(([k, l]) => (
+            {(names ? [['first_name', 'Όνομα'], ['last_name', 'Επώνυμο']] as const : [['full_name', 'Ονοματεπώνυμο']] as const).map(([k, l]) => (
+              <label key={k} className="text-[13px] font-medium">{l}
+                <input className="field mt-1" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} />
+              </label>
+            ))}
+            {([['phone', 'Τηλέφωνο'], ['email', 'Email'], ['address', 'Διεύθυνση'], ['city', 'Πόλη'], ['postal_code', 'Τ.Κ.']] as const).map(([k, l]) => (
               <label key={k} className="text-[13px] font-medium">{l}
                 <input className="field mt-1" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} />
               </label>
@@ -158,7 +168,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
             </label>
           </div>
           <div className="flex gap-2 mt-4">
-            <button className="atx-btn atx-btn-primary" disabled={saving || !form.full_name.trim()} onClick={() => void save()}>{saving ? '…' : 'Αποθήκευση'}</button>
+            <button className="atx-btn atx-btn-primary" disabled={saving || !(names ? (form.first_name.trim() || form.last_name.trim()) : form.full_name.trim())} onClick={() => void save()}>{saving ? '…' : 'Αποθήκευση'}</button>
             <button className="atx-btn atx-btn-quiet" disabled={saving} onClick={() => setEditing(false)}>Άκυρο</button>
           </div>
         </div>

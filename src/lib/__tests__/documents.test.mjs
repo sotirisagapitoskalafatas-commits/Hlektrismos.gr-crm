@@ -18,7 +18,7 @@ test('every legacy category keeps its old label; legacy types are not offered fo
 
 test('residential electricity: ID, electricity bill, proof of use (any of E9/lease/free use), signed contract', () => {
   const r = D.requiredDocs(RES);
-  assert.deepEqual(r.map((x) => x.anyOf), [['id_card'], ['bill_electricity'], ['e9', 'lease', 'free_use'], ['signed']]);
+  assert.deepEqual(r.map((x) => x.anyOf), [['id_front', 'id_card'], ['id_back', 'id_card'], ['bill_electricity'], ['e9', 'lease', 'free_use'], ['signed']]);
   assert.ok(r.every((x) => x.required));
 });
 test('gas asks for the gas bill; business adds tax start / ΓΕΜΗ; solar asks for ownership proof', () => {
@@ -34,11 +34,11 @@ test('checklist status: a lease satisfies proof of use; rejected does not count;
     { category: 'bill_electricity', status: 'received' }, { category: 'bill_electricity', status: 'verified' },
   ]);
   const by = Object.fromEntries(c.map((x) => [x.anyOf[0], x.status]));
-  assert.equal(by.e9, 'received'); assert.equal(by.id_card, 'rejected'); assert.equal(by.bill_electricity, 'verified'); assert.equal(by.signed, 'missing');
+  assert.equal(by.e9, 'received'); assert.equal(by.id_front, 'rejected'); assert.equal(by.id_back, 'rejected'); assert.equal(by.bill_electricity, 'verified'); assert.equal(by.signed, 'missing');
 });
 test('old «identity»/«bill» uploads still count, flagged as legacy (less specific)', () => {
   const c = D.buildChecklist(RES, [{ category: 'identity', status: 'received' }, { category: 'bill', status: 'verified' }]);
-  const id = c.find((x) => x.anyOf[0] === 'id_card'), bill = c.find((x) => x.anyOf[0] === 'bill_electricity');
+  const id = c.find((x) => x.anyOf[0] === 'id_back'), bill = c.find((x) => x.anyOf[0] === 'bill_electricity');
   assert.equal(id.status, 'received'); assert.equal(id.viaLegacy, true);
   assert.equal(bill.status, 'verified'); assert.equal(bill.viaLegacy, true);
 });

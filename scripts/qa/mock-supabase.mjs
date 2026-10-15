@@ -119,6 +119,7 @@ const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 // ---- B2B pipeline (mirrors staged-migrations/phase3/08 + scrape-b2b; synthetic, never calls SerpApi) ----
 // ---- Contact eligibility (mirrors staged-migrations/phase3/09; synthetic) ----
 const flaggedCheckins = [];
+let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
 let leadFail = null; // GET /__leadfail?code=42501 → the next POST to leads fails with that code (error-display test)
 const contactObjections = [];
 const contactConsents = [];
@@ -141,7 +142,7 @@ const ALLOWED = { new: ['contacted', 'lost', 'cancelled'], contacted: ['offer', 
   submitted: ['activation', 'document_check', 'lost', 'cancelled'], activation: ['completed', 'submitted', 'lost', 'cancelled'], lost: ['new'], cancelled: ['new'] };
 const reqsFor = (c) => {
   const svc = c.service_type ?? 'energy';
-  const l = [{ any: ['id_card', 'identity'], label: 'Ταυτότητα ή διαβατήριο' }];
+  const l = [{ any: ['id_front', 'id_card', 'identity'], label: 'Ταυτότητα — εμπρός όψη' }, { any: ['id_back', 'id_card', 'identity'], label: 'Ταυτότητα — πίσω όψη' }];
   if (svc === 'energy' || svc === 'gas') {
     l.push(svc === 'gas' ? { any: ['bill_gas', 'bill'], label: 'Λογαριασμός φυσικού αερίου' } : { any: ['bill_electricity', 'bill'], label: 'Λογαριασμός ρεύματος' });
     l.push({ any: ['e9', 'lease', 'free_use'], label: 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)' });
@@ -342,6 +343,26 @@ http.createServer((req, res) => {
           next_action_owner_id: c.back_office_owner, next_action: 'Επανέλεγχος μετά τη διόρθωση' });
         TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'resubmitted', title: 'Επανυποβολή στο Back Office', description: json.p_note ?? '', user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
         return send(200, null);
+      }
+      // ---- Default Back Office assignee (staged phase4/12) ----
+      if (name === 'default_backoffice_assignee') {
+        const p = staffRows.find((x) => x.id === boAssignee && x.role === 'back_office' && x.is_active);
+        return send(200, p ? { id: p.id, full_name: p.full_name } : null);
+      }
+      if (name === 'set_default_backoffice_assignee') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (u?.role !== 'admin') return deny('backoffice assignee: not allowed');
+        if (json.p_user && !staffRows.some((x) => x.id === json.p_user && x.role === 'back_office' && x.is_active)) return send(400, { code: '22023', message: 'backoffice assignee: must be an active Back Office user' });
+        boAssignee = json.p_user ?? null; return send(200, true);
+      }
+      if (name === 'route_lead_to_backoffice') {
+        log.push({ method: 'RPC', table: name, body: json });
+        const p = staffRows.find((x) => x.id === boAssignee && x.role === 'back_office' && x.is_active);
+        if (!p) return send(200, null);
+        const l = TABLES.leads.find((x) => x.id === json.p_lead);
+        if (!l) return send(404, { code: 'P0002', message: 'route lead: lead not found' });
+        l.assigned_to_user_id = p.id; l.assigned_to = { full_name: p.full_name };
+        return send(200, { id: p.id, full_name: p.full_name });
       }
       // ---- Check-in review (staged phase4/10) ----
       if (name === 'field_checkins_for_review') {
@@ -581,7 +602,7 @@ http.createServer((req, res) => {
         if (col) return send(400, { code: '23502', message: `null value in column "${col}" of relation "leads" violates not-null constraint`, hint: null });
       }
       for (const r of hit) Object.assign(r, json);
-      return send(200, hit);
+      return send(200, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? hit[0] ?? null : hit);
     }
     if (req.method === 'DELETE') {
       const hit = new Set(applyFilters(tbl, url.searchParams));
@@ -598,6 +619,7 @@ http.createServer((req, res) => {
     }
     const rowsIn = (Array.isArray(json) ? json : [json]).map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: stamp, occurred_at: stamp, ...r }));
     tbl.push(...rowsIn);
-    return send(201, rowsIn);
+    // .single() asks for one object (Accept: application/vnd.pgrst.object+json), like real PostgREST
+    return send(201, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? rowsIn[0] : rowsIn);
   });
 }).listen(54399, '127.0.0.1', () => console.log('mock supabase on 54399'));

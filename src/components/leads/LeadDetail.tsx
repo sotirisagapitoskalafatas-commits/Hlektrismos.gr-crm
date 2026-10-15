@@ -21,14 +21,15 @@ import { fmtDateTime } from '@/lib/ui';
 const ACTION_LABEL: Record<string, string> = { status_change: 'Αλλαγή κατάστασης', converted: 'Μετατροπή σε Case', updated: 'Ενημέρωση στοιχείων', created: 'Δημιουργία' };
 
 export default function LeadDetail({ leadId, version, onEdit }: { leadId: string; version: number; onEdit: (l: Lead) => void }) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { go, openCase } = useNav();
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | undefined>(undefined);
   const [activity, setActivity] = useState<ActivityLogRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [now] = useState(() => Date.now());
-  const isStaff = can(role, 'create_case');
+  // Back Office may work (and convert) a lead routed to them with documents; the server allows any active staff.
+  const isStaff = can(role, 'create_case') || (role === 'back_office' && !!lead && lead.assigned_to_user_id === user?.id);
 
   const load = useCallback(async () => {
     const [l, a] = await Promise.all([fetchLead(leadId), fetchEntityActivity('lead', leadId)]);
@@ -149,6 +150,7 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
                 ['Ενδιαφέρον', SERVICES[lead.service_category ?? ''] ?? lead.service_category],
                 ['Ακίνητο', lead.property_type],
                 ['Εταιρεία', lead.company],
+                ['Συνεργάτης', lead.partner],
                 ['Πάροχος', [lead.provider, lead.program].filter(Boolean).join(' · ') || null],
                 ['Πηγή', `${src.label}${lead.campaign_name ? ` · ${lead.campaign_name}` : ''}`],
                 ['Καταχώρηση', fmtDateTime(lead.created_at)],

@@ -6,13 +6,15 @@ import { TrashButton } from '@/components/trash/TrashControls';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
 import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLeadChecked, updateLeadStage } from '@/lib/api';
 import { useToast } from '@/lib/toast';
+import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
+import { classifyUpload, MAX_FORM_FILES, PUBLIC_FORM_ACCEPT } from '@/lib/upload-files';
 import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Users } from 'lucide-react';
 
 const EMPTY_FORM = {
   full_name: '', phone: '', email: '', service_category: 'energy', source: 'inside_sales',
-  property_type: '', campaign_name: '', comments: '', lead_type: 'B2C', provider: '', program: '',
+  property_type: '', campaign_name: '', comments: '', lead_type: 'B2C', provider: '', program: '', partner: '',
 };
 
 export default function LeadsPage() {
@@ -35,6 +37,9 @@ export default function LeadsPage() {
   // Errors are shown INSIDE the dialog that caused them (the page-level message was hidden behind the open modal).
   const [createErr, setCreateErr] = useState('');
   const [creating, setCreating] = useState(false);
+  // «Γρήγορο lead» (name only) or «Lead με έγγραφα» (details + files → default Back Office assignee).
+  const [mode, setMode] = useState<'quick' | 'docs'>('quick');
+  const [files, setFiles] = useState<File[]>([]);
   const [editErr, setEditErr] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -126,15 +131,30 @@ export default function LeadsPage() {
       lead_type: form.lead_type,
       provider: form.provider || null,
       program: form.program || null,
+      partner: form.partner.trim() || null,
     });
+    if (error || !lead) { setCreating(false); setCreateErr(error ?? 'Η δημιουργία απέτυχε. Δοκιμάστε ξανά.'); return; }
+    // The lead exists now. Files go under leads/<id>/; a failed file never removes the lead.
+    let extra = '';
+    let tone: 'ok' | 'warn' = 'ok';
+    if (mode === 'docs' && files.length) {
+      const up = await attachLeadFiles(lead, files);
+      if (up.failed.length) { tone = 'warn'; extra += ` Δεν ανέβηκαν: ${up.failed.join(', ')} — ανεβάστε τα ξανά από το case.`; }
+      if (up.saved.length) {
+        const r = await routeLeadToBackoffice(lead.id);
+        if (r.error) { tone = 'warn'; extra += ` ${r.error}`; }
+        else if (r.assignee) extra += ` Στάλθηκε στο Back Office: ${r.assignee.full_name}.`;
+        else { tone = 'warn'; extra += ' Δεν έχει οριστεί υπεύθυνος Back Office — ορίστε τον στη Διαχείριση → Cases & Ροή.'; }
+      }
+    }
     setCreating(false);
-    if (error || !lead) { setCreateErr(error ?? 'Η δημιουργία απέτυχε. Δοκιμάστε ξανά.'); return; }
+    setFiles([]);
     setModal(false);
     setForm(EMPTY_FORM);
     setErr('');
     await load();
     setTab(lead.status ?? 'new');
-    toast(`Δημιουργήθηκε το lead «${lead.full_name ?? form.full_name.trim()}».`, 'ok');
+    toast(`Δημιουργήθηκε το lead «${lead.full_name ?? form.full_name.trim()}».${extra}`, tone);
   };
 
   const tabs = [{ id: 'all', label: 'Όλα', emoji: '🗂️', short: 'Όλα' }, ...LEAD_STATUSES];
@@ -296,7 +316,14 @@ export default function LeadsPage() {
 
       <Modal open={modal} onClose={() => { if (!creating) { setModal(false); setCreateErr(''); } }} title="Νέο Lead" micro="Χειροκίνητη εισαγωγή">
         <div className="space-y-4">
-          <p className="text-[12.5px] text-ink/55 -mt-1">Αρκεί το όνομα. Τηλέφωνο, email και πρόγραμμα συμπληρώνονται και αργότερα.</p>
+          <div role="radiogroup" aria-label="Τύπος καταχώρησης" className="flex gap-2 flex-wrap -mt-1">
+            {([['quick', 'Γρήγορο lead'], ['docs', 'Lead με έγγραφα']] as const).map(([m, l]) => (
+              <button key={m} type="button" role="radio" aria-checked={mode === m} className={`atx-chip ${mode === m ? 'is-on' : ''}`} onClick={() => setMode(m)}>{l}</button>
+            ))}
+          </div>
+          <p className="text-[12.5px] text-ink/55">{mode === 'quick'
+            ? 'Αρκεί το όνομα. Τηλέφωνο, email και πρόγραμμα συμπληρώνονται και αργότερα.'
+            : 'Με έγγραφα (λογαριασμό, ταυτότητα κ.λπ.) το lead πηγαίνει στον υπεύθυνο Back Office που έχει οριστεί στη Διαχείριση.'}</p>
           <Field label="Ονοματεπώνυμο ή επωνυμία (υποχρεωτικό)">
             <input className="field" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Όνομα πελάτη" />
           </Field>
@@ -320,6 +347,10 @@ export default function LeadsPage() {
               </select>
             </Field>
           </div>
+          <Field label={form.source === 'partner' ? 'Συνεργάτης' : 'Συνεργάτης (αν υπάρχει)'}>
+            <input className="field" value={form.partner} onChange={e => setForm(f => ({ ...f, partner: e.target.value }))} placeholder="Όνομα συνεργάτη που έφερε τον πελάτη" />
+          </Field>
+          {mode === 'docs' && (<>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Τύπος πελάτη">
               <select className="field" value={form.lead_type}
@@ -348,6 +379,28 @@ export default function LeadsPage() {
           <Field label="Σχόλια">
             <textarea className="field" rows={2} value={form.comments} onChange={e => setForm(f => ({ ...f, comments: e.target.value }))} placeholder="Λεπτομέρειες ενδιαφέροντος…" />
           </Field>
+          <Field label={`Έγγραφα (έως ${MAX_FORM_FILES})`}>
+            <input type="file" multiple accept={PUBLIC_FORM_ACCEPT} className="field" aria-label="Έγγραφα lead" data-lead-files
+              onChange={e => {
+                const picked = Array.from(e.target.files ?? []);
+                const bad = picked.filter(f => !classifyUpload(f).ok).map(f => f.name);
+                const ok = picked.filter(f => classifyUpload(f).ok);
+                setFiles(cur => [...cur, ...ok].slice(0, MAX_FORM_FILES));
+                setCreateErr(bad.length ? `Μη υποστηριζόμενα αρχεία: ${bad.join(', ')} (PDF ή φωτογραφία).` : '');
+                e.target.value = '';
+              }} />
+            {files.length > 0 && (
+              <ul className="m-0 mt-2 p-0 list-none space-y-1 text-[13px]">
+                {files.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="flex items-center gap-2">
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <button type="button" className="atx-link !p-0 text-[12.5px]" onClick={() => setFiles(cur => cur.filter((_, j) => j !== i))}>Αφαίρεση</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Field>
+          </>)}
         </div>
         {createErr && <div className="atx-notice mt-4" role="alert" data-lead-error>{createErr}</div>}
         <div className="flex justify-end gap-2 mt-5">

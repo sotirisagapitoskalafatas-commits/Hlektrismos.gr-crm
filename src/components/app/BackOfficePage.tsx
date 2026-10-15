@@ -16,8 +16,13 @@ import { stageText } from '@/lib/case-flow';
 import { useStaff } from '@/lib/useStaff';
 import { StageChangeDialog } from '@/components/cases/CaseOverview';
 import CheckinReview from '@/components/field-sales/CheckinReview';
+import BackofficeLeads from '@/components/leads/BackofficeLeads';
+import ManagerFollowUps from '@/components/field-sales/ManagerFollowUps';
 
-type Filter = 'all' | 'mine' | 'blocked' | 'ready';
+type Filter = 'all' | 'mine' | 'from_sales' | 'exceptions' | 'blocked' | 'ready';
+const matches = (f: Filter, i: { mine: boolean; blockers: string[]; exception: string | null; fromSales: boolean }) =>
+  f === 'all' || (f === 'mine' && i.mine) || (f === 'from_sales' && i.fromSales) || (f === 'exceptions' && !!i.exception)
+  || (f === 'blocked' && i.blockers.length > 0) || (f === 'ready' && i.blockers.length === 0);
 
 export default function BackOfficePage() {
   const { role, user } = useAuth();
@@ -43,14 +48,14 @@ export default function BackOfficePage() {
   const queue = useMemo(() => buildOpsQueue(cases, docs, user?.id ?? '', now), [cases, docs, user?.id, now]);
   const visible = queue.filter(i =>
     (stage === 'all' || i.stage === stage)
-    && (filter === 'all' || (filter === 'mine' && i.mine) || (filter === 'blocked' && i.blockers.length > 0) || (filter === 'ready' && i.blockers.length === 0)));
-  const count = (f: Filter) => queue.filter(i => f === 'all' || (f === 'mine' && i.mine) || (f === 'blocked' && i.blockers.length > 0) || (f === 'ready' && i.blockers.length === 0)).length;
+    && matches(filter, i));
+  const count = (f: Filter) => queue.filter(i => matches(f, i)).length;
   const name = (id: string | null) => (id ? staff.find(s => s.id === id)?.full_name ?? 'Ορισμένος συνάδελφος' : 'Χωρίς υπεύθυνο');
   const canChange = can(role, 'change_stage');
   const caseById = useMemo(() => new Map(cases.map(c => [c.id, c])), [cases]);
 
   const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: 'Όλα' }, { id: 'mine', label: 'Δικά μου' }, { id: 'blocked', label: 'Με εκκρεμότητες' }, { id: 'ready', label: 'Έτοιμα να προχωρήσουν' },
+    { id: 'all', label: 'Όλα' }, { id: 'mine', label: 'Δικά μου' }, { id: 'from_sales', label: 'Από Sales' }, { id: 'exceptions', label: 'Εξαιρέσεις' }, { id: 'blocked', label: 'Με εκκρεμότητες' }, { id: 'ready', label: 'Έτοιμα να προχωρήσουν' },
   ];
 
   return (
@@ -59,6 +64,9 @@ export default function BackOfficePage() {
         <h1 className="atx-title">Λειτουργίες</h1>
         <p className="atx-sub">{loading ? 'Φόρτωση…' : `${queue.length} cases σε επεξεργασία · ${count('blocked')} με εκκρεμότητες · ${count('ready')} έτοιμα`}</p>
       </div>
+
+      <BackofficeLeads />
+      <ManagerFollowUps />
 
       <div className="mt-5 flex flex-wrap items-center gap-3 justify-between">
         <div className="atx-tabs" role="tablist" aria-label="Φίλτρο ουράς">

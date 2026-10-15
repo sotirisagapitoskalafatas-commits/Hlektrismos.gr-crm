@@ -8,7 +8,7 @@ Nothing here has been run against staging or production. Local behavior is verif
 | File | What | Needs |
 |---|---|---|
 | `01_rls_hardening.sql` | Remove anonymous access to `crm_emails`/`crm_integrations`; integrations admin-only + `crm_integrations_status` view; revoke anon read/write on 20 sensitive tables | **Before applying:** check non-admin screens read the status view, not the table |
-| `02_contact_permissions_and_audit.sql` | `contact_permissions` (provenance + per-channel permission evidence, grant impossible without evidence) and append-only `outreach_decisions` | none |
+| `02_outreach_decisions_audit.sql` | Append-only `outreach_decisions` (one row per gate decision). Per-channel consent evidence moved to `phase3/09_contact_eligibility.sql` (keyed by phone/email, not by the legacy lead id) | none |
 | `03_drop_exec_sql.sql` | Drop a hand-made `exec_sql` RPC if one exists | Save its definition first (audit SQL query 9) |
 | `04_cron_secret_and_pause.sql` | Tariff cron authenticates with a dedicated cron secret from Vault; unschedule the two outreach schedulers | `CRON_SECRET` function secret + Vault entries (steps in the file) |
 
@@ -25,8 +25,8 @@ Outreach stays OFF unless **all** are deliberately set: `OUTREACH_ENABLED=on` an
 
 ## Deploy order for edge functions (important)
 1. Apply `04` (or otherwise make the cron send `x-cron-secret`) **before** deploying `sync-green-tariffs`.
-2. Deploy `_shared` consumers together (`send-campaign-email`, `send-sms`, `make-voice-call`, `campaign-scheduler`) — they
-   now require the `contact_permissions` and `outreach_decisions` tables (02). Without 02 the gate **fails closed**: nothing is sent.
+2. Deploy `_shared` consumers together (`send-campaign-email`, `send-sms`, `make-voice-call`, `campaign-scheduler`). They
+   now require `outreach_decisions` (02) and the contact-eligibility tables (phase3/09). Without them the gate **fails closed**: nothing is sent.
 
 ## Rollback
 Each file ends with its rollback. Functions: redeploy the previous commit's versions. Cron: re-create jobs from

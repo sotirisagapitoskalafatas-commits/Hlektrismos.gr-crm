@@ -65,14 +65,14 @@ test('apply staged SQL 01 + 02 (and re-apply: idempotent)', async () => {
   await as(null);
   for (let i = 0; i < 2; i++) {
     await db.exec(read('../staged-migrations/phase1/01_rls_hardening.sql'));
-    await db.exec(read('../staged-migrations/phase1/02_contact_permissions_and_audit.sql'));
+    await db.exec(read('../staged-migrations/phase1/02_outreach_decisions_audit.sql'));
   }
   await db.exec('grant select on public.crm_integrations_status to authenticated');
 });
 
 test('AFTER: anonymous role is fully locked out', async () => {
   await as('anon');
-  for (const t of ['crm_emails', 'crm_integrations', 'crm_integrations_status', 'contact_permissions', 'outreach_decisions']) {
+  for (const t of ['crm_emails', 'crm_integrations', 'crm_integrations_status', 'outreach_decisions']) {
     const r = await can(`select * from public.${t}`);
     assert.ok(!r.ok || r.rows.length === 0, `anon must not read ${t}`);
   }
@@ -100,21 +100,7 @@ test('AFTER: inactive staff cannot read emails; active staff can (interim rule)'
   assert.equal((await can('select * from public.crm_emails')).rows.length, 1);
 });
 
-test('contact_permissions: grant needs evidence; only manager/admin can read/write; agent cannot', async () => {
-  await as('authenticated', MANAGER);
-  const noEvidence = await can(`insert into public.contact_permissions (lead_id, channel, status, basis) values ('${LEAD}','email','granted','consent')`);
-  assert.ok(!noEvidence.ok && /grant_requires_evidence/.test(noEvidence.err), 'grant without evidence rejected');
-  const weak = await can(`insert into public.contact_permissions (lead_id, channel, status, basis, evidence_ref, evidence_at) values ('${LEAD}','email','granted','other','x', now())`);
-  assert.ok(!weak.ok, 'grant with insufficient basis rejected');
-  const ok = await can(`insert into public.contact_permissions (lead_id, channel, status, basis, evidence_ref, evidence_at, source) values ('${LEAD}','email','granted','consent','form#1', now(), 'website_form') returning id`);
-  assert.equal(ok.ok, true, ok.err);
-  assert.equal((await can('select * from public.contact_permissions')).rows.length, 1);
-
-  await as('authenticated', AGENT);
-  assert.equal((await can('select * from public.contact_permissions')).rows.length, 0, 'agent cannot read');
-  const w = await can(`insert into public.contact_permissions (lead_id, channel, status) values ('${LEAD}','sms','none')`);
-  assert.ok(!w.ok, 'agent cannot write');
-});
+// Per-channel consent evidence moved to phase3/09 (keyed by phone/email): see supabase/tests/contact-eligibility.test.mjs.
 
 test('outreach_decisions is append-only and not writable by staff', async () => {
   await as('service_role'); // service role has BYPASSRLS in Supabase; emulate by writing as the owner

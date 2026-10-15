@@ -5,7 +5,7 @@
 // Contract: the caller passes lead IDS only. Address, phone and every other attribute are re-read from the
 // database here; request-supplied contact details are never trusted. If ANY lookup fails, EVERY recipient is denied.
 
-import { decideEligibility, type Channel, type EligibilityConfig, type PermissionRecord, type Purpose } from "./eligibility.ts";
+import { decideEligibility, type Article11Screening, type Channel, type EligibilityConfig, type Objection, type PermissionRecord, type Purpose } from "./eligibility.ts";
 
 export const MAX_BATCH = 200;
 
@@ -20,7 +20,12 @@ export interface LeadRow {
 
 export interface Loaders {
   leads(ids: string[]): Promise<LeadRow[]>;
-  permissions(ids: string[], channel: Channel): Promise<Record<string, PermissionRecord>>;
+  /** Per-channel consent, keyed by lead id (looked up by the lead's phone / email, see phase3/09). */
+  permissions(rows: LeadRow[], channel: Channel): Promise<Record<string, PermissionRecord>>;
+  /** Active objections on each lead's phone / email (an empty list = none). */
+  objections(rows: LeadRow[]): Promise<Record<string, Objection[]>>;
+  /** Latest Article 11 register screening of each lead's phone (calls only). */
+  article11(rows: LeadRow[]): Promise<Record<string, Article11Screening>>;
   /** Lower-cased, trimmed addresses that are on the suppression list. */
   suppressedEmails(emails: string[]): Promise<Set<string>>;
   recentAttempts(ids: string[], sinceIso: string): Promise<Record<string, number>>;
@@ -65,10 +70,13 @@ export async function gateRecipients(
     const byId = new Map(rows.map((r) => [r.id, r]));
     const emails = rows.map((r) => (r.email ? norm(r.email) : "")).filter(Boolean);
 
-    const [perms, suppressed, attempts] = await Promise.all([
-      loaders.permissions(ids, channel),
+    const phoneCall = channel === "voice" || channel === "call";
+    const [perms, suppressed, attempts, objections, screenings] = await Promise.all([
+      loaders.permissions(rows, channel),
       channel === "email" ? loaders.suppressedEmails(emails) : Promise.resolve(new Set<string>()),
       loaders.recentAttempts(ids, new Date(now.getTime() - config.windowHours * 3_600_000).toISOString()),
+      loaders.objections(rows),
+      phoneCall ? loaders.article11(rows) : Promise.resolve({} as Record<string, Article11Screening>),
     ]);
 
     const result: GateResult = { allowed: [], denied: [] };
@@ -84,6 +92,8 @@ export async function gateRecipients(
         hasAddress: !!address,
         permission: perms[id] ?? null,
         recentAttempts: attempts[id] ?? 0,
+        objections: objections[id] ?? [],
+        article11: phoneCall ? (screenings[id] ?? { screenedAt: null, result: null }) : undefined,
         now,
         config,
       });

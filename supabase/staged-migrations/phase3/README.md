@@ -15,3 +15,47 @@
 - Retention of excluded/duplicate prospects (minimal data kept to avoid re-import) — Greek privacy counsel.
 - Article 11 register screening before any promotional call (the `phone_screening` field exists; no screening integration yet).
 - Daily quota and SerpApi plan limits.
+
+## 09 — Contact eligibility: objections, consent with evidence, Article 11 screening
+
+`09_contact_eligibility.sql`. Apply **after** phase1/01–04 and phase3/08, on staging first, then production with the owner's approval and a backup.
+
+- **Keyed to the contact point, not the record.** Phone → last 10 digits; email → lower-cased (the website's `not-provided@hlektrismos.local` placeholder is ignored). The same rules live in `supabase/functions/_shared/contact-keys.ts`, and a test checks that both give the same result. A «no» recorded on one lead therefore applies to the same number or email on every lead, customer, B2B prospect and legacy row.
+- **Tables** (no write policies; reads only for admin / manager / back office):
+  - `contact_objections`: scope «marketing» or «all», per channel or all channels, with reason, source and batch. Lifting is admin-only with a reason.
+  - `contact_consents`: per channel, `granted` / `withdrawn`. A grant is impossible without a basis, an evidence reference and a date.
+  - `article11_screenings`: history of register checks; the latest one wins.
+- **Functions:**
+
+  | Function | Who may run it | What it does |
+  |---|---|---|
+  | `contact_facts(phone, email)` | any active staff member | Returns flags and records, never the address |
+  | `record_contact_objection` | any staff member | Records an objection. Also adds the email to `email_suppressions` |
+  | `withdraw_contact_consent` | any staff member | Withdraws consent for a channel |
+  | `record_contact_consent` | admin / manager / back office | Records consent; evidence is required and the date may not be in the future |
+  | `record_article11_screening` | admin / manager / back office | Records a register check. The date must be within the last year. Also sets `b2b_prospects.phone_screening` when 08 is present |
+  | `lift_contact_objection` | admin | Lifts the whole recorded «no» and removes the suppression it created. Suppressions from an unsubscribe link stay |
+
+  Every change is written to `activity_log`.
+- **The decision is code, not SQL:** `supabase/functions/_shared/eligibility.ts`.
+  - **Enforced** by the outreach gate (`outreach-gate.ts` + `outreach-loaders.ts`, which now read these tables) before any SMS, email or voice send.
+  - **Shown** in the CRM by «Επικοινωνία & συγκαταθέσεις» on lead and customer pages.
+  - **New channel `call`** (a person phoning for sales):
+    - not subject to the campaign master switches;
+    - needs no objection and a fresh (≤30 days) «not listed» Article 11 screening, unless there is consent for calls with evidence;
+    - a «listed» number is always refused;
+    - contact hours are 09:00–20:00 Athens time.
+  - Automated channels keep every earlier rule (master switch, legal approval, consent with evidence, suppression, frequency, hours). They now also check objections, and voice also checks the Article 11 screening.
+- **Replaces** phase1/02's `contact_permissions`, which was keyed to the legacy `hlektrismos_leads` table and had never been applied anywhere. phase1/02 now holds only `outreach_decisions`.
+- **Local evidence:**
+  - `node --test supabase/tests/contact-eligibility.test.mjs`: 6/6.
+  - `supabase/functions/_shared/__tests__/contact-eligibility.test.mjs`: 6/6.
+  - `gate.test.mjs`: 8/8.
+- **Rollback:** at the end of the file. It drops the recorded objections, consents and screenings, so export them first.
+
+### Needs legal / business confirmation (the rules are conservative engineering defaults, not legal advice)
+- Whether consent for calls with evidence may replace the Article 11 screening (currently yes, except for a «listed» number).
+- Screening validity (30 days) and contact hours (09:00–20:00).
+- How the register is checked in practice: provider lists, a vendor, or manual. Today a person records the result.
+- Whether «existing customer» is an acceptable basis per channel (soft opt-in for similar products), and the wording and version of consent texts.
+- Whether B2B email to a company's generic address needs consent (currently yes: no consent, no promotional email).

@@ -25,6 +25,8 @@ function loaders(over = {}) {
     permissions: async () => ({ [A]: GRANT }),            // B (e.g. scraped) has no permission record
     suppressedEmails: async () => new Set(),
     recentAttempts: async () => ({}),
+    objections: async () => ({}),
+    article11: async () => ({}),
     ...over,
   };
 }
@@ -46,7 +48,7 @@ test('default (disabled) configuration sends nothing, even to a recipient with p
 });
 
 test('any failing lookup denies EVERY recipient (fail closed)', async () => {
-  for (const key of ['leads', 'permissions', 'suppressedEmails', 'recentAttempts']) {
+  for (const key of ['leads', 'permissions', 'suppressedEmails', 'recentAttempts', 'objections']) {
     const r = await gateRecipients([A, B], 'email', 'promotional', loaders({ [key]: async () => { throw new Error('db down'); } }), OPEN, NOW);
     assert.equal(fakeSend(r).length, 0, key);
     assert.ok(r.denied.every((d) => d.reasons[0] === 'LOOKUP_FAILED'), key);
@@ -75,4 +77,27 @@ test('the gate uses database addresses, not request-supplied ones', async () => 
   // Request carries a different address in an object; only the id is read.
   const r = await gateRecipients([A], 'email', 'promotional', loaders(), OPEN, NOW);
   assert.equal(r.allowed[0].email, ' 1111@x.gr'.trim());
+});
+
+test('an objection on the phone or email stops the send even with a consent record (phase3/09)', async () => {
+  const r = await gateRecipients([A], 'email', 'promotional', loaders({ objections: async () => ({ [A]: [{ scope: 'marketing', channels: null }] }) }), OPEN, NOW);
+  assert.equal(fakeSend(r).length, 0);
+  assert.ok(r.denied[0].reasons.includes('OBJECTION_RECORDED'));
+  // an objection limited to SMS does not block email
+  const r2 = await gateRecipients([A], 'email', 'promotional', loaders({ objections: async () => ({ [A]: [{ scope: 'marketing', channels: ['sms'] }] }) }), OPEN, NOW);
+  assert.deepEqual(r2.allowed.map((l) => l.id), [A]);
+});
+
+test('voice reads the Article 11 screening; a failing screening lookup denies everyone', async () => {
+  const VOICE = { ...OPEN, voiceEnabled: true };
+  const perm = { [A]: { ...GRANT, channel: 'voice' } };
+  const fresh = { [A]: { result: 'not_listed', screenedAt: '2026-10-10T09:00:00Z' } };
+  const ok = await gateRecipients([A], 'voice', 'promotional', loaders({ permissions: async () => perm, article11: async () => fresh }), VOICE, NOW);
+  assert.deepEqual(ok.allowed.map((l) => l.id), [A]);
+  const listed = await gateRecipients([A], 'voice', 'promotional', loaders({ permissions: async () => perm, article11: async () => ({ [A]: { result: 'listed', screenedAt: '2026-10-10T09:00:00Z' } }) }), VOICE, NOW);
+  assert.ok(listed.denied[0].reasons.includes('ARTICLE11_LISTED'));
+  const none = await gateRecipients([A], 'voice', 'promotional', loaders({ permissions: async () => perm }), VOICE, NOW);
+  assert.ok(none.denied[0].reasons.includes('ARTICLE11_NOT_SCREENED'));
+  const down = await gateRecipients([A], 'voice', 'promotional', loaders({ permissions: async () => perm, article11: async () => { throw new Error('db down'); } }), VOICE, NOW);
+  assert.equal(down.denied[0].reasons[0], 'LOOKUP_FAILED');
 });

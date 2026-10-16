@@ -7,6 +7,7 @@ import {
   UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
   UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar, Boxes,
 } from 'lucide-react';
+import { labsVisible } from './labs';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
 export const DEFAULT_ROLE: Role = 'inside_sales';
@@ -201,6 +202,8 @@ export type NavLeaf = {
   maturity?: ModuleMaturity;
   badge?: NavBadge;
   accent?: boolean;
+  /** Outside the brief / unfinished: shown only to an admin with «Πειραματικές λειτουργίες» on (lib/labs.ts). */
+  labs?: boolean;
 };
 
 export type NavSection = {
@@ -258,7 +261,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: ShoppingBag,
     children: [
       { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
-      { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales', 'back_office'], maturity: 'live' },
+      { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales', 'back_office'], maturity: 'beta', labs: true },
       { key: 'providers', label: 'Πάροχοι & Προγράμματα', icon: Boxes, page: 'providers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
     ],
   },
@@ -294,8 +297,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Atlas AI',
     icon: Bot,
     children: [
-      { key: 'automations', label: 'Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
-      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true },
+      { key: 'automations', label: 'Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true, labs: true },
+      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true, labs: true },
     ],
   },
   {
@@ -312,7 +315,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export function navForRole(role: Role): NavSection[] {
   return NAV_SECTIONS
-    .map(s => ({ ...s, children: s.children.filter(i => i.roles.includes(role)) }))
+    .map(s => ({ ...s, children: s.children.filter(i => i.roles.includes(role) && (!i.labs || labsVisible(role))) }))
     .filter(s => s.children.length > 0);
 }
 
@@ -327,6 +330,11 @@ export function findNav(page: PageKey | 'case'): { section: NavSection; item: Na
     }
   }
   return null;
+}
+
+/** False when the page is a labs module (lib/labs.ts) the role may not see; the shell then shows Αρχική. */
+export function labsPageAllowed(page: PageKey | 'case', role: Role): boolean {
+  return !findNav(page)?.item.labs || labsVisible(role);
 }
 
 export function sectionColor(s: Pick<NavSection, 'id'>): string {
@@ -361,10 +369,10 @@ export const PAGE_TITLES: Record<PageKey, string> = {
 };
 
 export const MATURITY_LABEL: Record<ModuleMaturity, { label: string; dot: string }> = {
-  live: { label: 'Live', dot: 'dot-live' },
-  beta: { label: 'Beta', dot: 'dot-beta' },
-  planned: { label: 'Planned', dot: 'dot-planned' },
-  blocked: { label: 'Blocked', dot: 'dot-blocked' },
+  live: { label: 'Σε λειτουργία', dot: 'dot-live' },
+  beta: { label: 'Δοκιμαστικό', dot: 'dot-beta' },
+  planned: { label: 'Προγραμματισμένο', dot: 'dot-planned' },
+  blocked: { label: 'Μπλοκαρισμένο', dot: 'dot-blocked' },
 };
 
 /* ---------------- Permissions ---------------- */

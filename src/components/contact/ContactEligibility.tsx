@@ -13,6 +13,7 @@ import {
   reasonText, recordArticle11, recordConsent, recordObjection, withdrawConsent,
 } from '@/lib/contact-eligibility';
 import type { Channel, ContactFacts, Subject } from '@/lib/contact-eligibility';
+import { CONTACT_CHECK_UNAVAILABLE } from '@/lib/contact-eligibility';
 
 type Dialog = null | 'objection' | 'article11' | 'consent' | 'withdraw' | { lift: string };
 
@@ -34,6 +35,9 @@ export default function ContactEligibility({ subject }: { subject: Subject }) {
   const verdicts = useMemo(() => (facts ? evaluate(facts) : []), [facts]);
   const objections = useMemo(() => (facts ? groupObjections(facts.objections) : []), [facts]);
   const evidence = canRecordEvidence(role);
+
+  // Not in the database yet: non-admins don't see the block at all (no developer wording).
+  if (error === CONTACT_CHECK_UNAVAILABLE && role !== 'admin') return null;
 
   return (
     <div className="atx-panel" style={{ padding: 20 }} aria-label="Επικοινωνία και συγκαταθέσεις" data-contact-eligibility>

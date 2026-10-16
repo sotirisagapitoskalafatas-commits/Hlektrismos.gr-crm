@@ -5,7 +5,7 @@ import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, can,
-  findNav, flattenNav, leadStatusInfo, navForRole, roleLabel, sectionColor, stageLabel,
+  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, roleLabel, sectionColor, stageLabel,
 } from '@/lib/roles';
 import type { NavLeaf, PageKey, ShellCounts, Stage } from '@/lib/roles';
 import { Btn, IconBtn, Logo, Micro, Modal, Spinner, fmtMoney, rgbaOf, timeUntil } from '@/lib/ui';
@@ -548,7 +548,10 @@ export default function AppShell() {
 
   const onSignOut = () => { signOut(); window.location.hash = '/'; };
 
+  // Labs modules (lib/labs.ts): an address typed or linked directly falls back to Αρχική for everyone else.
+  const labsBlocked = !labsPageAllowed(view.page, role);
   const body = (() => {
+    if (labsBlocked) return <HomePage />;
     switch (view.page) {
       case 'home': return <HomePage />;
       case 'mywork': return <MyWorkPage />;

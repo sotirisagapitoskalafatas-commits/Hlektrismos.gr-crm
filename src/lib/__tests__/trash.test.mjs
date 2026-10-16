@@ -21,7 +21,7 @@ test('database refusals become clear Greek messages', () => {
     'Δεν επιτρέπεται οριστική διαγραφή: συνδέεται με 2 cases, 1 καταγραφές συγκατάθεσης. Το ιστορικό του CRM διατηρείται.');
   assert.equal(T.trashError('trash: customer has 3 open case(s)', 'x'), 'Ο πελάτης έχει 3 ανοιχτά cases. Κλείστε ή ολοκληρώστε τα πρώτα.');
   assert.equal(T.trashError('purge: only an administrator can delete permanently', 'x'), 'Μόνο ο διαχειριστής μπορεί να διαγράψει οριστικά.');
-  assert.match(T.trashError('Could not find the function public.trash_record', 'x'), /phase2\/06/);
+  assert.match(T.trashError('Could not find the function public.trash_record', 'x'), /^Ο κάδος δεν είναι ακόμη διαθέσιμος\.$/, 'neutral wording, no migration names');
   assert.equal(T.trashError('something else', 'fallback'), 'fallback');
   assert.equal(T.describeReferences({ cases: 1, follow_ups: 0 }), '1 cases');
 });

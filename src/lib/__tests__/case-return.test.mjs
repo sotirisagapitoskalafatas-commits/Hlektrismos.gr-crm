@@ -28,5 +28,5 @@ test('database refusals become clear messages', () => {
   assert.equal(R.parseStageError({ message: 'stage_transition_not_allowed: signed -> completed', hint: 'transition' }).kind, 'transition');
   assert.equal(R.parseStageError(null), null);
   assert.match(R.stageErrorText({ kind: 'other', message: 'return: a reason of at least 10 characters is required' }), /10 χαρακτήρων/);
-  assert.match(R.stageErrorText({ kind: 'other', message: 'Could not find the function public.return_case_for_correction' }), /phase2\/07/);
+  assert.match(R.stageErrorText({ kind: 'other', message: 'Could not find the function public.return_case_for_correction' }), /^Η λειτουργία δεν είναι ακόμη διαθέσιμη\.$/, 'neutral wording, no migration names');
 });

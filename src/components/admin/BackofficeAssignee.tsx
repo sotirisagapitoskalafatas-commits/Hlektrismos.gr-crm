@@ -7,6 +7,7 @@ import { useToast } from '@/lib/toast';
 import { useStaff } from '@/lib/useStaff';
 import { fetchDefaultBackofficeAssignee, setDefaultBackofficeAssignee } from '@/lib/lead-intake';
 import type { Assignee } from '@/lib/lead-intake';
+import { pendingText } from '@/lib/pending-text';
 
 export default function BackofficeAssignee() {
   const { role } = useAuth();
@@ -33,7 +34,7 @@ export default function BackofficeAssignee() {
       <div className="atx-card-head"><h2 className="atx-section-title">Υπεύθυνος Back Office για νέα leads με έγγραφα</h2></div>
       <div className="px-4 pb-4 space-y-3">
         <p className="text-[13px] text-[var(--atx-muted)]">Όταν δημιουργείται lead με έγγραφα, ανατίθεται σε αυτόν τον χρήστη, που ειδοποιείται και το βλέπει στη «Διεκπεραίωση». Ο δημιουργός του lead καταγράφεται κανονικά.</p>
-        {cur === undefined && <div className="atx-notice">Η ρύθμιση ενεργοποιείται μετά την εφαρμογή της migration phase4/12 (εκκρεμεί). Μέχρι τότε τα leads με έγγραφα μένουν σε αυτόν που τα δημιουργεί.</div>}
+        {cur === undefined && <div className="atx-notice">{pendingText(role, 'Η ρύθμιση ενεργοποιείται μετά την ενημέρωση της βάσης «Υπεύθυνος Back Office» (phase4/12). Μέχρι τότε τα leads με έγγραφα μένουν σε αυτόν που τα δημιουργεί.', 'Η ρύθμιση δεν είναι ακόμη διαθέσιμη. Μέχρι τότε τα leads με έγγραφα μένουν σε αυτόν που τα δημιουργεί.')}</div>}
         {cur !== undefined && (
           <div className="flex gap-2 flex-wrap items-center">
             <select className="field max-w-xs" value={pick} disabled={!isAdmin || busy} onChange={e => setPick(e.target.value)} aria-label="Υπεύθυνος Back Office">

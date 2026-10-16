@@ -49,6 +49,6 @@ export function stageErrorText(e: StageError): string {
   if (/reason of at least/i.test(e.message)) return 'Χρειάζεται αιτιολογία τουλάχιστον 10 χαρακτήρων.';
   if (/at least one missing/i.test(e.message)) return 'Επιλέξτε τουλάχιστον ένα στοιχείο που λείπει ή είναι λάθος.';
   if (/already returned/i.test(e.message)) return 'Το case έχει ήδη επιστραφεί.';
-  if (/Could not find the function|PGRST202|schema cache/i.test(e.message)) return 'Η λειτουργία ενεργοποιείται μετά την εφαρμογή της migration phase2/07 (εκκρεμεί έγκριση).';
+  if (/Could not find the function|PGRST202|schema cache/i.test(e.message)) return 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
   return 'Η ενέργεια απέτυχε. Δοκιμάστε ξανά.';
 }

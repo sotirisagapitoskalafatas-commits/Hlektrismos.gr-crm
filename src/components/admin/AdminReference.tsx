@@ -10,6 +10,8 @@ import type { DocGroup } from '@/lib/documents';
 import { ROLE_DESCRIPTION, manageableRoles } from '@/lib/staff-admin';
 import GateModes from './GateModes';
 import BackofficeAssignee from './BackofficeAssignee';
+import { pendingText } from '@/lib/pending-text';
+import { useAuth } from '@/lib/auth';
 
 const GROUPS: { label: string; items: [CaseAction, string][] }[] = [
   { label: 'Cases', items: [['create_case', 'Δημιουργία case'], ['edit_case', 'Επεξεργασία case'], ['change_stage', 'Αλλαγή σταδίου'], ['assign', 'Ανάθεση / παράδοση'], ['delete', 'Διαγραφή']] },
@@ -23,6 +25,7 @@ const Yes = () => <Check size={15} className="text-[#15803d] mx-auto" aria-label
 const No = () => <Minus size={15} className="text-[var(--atx-faint)] mx-auto" aria-label="όχι" />;
 
 export function PermissionsTab() {
+  const { role } = useAuth();
   const roles = ROLES.map(r => r.id as Role);
   return (
     <div className="space-y-4">
@@ -31,7 +34,7 @@ export function PermissionsTab() {
         <table className="atx-table atx-matrix">
           <thead><tr><th>Ενέργεια</th>{ROLES.map(r => <th key={r.id} title={r.hint}>{r.label}</th>)}</tr></thead>
           <tbody>
-            <tr className="atx-matrix-group"><td colSpan={roles.length + 1}>Διαχείριση χρηστών (επιβάλλεται από τον server — phase2/05)</td></tr>
+            <tr className="atx-matrix-group"><td colSpan={roles.length + 1}>{pendingText(role, 'Διαχείριση χρηστών (επιβάλλεται από τον server — phase2/05)', 'Διαχείριση χρηστών (επιβάλλεται από τον server)')}</td></tr>
             <tr>
               <td>Ποιους ρόλους διαχειρίζεται</td>
               {roles.map(r => <td key={r} className="text-[12px] text-center">{manageableRoles(r, true).length ? manageableRoles(r, true).map(x => ROLES.find(y => y.id === x)?.short).join(' · ') : '—'}</td>)}
@@ -58,6 +61,8 @@ export function PermissionsTab() {
 }
 
 export function WorkflowTab() {
+  const { role } = useAuth();
+  const pending = pendingText(role, 'Εκκρεμεί εφαρμογή (phase2/07)', 'Εκκρεμεί');
   return (
     <div className="space-y-4">
       <BackofficeAssignee />
@@ -83,9 +88,9 @@ export function WorkflowTab() {
       <div className="atx-panel">
         <div className="atx-card-head"><h2 className="atx-section-title">Κατάσταση κανόνων</h2></div>
         <ul className="m-0 p-0 list-none">
-          <li className="atx-check"><span className="flex-1"><b>Επιτρεπτές μεταβάσεις</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Επιβάλλονται από τη βάση (staged phase2/07, trigger στο στάδιο) — ενεργές μόλις εφαρμοστεί· ως τότε μόνο το UI τις περιορίζει.</span></span><span className="atx-tag">Δεν έχει επαληθευτεί ζωντανά</span></li>
-          <li className="atx-check"><span className="flex-1"><b>Απαιτούμενα έγγραφα πριν την αλλαγή σταδίου</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Η βάση απορρίπτει τη μετάβαση όταν λείπουν (Έλεγχος εγγράφων) ή δεν έχουν ελεγχθεί (Καταχώρηση/Ενεργοποίηση/Ολοκλήρωση). Παράκαμψη μόνο Διαχειριστής/Διευθυντής με αιτιολογία. Οι κανόνες χρειάζονται επιβεβαίωση από την επιχείρηση.</span></span><span className="atx-tag t-warning">Εκκρεμεί εφαρμογή (phase2/07)</span></li>
-          <li className="atx-check"><span className="flex-1"><b>Επιστροφή για διόρθωση (Back Office)</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Υποχρεωτική αιτιολογία και στοιχεία, ίδιο case, ειδοποίηση υπευθύνου, χρονολόγιο και audit· «Επανυποβολή» από την ομάδα που το παρέλαβε.</span></span><span className="atx-tag t-warning">Εκκρεμεί εφαρμογή (phase2/07)</span></li>
+          <li className="atx-check"><span className="flex-1"><b>Επιτρεπτές μεταβάσεις</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Επιβάλλονται από τη βάση μετά την επόμενη ενημέρωση· ως τότε τις περιορίζει η εφαρμογή.</span></span><span className="atx-tag">Δεν έχει επαληθευτεί ζωντανά</span></li>
+          <li className="atx-check"><span className="flex-1"><b>Απαιτούμενα έγγραφα πριν την αλλαγή σταδίου</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Η βάση απορρίπτει τη μετάβαση όταν λείπουν (Έλεγχος εγγράφων) ή δεν έχουν ελεγχθεί (Καταχώρηση/Ενεργοποίηση/Ολοκλήρωση). Παράκαμψη μόνο Διαχειριστής/Διευθυντής με αιτιολογία. Οι κανόνες χρειάζονται επιβεβαίωση από την επιχείρηση.</span></span><span className="atx-tag t-warning">{pending}</span></li>
+          <li className="atx-check"><span className="flex-1"><b>Επιστροφή για διόρθωση (Back Office)</b><span className="block text-[12.5px] text-[var(--atx-muted)]">Υποχρεωτική αιτιολογία και στοιχεία, ίδιο case, ειδοποίηση υπευθύνου, χρονολόγιο και audit· «Επανυποβολή» από την ομάδα που το παρέλαβε.</span></span><span className="atx-tag t-warning">{pending}</span></li>
         </ul>
       </div>
     </div>

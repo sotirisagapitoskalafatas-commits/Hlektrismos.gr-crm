@@ -19,6 +19,7 @@ import { SOURCE_FINDINGS, lastAnonChecks } from '@/lib/admin-checks';
 import { DocumentsTab, PermissionsTab, WorkflowTab } from './AdminReference';
 import ScraperSettingsCard from './ScraperSettings';
 import { TrashTab } from '@/components/trash/TrashControls';
+import { pendingText } from '@/lib/pending-text';
 
 type Tab = 'overview' | 'users' | 'trash' | 'permissions' | 'workflow' | 'documents' | 'scraper' | 'security' | 'audit';
 const TAB_LABEL: Record<Tab, string> = {
@@ -99,7 +100,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
         <button type="button" className="atx-ov" onClick={() => onOpen('users')}>
           <span className="atx-ov-k">Διαχείριση χρηστών</span>
           <span className={`atx-ov-v ${staff?.source === 'server' ? '' : 'is-warn'}`}>{!staff ? '…' : staff.source === 'server' ? 'Ενεργή' : 'Εκκρεμεί'}</span>
-          <span className="atx-ov-s">{staff?.source === 'server' ? 'Ο server απαντά στις ενέργειες διαχείρισης.' : 'Απαιτεί migration phase2/05 και function admin-users.'}</span>
+          <span className="atx-ov-s">{staff?.source === 'server' ? 'Ο server απαντά στις ενέργειες διαχείρισης.' : pendingText(role, 'Εκκρεμεί η ενημέρωση της βάσης «Διαχείριση χρηστών» (phase2/05) και η function admin-users.', 'Η διαχείριση χρηστών ενεργοποιείται μετά την επόμενη ενημέρωση.')}</span>
         </button>
         {role === 'admin' && (
           <button type="button" className="atx-ov" onClick={() => onOpen('security')}>
@@ -150,7 +151,7 @@ function AuditTab() {
     <div className="atx-panel" aria-busy={rows === undefined}>
       <div className="atx-card-head"><h2 className="atx-section-title">Ενέργειες διαχείρισης χρηστών</h2></div>
       {rows === undefined && [0, 1, 2].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
-      {rows === null && <p className="px-4 pb-4 text-[14px] text-[var(--atx-muted)]">Το audit log διαχείρισης χρηστών θα είναι διαθέσιμο μετά την εφαρμογή της migration phase2/05.</p>}
+      {rows === null && <p className="px-4 pb-4 text-[14px] text-[var(--atx-muted)]">Το ιστορικό διαχείρισης χρηστών θα είναι διαθέσιμο μετά την επόμενη ενημέρωση της βάσης.</p>}
       {rows && rows.length === 0 && <p className="px-4 pb-4 text-[14px] text-[var(--atx-muted)]">Δεν υπάρχουν καταγραφές ακόμη.</p>}
       {rows && rows.length > 0 && (
         <table className="atx-table">

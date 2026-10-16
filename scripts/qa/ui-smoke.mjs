@@ -15,13 +15,15 @@ const click = (page, label, scope = 'button') => page.evaluate((l, sc) => {
 // The role preview has a built-in hard stop (ROLE_PREVIEW_HARD_STOP in src/lib/role-preview.ts); after it the selector is gone by design.
 const PREVIEW_LIVE = Date.now() < Date.parse('2026-10-16T00:00:00+03:00');
 const ADMIN_ONLY = ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Διαχείριση'];
+// Hidden behind the admin-only «Πειραματικές λειτουργίες» switch (src/lib/labs.ts), off by default.
+const LABS = ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'B2B Prospecting'];
 const EXPECT = {
-  admin: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Ρυθμίσεις'.length && 'Προτιμήσεις', ...ADMIN_ONLY], mustNot: [] },
-  manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', ...ADMIN_ONLY], mustNot: [] },
-  inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'Διεκπεραίωση', 'Χάρτης'] },
+  admin: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Ρυθμίσεις'.length && 'Προτιμήσεις', 'Διαχείριση'], mustNot: LABS },
+  manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Διαχείριση'], mustNot: LABS },
+  inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'B2B Prospecting', 'Διεκπεραίωση', 'Χάρτης'] },
   field_sales: { must: ['Αρχική', 'Η εργασία μου', 'Ημέρα μου', 'Χάρτης', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Διεκπεραίωση', 'B2B Prospecting'] },
-  // Back Office reviews and distributes B2B prospects (phase3/08), so it sees B2B Prospecting.
-  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Διεκπεραίωση', 'Cases', 'Διαχείριση', 'B2B Prospecting'], mustNot: ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Leads', 'Χάρτης'] },
+  // B2B Prospecting is a labs module until phase3/08 and the legal review are done: hidden for Back Office too.
+  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Διεκπεραίωση', 'Cases', 'Διαχείριση'], mustNot: [...LABS, 'Leads', 'Χάρτης'] },
 };
 
 /* ---- 1. per-role navigation + role simulator ---- */
@@ -111,6 +113,30 @@ if (!PREVIEW_LIVE) {
   await sleep(400);
   check('Preview expired: selector gone and stored preview ignored', !(await body()).includes('Επίδειξη ρόλου') && !(await body()).includes('ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ'));
   await fetch('http://127.0.0.1:54399/__preview?state=on');
+  await browser.close();
+}
+
+/* ---- 2b2. «Πειραματικές λειτουργίες»: admin-only switch in Προτιμήσεις, off by default ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'manager');
+  await click(page, 'Προτιμήσεις', '#shell-rail nav button'); await sleep(1000);
+  check('Labs: the switch is not offered to a manager', !(await page.evaluate(() => !!document.querySelector('[data-labs-toggle]'))));
+  await signInAs(page, 'admin');
+  await click(page, 'Προτιμήσεις', '#shell-rail nav button'); await sleep(1000);
+  const off = await page.evaluate(() => document.querySelector('[data-labs-toggle] input')?.checked);
+  await page.evaluate(() => document.querySelector('[data-labs-toggle] input')?.click());
+  await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+  await sleep(2000);
+  const nav = await text(page, '#shell-rail nav button');
+  check('Labs: off by default; once the admin turns it on, the three modules appear', off === false && LABS.every((l) => nav.some((t) => t.startsWith(l))), JSON.stringify(nav.filter((t) => LABS.some((l) => t.startsWith(l)))));
+  await click(page, 'AI Εργατικό Δυναμικό', '#shell-rail nav button'); await sleep(1500);
+  check('Labs: the module opens for the admin', (await page.evaluate(() => document.querySelector('main')?.innerText ?? '')).length > 50);
+  await click(page, 'Προτιμήσεις', '#shell-rail nav button'); await sleep(1000);
+  await page.evaluate(() => document.querySelector('[data-labs-toggle] input')?.click());
+  await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+  await sleep(2000);
+  check('Labs: turning it off hides them again', !(await text(page, '#shell-rail nav button')).some((t) => LABS.some((l) => t.startsWith(l))));
   await browser.close();
 }
 
@@ -507,18 +533,27 @@ if (!PREVIEW_LIVE) {
 {
   const M = 'http://127.0.0.1:54399';
   const openB2B = async (page) => { await click(page, 'B2B Prospecting', '#shell-rail nav button'); await sleep(1200); };
+  const labsOn = async (page) => { await page.evaluate(() => localStorage.setItem('atlas.labs', 'on')); await page.reload({ waitUntil: 'domcontentloaded' }); await sleep(2000); };
   const tabTo = (page, t) => page.evaluate((x) => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim().startsWith(x))?.click(), t);
   const setInput = (page, idx, v) => page.evaluate((i, val) => { const el = [...document.querySelectorAll('input.field')][i]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, idx, v);
   {
     const { browser, page } = await launch(1440, 900);
-    await signInAs(page, 'field_sales');
-    const nav = await text(page, '#shell-rail nav button');
-    check('B2B: field sales has no prospecting', !nav.some((t) => t.startsWith('B2B Prospecting')));
+    // the switch is admin-only: set by hand for Back Office / Inside Sales it changes nothing
+    const hidden = [];
+    for (const r of ['field_sales', 'inside_sales', 'back_office']) {
+      await signInAs(page, r);
+      await labsOn(page);
+      hidden.push(!(await text(page, '#shell-rail nav button')).some((t) => t.startsWith('B2B Prospecting')));
+    }
+    check('B2B: hidden for every non-admin, even with the browser switch set by hand', hidden.every(Boolean));
+    await signInAs(page, 'admin');
+    check('B2B: hidden for the admin while «Πειραματικές λειτουργίες» is off', !(await text(page, '#shell-rail nav button')).some((t) => t.startsWith('B2B Prospecting')));
     await browser.close();
   }
   {
     const { browser, page } = await launch(1440, 900);
-    await signInAs(page, 'inside_sales');
+    await signInAs(page, 'admin');
+    await labsOn(page);
     await openB2B(page);
     const leadsBefore = (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'POST' && l.table === 'leads').length;
     await setInput(page, 0, 'Γλυφάδα, Βούλα');
@@ -527,22 +562,15 @@ if (!PREVIEW_LIVE) {
     const preview = await page.evaluate(() => document.body.innerText.match(/(\d+) αναζητήσεις/)?.[1]);
     await page.evaluate(() => [...document.querySelectorAll('button.atx-btn-primary')].find((b) => b.textContent.trim() === 'Αναζήτηση')?.click());
     await sleep(1500);
-    const log = await (await fetch(`${M}/__log`)).json();
+    let log = await (await fetch(`${M}/__log`)).json();
     const call = log.filter((l) => l.table === 'scrape-b2b').pop();
     check('B2B: multi-select search (2 categories × 2 cities = 4 searches) goes to scrape-b2b', preview === '4' && call?.body?.categories?.length === 2 && call.body.cities.length === 2);
     check('B2B: results go to the review queue, not to leads', (await page.evaluate(() => document.querySelector('[data-outcome="ok"]')?.innerText ?? '')).includes('νέες για έλεγχο')
       && log.filter((l) => l.method === 'POST' && l.table === 'leads').length === leadsBefore);
     await tabTo(page, 'Έλεγχος');
     await sleep(1000);
-    check('B2B: inside sales sees the queue but cannot approve', (await page.evaluate(() => document.querySelectorAll('[data-prospect]').length)) >= 8
-      && (await page.evaluate(() => { document.querySelector('[data-prospect] input[type="checkbox"]')?.click(); return ![...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Έγκριση'); })));
-    await browser.close();
-  }
-  {
-    const { browser, page } = await launch(1440, 900);
-    await signInAs(page, 'back_office');
-    await openB2B(page);
-    await tabTo(page, 'Έλεγχος');
+    check('B2B: the review queue lists the results', (await page.evaluate(() => document.querySelectorAll('[data-prospect]').length)) >= 8);
+
     await sleep(1000);
     check('B2B: duplicate of an existing lead is flagged', (await page.evaluate(() => document.body.innerText)).includes('Υπάρχει ήδη ως lead (ίδιο τηλέφωνο)'));
     // exclude the flagged one with a reason
@@ -553,7 +581,7 @@ if (!PREVIEW_LIVE) {
     await page.evaluate((val) => { const el = [...document.querySelectorAll('input.field')].pop(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, 'Υπάρχει ήδη ως πελάτης μας');
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Επιβεβαίωση')?.click());
     await sleep(1000);
-    let log = await (await fetch(`${M}/__log`)).json();
+    log = await (await fetch(`${M}/__log`)).json();
     check('B2B: exclusion needs a reason and goes through b2b_review', disabled === true && log.some((l) => l.table === 'b2b_review' && l.body.p_action === 'exclude' && l.body.p_reason.length >= 3));
     // approve three
     await page.evaluate(() => [...document.querySelectorAll('[data-prospect] input[type="checkbox"]')].slice(0, 3).forEach((b) => b.click()));
@@ -575,7 +603,7 @@ if (!PREVIEW_LIVE) {
       && !log.some((l) => /send-campaign|send-sms|make-voice-call|send-email/.test(l.table ?? '')));
     await tabTo(page, 'Ιστορικό');
     await sleep(1000);
-    check('B2B: search history shows who, what and counts', (await page.evaluate(() => document.body.innerText)).includes('Ελένη Δημητρίου'));
+    check('B2B: search history shows who, what and counts', (await page.evaluate(() => document.body.innerText)).includes('Μαρία Παπαδοπούλου'));
     await browser.close();
   }
   {

@@ -15,6 +15,7 @@ import {
   staffReferenceCount, updateStaff,
 } from '@/lib/staff-admin';
 import type { StaffMember, StaffSource } from '@/lib/staff-admin';
+import { pendingText } from '@/lib/pending-text';
 
 type Dialog =
   | { kind: 'create' }
@@ -72,8 +73,7 @@ export default function StaffAdmin() {
     <div className="space-y-3">
       {source === 'fallback' && (
         <div className="atx-notice" role="status">
-          <strong>Μόνο προβολή.</strong> Η διαχείριση χρηστών ενεργοποιείται όταν εφαρμοστεί η migration
-          <code className="mx-1">staged-migrations/phase2/05</code> και αναπτυχθεί η function <code>admin-users</code> (εκκρεμεί έγκριση).
+          <strong>Μόνο προβολή.</strong> {pendingText(viewRole, 'Η διαχείριση χρηστών ενεργοποιείται μετά την ενημέρωση της βάσης «Διαχείριση χρηστών» (phase2/05) και την ανάπτυξη της function admin-users.', 'Η διαχείριση χρηστών ενεργοποιείται μετά την επόμενη ενημέρωση.')}
         </div>
       )}
       {error && <div className="atx-notice" role="alert">{error}</div>}

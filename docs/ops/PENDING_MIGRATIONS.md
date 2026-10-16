@@ -12,6 +12,8 @@ The Admin centre findings match this: anonymous read of integration settings, se
 
 These files sit outside `supabase/migrations/`, so the GitHub integration never applies them. They are run by hand in the SQL editor, staging first. Production needs your approval and a backup or PITR checkpoint.
 
+> **Hotfix first:** apply `phase1/16` and `phase1/01` ahead of everything else, and **rotate the leaked service-role key** in the same window. See [`SECURITY_HOTFIX_RUNBOOK.md`](SECURITY_HOTFIX_RUNBOOK.md).
+
 ## Recommended order (security first)
 
 | # | File | What | Additive? | Depends on | Could it break the website form / chatbot / webhook? | Priority |

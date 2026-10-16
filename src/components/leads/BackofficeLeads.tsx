@@ -1,4 +1,4 @@
-/* Λειτουργίες: «Νέα leads με έγγραφα» — leads created with documents and routed to the default Back Office assignee
+/* Διεκπεραίωση: «Νέα leads με έγγραφα» — leads created with documents and routed to the default Back Office assignee
    (staged phase4/12). Back Office sees the ones assigned to them; admin/manager see all. Hidden when empty. */
 
 import { useEffect, useState } from 'react';

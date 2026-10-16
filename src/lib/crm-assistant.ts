@@ -49,7 +49,7 @@ const PAGES: { page: string; label: string; re: RegExp }[] = [
   { page: 'providers', label: 'Πάροχοι & Προγράμματα', re: /(παροχ|προγραμματα)/ },
   { page: 'myday', label: 'Ημέρα μου', re: /(ημερα μου|my ?day)/ },
   { page: 'map', label: 'Χάρτης', re: /(χαρτη|map)/ },
-  { page: 'backoffice', label: 'Λειτουργίες', re: /(λειτουργι|back ?office)/ },
+  { page: 'backoffice', label: 'Διεκπεραίωση', re: /(διεκπεραι|λειτουργι|back ?office)/ },
   { page: 'reports', label: 'Αναφορές', re: /(αναφορ|report)/ },
   { page: 'revenue', label: 'Έσοδα', re: /(εσοδα|revenue)/ },
   { page: 'automations', label: 'Αυτοματισμοί', re: /(αυτοματισμ)/ },
@@ -65,7 +65,7 @@ export function suggestionsFor(role: AssistantRole): string[] {
   const base = ['Τι έχω σήμερα;', 'Εκπρόθεσμα follow-ups', 'Βρες πελάτη…'];
   if (role === 'admin' || role === 'manager') return [...base, 'Σύνοψη ομάδας', 'Άνοιξε Cases'];
   if (role === 'field_sales') return [...base, 'Άνοιξε Ημέρα μου'];
-  if (role === 'back_office') return [...base, 'Άνοιξε Λειτουργίες'];
+  if (role === 'back_office') return [...base, 'Άνοιξε Διεκπεραίωση'];
   return [...base, 'Leads για επικοινωνία', 'Άνοιξε Leads'];
 }
 

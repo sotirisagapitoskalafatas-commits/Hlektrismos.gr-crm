@@ -9,6 +9,8 @@ import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
 import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
+import { casePatch, contactFormFrom, contactNameOk, contactSaveError, customerPatch } from '@/lib/contact-save';
+import type { ContactForm } from '@/lib/contact-save';
 import { APPLICATION_STATUS_TEXT, OFFER_STATUS_TEXT, SIGNATURE_STATUS_TEXT, statusText } from '@/lib/status-text';
 import { entryTeam, entryTeamLabel, historyDescription, historyText, visibleHistory } from '@/lib/history-text';
 import { useToast } from '@/lib/toast';
@@ -25,7 +27,7 @@ import {
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
   fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
-  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, updateCase, updateCustomer,
+  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, updateCase, updateCustomer, customerNamesAvailable,
   uploadDocumentFile,
 } from '@/lib/api';
 import {
@@ -616,23 +618,17 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const [docs, setDocs] = useState<CaseDocument[]>([]);
   const staff = useStaff();
   const [editContact, setEditContact] = useState(false);
-  const [contactForm, setContactForm] = useState({
-    full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', lat: '', lng: '',
-  });
+  const [contactForm, setContactForm] = useState<ContactForm>(contactFormFrom(null, {}));
   const [contactSaving, setContactSaving] = useState(false);
+  const [contactErr, setContactErr] = useState<string | null>(null);
+  const { toast: notify } = useToast();
+  const [names, setNames] = useState(false);
+  useEffect(() => { void customerNamesAvailable().then(setNames); }, []);
   const [contactLocating, setContactLocating] = useState(false);
 
   const openContactEdit = () => {
-    setContactForm({
-      full_name: c?.customer?.full_name ?? '',
-      phone: c?.customer?.phone ?? '',
-      email: c?.customer?.email ?? '',
-      address: c?.address || c?.customer?.address || '',
-      city: c?.customer?.city ?? '',
-      postal_code: c?.customer?.postal_code ?? '',
-      lat: c?.lat ?? c?.customer?.lat ?? '',
-      lng: c?.lng ?? c?.customer?.lng ?? '',
-    });
+    setContactForm(contactFormFrom(c?.customer, { address: c?.address, lat: c?.lat, lng: c?.lng }));
+    setContactErr(null);
     setEditContact(true);
   };
 
@@ -643,28 +639,17 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
     if (coords) setContactForm(f => ({ ...f, lat: String(coords.lat), lng: String(coords.lng) }));
   };
 
+  // A failed save keeps the form open with a Greek message (D4); nothing closes as if it worked.
   const saveContact = async () => {
     if (!c) return;
-    setContactSaving(true);
-    if (c.customer_id) {
-      await updateCustomer(c.customer_id, {
-        full_name: contactForm.full_name?.trim() || c.customer?.full_name || '—',
-        phone: contactForm.phone || null,
-        email: contactForm.email || null,
-        address: contactForm.address || null,
-        city: contactForm.city || null,
-        postal_code: contactForm.postal_code || null,
-        lat: contactForm.lat === '' ? null : Number(contactForm.lat),
-        lng: contactForm.lng === '' ? null : Number(contactForm.lng),
-      });
-    }
-    await updateCase(c.id, {
-      address: contactForm.address ?? c.address,
-      lat: contactForm.lat === '' ? null : Number(contactForm.lat),
-      lng: contactForm.lng === '' ? null : Number(contactForm.lng),
-    });
+    setContactSaving(true); setContactErr(null);
+    const customerSaved = c.customer_id ? await updateCustomer(c.customer_id, customerPatch(contactForm, names, c.customer?.full_name || '—')) : true;
+    const { error: caseError } = await updateCase(c.id, casePatch(contactForm));
     setContactSaving(false);
+    const err = contactSaveError(customerSaved, caseError);
+    if (err) { setContactErr(err); notify(err, 'bad'); return; }
     setEditContact(false);
+    notify('Τα στοιχεία αποθηκεύτηκαν', 'ok');
     await reload();
   };
 
@@ -751,9 +736,20 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
 
           {editContact ? (
             <div className="mt-3 space-y-2.5">
-              <Field label="Ονοματεπώνυμο">
-                <input className="field" value={contactForm.full_name ?? ''} onChange={e => setContactForm(f => ({ ...f, full_name: e.target.value }))} />
-              </Field>
+              {names ? (
+                <div className="grid sm:grid-cols-2 gap-2.5">
+                  <Field label="Όνομα">
+                    <input className="field" value={contactForm.first_name} onChange={e => setContactForm(f => ({ ...f, first_name: e.target.value }))} />
+                  </Field>
+                  <Field label="Επώνυμο">
+                    <input className="field" value={contactForm.last_name} onChange={e => setContactForm(f => ({ ...f, last_name: e.target.value }))} />
+                  </Field>
+                </div>
+              ) : (
+                <Field label="Ονοματεπώνυμο">
+                  <input className="field" value={contactForm.full_name} onChange={e => setContactForm(f => ({ ...f, full_name: e.target.value }))} />
+                </Field>
+              )}
               <div className="grid sm:grid-cols-2 gap-2.5">
                 <Field label="Τηλέφωνο">
                   <input type="tel" className="field" value={contactForm.phone ?? ''} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))} placeholder="69…" />
@@ -780,8 +776,9 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
                   <Crosshair className="w-3.5 h-3.5" /> {contactLocating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
                 </button>
               </Field>
+              {contactErr && <p role="alert" data-contact-error className="text-[13px] text-bad-600">{contactErr}</p>}
               <div className="flex gap-2 pt-1">
-                <Btn onClick={saveContact} disabled={contactSaving || !contactForm.full_name?.trim()}>
+                <Btn onClick={saveContact} disabled={contactSaving || !contactNameOk(contactForm, names)}>
                   {contactSaving ? <Spinner /> : <Check className="w-3.5 h-3.5" />} Αποθήκευση
                 </Btn>
                 <Btn variant="ghost" onClick={() => setEditContact(false)}>Ακύρωση</Btn>

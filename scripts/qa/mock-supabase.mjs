@@ -120,6 +120,7 @@ const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 // ---- Contact eligibility (mirrors staged-migrations/phase3/09; synthetic) ----
 const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
+let patchFail = null; // GET /__patchfail?table=customers → the next PATCH to that table fails once (save-error test)
 let leadFail = null; // GET /__leadfail?code=42501 → the next POST to leads fails with that code (error-display test)
 const contactObjections = [];
 const contactConsents = [];
@@ -221,6 +222,7 @@ http.createServer((req, res) => {
     const send = (code, obj, extra = {}) => { res.writeHead(code, { ...cors, ...extra }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
+    if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; return send(200, { patchFail }); }
     if (url.pathname === '/__leadfail') { leadFail = url.searchParams.get('code') || null; return send(200, { leadFail }); } // next leads POST fails once
     if (url.pathname === '/__gates') {
       gatesOn = url.searchParams.get('state') === 'on';
@@ -599,6 +601,7 @@ http.createServer((req, res) => {
     // writes: applied IN MEMORY so UI flows can be verified end-to-end (reset by restarting the mock)
     log.push({ method: req.method, table, query: url.search, body: json });
     const tbl = (TABLES[table] ??= []);
+    if (req.method === 'PATCH' && patchFail === table) { patchFail = null; return send(400, { code: '23514', message: 'mock: write refused', details: null, hint: null }); }
     if (req.method === 'PATCH') {
       const hit = applyFilters(tbl, url.searchParams);
       if (gatesOn && table === 'cases' && json.current_stage) {

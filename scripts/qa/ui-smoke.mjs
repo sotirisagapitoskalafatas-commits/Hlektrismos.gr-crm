@@ -1135,6 +1135,37 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await browser.close();
 }
 
+/* ---- 10b. Case → «Στοιχεία επαφής»: a failed save stays open with a message; first/last name like the Customer page (D4) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+  await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === 'CS-2026-006' && e.offsetParent); el && el.click(); });
+  await sleep(2000);
+  await page.evaluate(() => document.querySelector('button[title="Επεξεργασία στοιχείων"]')?.click()); await sleep(500);
+  const labels = await page.evaluate(() => [...document.querySelectorAll('main label')].map((l) => l.textContent.trim()));
+  const setField = (label, v) => page.evaluate((l, val) => {
+    const i = [...document.querySelectorAll('main label')].find((x) => x.textContent.trim().startsWith(l))?.querySelector('input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, val); i.dispatchEvent(new Event('input', { bubbles: true }));
+  }, label, v);
+  const names = labels.some((l) => l.startsWith('Επώνυμο'));
+  await setField('Τηλέφωνο', '6900000099');
+  await fetch(`${M}/__patchfail?table=customers`);
+  await click(page, 'Αποθήκευση'); await sleep(1500);
+  const failed = await page.evaluate(() => ({ msg: document.querySelector('[data-contact-error]')?.textContent ?? '', open: !!document.querySelector('button[title="Ακύρωση"]') }));
+  check('Contact save (case): a failed save stays open and says so in Greek', failed.open && failed.msg.includes('δεν αποθηκεύτηκαν'), JSON.stringify(failed));
+  if (names) await setField('Επώνυμο', 'Δοκιμαστική');
+  await click(page, 'Αποθήκευση'); await sleep(1500);
+  const log = await (await fetch(`${M}/__log`)).json();
+  const w = log.filter((l) => l.method === 'PATCH' && l.table === 'customers').pop()?.body ?? {};
+  const closed = await page.evaluate(() => !document.querySelector('[data-contact-error]') && !document.querySelector('button[title="Ακύρωση"]'));
+  check('Contact save (case): the retry saves and closes the form', closed && w.phone === '6900000099');
+  check('Contact save (case): first and last name are sent when the columns exist, full name kept in step',
+    names ? (w.last_name === 'Δοκιμαστική' && typeof w.full_name === 'string' && w.full_name.endsWith('Δοκιμαστική')) : (typeof w.full_name === 'string' && !('last_name' in w)), JSON.stringify({ names, w }));
+  await browser.close();
+}
+
 /* ---- 11. Field day: order, arrival prompt, check-in without GPS (accepted + flagged), outcome-gated check-out ---- */
 {
   {

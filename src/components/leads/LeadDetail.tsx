@@ -17,8 +17,8 @@ import { leadNextAction } from '@/lib/lead-next';
 import { leadName } from '@/lib/work';
 import { useToast } from '@/lib/toast';
 import { fmtDateTime } from '@/lib/ui';
+import { leadActionText } from '@/lib/history-text';
 
-const ACTION_LABEL: Record<string, string> = { status_change: 'Αλλαγή κατάστασης', converted: 'Μετατροπή σε Case', updated: 'Ενημέρωση στοιχείων', created: 'Δημιουργία' };
 
 export default function LeadDetail({ leadId, version, onEdit }: { leadId: string; version: number; onEdit: (l: Lead) => void }) {
   const { role, user } = useAuth();
@@ -98,9 +98,7 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
   const history: { at: string; text: string }[] = [
     ...(activity ?? []).map(a => ({
       at: a.created_at,
-      text: a.action === 'status_change' && a.details
-        ? `Κατάσταση: ${leadStatusDisplay(String(a.details.from ?? '')).label} → ${leadStatusDisplay(String(a.details.to ?? '')).label}`
-        : ACTION_LABEL[a.action] ?? a.action,
+      text: leadActionText(a, s => leadStatusDisplay(s).label),
     })),
     ...(lead.converted_at ? [{ at: lead.converted_at, text: 'Μετατράπηκε σε Case' }] : []),
     { at: lead.created_at, text: `Νέο lead · ${src.label}` },

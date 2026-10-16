@@ -168,6 +168,9 @@ const TABLES = { b2b_prospects: b2bProspects, b2b_search_jobs: b2bJobs, b2b_sear
   timeline_events: [
     { id: '70000000-0000-4000-8000-000000000001', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'call', title: 'Τηλεφωνική επικοινωνία', description: 'Ενδιαφέρεται για πρόγραμμα ρεύματος', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: { id: U('inside_sales'), full_name: USERS.inside_sales.full_name, role: 'inside_sales' } },
     { id: '70000000-0000-4000-8000-000000000002', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'email', title: 'Αποστολή προσφοράς', description: '', user_id: U('inside_sales'), occurred_at: iso(-1 * D), location: null, metadata: {}, user: null },
+    // stored before the W1/W2 fix: raw stage codes plus the «Ενημέρωση Case» duplicate (shown in Greek, duplicate hidden)
+    { id: '70000000-0000-4000-8000-000000000003', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'status_change', title: 'Στάδιο: new → contacted', description: 'Στάδιο: new → contacted', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: null },
+    { id: '70000000-0000-4000-8000-000000000004', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'status_change', title: 'Ενημέρωση Case', description: 'Στάδιο: new → contacted', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: null },
   ] };
 Object.defineProperty(TABLES, 'stage_document_gates', { enumerable: true, get: () => Object.entries(GATES).map(([stage, min_status]) => ({ stage, min_status, mode: gateMode[stage], enabled: true })) });
 const log = [];

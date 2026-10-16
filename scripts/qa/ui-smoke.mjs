@@ -497,7 +497,7 @@ if (!PREVIEW_LIVE) {
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'back_office');
-    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    await click(page, 'Διεκπεραίωση', '#shell-rail nav button'); await sleep(1800);
     const subs = await page.evaluate(() => [...document.querySelectorAll('main .atx-row-sub')].map((e) => e.textContent));
     check('Queue: no double separator when a case has no number', subs.length > 0 && subs.every((t) => !/·\s*·/.test(t)) && subs.some((t) => t.startsWith('Αίτηση · ')), JSON.stringify(subs.filter((t) => t.startsWith('Αίτηση'))));
     await browser.close();
@@ -550,6 +550,8 @@ if (!PREVIEW_LIVE) {
       hidden.push(!(await text(page, '#shell-rail nav button')).some((t) => t.startsWith('B2B Prospecting')));
     }
     check('B2B: hidden for every non-admin, even with the browser switch set by hand', hidden.every(Boolean));
+    // same browser as above: clear the switch the loop set by hand, so the admin starts with it off (the default)
+    await page.evaluate(() => localStorage.removeItem('atlas.labs'));
     await signInAs(page, 'admin');
     check('B2B: hidden for the admin while «Πειραματικές λειτουργίες» is off', !(await text(page, '#shell-rail nav button')).some((t) => t.startsWith('B2B Prospecting')));
     await browser.close();

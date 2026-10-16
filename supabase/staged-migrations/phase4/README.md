@@ -50,3 +50,10 @@
 - Until applied, the app does not send `kind` and recognises these follow-ups by that text prefix.
 
 **Apply order:** phase2/07 → phase4/10 → 11 → 12 → 13 → 14, on staging first. They are independent of each other except that all expect the live schema.
+
+## 15 — Lead → Case: match an existing customer on phone only (finding D1)
+- `convert_lead_to_case` reused a customer by exact phone **or email**. The website placeholder `not-provided@hlektrismos.local` therefore joined different people without email into one customer.
+- Now: phone only (last 10 digits); never a customer in the Κάδος; the placeholder is never stored on a new customer. Existing rows unchanged.
+- Count (read-only) and manual review: `docs/ops/D1_PLACEHOLDER_EMAIL.md`. Rollback: `docs/ops/rollback_phase4_15_convert_lead.sql`.
+- Local evidence: `node --test supabase/tests/convert-lead-d1.test.mjs` — 7/7. Independent of the other files; full order in `docs/ops/PENDING_MIGRATIONS.md`.
+

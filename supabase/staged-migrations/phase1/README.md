@@ -11,6 +11,7 @@ Nothing here has been run against staging or production. Local behavior is verif
 | `02_outreach_decisions_audit.sql` | Append-only `outreach_decisions` (one row per gate decision). Per-channel consent evidence moved to `phase3/09_contact_eligibility.sql` (keyed by phone/email, not by the legacy lead id) | none |
 | `03_drop_exec_sql.sql` | Drop a hand-made `exec_sql` RPC if one exists | Save its definition first (audit SQL query 9) |
 | `04_cron_secret_and_pause.sql` | Tariff cron authenticates with a dedicated cron secret from Vault; unschedule the two outreach schedulers | `CRON_SECRET` function secret + Vault entries (steps in the file) |
+| `16_storage_docs_lockdown.sql` | Anonymous visitors can no longer list or download files in `hlektrismos_docs`; anon may upload only into `contact-forms/`; inactive accounts lose access (legacy permissive policies from `20260820000004` dropped) | After applying: incognito website upload test in `docs/ops/SECURITY_LIVE_FINDINGS.md` |
 
 ## Procedure (owner/operator)
 1. Run `docs/audit/audit-rls-readonly.sql` on **staging**, save the output (queries 1–11).

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Card, CardHeader, Micro } from '@/lib/ui';
 import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
 import type { NavigationApp } from '@/lib/navigation/external-maps';
-import { History, Navigation, PanelLeft, SlidersHorizontal } from 'lucide-react';
+import { FlaskConical, History, Navigation, PanelLeft, SlidersHorizontal } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { labsEnabled, setLabsEnabled } from '@/lib/labs';
 
 export function dispatchPrefsChanged() {
   window.dispatchEvent(new Event('atlas:prefs'));
@@ -11,6 +13,14 @@ export function dispatchPrefsChanged() {
 export default function PreferencesPage() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('atlas.nav.collapsed') === '1');
   const [navApp, setNavApp] = useState<NavigationApp>(() => getNavigationPreference());
+  const { role } = useAuth();
+  const [labs, setLabs] = useState(() => labsEnabled());
+  const toggleLabs = () => {
+    const next = !labs;
+    setLabs(next);
+    setLabsEnabled(next);
+    window.location.reload(); // the menu of every shell is rebuilt from scratch
+  };
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -50,6 +60,21 @@ export default function PreferencesPage() {
           Οι προτιμήσεις αποθηκεύονται τοπικά σε αυτόν τον browser και εφαρμόζονται αμέσως.
         </p>
       </Card>
+
+      {/* Labs — admin only (lib/labs.ts) */}
+      {role === 'admin' && (
+        <Card>
+          <CardHeader micro="Μόνο για διαχειριστές" title="Πειραματικές λειτουργίες" className="mb-3" />
+          <label className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 cursor-pointer hover:border-ink/25 transition-colors" data-labs-toggle>
+            <FlaskConical className="w-4 h-4 text-ink/40 shrink-0" />
+            <span className="flex-1 min-w-0">
+              <span className="block text-[13px] font-medium text-ink">Εμφάνιση μη ολοκληρωμένων ενοτήτων</span>
+              <span className="block text-xs text-ink/45">AI Εργατικό Δυναμικό, Αυτοματισμοί, B2B Prospecting. Μόνο εσείς τις βλέπετε, μόνο σε αυτόν τον browser. Οι υπόλοιποι χρήστες δεν τις βλέπουν ποτέ.</span>
+            </span>
+            <input type="checkbox" checked={labs} onChange={toggleLabs} className="w-4 h-4 accent-brand-500" aria-label="Πειραματικές λειτουργίες" />
+          </label>
+        </Card>
+      )}
 
       {/* Navigation app */}
       <Card>

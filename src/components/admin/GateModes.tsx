@@ -8,6 +8,7 @@ import { useToast } from '@/lib/toast';
 import { fetchStageGates, setStageGateMode } from '@/lib/api';
 import type { StageGate } from '@/lib/api';
 import { stageText } from '@/lib/case-flow';
+import { pendingText } from '@/lib/pending-text';
 
 const LEVEL = { received: 'να έχουν παραληφθεί', verified: 'να έχουν ελεγχθεί' } as const;
 
@@ -38,7 +39,7 @@ export default function GateModes() {
           «Μπλοκάρισμα»: η βάση δεν επιτρέπει τη μετάβαση· ο διαχειριστής ή ο διευθυντής μπορεί να την παρακάμψει με αιτιολογία.
         </p>
         {gates === undefined && <div className="atx-skeleton" />}
-        {gates === null && <div className="atx-notice">Η ρύθμιση ενεργοποιείται μετά την εφαρμογή της migration phase2/07 (εκκρεμεί). Μέχρι τότε κανένα στάδιο δεν μπλοκάρεται από τη βάση.</div>}
+        {gates === null && <div className="atx-notice">{pendingText(role, 'Η ρύθμιση ενεργοποιείται μετά την ενημέρωση της βάσης «Ροή case» (phase2/07). Μέχρι τότε κανένα στάδιο δεν μπλοκάρεται από τη βάση.', 'Η ρύθμιση δεν είναι ακόμη διαθέσιμη. Μέχρι τότε κανένα στάδιο δεν μπλοκάρεται.')}</div>}
         {gates && (
           <ul className="m-0 p-0 list-none divide-y divide-[var(--atx-line)]">
             {gates.filter(g => g.enabled).map(g => (

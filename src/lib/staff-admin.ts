@@ -45,7 +45,7 @@ const friendly = (msg: string | undefined, fallback: string) => {
   if (/own role|own status/i.test(m)) return 'Δεν μπορείτε να αλλάξετε τον δικό σας ρόλο ή την κατάστασή σας.';
   if (/not allowed/i.test(m) || /permission|42501/i.test(m)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
   if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
-  if (/Could not find the function|PGRST202/i.test(m)) return 'Η λειτουργία δεν είναι ακόμη ενεργή στη βάση (εκκρεμεί η migration phase2/05).';
+  if (/Could not find the function|PGRST202/i.test(m)) return 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
   return fallback;
 };
 

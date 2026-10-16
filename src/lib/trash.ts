@@ -42,7 +42,7 @@ export function trashError(message: string | undefined, fallback: string): strin
   if (/only an administrator/i.test(m)) return 'Μόνο ο διαχειριστής μπορεί να διαγράψει οριστικά.';
   if (/not allowed|42501|permission/i.test(m)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
   if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
-  if (/Could not find the function|PGRST202|schema cache/i.test(m)) return 'Ο κάδος ενεργοποιείται μετά την εφαρμογή της migration phase2/06 (εκκρεμεί έγκριση).';
+  if (/Could not find the function|PGRST202|schema cache/i.test(m)) return 'Ο κάδος δεν είναι ακόμη διαθέσιμος.';
   return fallback;
 }
 

@@ -23,7 +23,7 @@ export async function fetchDefaultBackofficeAssignee(): Promise<Assignee | null 
 export async function setDefaultBackofficeAssignee(userId: string | null): Promise<string | null> {
   const { error } = await supabase.rpc('set_default_backoffice_assignee', { p_user: userId });
   if (!error) return null;
-  if (missingFn(error.message)) return 'Η ρύθμιση ενεργοποιείται μετά την εφαρμογή της migration phase4/12.';
+  if (missingFn(error.message)) return 'Η ρύθμιση δεν είναι ακόμη διαθέσιμη.';
   if (/not allowed|42501/i.test(error.message)) return 'Μόνο ο διαχειριστής αλλάζει αυτή τη ρύθμιση.';
   if (/active Back Office/i.test(error.message)) return 'Επιλέξτε ενεργό χρήστη Back Office.';
   return 'Η αποθήκευση απέτυχε.';
@@ -32,7 +32,7 @@ export async function setDefaultBackofficeAssignee(userId: string | null): Promi
 /** Assign the lead to the default Back Office assignee. assignee null = none set; error = could not route. */
 export async function routeLeadToBackoffice(leadId: string): Promise<{ assignee: Assignee | null; error: string | null }> {
   const { data, error } = await supabase.rpc('route_lead_to_backoffice', { p_lead: leadId });
-  if (error) return { assignee: null, error: missingFn(error.message) ? 'Η ανάθεση στο Back Office ενεργοποιείται μετά την εφαρμογή της migration phase4/12.' : 'Η ανάθεση στο Back Office απέτυχε.' };
+  if (error) return { assignee: null, error: missingFn(error.message) ? 'Η αυτόματη ανάθεση στο Back Office δεν είναι ακόμη ενεργή.' : 'Η ανάθεση στο Back Office απέτυχε.' };
   return { assignee: (data ?? null) as Assignee | null, error: null };
 }
 

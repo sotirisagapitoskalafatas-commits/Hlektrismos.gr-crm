@@ -34,7 +34,7 @@ export const DUP_TEXT = (d: NonNullable<Prospect['duplicate_of']>) =>
 
 const friendly = (m: string | undefined, fallback: string) => {
   const s = m ?? '';
-  if (/relation .*b2b_|does not exist|schema cache|PGRST20[25]|Could not find/i.test(s)) return 'Η ροή B2B ενεργοποιείται μετά την εφαρμογή της migration phase3/08 (εκκρεμεί έγκριση).';
+  if (/relation .*b2b_|does not exist|schema cache|PGRST20[25]|Could not find/i.test(s)) return 'Η ροή B2B δεν είναι ακόμη διαθέσιμη.';
   if (/a reason is required/i.test(s)) return 'Χρειάζεται αιτιολογία.';
   if (/choose at least one active sales agent/i.test(s)) return 'Επιλέξτε τουλάχιστον έναν ενεργό πωλητή.';
   if (/manual mode takes exactly one agent/i.test(s)) return 'Η χειροκίνητη ανάθεση γίνεται σε έναν πωλητή.';

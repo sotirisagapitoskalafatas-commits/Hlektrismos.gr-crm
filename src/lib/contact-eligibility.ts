@@ -8,6 +8,9 @@ import type { Role } from './roles';
 import { decideEligibility, DEFAULT_CONFIG } from '../../supabase/functions/_shared/eligibility';
 import type { Channel, EligibilityConfig, PermissionRecord } from '../../supabase/functions/_shared/eligibility';
 
+/** Shown when the consent tables are not in the database yet (staged phase3/09). Non-admins don't see the block at all. */
+export const CONTACT_CHECK_UNAVAILABLE = 'Ο έλεγχος συγκαταθέσεων δεν είναι ακόμη διαθέσιμος.';
+
 export type { Channel };
 
 export interface ContactFacts {
@@ -97,7 +100,7 @@ export function evaluate(f: ContactFacts, now: Date = new Date()): ChannelVerdic
 
 const friendly = (m: string | undefined, fallback: string) => {
   const s = m ?? '';
-  if (/Could not find the function|PGRST202|schema cache|does not exist/i.test(s)) return 'Ο έλεγχος επικοινωνίας ενεργοποιείται μετά την εφαρμογή της migration phase3/09 (εκκρεμεί έγκριση).';
+  if (/Could not find the function|PGRST202|schema cache|does not exist/i.test(s)) return CONTACT_CHECK_UNAVAILABLE;
   if (/a reason is required/i.test(s)) return 'Χρειάζεται αιτιολογία.';
   if (/evidence is required/i.test(s)) return 'Χρειάζεται αποδεικτικό (αριθμός εντύπου, ηχογράφησης κ.λπ.) και ημερομηνία.';
   if (/in the future/i.test(s)) return 'Η ημερομηνία του αποδεικτικού δεν μπορεί να είναι μελλοντική.';

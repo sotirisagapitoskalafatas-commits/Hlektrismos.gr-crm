@@ -583,7 +583,7 @@ export async function setStageGateMode(stage: Stage, mode: 'warn' | 'block'): Pr
   const { error } = await supabase.rpc('set_stage_gate_mode', { p_stage: stage, p_mode: mode });
   if (!error) return null;
   if (/not allowed|42501/i.test(error.message)) return 'Μόνο ο διαχειριστής αλλάζει αυτή τη ρύθμιση.';
-  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Η ρύθμιση ενεργοποιείται μετά την εφαρμογή της migration phase2/07.';
+  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Η ρύθμιση δεν είναι ακόμη διαθέσιμη.';
   return 'Η αλλαγή δεν αποθηκεύτηκε.';
 }
 
@@ -598,7 +598,7 @@ export async function setCaseException(caseId: string, state: Case['exception_st
   if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
   const { error } = await supabase.rpc('set_case_exception', { p_case: caseId, p_state: state ?? null, p_note: note.trim() || null });
   if (!error) return null;
-  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Οι εξαιρέσεις ενεργοποιούνται μετά την εφαρμογή της migration phase4/13.';
+  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Οι εξαιρέσεις δεν είναι ακόμη διαθέσιμες.';
   if (/a note is required/i.test(error.message)) return 'Γράψτε σύντομα τι συνέβη.';
   if (/not allowed|42501/i.test(error.message)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
   return 'Η αλλαγή δεν αποθηκεύτηκε.';

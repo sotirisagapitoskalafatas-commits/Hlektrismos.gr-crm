@@ -30,6 +30,12 @@ export const EXCEPTION_TEXT: Record<string, string> = {
 export const fromSales = (c: Pick<OpsCase, 'next_action' | 'current_stage' | 'back_office_owner'>) =>
   (c.next_action ?? '').startsWith('Παραλαβή από Sales') || (['application', 'signed'].includes(c.current_stage) && !!c.back_office_owner);
 
+/** Row subtitle: stage · case no. · time in stage · owner. Empty parts are left out (no «Αίτηση · · σήμερα»). */
+export function opsRowSub(i: Pick<OpsItem, 'stageLabel' | 'caseNo' | 'daysInStage'>, owner: string): string {
+  const days = i.daysInStage === 0 ? 'σήμερα στο στάδιο' : `${i.daysInStage} ${i.daysInStage === 1 ? 'ημέρα' : 'ημέρες'} στο στάδιο`;
+  return [i.stageLabel, i.caseNo, days, owner].map(v => (v ?? '').trim()).filter(Boolean).join(' · ');
+}
+
 export interface OpsItem {
   id: string;
   title: string;

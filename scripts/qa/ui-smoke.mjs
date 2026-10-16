@@ -18,10 +18,10 @@ const ADMIN_ONLY = ['Αυτοματισμοί', 'AI Εργατικό Δυναμ�
 const EXPECT = {
   admin: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Ρυθμίσεις'.length && 'Προτιμήσεις', ...ADMIN_ONLY], mustNot: [] },
   manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', ...ADMIN_ONLY], mustNot: [] },
-  inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'Λειτουργίες', 'Χάρτης'] },
-  field_sales: { must: ['Αρχική', 'Η εργασία μου', 'Ημέρα μου', 'Χάρτης', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Λειτουργίες', 'B2B Prospecting'] },
+  inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'Διεκπεραίωση', 'Χάρτης'] },
+  field_sales: { must: ['Αρχική', 'Η εργασία μου', 'Ημέρα μου', 'Χάρτης', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Διεκπεραίωση', 'B2B Prospecting'] },
   // Back Office reviews and distributes B2B prospects (phase3/08), so it sees B2B Prospecting.
-  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Λειτουργίες', 'Cases', 'Διαχείριση', 'B2B Prospecting'], mustNot: ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Leads', 'Χάρτης'] },
+  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Διεκπεραίωση', 'Cases', 'Διαχείριση', 'B2B Prospecting'], mustNot: ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Leads', 'Χάρτης'] },
 };
 
 /* ---- 1. per-role navigation + role simulator ---- */
@@ -83,7 +83,7 @@ if (!PREVIEW_LIVE) {
   const body = () => page.evaluate(() => document.body.innerText);
   check('Preview: banner says DEMO, real role and read-only', /ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ — DEMO/.test(await body()) && (await body()).includes('Πραγματικός ρόλος: Διαχειριστής') && (await body()).includes('μόνο ανάγνωση'));
   const nav = await text(page, '#shell-rail nav button');
-  check('Preview: navigation shows the Back Office view', nav.some((t) => t.startsWith('Λειτουργίες')) && !nav.some((t) => t.startsWith('Leads')));
+  check('Preview: navigation shows the Back Office view', nav.some((t) => t.startsWith('Διεκπεραίωση')) && !nav.some((t) => t.startsWith('Leads')));
   let log = await (await fetch('http://127.0.0.1:54399/__log')).json();
   check('Preview: start recorded on the server (audited)', log.some((l) => l.table === 'role_preview_event' && l.body.p_action === 'start' && l.body.p_role === 'back_office'));
   // a write while previewing never leaves the browser
@@ -387,9 +387,9 @@ if (!PREVIEW_LIVE) {
     check('Return: needs a reason; missing items preselected; signature → Field Sales by default', submitDisabled === true && toField === true && r?.body?.p_to_team === 'field_sales' && r.body.p_items.length >= 1);
     check('Return: banner on the case, same stage, no second return', (await body(page)).includes('Επιστράφηκε για διόρθωση → Field Sales')
       && (await body(page)).includes('Έλεγχος εγγράφων') && !(await page.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Επιστροφή για διόρθωση'))));
-    await click(page, 'Λειτουργίες', '#shell-rail nav button');
+    await click(page, 'Διεκπεραίωση', '#shell-rail nav button');
     await sleep(1500);
-    check('Return: Λειτουργίες shows the case waits on Field Sales', (await body(page)).includes('Επιστράφηκε για διόρθωση σε Field Sales'));
+    check('Return: Διεκπεραίωση shows the case waits on Field Sales', (await body(page)).includes('Επιστράφηκε για διόρθωση σε Field Sales'));
     await browser.close();
   }
   // 4) Field Sales resubmits
@@ -779,9 +779,9 @@ if (!PREVIEW_LIVE) {
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'back_office');
-    await click(page, 'Λειτουργίες', '#shell-rail nav button');
+    await click(page, 'Διεκπεραίωση', '#shell-rail nav button');
     await sleep(1800);
-    check('Leads+docs: the assignee sees it in «Νέα leads με έγγραφα» in Λειτουργίες', await page.evaluate(() => (document.querySelector('[data-bo-leads]')?.innerText ?? '').includes('Φούρνος Δοκιμή')));
+    check('Leads+docs: the assignee sees it in «Νέα leads με έγγραφα» in Διεκπεραίωση', await page.evaluate(() => (document.querySelector('[data-bo-leads]')?.innerText ?? '').includes('Φούρνος Δοκιμή')));
     await page.evaluate(() => [...document.querySelectorAll('[data-bo-leads] button')].find((b) => b.textContent.trim() === 'Άνοιγμα')?.click());
     await sleep(1500);
     const t = await page.evaluate(() => document.querySelector('main').innerText);
@@ -1164,7 +1164,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'back_office');
-  await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(2000);
+  await click(page, 'Διεκπεραίωση', '#shell-rail nav button'); await sleep(2000);
   const t = await page.evaluate(() => document.querySelector('main').innerText);
   check('Ops: one queue with blockers and days in stage (no stage columns)', t.includes('Λείπει: Ταυτότητα') && /στο στάδιο/.test(t) && !t.includes('Κενό — κανένα case εδώ'));
   check('Ops: only back-office stages (no Νέο/Προσφορά cases)', !/· Προσφορά ·|· Νέο ·/.test(t));
@@ -1236,7 +1236,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'back_office');
-    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    await click(page, 'Διεκπεραίωση', '#shell-rail nav button'); await sleep(1800);
     check('Ops: «Follow-ups για υπεύθυνο» lists the manager follow-up', await page.evaluate(() => (document.querySelector('[data-manager-followups]')?.innerText ?? '').includes('Θέλει έκπτωση')));
     check('Ops: «Από Sales» filter counts the Νέο Sale case', await page.evaluate(() => { const t = [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.startsWith('Από Sales')); return !!t && Number(t.textContent.replace(/\D+/g, '')) >= 1; }));
     await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
@@ -1254,7 +1254,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
     const ex = (await logOf()).filter((l) => l.table === 'set_case_exception').pop();
     check('Case: Back Office exception needs a note and goes through set_case_exception', noNote === true && ex?.body?.p_state === 'provider_rejected' && ex.body.p_note === 'Λάθος αριθμός παροχής'
       && (await page.evaluate(() => document.querySelector('[data-case-exception]').innerText.includes('Απόρριψη από τον πάροχο'))));
-    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    await click(page, 'Διεκπεραίωση', '#shell-rail nav button'); await sleep(1800);
     await click(page, 'Εξαιρέσεις', '[role="tab"]'); await sleep(400);
     check('Ops: «Εξαιρέσεις» shows the case with the reason first', await page.evaluate(() => [...document.querySelectorAll('main li.atx-row')].some((r) => r.innerText.includes('Απόρριψη από τον πάροχο'))));
     await browser.close();

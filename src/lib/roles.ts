@@ -274,10 +274,10 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: 'operations',
-    label: 'Λειτουργίες',
+    label: 'Διεκπεραίωση',
     icon: Cog,
     children: [
-      { key: 'backoffice', label: 'Λειτουργίες', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
+      { key: 'backoffice', label: 'Διεκπεραίωση', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
     ],
   },
   {
@@ -350,7 +350,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   myday: 'Ημέρα μου',
   map: 'Χάρτης',
   field: 'Λειτουργία Πεδίου',
-  backoffice: 'Λειτουργίες',
+  backoffice: 'Διεκπεραίωση',
   reports: 'Αναφορές',
   revenue: 'Έσοδα',
   admin: 'Διαχείριση',

@@ -1,4 +1,4 @@
-/* Λειτουργίες: «Follow-ups για υπεύθυνο» — follow-ups created from a field visit with the outcome
+/* Διεκπεραίωση: «Follow-ups για υπεύθυνο» — follow-ups created from a field visit with the outcome
    «Follow-up από υπεύθυνο» (marked by MANAGER_FOLLOWUP_PREFIX). The agent who created it stays visible. Hidden when empty. */
 
 import { useCallback, useEffect, useState } from 'react';

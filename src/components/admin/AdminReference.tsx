@@ -16,7 +16,7 @@ const GROUPS: { label: string; items: [CaseAction, string][] }[] = [
   { label: 'Επικοινωνία', items: [['log_call', 'Καταγραφή κλήσης'], ['log_email', 'Καταγραφή email'], ['log_sms', 'Καταγραφή SMS'], ['log_whatsapp', 'Καταγραφή WhatsApp'], ['add_note', 'Σημείωση'], ['create_followup', 'Νέο follow-up'], ['complete_followup', 'Ολοκλήρωση follow-up']] },
   { label: 'Προσφορές', items: [['create_offer', 'Δημιουργία προσφοράς'], ['send_offer', 'Αποστολή προσφοράς']] },
   { label: 'Πεδίο', items: [['schedule_visit', 'Προγραμματισμός επίσκεψης'], ['check_in', 'Check-in'], ['check_out', 'Check-out'], ['photo', 'Φωτογραφία'], ['meeting', 'Συνάντηση'], ['capture_signature', 'Λήψη υπογραφής']] },
-  { label: 'Λειτουργίες', items: [['add_document', 'Προσθήκη εγγράφου'], ['verify_document', 'Έλεγχος εγγράφου'], ['create_application', 'Δημιουργία αίτησης'], ['submit_provider', 'Καταχώρηση στον πάροχο']] },
+  { label: 'Διεκπεραίωση', items: [['add_document', 'Προσθήκη εγγράφου'], ['verify_document', 'Έλεγχος εγγράφου'], ['create_application', 'Δημιουργία αίτησης'], ['submit_provider', 'Καταχώρηση στον πάροχο']] },
 ];
 
 const Yes = () => <Check size={15} className="text-[#15803d] mx-auto" aria-label="ναι" />;

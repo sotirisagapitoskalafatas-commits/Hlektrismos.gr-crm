@@ -79,7 +79,7 @@ export function homeInsights(i: { cases: PipeCase[]; leads: PipeLead[]; followUp
   }
 
   const paper = active.filter(c => PAPER_STAGES.includes(c.current_stage)).length;
-  if (paper) out.push({ id: 'paper', tone: 'info', text: `${plural(paper, 'case βρίσκεται', 'cases βρίσκονται')} σε στάδιο αίτησης, υπογραφής ή ελέγχου εγγράφων.`, action: { kind: 'page', page: 'backoffice' }, actionLabel: 'Λειτουργίες' });
+  if (paper) out.push({ id: 'paper', tone: 'info', text: `${plural(paper, 'case βρίσκεται', 'cases βρίσκονται')} σε στάδιο αίτησης, υπογραφής ή ελέγχου εγγράφων.`, action: { kind: 'page', page: 'backoffice' }, actionLabel: 'Διεκπεραίωση' });
 
   const noValue = active.filter(c => !hasValue(c)).length;
   if (noValue) out.push({ id: 'novalue', tone: 'info', text: `${plural(noValue, 'ενεργό case δεν έχει', 'ενεργά cases δεν έχουν')} καταχωρημένη αξία — δεν μετρούν στο pipeline.`, action: { kind: 'page', page: 'cases', filters: { status: 'active' } }, actionLabel: 'Cases' });

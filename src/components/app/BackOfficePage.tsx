@@ -1,4 +1,4 @@
-/* Λειτουργίες — one prioritised Back Office queue instead of stage columns.
+/* Διεκπεραίωση — one prioritised Back Office queue instead of stage columns.
    Each row: customer, stage, days in stage, who is responsible, and exactly what blocks it (missing/rejected/unchecked
    documents, overdue follow-up). The forward action uses the existing transitions and the verified stage-change
    dialog; blocked cases open the case instead of being pushed forward. Server-side rules are unchanged. */
@@ -61,7 +61,7 @@ export default function BackOfficePage() {
   return (
     <div className="atx-page" style={{ maxWidth: 1040 }}>
       <div className="atx-head">
-        <h1 className="atx-title">Λειτουργίες</h1>
+        <h1 className="atx-title">Διεκπεραίωση</h1>
         <p className="atx-sub">{loading ? 'Φόρτωση…' : `${queue.length} cases σε επεξεργασία · ${count('blocked')} με εκκρεμότητες · ${count('ready')} έτοιμα`}</p>
       </div>
 

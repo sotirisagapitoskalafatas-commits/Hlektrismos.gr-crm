@@ -16,7 +16,7 @@
   - `field_checkins_for_review(days)`, which lists flagged, unreviewed check-ins with agent, case and customer;
   - `review_field_checkin(id, note)`, which marks one as checked.
 
-  The CRM shows the list as «Check-in προς έλεγχο» in *Λειτουργίες*.
+  The CRM shows the list as «Check-in προς έλεγχο» in *Διεκπεραίωση*.
 - **Arrival prompt:** the setting `arrival_prompt_radius_m` (default 75) is read by «Ημέρα μου». While the page is open and location permission is already granted, the page asks «Φτάσατε στο…;» with a one-tap Check In.
   - No background tracking.
   - Only the position at check-in is stored.

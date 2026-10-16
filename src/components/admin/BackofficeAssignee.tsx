@@ -32,7 +32,7 @@ export default function BackofficeAssignee() {
     <div className="atx-panel" data-bo-assignee>
       <div className="atx-card-head"><h2 className="atx-section-title">Υπεύθυνος Back Office για νέα leads με έγγραφα</h2></div>
       <div className="px-4 pb-4 space-y-3">
-        <p className="text-[13px] text-[var(--atx-muted)]">Όταν δημιουργείται lead με έγγραφα, ανατίθεται σε αυτόν τον χρήστη, που ειδοποιείται και το βλέπει στις «Λειτουργίες». Ο δημιουργός του lead καταγράφεται κανονικά.</p>
+        <p className="text-[13px] text-[var(--atx-muted)]">Όταν δημιουργείται lead με έγγραφα, ανατίθεται σε αυτόν τον χρήστη, που ειδοποιείται και το βλέπει στη «Διεκπεραίωση». Ο δημιουργός του lead καταγράφεται κανονικά.</p>
         {cur === undefined && <div className="atx-notice">Η ρύθμιση ενεργοποιείται μετά την εφαρμογή της migration phase4/12 (εκκρεμεί). Μέχρι τότε τα leads με έγγραφα μένουν σε αυτόν που τα δημιουργεί.</div>}
         {cur !== undefined && (
           <div className="flex gap-2 flex-wrap items-center">

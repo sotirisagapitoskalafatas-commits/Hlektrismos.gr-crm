@@ -1,7 +1,7 @@
 -- STAGED (Phase 4 / 12) — NOT APPLIED. Additive only.
 -- Default Back Office assignee: a SETTING that points to a user (never a hardcoded name).
 -- When a lead is created with documents, the app calls route_lead_to_backoffice(): the lead is assigned to that
--- person, who is notified, and it appears in their «Λειτουργίες» queue. If no assignee is set (or the user is no longer
+-- person, who is notified, and it appears in their «Διεκπεραίωση» queue. If no assignee is set (or the user is no longer
 -- an active Back Office member), nothing is changed and the app says so.
 --
 -- Stored in crm_settings('default_backoffice_assignee') as a JSON string with the user id. Not a credential.

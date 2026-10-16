@@ -26,7 +26,7 @@ Apply order (unchanged, matches the files and PR #46's table):
 | Where | Move | After 07 |
 |---|---|---|
 | Case stepper / «Επόμενη ενέργεια» / stage dialog | only moves in the app's own list (`STAGE_TRANSITIONS`, same pairs as the table) | ✅ allowed |
-| Λειτουργίες (Back Office queue) forward button | next stage from the same list | ✅ allowed |
+| Διεκπεραίωση (Back Office queue) forward button | next stage from the same list | ✅ allowed |
 | Reopen a lost / cancelled case | `lost → new`, `cancelled → new` | ✅ allowed |
 | Reopen a completed case | not offered today either (`completed` has no next stage) | — unchanged |
 | «Νέο Sale» handover (field) | **no stage change** (owner + next action only) | ✅ unaffected |

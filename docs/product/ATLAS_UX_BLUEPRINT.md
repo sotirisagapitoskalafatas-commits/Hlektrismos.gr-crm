@@ -16,7 +16,7 @@ Existing `PageKey`s: `home, mywork, leads, prospecting, providers, cases, follow
 | **CRM** | `leads`, `customers` (+ universal search, contact history) | ✔ | ✔ | ✔ | assigned | assigned |
 | **Πωλήσεις** | `cases` (pipeline/stepper), `providers` (services & programs), `prospecting` (B2B) | ✔ | ✔ | ✔ (no prospecting import) | — | — |
 | **Πεδίο** | `myday`, `map`, `field` as three views of one workflow | ✔ | ✔ | — | ✔ | — |
-| **Λειτουργίες** | `backoffice` (prioritized queue; documents, signatures, submission, activation) | ✔ | ✔ | — | — | ✔ |
+| **Διεκπεραίωση** | `backoffice` (prioritized queue; documents, signatures, submission, activation) | ✔ | ✔ | — | — | ✔ |
 | **Insights** | `reports`, `revenue` | ✔ | ✔ | own stats | own stats | queue stats |
 | **Atlas AI** | contextual panel for everyone; `aiworkforce`, `automations` only for Admin (+ read-only monitoring for Manager) | ✔ | monitor | panel | panel | panel |
 | **Ρυθμίσεις** | `preferences`, `account` (everyone); `admin` split into the sections of §10 | ✔ | team | personal | personal | personal |
@@ -68,7 +68,7 @@ The timeline model already exists (event types carry a `team`: inside_sales / fi
 | **Πελάτης** | Overview, related cases, documents, communication history — each item shown once | Open active case / log interaction | customer, cases, docs |
 | **Case** | Progress stepper, required documents with missing items, responsible team, next action, shared timeline | Complete the next step | case, docs, timeline |
 | **Πεδίο** (mobile-first) | Today's visits → Navigate → Check-in (GPS or manual fallback) → meeting outcome, notes, documents → set next action → Check-out | Check in / Navigate | visits, check-ins, map |
-| **Λειτουργίες** | Prioritized queue (due date, blocker reason, owner, age), not empty stage columns | Open next case to process | cases by stage + blockers |
+| **Διεκπεραίωση** | Prioritized queue (due date, blocker reason, owner, age), not empty stage columns | Open next case to process | cases by stage + blockers |
 | **Ρυθμίσεις** | §10 | — | — |
 Every screen defines: empty state (what to do next), loading, success confirmation, and plain-language error with a retry.
 
@@ -128,7 +128,7 @@ First-run checklist (7 items: company/services · employees & roles · providers
 2. **Αρχική + Η εργασία μου.**
 3. **Lead & Customer details** (call-outcome flow with required next action).
 4. **Case details + shared workflow** (stepper, missing items, handover events).
-5. **Πεδίο + Λειτουργίες.**
+5. **Πεδίο + Διεκπεραίωση.**
 6. **Settings split, Atlas AI areas.**
 Per phase: role walkthroughs (Admin, Manager, Inside, Field, Back Office), keyboard + mobile tests, Playwright journeys on staging with synthetic data, and a reconciliation check that dashboard numbers equal their SQL definitions.
 

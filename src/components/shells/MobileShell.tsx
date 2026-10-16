@@ -33,7 +33,7 @@ function tabsForRole(role: Role): Tab[] {
     tabs.push({ page: 'myday', label: 'Ημέρα μου', icon: Compass, badge: 'followups' });
     tabs.push({ page: 'map', label: 'Χάρτης', icon: Map });
   } else {
-    tabs.push({ page: 'backoffice', label: 'Λειτουργίες', icon: MonitorCog });
+    tabs.push({ page: 'backoffice', label: 'Διεκπεραίωση', icon: MonitorCog });
     tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
   }
   return tabs.slice(0, 4);

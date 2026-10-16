@@ -160,7 +160,7 @@ export default function MyDayPage() {
     if (out?.next === 'sale') setSale({ caseId: v.case_id, customerId: v.case?.customer?.id ?? null, name: v.case?.customer?.full_name ?? v.case?.title ?? 'Πελάτης', handedOver: null });
     if (out?.next === 'manager') {
       const m = await managerFollowUp(v.case_id, form.notes);
-      branchMsg = m.ok ? ` Follow-up για υπεύθυνο${m.assignee ? ` (${m.assignee})` : ''} στις Λειτουργίες.` : ' Το follow-up για υπεύθυνο δεν αποθηκεύτηκε — δοκιμάστε από το case.';
+      branchMsg = m.ok ? ` Follow-up για υπεύθυνο${m.assignee ? ` (${m.assignee})` : ''} στη Διεκπεραίωση.` : ' Το follow-up για υπεύθυνο δεν αποθηκεύτηκε — δοκιμάστε από το case.';
     }
     let fuOk = true;
     if (form.fuAt) {
@@ -259,7 +259,7 @@ export default function MyDayPage() {
                 )}
                 {form.reason === 'Δεν θέλει επικοινωνία' && <div className="atx-notice text-[13px]">Καταγράψτε το και στο «Επικοινωνία & συγκαταθέσεις» του πελάτη, ώστε να μην ξανακληθεί.</div>}
                 {outcomeByLabel(form.outcome)?.next === 'sale' && <div className="atx-notice text-[13px]">Μετά το Check Out: στοιχεία πελάτη → έγγραφα → παράδοση στο Back Office.</div>}
-                {outcomeByLabel(form.outcome)?.next === 'manager' && <div className="atx-notice text-[13px]">Θα δημιουργηθεί follow-up για τον υπεύθυνο (ουρά Λειτουργιών), με τις σημειώσεις σας.</div>}
+                {outcomeByLabel(form.outcome)?.next === 'manager' && <div className="atx-notice text-[13px]">Θα δημιουργηθεί follow-up για τον υπεύθυνο (ουρά Διεκπεραίωσης), με τις σημειώσεις σας.</div>}
                 <textarea className="field" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Σημειώσεις επίσκεψης (έγγραφα που συλλέχθηκαν, τι συμφωνήθηκε…)" aria-label="Σημειώσεις επίσκεψης" />
                 <div className="grid sm:grid-cols-2 gap-2">
                   <label className="text-[13px] font-medium">Επόμενο follow-up (προαιρετικό)

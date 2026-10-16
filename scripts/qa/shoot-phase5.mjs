@@ -18,7 +18,7 @@ const OUT = 'docs/product/screenshots/after';
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'back_office');
-  await page.evaluate(() => { const el = [...document.querySelectorAll('#shell-rail nav button')].find((b) => b.textContent.trim().startsWith('Λειτουργίες')); el && el.click(); });
+  await page.evaluate(() => { const el = [...document.querySelectorAll('#shell-rail nav button')].find((b) => b.textContent.trim().startsWith('Διεκπεραίωση')); el && el.click(); });
   await sleep(2000);
   await page.screenshot({ path: `${OUT}/operations-1440.jpg`, type: 'jpeg', quality: 78 });
   await browser.close();

@@ -1094,6 +1094,11 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await click(page, 'Αποθήκευση'); await sleep(1500);
   const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
   check('Customer detail: edit saves via PATCH customers', log.some((l) => l.method === 'PATCH' && l.table === 'customers' && /Κέντρο/.test(l.body.city || '')));
+  // B4: Customer → Lead and Case → Lead links (inside_sales opens leads)
+  await click(page, 'Cases', '[role="tab"]'); await sleep(400);
+  await page.evaluate(() => document.querySelector('main [data-open-lead]')?.click()); await sleep(1500);
+  const leadPage = await body();
+  check('Links: Customer → Lead opens the lead the case came from', /Επιστροφή σ/.test(leadPage) && leadPage.includes('Μετατράπηκε'), leadPage.slice(0, 120));
   await browser.close();
 }
 

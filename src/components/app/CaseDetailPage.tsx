@@ -9,6 +9,7 @@ import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
 import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
+import { APPLICATION_STATUS_TEXT, OFFER_STATUS_TEXT, SIGNATURE_STATUS_TEXT, statusText } from '@/lib/status-text';
 import { entryTeam, entryTeamLabel, historyDescription, historyText, visibleHistory } from '@/lib/history-text';
 import { useToast } from '@/lib/toast';
 import { useStaff } from '@/lib/useStaff';
@@ -137,7 +138,7 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
   );
 }
 
-/* ================= Follow Ups ================= */
+/* ================= Follow-ups ================= */
 function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
   const { role } = useAuth();
   const [items, setItems] = useState<FollowUp[]>([]);
@@ -165,7 +166,7 @@ function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
 
   return (
     <Card>
-      <CardHeader micro="Follow ups" title="Follow Ups"
+      <CardHeader title="Follow-ups"
         action={can(role, 'create_followup') ? <Btn onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" /> Νέο</Btn> : undefined} />
 
       <div className="space-y-2 mb-5">
@@ -212,7 +213,7 @@ function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
         </>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Νέο Follow Up" micro="Follow up">
+      <Modal open={open} onClose={() => setOpen(false)} title="Νέο follow-up">
         <div className="space-y-4">
           <Field label="Πότε">
             <input type="datetime-local" className="field" value={form.due_at} min={now}
@@ -275,7 +276,7 @@ function VisitsTab({ c }: { c: Case }) {
 
   return (
     <Card>
-      <CardHeader micro="Field sales" title="Επισκέψεις"
+      <CardHeader title="Επισκέψεις"
         action={can(role, 'schedule_visit') ? <Btn onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" /> Προγραμματισμός</Btn> : undefined} />
 
       <div className="space-y-2">
@@ -314,7 +315,7 @@ function VisitsTab({ c }: { c: Case }) {
         ))}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Προγραμματισμός Επίσκεψης" micro="Field sales">
+      <Modal open={open} onClose={() => setOpen(false)} title="Προγραμματισμός επίσκεψης">
         <div className="space-y-4">
           <Field label="Σκοπός">
             <input className="field" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="π.χ. κατάθεση προσφοράς, υπογραφή συμβολαίου" />
@@ -355,7 +356,7 @@ function OffersTab({ caseId }: { caseId: string }) {
 
   return (
     <Card>
-      <CardHeader micro="Offers" title="Προσφορές"
+      <CardHeader title="Προσφορές"
         action={can(role, 'create_offer') ? <Btn onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" /> Νέα</Btn> : undefined} />
 
       <div className="space-y-2">
@@ -372,7 +373,7 @@ function OffersTab({ caseId }: { caseId: string }) {
               <div className="text-xs text-ink/45">{fmtDateTime(o.created_at)}{o.valid_until ? ` · ισχύς έως ${fmtDate(o.valid_until)}` : ''}</div>
               {o.notes && <div className="text-xs text-ink/50 mt-0.5">{o.notes}</div>}
             </div>
-            <Pill tone={o.status === 'sent' ? 'green' : o.status === 'accepted' ? 'green' : o.status === 'rejected' ? 'red' : 'blue'}>{o.status}</Pill>
+            <Pill tone={o.status === 'sent' ? 'green' : o.status === 'accepted' ? 'green' : o.status === 'rejected' ? 'red' : 'blue'}>{statusText(OFFER_STATUS_TEXT, o.status)}</Pill>
             {o.status === 'draft' && can(role, 'send_offer') && (
               <Btn onClick={async () => { await markOfferSent(o.id, caseId); loadItems(); }}>
                 <Send className="w-3.5 h-3.5" /> Αποστολή
@@ -382,7 +383,7 @@ function OffersTab({ caseId }: { caseId: string }) {
         ))}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Νέα Προσφορά" micro="Offers">
+      <Modal open={open} onClose={() => setOpen(false)} title="Νέα προσφορά">
         <div className="space-y-4">
           <Field label="Ποσό (€)">
             <input className="field" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" />
@@ -429,7 +430,7 @@ function SignaturesTab({ caseId }: { caseId: string }) {
 
   return (
     <Card>
-      <CardHeader micro="Signatures" title="Υπογραφές"
+      <CardHeader title="Υπογραφές"
         action={can(role, 'capture_signature')
           ? <Btn onClick={() => setPadOpen(true)}><PenLine className="w-3.5 h-3.5" /> Νέα υπογραφή</Btn>
           : undefined} />
@@ -445,7 +446,7 @@ function SignaturesTab({ caseId }: { caseId: string }) {
               <div className="text-[13px] font-medium text-ink">{s.notes || 'Υπογραφή πελάτη'}</div>
               <div className="text-xs text-ink/45">{fmtDateTime(s.captured_at ?? s.created_at)}</div>
             </div>
-            <Pill tone={s.status === 'received' || s.status === 'captured' ? 'blue' : s.status === 'verified' ? 'green' : 'red'}>{s.status}</Pill>
+            <Pill tone={s.status === 'received' || s.status === 'captured' ? 'blue' : s.status === 'verified' ? 'green' : 'red'}>{statusText(SIGNATURE_STATUS_TEXT, s.status)}</Pill>
             {canVerify && (s.status !== 'verified') && (
               <Btn variant="ok" onClick={async () => { await setSignatureStatus(s.id, 'verified', caseId); loadItems(); }}><Check className="w-3.5 h-3.5" /></Btn>
             )}
@@ -516,7 +517,7 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
     <>
     <CaseExceptionCard c={c} onChanged={reload} />
     <Card>
-      <CardHeader micro="Back office" title="Λειτουργική Ολοκλήρωση" />
+      <CardHeader title="Διεκπεραίωση" />
       {can(role, 'create_application') || can(role, 'submit_provider') || can(role, 'change_stage') ? (
         <div className="space-y-4">
           <div className="p-3 rounded-xl bg-paper border border-line">
@@ -533,7 +534,7 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
               {docs.map(d => (
                 <button key={d.id} onClick={() => setDocumentStatus(d.id, d.status === 'verified' ? 'received' : 'verified').then(() => fetchDocuments(c.id).then(setDocs))}
                   title={`${docLabel(d.category)} — ${DOC_STATUSES[d.status] ?? d.status} (κλικ για εναλλαγή)`}
-                  className={`px-2 py-1 rounded-lg border text-[11px] font-mono uppercase transition-colors ${d.status === 'verified' ? 'bg-ok-100 text-ok-600 border-ok-600/20' : d.status === 'rejected' ? 'bg-bad-100 text-bad-600 border-bad-600/20' : 'bg-white border-line text-ink/45'}`}>
+                  className={`px-2 py-1 rounded-lg border text-[12px] transition-colors ${d.status === 'verified' ? 'bg-ok-100 text-ok-600 border-ok-600/20' : d.status === 'rejected' ? 'bg-bad-100 text-bad-600 border-bad-600/20' : 'bg-white border-line text-ink/45'}`}>
                   {docLabel(d.category)}
                 </button>
               ))}
@@ -595,7 +596,7 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
         ) : null}
       </div>
 
-      {c.application_status && <div className="mt-1 text-xs text-ink/45">Κατάσταση αίτησης: {c.application_status}{c.activation_status ? ` · Ενεργοποίηση: ${c.activation_status}` : ''}</div>}
+      {c.application_status && <div className="mt-1 text-xs text-ink/45">Κατάσταση αίτησης: {statusText(APPLICATION_STATUS_TEXT, c.application_status)}{c.activation_status ? ` · Ενεργοποίηση: ${statusText(APPLICATION_STATUS_TEXT, c.activation_status)}` : ''}</div>}
     </Card>
     </>
   );
@@ -692,7 +693,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
 
   const tabs: { id: typeof tab; label: string; icon: IconType }[] = [
     { id: 'timeline', label: 'Ιστορικό', icon: CalendarClock },
-    { id: 'followups', label: 'Follow Ups', icon: CalendarClock },
+    { id: 'followups', label: 'Follow-ups', icon: CalendarClock },
     { id: 'docs', label: 'Έγγραφα', icon: FolderOpen },
     { id: 'visits', label: 'Επισκέψεις', icon: MapPin },
     { id: 'offers', label: 'Προσφορές', icon: FileText },

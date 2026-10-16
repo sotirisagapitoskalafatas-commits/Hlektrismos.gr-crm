@@ -154,7 +154,7 @@ export default function ReportsPage() {
 
         {/* Follow-up velocity */}
         <Card>
-          <CardHeader micro="Follow Ups" title="Ταχύτητα ολοκλήρωσης" action={<Pill tone="gray">{pendingFus.length} σε εκκρεμότητα</Pill>} />
+          <CardHeader micro="Follow-ups" title="Ταχύτητα ολοκλήρωσης" action={<Pill tone="gray">{pendingFus.length} σε εκκρεμότητα</Pill>} />
           <div className="space-y-3 mt-1">
             <div className="flex h-9 rounded-xl overflow-hidden border border-line bg-ink/[0.02]">
               {fuStatus.map(f => (

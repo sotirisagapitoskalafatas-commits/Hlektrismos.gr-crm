@@ -36,7 +36,7 @@ export function AdminSummary({ d }: { d: DashboardData }) {
           sub={`${pipe.withoutValue ? `${pipe.withoutValue} χωρίς αξία εκτός · ` : ''}${fmtMoney(wonValue(cases))} κερδισμένα`} icon={BarChart3} />
       </button>
       <button type="button" className="text-left" onClick={() => go('followups', { status: 'pending' })}>
-        <KpiCard label="Εκπρόθεσμα Follow Ups" value={String(overdue.length)} sub="χρειάζονται σήμερα" icon={Bell} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
+        <KpiCard label="Εκπρόθεσμα follow-ups" value={String(overdue.length)} sub="χρειάζονται σήμερα" icon={Bell} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
       </button>
     </div>
   );

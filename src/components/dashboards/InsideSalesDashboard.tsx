@@ -28,7 +28,7 @@ export default function InsideSalesDashboard({ d }: { d: DashboardData }) {
         <KpiCard label="Νέα leads σήμερα" value={String(newLeadsToday)} sub={`${leads.length} συνολικά`} icon={UserPlus} tone={newLeadsToday > 0 ? 'text-brand-600' : 'text-ink'} />
         <KpiCard label="Προς επικοινωνία" value={String(toContact.length)} sub="νέα ή qualified" icon={Phone} />
         <KpiCard label="Ενεργά Cases" value={String(active.length)} sub={`${offer} στο στάδιο προσφοράς`} icon={CalendarClock} />
-        <KpiCard label="Follow Ups σήμερα" value={String(overdue.length + today.length)} sub={`${today.length} σήμερα · ${overdue.length} εκπρόθεσμα`} icon={Plus} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
+        <KpiCard label="Follow-ups σήμερα" value={String(overdue.length + today.length)} sub={`${today.length} σήμερα · ${overdue.length} εκπρόθεσμα`} icon={Plus} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -72,7 +72,7 @@ export default function InsideSalesDashboard({ d }: { d: DashboardData }) {
           </Card>
 
           <Card className="!p-0" pad={false}>
-            <CardHeader micro="Follow Ups" title="Εκπρόθεσμα & σημερινά" className="px-5 pt-5"
+            <CardHeader micro="Follow-ups" title="Εκπρόθεσμα & σημερινά" className="px-5 pt-5"
               action={<Pill tone={overdue.length + today.length > 0 ? 'red' : 'green'}>{overdue.length + today.length}</Pill>} />
             <div className="px-3 pb-3 space-y-1">
               {overdue.length === 0 && today.length === 0 && <EmptyState icon={CalendarClock} title="Δεν υπάρχουν εκκρεμή follow ups" hint="Όλες οι ενέργειες εντός προγράμματος." />}

@@ -8,6 +8,7 @@ import {
   UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar, Boxes,
 } from 'lucide-react';
 import { labsVisible } from './labs';
+import { DOC_STATUS_TEXT } from './status-text';
 
 export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
 export const DEFAULT_ROLE: Role = 'inside_sales';
@@ -47,8 +48,8 @@ export const STAGES: { id: Stage; label: string; short: string }[] = [
   { id: 'offer', label: 'Προσφορά', short: 'ΠΡΟ' },
   { id: 'application', label: 'Αίτηση', short: 'ΑΙΤ' },
   { id: 'signed', label: 'Υπογραφή', short: 'ΥΠΓ' },
-  { id: 'document_check', label: 'Έλεγχος Εγγράφων', short: 'ΕΓΓ' },
-  { id: 'submitted', label: 'Καταχώρηση Παρόχου', short: 'ΚΑΤ' },
+  { id: 'document_check', label: 'Έλεγχος εγγράφων', short: 'ΕΓΓ' },
+  { id: 'submitted', label: 'Καταχώρηση παρόχου', short: 'ΚΑΤ' },
   { id: 'activation', label: 'Ενεργοποίηση', short: 'ΕΝΕ' },
   { id: 'completed', label: 'Ολοκληρώθηκε', short: 'ΟΛΟ' },
   { id: 'lost', label: 'Χάθηκε', short: 'ΧΑΣ' },
@@ -123,13 +124,7 @@ export const DOC_CATEGORIES: Record<string, string> = {
   other: 'Άλλο',
 };
 
-export const DOC_STATUSES: Record<string, string> = {
-  required: 'Απαιτείται',
-  received: 'Παραλήφθηκε',
-  verified: 'Ελέγχθηκε',
-  rejected: 'Απορρίφθηκε',
-  missing: 'Λείπει',
-};
+export const DOC_STATUSES: Record<string, string> = DOC_STATUS_TEXT;
 
 /* ---------------- Service types ---------------- */
 export const SERVICES: Record<string, string> = {

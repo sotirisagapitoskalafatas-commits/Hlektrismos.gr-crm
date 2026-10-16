@@ -11,6 +11,7 @@ import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
 import { useToast } from '@/lib/toast';
 import { useStaff } from '@/lib/useStaff';
+import { meetingPoint } from '@/lib/visit-location';
 import SignaturePad from './SignaturePad';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import {
@@ -243,8 +244,10 @@ function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
 
 
 /* ================= Visits ================= */
-function VisitsTab({ caseId }: { caseId: string }) {
+function VisitsTab({ c }: { c: Case }) {
+  const caseId = c.id;
   const { role } = useAuth();
+  const point = meetingPoint(c);
   const [items, setItems] = useState<CaseVisit[]>([]);
   const [open, setOpen] = useState(false);
   const [purpose, setPurpose] = useState('');
@@ -260,8 +263,8 @@ function VisitsTab({ caseId }: { caseId: string }) {
 
   const plan = async () => {
     if (!purpose.trim()) return;
-    const coords = await getPosition();
-    await createVisit(caseId, { purpose: purpose.trim(), scheduled_at: when ? new Date(when).toISOString() : undefined, location: coords ? { label: 'Σημείο συνάντησης', ...coords } : undefined });
+    // The case's (or customer's) stored address — never the planner's own position.
+    await createVisit(caseId, { purpose: purpose.trim(), scheduled_at: when ? new Date(when).toISOString() : undefined, location: point ?? undefined });
     setOpen(false); setPurpose(''); setWhen('');
     loadItems();
   };
@@ -317,6 +320,9 @@ function VisitsTab({ caseId }: { caseId: string }) {
           <Field label="Πότε">
             <input type="datetime-local" className="field" value={when} min={now} onChange={e => setWhen(e.target.value)} />
           </Field>
+          <p className="text-xs text-ink/50" data-visit-point>
+            {point ? `Σημείο συνάντησης: ${point.label}` : 'Δεν υπάρχει αποθηκευμένη διεύθυνση με συντεταγμένες για αυτό το case. Το check-in θα καταγραφεί και θα σημειωθεί για έλεγχο.'}
+          </p>
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <Btn variant="ghost" onClick={() => setOpen(false)}>Ακύρωση</Btn>
@@ -818,7 +824,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       {tab === 'timeline' && <TimelineTab caseId={c.id} load={reload} />}
       {tab === 'followups' && <FollowUpsTab caseId={c.id} load={reload} />}
       {tab === 'docs' && <CaseDocuments c={c} onChanged={reload} leadFiles={websiteFiles} />}
-      {tab === 'visits' && <VisitsTab caseId={c.id} />}
+      {tab === 'visits' && <VisitsTab c={c} />}
       {tab === 'offers' && <OffersTab caseId={c.id} />}
       {tab === 'signatures' && <SignaturesTab caseId={c.id} />}
       {tab === 'backoffice' && <BackOfficeTab c={c} reload={reload} />}

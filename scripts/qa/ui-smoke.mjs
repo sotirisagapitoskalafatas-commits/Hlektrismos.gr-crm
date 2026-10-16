@@ -455,6 +455,54 @@ if (!PREVIEW_LIVE) {
   await fetch(`${M}/rest/v1/cases?id=eq.${C7}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: 'submitted' }) });
 }
 
+/* ---- 2e3. Small fixes: queue row separator; a planned visit uses the case's address, not the planner's GPS ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' };
+  const C4 = '30000000-0000-4000-8000-000000000004'; // «Αίτηση», in the Back Office queue
+  const C5 = '30000000-0000-4000-8000-000000000005';
+  const patchCase = (id, body) => fetch(`${M}/rest/v1/cases?id=eq.${id}`, { method: 'PATCH', headers: H, body: JSON.stringify(body) });
+  // queue row with an empty case number
+  await patchCase(C4, { case_no: '' });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    const subs = await page.evaluate(() => [...document.querySelectorAll('main .atx-row-sub')].map((e) => e.textContent));
+    check('Queue: no double separator when a case has no number', subs.length > 0 && subs.every((t) => !/·\s*·/.test(t)) && subs.some((t) => t.startsWith('Αίτηση · ')), JSON.stringify(subs.filter((t) => t.startsWith('Αίτηση'))));
+    await browser.close();
+  }
+  await patchCase(C4, { case_no: 'CS-2026-004' });
+  // planned visit: the meeting point is the case's stored point; the planner's position is never asked for
+  const plan = async (purpose) => {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'field_sales');
+    await page.evaluate(() => { window.__geo = 0; const g = navigator.geolocation; if (g) { const orig = g.getCurrentPosition.bind(g); g.getCurrentPosition = (...a) => { window.__geo++; return orig(...a); }; } });
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === 'CS-2026-005' && e.offsetParent)[0]; el && el.click(); });
+    await sleep(1600);
+    await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === 'Επισκέψεις')?.click());
+    await sleep(800);
+    await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Προγραμματισμός')?.click());
+    await sleep(500);
+    const hint = await page.evaluate(() => document.querySelector('[data-visit-point]')?.textContent ?? '');
+    await page.evaluate((v) => { const i = [...document.querySelectorAll('input.field')].find((x) => (x.placeholder ?? '').startsWith('π.χ. κατάθεση')); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v); i.dispatchEvent(new Event('input', { bubbles: true })); }, purpose);
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Προγραμματισμός').pop()?.click());
+    await sleep(1500);
+    const geo = await page.evaluate(() => window.__geo);
+    const sent = (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'POST' && l.table === 'case_visits' && l.body?.purpose === purpose).pop();
+    await browser.close();
+    return { hint, geo, sent };
+  };
+  const a = await plan('Υπογραφή — χωρίς συντεταγμένες');
+  check('Visit: no stored point → no location is saved, the planner’s GPS is not used, the form says so', !!a.sent && a.sent.body.location == null && a.geo === 0 && a.hint.includes('Δεν υπάρχει αποθηκευμένη διεύθυνση'), JSON.stringify({ geo: a.geo, loc: a.sent?.body?.location }));
+  await patchCase(C5, { lat: 37.9838, lng: 23.7275, address: 'Πανεπιστημίου 10, Αθήνα' });
+  const b = await plan('Υπογραφή — με διεύθυνση case');
+  check('Visit: the meeting point is the case’s stored address', b.sent?.body?.location?.lat === 37.9838 && b.sent.body.location.lng === 23.7275 && b.sent.body.location.label === 'Πανεπιστημίου 10, Αθήνα' && b.geo === 0 && b.hint.includes('Πανεπιστημίου 10'), JSON.stringify(b.sent?.body?.location));
+  await patchCase(C5, { lat: null, lng: null, address: '' });
+}
+
 /* ---- 2f. B2B: discover → review → distribute (never leads directly, never outreach) ---- */
 {
   const M = 'http://127.0.0.1:54399';

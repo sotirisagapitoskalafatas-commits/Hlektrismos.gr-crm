@@ -11,7 +11,7 @@ import { STAGE_TRANSITIONS, can } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
 import { fetchCases, fetchDocumentsForCases } from '@/lib/api';
 import type { Case, CaseDocument } from '@/lib/api';
-import { buildOpsQueue, inOpsQueue, OPS_STAGES } from '@/lib/ops-queue';
+import { buildOpsQueue, inOpsQueue, OPS_STAGES, opsRowSub } from '@/lib/ops-queue';
 import { stageText } from '@/lib/case-flow';
 import { useStaff } from '@/lib/useStaff';
 import { StageChangeDialog } from '@/components/cases/CaseOverview';
@@ -107,7 +107,7 @@ export default function BackOfficePage() {
                       {i.title}
                       {i.urgent && <span className="atx-tag t-danger ml-2">Επείγον</span>}
                     </span>
-                    <span className="atx-row-sub">{i.stageLabel} · {i.caseNo} · {i.daysInStage === 0 ? 'σήμερα στο στάδιο' : `${i.daysInStage} ${i.daysInStage === 1 ? 'ημέρα' : 'ημέρες'} στο στάδιο`} · {name(i.ownerId)}</span>
+                    <span className="atx-row-sub">{opsRowSub(i, name(i.ownerId))}</span>
                     {blocked
                       ? <span className="block text-[13px] mt-1" style={{ color: 'var(--atx-amber)', whiteSpace: 'normal' }}>{i.blockers.join(' · ')}</span>
                       : <span className="block text-[13px] mt-1" style={{ color: 'var(--atx-green)' }}>{i.nextAction || 'Χωρίς εκκρεμότητες'}</span>}

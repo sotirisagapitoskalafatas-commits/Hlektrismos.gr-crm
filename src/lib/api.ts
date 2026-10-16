@@ -367,9 +367,16 @@ export function followUpKindAvailable(): Promise<boolean> {
 
 /** Do customers have first_name / last_name yet (staged phase4/11)? Checked once per session. */
 let customerNamesProbe: Promise<boolean> | null = null;
+const NAMES_MISSING_KEY = 'atlas.customerNames.missing';
+/** A failed check is remembered for the browser session (sessionStorage), so the app stops sending a failing request
+    on every page load until phase4/11 is applied and a new session starts. */
 export function customerNamesAvailable(): Promise<boolean> {
   if (!supabase) return Promise.resolve(false);
-  customerNamesProbe ??= Promise.resolve(supabase.from('customers').select('first_name, last_name').limit(1)).then(r => !r.error, () => false);
+  try { if (sessionStorage.getItem(NAMES_MISSING_KEY) === '1') return Promise.resolve(false); } catch { /* storage blocked */ }
+  customerNamesProbe ??= Promise.resolve(supabase.from('customers').select('first_name, last_name').limit(1)).then(r => {
+    if (r.error) { try { sessionStorage.setItem(NAMES_MISSING_KEY, '1'); } catch { /* storage blocked */ } return false; }
+    return true;
+  }, () => false);
   return customerNamesProbe;
 }
 

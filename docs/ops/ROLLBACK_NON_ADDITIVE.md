@@ -32,10 +32,9 @@ Apply order (unchanged, matches the files and PR #46's table):
 | «Νέο Sale» handover (field) | **no stage change** (owner + next action only) | ✅ unaffected |
 | «Επιστροφή για διόρθωση» / «Επανυποβολή» | **no stage change** (function from 07 itself) | ✅ unaffected |
 | Admin/manager «Παράκαμψη» | only document blockers; the transition must still be in the list | as designed |
-| **Case → tab «Back Office» → button «Ενεργοποίηση»** | shown at **every** stage except Ενεργοποίηση. Jumps directly, e.g. Έλεγχος εγγράφων → Ενεργοποίηση, Υπογραφή → Ενεργοποίηση | ❌ **rejected** unless the case is in «Καταχώρηση Παρόχου» |
-| **Case → tab «Back Office» → button «Ολοκλήρωση»** | shown at **every** stage except Ολοκληρώθηκε | ❌ **rejected** unless the case is in «Ενεργοποίηση» |
+| Case → tab «Back Office» → buttons «Ενεργοποίηση» / «Ολοκλήρωση» | fixed in `fix/bo-stage-buttons-handover`: only the allowed next stage is attempted; otherwise a Greek message names the stage the move comes from and the next step. A database refusal is shown on screen | ✅ allowed (once that fix is live) |
 
-⚠️ **Those two buttons ignore the error**, so after 07 the click silently does nothing. They are the only real moves that 07 would block. **Recommended before applying 07:** limit the buttons to the allowed next stage and show the error. This is a small code change that is **not** in this branch; say if you want it.
+⚠️ **Deploy that fix before applying 07.** Before the fix, these two buttons jumped straight to the stage and ignored the error, so after 07 a click would silently do nothing.
 
 Edge functions do not write `current_stage` (checked: none in `supabase/functions`). Creating a case (insert) is not affected: the trigger is UPDATE-only.
 

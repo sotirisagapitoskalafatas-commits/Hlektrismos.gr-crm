@@ -12,6 +12,8 @@ const click = (page, label, scope = 'button') => page.evaluate((l, sc) => {
   if (el) { el.click(); return true; } return false;
 }, label, scope);
 
+// The role preview has a built-in hard stop (ROLE_PREVIEW_HARD_STOP in src/lib/role-preview.ts); after it the selector is gone by design.
+const PREVIEW_LIVE = Date.now() < Date.parse('2026-10-16T00:00:00+03:00');
 const ADMIN_ONLY = ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'Διαχείριση'];
 const EXPECT = {
   admin: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Ρυθμίσεις'.length && 'Προτιμήσεις', ...ADMIN_ONLY], mustNot: [] },
@@ -36,7 +38,7 @@ for (const role of Object.keys(EXPECT)) {
   const menu = await page.evaluate(() => document.querySelector('[role="menu"]')?.innerText ?? '');
   check(`${role}: account menu = identity, real role, Λογαριασμός, Προτιμήσεις, Κέντρο βοήθειας, Αποσύνδεση`,
     ['Λογαριασμός', 'Προτιμήσεις', 'Κέντρο βοήθειας', 'Αποσύνδεση', 'Ρόλος'].every((t) => menu.includes(t)) && !/\bsim\b|πραγματικός/.test(menu));
-  check(`${role}: demo role selector ${role === 'admin' ? 'shown (allowed)' : 'absent'}`, (role === 'admin') === menu.includes('Επίδειξη ρόλου'));
+  check(`${role}: demo role selector ${role === 'admin' && PREVIEW_LIVE ? 'shown (allowed)' : 'absent'}`, (role === 'admin' && PREVIEW_LIVE) === menu.includes('Επίδειξη ρόλου'));
   await page.evaluate(() => document.querySelector('.fixed.inset-0.z-40')?.click());
   await click(page, 'Προτιμήσεις');
   await sleep(700);
@@ -59,7 +61,18 @@ for (const role of Object.keys(EXPECT)) {
 }
 
 /* ---- 2b. Role preview (presentation): banner, read-only, exit, expiry ---- */
-{
+if (!PREVIEW_LIVE) {
+  // past the hard stop: the selector is absent for the admin too (checked in section 1); nothing else to exercise
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'admin');
+  await sleep(1200);
+  await page.evaluate(() => sessionStorage.setItem('atlas.preview.role', 'field_sales'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await sleep(2500);
+  const t = await page.evaluate(() => document.body.innerText);
+  check('Preview past its hard stop: no banner, a stored preview is ignored', !t.includes('ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ'));
+  await browser.close();
+} else {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'admin');
   await sleep(1200);
@@ -393,6 +406,53 @@ for (const role of Object.keys(EXPECT)) {
     await browser.close();
   }
   await fetch(`${M}/__gates?state=off&mode=warn`);
+}
+
+/* ---- 2e2. Back Office tab: «Ενεργοποίηση» / «Ολοκλήρωση» follow the allowed moves (staged phase2/07 guard on) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const C6 = '30000000-0000-4000-8000-000000000006';
+  const C7 = '30000000-0000-4000-8000-000000000007';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' };
+  const stageOf = async (id) => (await (await fetch(`${M}/rest/v1/cases?id=eq.${id}&select=current_stage`, { headers: H })).json())[0]?.current_stage;
+  const stageWrites = async (id) => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'PATCH' && l.table === 'cases' && String(l.query).includes(id) && l.body?.current_stage);
+  const openBO = async (page, no) => {
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate((n) => { const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === n && e.offsetParent)[0]; el && el.click(); }, no);
+    await sleep(1600);
+    await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === 'Back Office')?.click());
+    await sleep(900);
+  };
+  const press = (page, label) => page.evaluate((l) => { const b = [...document.querySelectorAll('[data-bo-actions] button')].find((x) => x.textContent.trim() === l && !x.disabled); b?.click(); return !!b; }, label);
+  const jumpMsg = (page) => page.evaluate(() => document.querySelector('[data-jump-msg]')?.textContent ?? '');
+  await fetch(`${M}/__gates?state=on&mode=warn`);
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'back_office');
+  // impossible jump: CS-2026-006 is in «Έλεγχος εγγράφων»
+  const before6 = (await stageWrites(C6)).length;
+  await openBO(page, 'CS-2026-006');
+  const shown = await press(page, 'Ενεργοποίηση');
+  await sleep(700);
+  const m6 = await jumpMsg(page);
+  check('BO buttons: an impossible jump shows a clear Greek message and writes nothing', shown
+    && m6.includes('«Ενεργοποίηση» γίνεται μόνο από «Καταχώρηση παρόχου»') && m6.includes('επόμενο βήμα')
+    && (await stageWrites(C6)).length === before6 && (await stageOf(C6)) === 'document_check', m6);
+  // allowed move: CS-2026-007 in «Καταχώρηση παρόχου» → «Ενεργοποίηση»
+  await openBO(page, 'CS-2026-007');
+  await press(page, 'Ενεργοποίηση');
+  await sleep(1600);
+  check('BO buttons: an allowed move passes the guard and the case moves to «Ενεργοποίηση»', (await stageOf(C7)) === 'activation'
+    && (await stageWrites(C7)).some((l) => l.body.current_stage === 'activation') && !(await jumpMsg(page)));
+  // a database refusal is shown: with the «block» gate and no verified documents, «Ολοκλήρωση» is refused by the server
+  await fetch(`${M}/__gates?state=on&mode=block`);
+  await press(page, 'Ολοκλήρωση');
+  await sleep(1400);
+  const m7 = await jumpMsg(page);
+  check('BO buttons: a database refusal is shown on screen, never silent', m7.startsWith('Δεν επιτρέπεται η μετάβαση:') && (await stageOf(C7)) === 'activation', m7);
+  await browser.close();
+  // leave the shared mock as we found it
+  await fetch(`${M}/__gates?state=off&mode=warn`);
+  await fetch(`${M}/rest/v1/cases?id=eq.${C7}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: 'submitted' }) });
 }
 
 /* ---- 2f. B2B: discover → review → distribute (never leads directly, never outreach) ---- */

@@ -4,10 +4,12 @@ import { useNav } from '@/lib/nav';
 import CaseDocuments from '@/components/documents/CaseDocuments';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { buildChecklist, docLabel } from '@/lib/documents';
-import { stageText } from '@/lib/case-flow';
 import { CaseExceptionCard, CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
 import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
-import { canResubmit as canResubmitCase, canReturn as canReturnCase } from '@/lib/case-return';
+import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
+import { checkJump } from '@/lib/stage-jump';
+import { stageText } from '@/lib/case-flow';
+import { useToast } from '@/lib/toast';
 import { useStaff } from '@/lib/useStaff';
 import SignaturePad from './SignaturePad';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
@@ -456,6 +458,21 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
   const [busy, setBusy] = useState(false);
   const [supply, setSupply] = useState({ provider: c.provider ?? '', program: c.program ?? '' });
   const [savingSupply, setSavingSupply] = useState(false);
+  const { toast: notify } = useToast();
+  const [jumpMsg, setJumpMsg] = useState<string | null>(null);
+  useEffect(() => { setJumpMsg(null); }, [c.current_stage]);
+  const jumpHint = (target: Stage) => { const j = checkJump(c.current_stage as Stage, target); return j.allowed ? undefined : j.message; };
+  // Only an allowed next stage is attempted (same list as the database after phase2/07); any refusal is shown.
+  const jump = async (target: Stage) => {
+    const j = checkJump(c.current_stage as Stage, target);
+    if (!j.allowed) { setJumpMsg(j.message); return; }
+    setBusy(true); setJumpMsg(null);
+    const r = await changeStage(c.id, target, role, note || undefined);
+    setBusy(false);
+    if (r.error) { const m = stageErrorText(r.error); setJumpMsg(m); notify(m, 'bad'); return; }
+    notify(`Στάδιο: ${stageText(target)}`, 'ok');
+    reload();
+  };
 
   useEffect(() => { fetchDocuments(c.id).then(setDocs); }, [c.id]);
   useEffect(() => { setSupply({ provider: c.provider ?? '', program: c.program ?? '' }); }, [c.provider, c.program]);
@@ -516,7 +533,7 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-paper border border-line flex items-center gap-2 flex-wrap">
+          <div className="p-3 rounded-xl bg-paper border border-line flex items-center gap-2 flex-wrap" data-bo-actions>
             <input className="field flex-1 !py-1.5 text-[13px] min-w-[160px]" value={note} onChange={e => setNote(e.target.value)} placeholder="Σημείωση δράσης (θα καταγραφεί στο timeline)…" />
             {can(role, 'create_application') && (
               <Btn variant="brand" disabled={busy} onClick={() => doAction('application', 'Δημιουργία αίτησης', note || 'Αίτηση δημιουργήθηκε για τον πάροχο.')}>
@@ -528,17 +545,18 @@ function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
                 <Send className="w-3.5 h-3.5" /> Υποβολή παρόχου
               </Btn>
             )}
-            {can(role, 'change_stage') && c.current_stage !== 'activation' && (
-              <Btn variant="ok" disabled={busy} onClick={() => changeStage(c.id, 'activation', role, note || undefined).then(reload)}>
+            {can(role, 'change_stage') && c.current_stage !== 'activation' && c.current_stage !== 'completed' && (
+              <Btn variant="ok" disabled={busy} onClick={() => void jump('activation')} title={jumpHint('activation')}>
                 <LogIn className="w-3.5 h-3.5" /> Ενεργοποίηση
               </Btn>
             )}
             {can(role, 'change_stage') && c.current_stage !== 'completed' && (
-              <Btn variant="ok" disabled={busy} onClick={() => changeStage(c.id, 'completed', role, note || undefined).then(reload)}>
+              <Btn variant="ok" disabled={busy} onClick={() => void jump('completed')} title={jumpHint('completed')}>
                 <CheckCircle2 className="w-3.5 h-3.5" /> Ολοκλήρωση
               </Btn>
             )}
           </div>
+          {jumpMsg && <div className="atx-notice text-[13px]" role="alert" data-jump-msg>{jumpMsg}</div>}
         </div>
       ) : null}
 

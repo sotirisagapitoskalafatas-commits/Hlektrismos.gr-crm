@@ -18,8 +18,8 @@ export async function handoverNewSale(caseId: string, me: { id: string; role: Ro
   const patch: Partial<Case> = {
     field_sales_owner: c.field_sales_owner ?? me.id,
     next_action: 'Παραλαβή από Sales — Νέο Sale',
-    next_action_owner_id: bo?.id ?? null,
-    ...(bo ? { back_office_owner: bo.id } : {}),
+    // Without a configured Back Office assignee the current owner is left unchanged (never cleared).
+    ...(bo ? { next_action_owner_id: bo.id, back_office_owner: bo.id } : {}),
   };
   const { error } = await updateCase(caseId, patch, { log: false, role: me.role });
   if (error) return { ok: false, assignee: null };

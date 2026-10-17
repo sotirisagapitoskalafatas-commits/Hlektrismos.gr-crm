@@ -530,21 +530,44 @@ if (!PREVIEW_LIVE) {
     check('Stage set: Inside Sales has no Back Office tab and no such control', await page.evaluate(() => ![...document.querySelectorAll('[role="tab"]')].some((b) => b.textContent.trim().startsWith('Back Office')) && !document.querySelector('[data-stage-set]')));
     await browser.close();
   }
-  // the SQL is not applied yet (normal state for weeks): a neutral Greek sentence, no migration wording, nothing changes
+  // the SQL is not applied yet (normal state for weeks): the control is a neutral note instead of a form that cannot work
   await fetch(`${M}/__setstage?state=off`);
+  for (const role of ['back_office', 'admin']) {
+    const seen = (await rpcs()).length; // calls made by the earlier checks do not count here
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, role);
+    await openC3(page);
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(1200);
+    const st = await page.evaluate(() => ({
+      note: document.querySelector('[data-stage-set-unavailable]')?.textContent?.trim() ?? '',
+      form: !!document.querySelector('#stage-set-target, #stage-set-reason'),
+      button: [...document.querySelectorAll('[data-stage-set] button')].some((b) => b.textContent.trim() === 'Αλλαγή σταδίου'),
+      box: document.querySelector('[data-stage-set]')?.innerText ?? '',
+    }));
+    const now = (await (await fetch(`${M}/rest/v1/cases?id=eq.${C3}&select=current_stage`, { headers: H })).json())[0]?.current_stage;
+    const writes = (await rpcs()).slice(seen).filter((l) => String(l.body?.p_reason ?? '').trim() !== '');
+    check(`Stage set (${role}): while the SQL is not applied there is one neutral Greek sentence and no form, no button`,
+      st.note === 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.' && !st.form && !st.button && !/migration|phase|SQL|schema|PGRST|07[ab]/i.test(st.box), JSON.stringify(st));
+    check(`Stage set (${role}): the availability check writes nothing (empty reason only) and the case is unchanged`, writes.length === 0 && now === 'submitted', `${writes.length} writes, stage ${now}`);
+    await browser.close();
+  }
+  // the SQL disappears while the page is open: the failed save is a neutral sentence and the form gives way to the note
+  await fetch(`${M}/__setstage?state=on`);
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'back_office');
     await openC3(page);
-    await click(page, 'Back Office', '[role="tab"]'); await sleep(600);
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(1200);
     await setVal(page, '#stage-set-target', 'activation');
     await setVal(page, '#stage-set-reason', 'Συνεχίζει από την ενεργοποίηση');
+    await fetch(`${M}/__setstage?state=off`);
     await sleep(200);
     await page.evaluate(() => [...document.querySelectorAll('[data-stage-set] button')].find((b) => b.textContent.trim() === 'Αλλαγή σταδίου')?.click());
-    await sleep(1500);
-    const msg = await page.evaluate(() => document.querySelector('[data-stage-set-error]')?.textContent ?? '');
+    await sleep(1800);
+    const after = await page.evaluate(() => ({ err: document.querySelector('[data-stage-set-error]')?.textContent ?? '', note: !!document.querySelector('[data-stage-set-unavailable]'), form: !!document.querySelector('#stage-set-reason'), toasts: document.body.innerText }));
     const now = (await (await fetch(`${M}/rest/v1/cases?id=eq.${C3}&select=current_stage`, { headers: H })).json())[0]?.current_stage;
-    check('Stage set: while the SQL is not applied the control says so in one neutral Greek sentence and changes nothing', msg === 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.' && !/migration|phase|SQL|schema/i.test(msg) && now === 'submitted', msg);
+    check('Stage set: if the SQL is removed while the page is open the save says so in one neutral Greek sentence, changes nothing and the form gives way to the note',
+      after.toasts.includes('Η λειτουργία δεν είναι ακόμη διαθέσιμη.') && !/migration|phase|SQL|schema|PGRST/i.test(after.err) && after.note && !after.form && now === 'submitted', JSON.stringify({ ...after, toasts: undefined, now }));
     await browser.close();
   }
   // leave the shared mock as we found it

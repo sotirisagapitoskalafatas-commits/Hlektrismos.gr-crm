@@ -78,7 +78,20 @@ test('stepper from history reads old and new entries: Greek names, raw codes, me
 
 test('the stage control is wired into the Back Office tab and the stepper reads history', () => {
   const page = read('../../components/app/CaseDetailPage.tsx');
-  assert.ok(/<StageSetControl c=\{c\} reload=\{reload\} \/>/.test(page) && /canUseStageSet\(role\)\) return null/.test(page));
+  assert.ok(/<StageSetControl c=\{c\} reload=\{reload\} \/>/.test(page) && /const allowed = canUseStageSet\(role\)/.test(page) && /if \(!allowed\) return null/.test(page));
   assert.ok(/visited=\{stageHistory \? visitedStages\(stageHistory, c\.current_stage\) : null\}/.test(page));
   assert.ok(/visited=\{visitedStages\(events\.filter/.test(read('../../components/customers/CustomerDetail.tsx')));
+});
+
+test('until set_case_stage is installed the control is a neutral note, not a form that fails after submit', () => {
+  const page = read('../../components/app/CaseDetailPage.tsx');
+  const api = read('../api.ts');
+  const ctl = page.slice(page.indexOf('function StageSetControl'));
+  // the note replaces the form, and a failed submit re-checks availability
+  assert.ok(/available === false \? \(\s*<p[^>]*data-stage-set-unavailable>Η λειτουργία δεν είναι ακόμη διαθέσιμη\.<\/p>/.test(ctl));
+  assert.ok(ctl.indexOf('data-stage-set-unavailable') < ctl.indexOf('id="stage-set-reason"'), 'the form is only reachable after the availability check');
+  assert.ok(/void stageSetAvailable\(\)\.then\(setAvailable\)/.test(ctl));
+  // the probe sends an empty reason (the SQL refuses before reading or writing anything); only a missing function counts as «not installed»
+  assert.ok(/p_reason: ''/.test(api) && /ok: !\(error && isMissingFunction\(error\)\)/.test(api));
+  assert.ok(/PGRST202/.test(api) && /Could not find the function\|schema cache/.test(api));
 });

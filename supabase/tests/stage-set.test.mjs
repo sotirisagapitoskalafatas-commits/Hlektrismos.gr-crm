@@ -140,6 +140,22 @@ test('reason, stage, case and caller are validated', async () => {
   assert.equal((await T.set(U.back_office, id, 'application')).ok, true, 'back one step, with a valid reason');
 });
 
+test('the availability probe (empty reason) changes nothing for any caller and is never mistaken for «not installed»', async () => {
+  const snap = async () => { await T.su(); const q = async (t) => JSON.stringify((await main.query(`select * from public.${t} order by 1`)).rows); return [await q('cases'), await q('timeline_events'), await q('activity_log'), await q('app_notifications')].join('|'); };
+  const id = await T.newCase('document_check');
+  const before = await snap();
+  for (const who of [U.admin, U.manager, U.back_office, U.inside_sales, U.inactive_bo, null]) {
+    await T.as(who);
+    // the exact call the app makes: a zero case, any stage, an EMPTY reason
+    const r = await T.run('select public.set_case_stage($1, $2, $3)', ['00000000-0000-0000-0000-000000000000', 'new', '']);
+    assert.equal(r.ok, false, `probe as ${who}`);
+    assert.ok(!/Could not find the function|schema cache/i.test(r.err), `an installed function never reports itself missing: ${r.err}`);
+    // the same call on a REAL case and a different stage: still refused, still no write
+    assert.equal((await T.run('select public.set_case_stage($1, $2, $3)', [id, 'application', ''])).ok, false, `empty reason as ${who}`);
+  }
+  assert.equal(await snap(), before, 'no row in cases, timeline_events, activity_log or app_notifications changed');
+});
+
 test('side effects match the app\'s changeStage; leaving lost/cancelled reopens the status', async () => {
   const a = await T.newCase('activation');
   assert.equal((await T.set(U.back_office, a, 'completed')).ok, true);

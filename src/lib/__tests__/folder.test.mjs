@@ -45,3 +45,12 @@ test('subtitle: πόλη · υπεύθυνος (next-action owner of the open ca
   assert.equal(F.folderSubtitle({ city: 'Αθήνα', since: 'x', cases: [k('a', 'offer', { next_action_owner_id: 'u1' })], staffName, fmtDate }), 'Αθήνα · Υπεύθυνος: Εύα · από 12/10');
   assert.equal(F.folderSubtitle({ city: null, since: 'x', cases: [k('a', 'completed', { next_action_owner_id: 'u1' })], staffName, fmtDate }), 'από 12/10');
 });
+
+test('origin: a lead that cannot be read is «μη διαθέσιμο», not «χωρίς lead»', () => {
+  const cases = [{ lead_id: null, created_at: '2026-10-05T00:00:00Z' }, { lead_id: 'L1', created_at: '2026-10-01T00:00:00Z' }];
+  assert.deepEqual(F.folderOrigin(cases, () => true), { kind: 'lead', leadId: 'L1' });
+  assert.deepEqual(F.folderOrigin(cases, () => false), { kind: 'unavailable', leadId: 'L1' });
+  assert.deepEqual(F.folderOrigin([{ lead_id: null, created_at: 'x' }], () => true), { kind: 'none', leadId: null });
+  assert.deepEqual(F.folderOrigin([], () => true), { kind: 'none', leadId: null });
+  assert.notEqual(F.ORIGIN_TEXT.none, F.ORIGIN_TEXT.unavailable);
+});

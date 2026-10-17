@@ -296,21 +296,44 @@ Customer documents/checklist
 
 Where a document relates to a particular energy supply point/application, attach it to that relevant connection or case. Do not keep every bill/meter image only at customer level if that would make it ambiguous which supply point it represents.
 6.2 Multiple electricity supply-point records
-One customer can have multiple separate electricity connection/supply-point records. Do not store a list of multiple supply numbers in one text field.
+One customer folder can contain many separate electricity connection/supply-point records, including a mixture of residential/home and business/commercial connections. This is a per-connection classification, not a single classification for the whole customer: the same customer may have a home supply point and one or more business supply points at different addresses. Do not store several supply numbers or addresses in one text field.
+Treat Αριθμός Παροχής as the 11-digit identifier for a specific electricity network connection associated with ΔΕΔΔΗΕ, when available. It belongs to the individual supply-point record, not just to the overall customer. Keep it distinct from the physical electricity meter (Μετρητής / Ρολόι ΔΕΗ) and any meter serial/identifier. Do not use “meter number” and “supply number” as interchangeable labels or fields.
 Each supply-point record should support:
 
-* Property/supply address.
-* Αριθμός Παροχής Ρεύματος, using the specified 11-digit format when provided.
-* Tariff/contract name (Ονομασία τιμολογίου ρεύματος).
-* Application date (Ημερομηνία αίτησης).
-* Contract duration (Διάρκεια σύμβασης).
-* Documents linked to this specific connection/application, including the applicable electricity bill and meter photograph.
-* Provider/program details using existing fields and rules, or configured provider-specific fields where available.
-* Existing application, offer, contract, status, and history links relevant to this connection.
+* Connection usage/type: residential/home (Οικιακό) or business/commercial (Επαγγελματικό), selected independently for each connection.
+* Property/supply address: the address to which this specific supply number belongs. Keep this distinct from the customer’s home address and the business visit address.
+* Αριθμός Παροχής Ρεύματος: the 11-digit supply number, stored independently for each connection when known.
+* Meter details: the electricity meter / Μετρητής / Ρολόι ΔΕΗ, and a separate meter serial/identifier field if the current model or workflow captures it. A meter photograph must be stored as a document, not used as a substitute for the identifier field.
+* Tariff category/code: support the connection’s category, independently of the supplier’s commercial tariff/product name.
+* Tariff/contract name: Ονομασία τιμολογίου ρεύματος.
+* Application date: Ημερομηνία αίτησης.
+* Contract duration: Διάρκεια σύμβασης.
+* Documents linked to this specific connection/application: including the applicable current electricity bill and meter photograph; any ID/E9 or other documents should be linked at the appropriate customer, connection, or case level without duplicating files unnecessarily.
+* Provider/program details: use existing fields and verified rules, or configurable provider-specific fields where supported. A program must not be required merely to create a Lead; the program is selected later when preparing an offer.
+* Related application, offer, contract, case, status, and history: each must remain linked to the correct supply point where applicable.
 
-Keep the property address of each supply point distinct from the customer’s home address.
-Do not assume the supply number and physical meter serial/identifier are always interchangeable. If the existing workflow or data includes a separate Αριθμός Μετρητή ΔΕΔΔΗΕ, preserve/support it as a separate field rather than silently renaming one identifier to the other. Do not invent an unconfirmed mandatory format for any additional identifier.
-Use appropriate validation for the specified 11-digit supply number when one is provided, but do not let missing documents block workflow transitions. If existing legacy data has another format, do not corrupt it; document the validation/compatibility approach and test existing records.
+Connection/tariff category options
+The following are the initial examples supplied for the business workflow. Inspect the repository’s existing tariff/provider data and configuration first. Reuse those definitions where present; otherwise offer these as configurable options rather than embedding provider eligibility or pricing logic in code:
+
+* Γ1 — Residential / Home (Οικιακό), standard household connection.
+* Γ1Ν — Residential with night tariff.
+* Γ21 — Small business (Επαγγελματικό), described in the supplied requirements as up to 25 kVA.
+* Γ22 — Medium/large business, described in the supplied requirements as above 25 kVA and often two-zone billing.
+* Γ23 — Business connection with night/off-peak tariff.
+
+Keep the connection category/code separate from the free-text or configured commercial tariff/product name. Do not infer eligibility, kVA requirements, billing terms, or provider availability beyond verified existing product data or explicit business configuration. Authorized Sales and Back Office users should be able to choose from the configured options; changes to available options must not rewrite historic connection records.
+Multiple connections and data integrity
+
+* The customer folder must present a clear list of all supply points, with a way to open, add, and edit each connection independently using the existing UI conventions and permissions.
+* Creating or editing one connection must not overwrite another connection’s supply number, address, category, tariff, application date, contract duration, documents, or case links.
+* A customer may have multiple residential connections, multiple commercial connections, or a mixture of both.
+* Use the supply number as a strong duplicate/matching signal for a connection when available. Inspect existing records before adding strict database uniqueness constraints; flag existing duplicates or uncertain matches for review instead of silently merging or deleting data.
+* Validate that a newly entered supply number has 11 digits when it is supplied, using a user-friendly error or warning consistent with the existing form patterns. Do not corrupt or silently discard legacy values.
+* Do not make the supply number mandatory at Lead creation or at any pipeline stage unless an existing, verified business rule requires it. If it is not yet available, preserve the record and surface missing information clearly.
+* Preserve the existing rule that missing documents never block stage transitions. Missing supply-point information should likewise not introduce a new blocking rule unless explicitly confirmed by the business.
+* If the existing workflow/data includes a separate Αριθμός Μετρητή ΔΕΔΔΗΕ or meter serial/identifier, preserve it separately from the 11-digit Αριθμός Παροχής. Do not invent an unconfirmed format for an additional meter identifier.
+* If existing legacy data has another format, do not corrupt it; document the validation/compatibility approach and test existing records.
+
 6.3 Global custom fields added by Sales and Back Office
 The confirmed requirement is that Sales and Back Office users can add fields globally whenever needed so the customer folder can be configured for sales or Back Office needs.
 
@@ -507,8 +530,12 @@ At minimum, test or verify the following cases using the project’s real test s
 12.5 Customer folder and documents
 
 * Standard customer/contact fields save and reload correctly.
-* A customer can have multiple supply-point records without overwriting one connection with another.
-* Supply-point address, supply number, tariff, application date, duration, and linked documents are kept with the appropriate connection.
+* A customer can have multiple supply-point records, including a mix of residential and business connections, without overwriting one connection with another.
+* Every connection has its own property address, 11-digit Αριθμός Παροχής when known, separate meter details where applicable, configurable tariff category/code, commercial tariff name, application date, contract duration, and appropriately linked documents/cases.
+* The customer folder can list, open, add, and edit multiple connections independently; information on one connection cannot overwrite another.
+* Γ1, Γ1Ν, Γ21, Γ22, and Γ23 are handled as configurable tariff-category options unless equivalent verified configuration already exists; the UI does not conflate these codes with the commercial tariff/product name.
+* When provided, a supply number is validated as 11 digits and used as a duplicate/matching signal, while legacy data is preserved and uncertain duplicates are flagged for review.
+* A missing supply number or document does not block a Lead creation or pipeline transition unless an existing, verified business rule requires it.
 * Global custom field definitions can be created by both Sales and Back Office users as required, and values save/reload against customer folders.
 * Renaming/archiving a custom field does not accidentally erase existing values.
 * Missing documents display a checklist/warning but do not block stage transitions or Back Office handoff.
@@ -561,7 +588,7 @@ After implementation, report:
 4. Field Sales workflow: default outcomes, branches, follow-ups, and configuration implemented.
 5. Routes and visits: how route generation, map-discovered businesses, optimization/segmentation, saving, manual check-in, history, and reassignment work; identify any map-provider or API-key requirement.
 6. Duplicate approval: matching logic, approval behavior, and how it is enforced beyond the UI.
-7. Customer folder: standard fields, multiple supply-point model, configurable custom fields, and document associations.
+7. Customer folder: standard fields, multiple residential/commercial supply points, 11-digit supply-number handling, separate meter identification, tariff category versus commercial tariff name, configurable custom fields, and document associations.
 8. Back Office: supported stages, non-linear progression, exception branches, and document warning behavior.
 9. Files changed: principal modified/created files and migrations.
 10. Validation: exact commands/checks run and actual outcomes.

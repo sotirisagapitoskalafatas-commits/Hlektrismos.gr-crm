@@ -77,3 +77,12 @@ test('folder link: only the roles that have the Πελάτες page; the old lea
   assert.ok(/shouldRedirectLead/.test(lead) && /NEEDS_CASE_TEXT/.test(lead) && !/Σχετικό Case/.test(lead), 'lead screen: redirect, case-needed tabs, no second «Σχετικό Case» card');
   assert.ok(/Μετατράπηκε → Φάκελος/.test(read('../../components/app/LeadsPage.tsx')));
 });
+
+test('consent on the case (B1): the same component as on the lead and the customer, keyed to the case\'s customer', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const kase = read('../../components/app/CaseDetailPage.tsx');
+  assert.ok(/\{c\.customer_id && <ContactEligibility subject=\{\{ phone: c\.customer\?\.phone \?\? null, email: c\.customer\?\.email \?\? null, customerId: c\.customer_id \}\} \/>\}/.test(kase));
+  // the component keeps the rule: hidden for non-admins while the check is unavailable
+  assert.ok(/error === CONTACT_CHECK_UNAVAILABLE && role !== 'admin'\) return null/.test(read('../../components/contact/ContactEligibility.tsx')));
+});

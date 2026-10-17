@@ -9,6 +9,8 @@ import { parseStageError } from './case-return';
 import { reopenErrorText, stageSetErrorText } from './stage-jump';
 import { DOC_STATUS_TEXT, statusText } from './status-text';
 import { stageChangeDescription, stageChangeTitle } from './history-text';
+import { draftToRow, isNotInstalled, supplyErrorText } from './supply-points';
+import type { SupplyPoint, SupplyPointDraft, TariffCategory } from './supply-points';
 import { leadSyncPatch } from './lead-sync';
 import type { LeadSyncResult, SyncCustomer } from './lead-sync';
 import { leadIdentityColumns, leadNamePatch, leadWriteErrorText, safeDiagnostics } from './lead-payload';
@@ -1939,4 +1941,80 @@ export async function revokeConsent(id: string): Promise<boolean> {
     .eq('id', id);
   if (error) { logError('revokeConsent', error); return false; }
   return true;
+}
+
+/* ---- Παροχές: several independent connections per customer (staged phase5/17). null = the SQL is not applied yet. ---- */
+export async function fetchSupplyPoints(customerId: string): Promise<SupplyPoint[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('customer_supply_points').select('*').eq('customer_id', customerId).order('created_at', { ascending: true }).order('id');
+  if (error) { if (!isNotInstalled(error)) logError('fetchSupplyPoints', error); return null; }
+  return (data ?? []) as SupplyPoint[];
+}
+
+export async function fetchTariffCategories(): Promise<TariffCategory[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('tariff_categories').select('*').order('sort', { ascending: true }).order('code');
+  if (error) { if (!isNotInstalled(error)) logError('fetchTariffCategories', error); return null; }
+  return (data ?? []) as TariffCategory[];
+}
+
+export type SupplyWrite = { point: SupplyPoint | null; error: string | null };
+
+/** Creates ONE connection. Nothing else is touched; nothing is required. */
+export async function createSupplyPoint(customerId: string, draft: SupplyPointDraft): Promise<SupplyWrite> {
+  if (!supabase) return { point: null, error: 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.from('customer_supply_points').insert({ customer_id: customerId, ...draftToRow(draft) }).select('*').single();
+  if (error) { logError('createSupplyPoint', error); return { point: null, error: supplyErrorText(error) }; }
+  return { point: data as SupplyPoint, error: null };
+}
+
+/** Saves ONE connection, addressed by its own id; the customer is never part of the update, so it can never move. */
+export async function updateSupplyPoint(id: string, draft: SupplyPointDraft): Promise<SupplyWrite> {
+  if (!supabase) return { point: null, error: 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.from('customer_supply_points').update(draftToRow(draft)).eq('id', id).select('*').single();
+  if (error) { logError('updateSupplyPoint', error); return { point: null, error: supplyErrorText(error) }; }
+  return { point: data as SupplyPoint, error: null };
+}
+
+/** Archive (or restore) one connection. There is no delete. */
+export async function archiveSupplyPoint(id: string, archived: boolean): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.from('customer_supply_points').update({ archived_at: archived ? new Date().toISOString() : null }).eq('id', id);
+  if (!error) return null;
+  logError('archiveSupplyPoint', error);
+  return supplyErrorText(error);
+}
+
+export type SupplyDuplicate = { id: string; customer_id: string; customer_name: string; usage: SupplyPoint['usage']; property_address: string; needs_review: boolean };
+/** Other active connections with the same number, on any customer. A signal only. null = not installed yet. */
+export async function findSupplyDuplicates(number: string, excludeId?: string | null): Promise<SupplyDuplicate[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('supply_point_duplicates', { p_number: number, p_exclude: excludeId ?? null });
+  if (error) { if (!isNotInstalled(error)) logError('findSupplyDuplicates', error); return null; }
+  return (data ?? []) as SupplyDuplicate[];
+}
+
+export async function flagSupplyReview(id: string, note?: string): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('flag_supply_point_review', { p_id: id, p_note: note?.trim() || null });
+  if (!error) return null;
+  logError('flagSupplyReview', error);
+  return supplyErrorText(error);
+}
+
+export async function resolveSupplyReview(id: string, note?: string): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('resolve_supply_point_review', { p_id: id, p_note: note?.trim() || null });
+  if (!error) return null;
+  logError('resolveSupplyReview', error);
+  return supplyErrorText(error);
+}
+
+/** Tariff list edits (admins). Connections keep the code text, so none of this rewrites a connection. */
+export async function saveTariffCategory(c: Pick<TariffCategory, 'code' | 'label' | 'usage' | 'active' | 'sort'>): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.from('tariff_categories').upsert({ ...c, code: c.code.trim(), updated_at: new Date().toISOString() }, { onConflict: 'code' });
+  if (!error) return null;
+  logError('saveTariffCategory', error);
+  return supplyErrorText(error);
 }

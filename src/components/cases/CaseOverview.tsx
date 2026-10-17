@@ -130,16 +130,13 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   };
   const submit = async () => {
     setBusy(true); setErr(null);
-    const r = await changeStage(c.id, stage, role, note.trim() || undefined);
+    const missing = warnings.map(b => `${b.label} — ${BLOCKER_TEXT[b.status]}`);
+    const r = await changeStage(c.id, stage, role, note.trim() || undefined, missing);
     if (r.error) {
       setBusy(false);
       if (r.error.kind === 'documents') setBlockers(r.error.blockers.map(b => ({ ...b, mode: 'block' as const })));
       setErr(stageErrorText(r.error));
       return;
-    }
-    if (warnings.length) {
-      await addActivity(c.id, { role, activity_type: 'note', title: 'Μετάβαση με ελλείψεις εγγράφων',
-        description: warnings.map(b => `${b.label} — ${BLOCKER_TEXT[b.status]}`).join(' · '), metadata: { stage, missing: warnings } });
     }
     await verify(`Στάδιο: ${stageText(stage)}${warnings.length ? ' — με ελλείψεις εγγράφων (καταγράφηκαν)' : ''}`);
   };

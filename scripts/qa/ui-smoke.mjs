@@ -465,8 +465,12 @@ if (!PREVIEW_LIVE) {
     && (await stageWrites(C6)).length === before6 && (await stageOf(C6)) === 'document_check', m6);
   // allowed move: CS-2026-007 in «Καταχώρηση παρόχου» → «Ενεργοποίηση»
   await openBO(page, 'CS-2026-007');
+  const tl7 = async () => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'POST' && l.table === 'timeline_events' && JSON.stringify(l.body).includes(C7));
+  const tlBefore7 = (await tl7()).length;
   await press(page, 'Ενεργοποίηση');
   await sleep(1600);
+  const tlNew7 = (await tl7()).slice(tlBefore7).map((l) => (Array.isArray(l.body) ? l.body[0] : l.body));
+  check('History: one stage move writes ONE entry, titled in Greek', tlNew7.length === 1 && tlNew7[0].title === 'Στάδιο: Καταχώρηση παρόχου → Ενεργοποίηση', JSON.stringify(tlNew7.map((b) => b.title)));
   check('BO buttons: an allowed move passes the guard and the case moves to «Ενεργοποίηση»', (await stageOf(C7)) === 'activation'
     && (await stageWrites(C7)).some((l) => l.body.current_stage === 'activation') && !(await jumpMsg(page)));
   // a database refusal is shown: with the «block» gate and no verified documents, «Ολοκλήρωση» is refused by the server
@@ -493,7 +497,7 @@ if (!PREVIEW_LIVE) {
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'back_office');
-    await click(page, 'Λειτουργίες', '#shell-rail nav button'); await sleep(1800);
+    await click(page, 'Διεκπεραίωση', '#shell-rail nav button'); await sleep(1800);
     const subs = await page.evaluate(() => [...document.querySelectorAll('main .atx-row-sub')].map((e) => e.textContent));
     check('Queue: no double separator when a case has no number', subs.length > 0 && subs.every((t) => !/·\s*·/.test(t)) && subs.some((t) => t.startsWith('Αίτηση · ')), JSON.stringify(subs.filter((t) => t.startsWith('Αίτηση'))));
     await browser.close();
@@ -546,6 +550,8 @@ if (!PREVIEW_LIVE) {
       hidden.push(!(await text(page, '#shell-rail nav button')).some((t) => t.startsWith('B2B Prospecting')));
     }
     check('B2B: hidden for every non-admin, even with the browser switch set by hand', hidden.every(Boolean));
+    // same browser as above: clear the switch the loop set by hand, so the admin starts with it off (the default)
+    await page.evaluate(() => localStorage.removeItem('atlas.labs'));
     await signInAs(page, 'admin');
     check('B2B: hidden for the admin while «Πειραματικές λειτουργίες» is off', !(await text(page, '#shell-rail nav button')).some((t) => t.startsWith('B2B Prospecting')));
     await browser.close();
@@ -1077,6 +1083,10 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   check('Customer detail: opens with next step, cases and contact', t.includes('Επόμενο βήμα') && t.includes('Επικοινωνία') && /CS-2026-00/.test(t));
   await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(500);
   check('Customer detail: history merges case timeline events', (await body()).includes('Τηλεφωνική επικοινωνία'));
+  {
+    const h = await body();
+    check('History: stored stage codes are shown in Greek; the «Ενημέρωση Case» duplicate is hidden', h.includes('Στάδιο: Νέο → Επικοινωνία') && !h.includes('new → contacted') && !h.includes('Ενημέρωση Case'));
+  }
   await click(page, 'Επεξεργασία'); await sleep(400);
   await page.evaluate(() => { const i = [...document.querySelectorAll('main label')].find((l) => l.textContent.startsWith('Πόλη')).querySelector('input'); i.focus(); });
   await page.keyboard.type(' Κέντρο');

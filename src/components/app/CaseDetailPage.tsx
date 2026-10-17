@@ -9,6 +9,7 @@ import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
 import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
+import { entryTeam, entryTeamLabel, historyDescription, historyText, visibleHistory } from '@/lib/history-text';
 import { useToast } from '@/lib/toast';
 import { useStaff } from '@/lib/useStaff';
 import { meetingPoint } from '@/lib/visit-location';
@@ -51,7 +52,8 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  const visible = team === 'all' ? events : events.filter(e => e.role === team);
+  const shown = visibleHistory(events);
+  const visible = team === 'all' ? shown : shown.filter(e => entryTeam(e) === team);
 
   const opts: { value: ActivityType; label: string; icon: IconType }[] = [];
   opts.push({ value: 'note', label: 'Σημείωση', icon: StickyNote });
@@ -78,7 +80,7 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
 
   return (
     <Card>
-      <CardHeader micro="Timeline" title="Χρονολόγιο" />
+      <CardHeader title="Ιστορικό" />
       {opts.length > 0 && (
         <div className="mb-4 p-3 rounded-xl bg-paper border border-line">
           <div className="flex items-center gap-2 flex-wrap">
@@ -116,12 +118,12 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
                 </span>
                 <div className="flex-1 min-w-0 pt-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[13px] font-medium text-ink">{e.title}</span>
+                    <span className="text-[13px] font-medium text-ink">{historyText(e.title)}</span>
                     <span className="text-[11px] text-ink/35">{fmtDateTime(e.occurred_at)}</span>
                   </div>
-                  {e.description && <p className="text-[13px] text-ink/60 mt-0.5">{e.description}</p>}
+                  {historyDescription(e) && <p className="text-[13px] text-ink/60 mt-0.5 whitespace-pre-line">{historyDescription(e)}</p>}
                   <div className="flex items-center gap-2 mt-1.5">
-                    <Pill tone="gray">{TEAM_FILTERS.find(t => t.id === (meta.team ?? 'system'))?.label ?? meta.team}</Pill>
+                    <Pill tone="gray">{entryTeamLabel(e)}</Pill>
                     {e.user?.full_name && <span className="text-[11px] text-ink/40">{e.user.full_name}</span>}
                     {e.location?.label && <span className="text-[11px] text-ink/35"><MapPin className="w-3 h-3 inline -mt-0.5" /> {e.location.label}</span>}
                   </div>

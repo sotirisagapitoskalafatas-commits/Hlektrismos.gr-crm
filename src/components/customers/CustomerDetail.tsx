@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { activityLabel, can, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
+import { historyDescription, historyText, visibleHistory } from '@/lib/history-text';
 import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
 import type { Case, CaseDocument, Customer, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
@@ -51,7 +52,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
       Promise.all(mine.map(k => fetchTimeline(k.id))),
     ]);
     setDocs(Object.fromEntries(mine.map((k, i) => [k.id, d[i]])));
-    setEvents(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no })))
+    setEvents(visibleHistory(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no }))))
       .filter(e => COMMS.includes(e.activity_type))
       .sort((a, b) => +new Date(b.occurred_at) - +new Date(a.occurred_at)));
   }, [customerId]);
@@ -262,11 +263,11 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
                 <li key={e.id} className="flex gap-3">
                   <span className="atx-icon" style={{ width: 30, height: 30 }} aria-hidden="true"><Clock size={14} /></span>
                   <span className="min-w-0">
-                    <span className="block text-[14px] font-medium">{e.title || activityLabel(e.activity_type)}</span>
+                    <span className="block text-[14px] font-medium">{historyText(e.title) || activityLabel(e.activity_type)}</span>
                     <span className="block text-[12.5px] text-[var(--atx-muted)]">
                       {activityLabel(e.activity_type)} · Case <button className="atx-link !p-0 text-[12.5px]" onClick={() => openCase(e.case_id)}>{e.case_no}</button> · {fmtDateTime(e.occurred_at)}{e.user?.full_name ? ` · ${e.user.full_name}` : ''}
                     </span>
-                    {e.description && <span className="block text-[13px] mt-0.5">{e.description}</span>}
+                    {historyDescription(e) && <span className="block text-[13px] mt-0.5 whitespace-pre-line">{historyDescription(e)}</span>}
                   </span>
                 </li>
               ))}

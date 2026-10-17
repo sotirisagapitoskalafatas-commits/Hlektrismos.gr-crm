@@ -102,6 +102,9 @@ export const ACTIVITY_META: Record<string, { icon: React.ComponentType<{ classNa
   assignment: { icon: Briefcase, label: 'Ανάθεση', team: 'system' },
   comment: { icon: MessageCircle, label: 'Σχόλιο', team: 'system' },
   completed: { icon: CheckCircle2, label: 'Ολοκλήρωση', team: 'system' },
+  stage_override: { icon: Gauge, label: 'Παράκαμψη ελέγχου εγγράφων', team: 'system' },
+  returned: { icon: Briefcase, label: 'Επιστροφή για διόρθωση', team: 'back_office' },
+  resubmitted: { icon: Upload, label: 'Επανυποβολή', team: 'system' },
 };
 
 export function activityLabel(t: string) {

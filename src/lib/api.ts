@@ -6,6 +6,7 @@ import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 import { notTrashed } from './trash';
 import { parseStageError } from './case-return';
+import { stageChangeDescription, stageChangeTitle } from './history-text';
 import { leadIdentityColumns, leadNamePatch, leadWriteErrorText, safeDiagnostics } from './lead-payload';
 import type { ReturnTeam, StageBlocker, StageError } from './case-return';
 
@@ -506,7 +507,7 @@ export async function fetchCase(id: string): Promise<Case | null> {
   return applyCanonicalLabels([row], catalog)[0];
 }
 
-export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?: boolean; role?: Role }): Promise<{ error: { message: string; details?: string | null; hint?: string | null } | null }> {
+export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?: boolean; role?: Role; note?: string; missing?: string[] }): Promise<{ error: { message: string; details?: string | null; hint?: string | null } | null }> {
   if (!supabase) return { error: { message: 'Database not configured' } };
   const prev = opts?.log ? await fetchCase(id) : null;
   const catalog = await loadCatalog();
@@ -525,40 +526,30 @@ export async function updateCase(id: string, patch: Partial<Case>, opts?: { log?
   delete upd.updated_at;
   const { error } = await supabase.from('cases').update(upd).eq('id', id);
   if (error) { logError('updateCase', error); return { error }; }
-  if (opts?.log && prev) {
-    const changed: string[] = [];
-    if (patch.current_stage && patch.current_stage !== prev.current_stage) {
-      changed.push(`Στάδιο: ${prev.current_stage} → ${patch.current_stage}`);
-      if (patch.current_stage === 'completed') {
-        await addActivity(id, { role: opts.role ?? 'system', activity_type: 'completed', title: 'Case ολοκληρώθηκε', description: 'Η παροχή ενεργοποιήθηκε.' });
-      } else {
-        await addActivity(id, { role: opts.role ?? 'system', activity_type: 'status_change', title: `Στάδιο: ${prev.current_stage} → ${patch.current_stage}`, description: changed[0] });
-      }
-    }
-    if (changed.length > 0) {
-      await addActivity(id, {
-        role: opts.role ?? 'system',
-        activity_type: 'status_change',
-        title: 'Ενημέρωση Case',
-        description: changed.join(' · '),
-      });
-    }
+  // One history entry per stage change (W2): the move in Greek, with the note and any missing documents.
+  if (opts?.log && prev && patch.current_stage && patch.current_stage !== prev.current_stage) {
+    const completed = patch.current_stage === 'completed';
+    const description = [completed ? 'Η παροχή ενεργοποιήθηκε.' : '', stageChangeDescription(opts.note, opts.missing)].filter(Boolean).join('\n');
+    await addActivity(id, {
+      role: opts.role ?? 'system',
+      activity_type: completed ? 'completed' : 'status_change',
+      title: completed ? 'Case ολοκληρώθηκε' : stageChangeTitle(prev.current_stage, patch.current_stage),
+      description,
+      metadata: { from: prev.current_stage, to: patch.current_stage, ...(opts.missing?.length ? { missing: opts.missing } : {}) },
+    });
   }
   return { error: null };
 }
 
 /** Changes the stage. The database refuses moves that skip the allowed path or lack required documents
  *  (staged migration phase2/07); the reason comes back as a StageError instead of a silent failure. */
-export async function changeStage(id: string, stage: Stage, role: Role, note?: string): Promise<{ error: StageError | null }> {
+export async function changeStage(id: string, stage: Stage, role: Role, note?: string, missing?: string[]): Promise<{ error: StageError | null }> {
   const { error } = await updateCase(id, {
     current_stage: stage,
     ...(stage === 'completed' ? { status: 'completed', activation_status: 'active' } : {}),
     ...(stage === 'lost' || stage === 'cancelled' ? { status: 'lost' } : {}),
-  }, { log: true, role });
+  }, { log: true, role, note, missing });
   if (error) return { error: parseStageError(error) };
-  if (note) {
-    await addActivity(id, { role: 'system', activity_type: 'note', title: stage === 'completed' ? 'Σχόλιο ολοκλήρωσης' : 'Σημείωση αλλαγής σταδίου', description: note });
-  }
   return { error: null };
 }
 

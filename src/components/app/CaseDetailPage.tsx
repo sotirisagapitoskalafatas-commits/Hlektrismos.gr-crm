@@ -7,9 +7,9 @@ import { buildChecklist, docLabel } from '@/lib/documents';
 import { CaseExceptionCard, CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
 import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
-import { STAGE_SET_MIN_REASON, canUseStageSet, checkJump, stageSetTargets } from '@/lib/stage-jump';
+import { STAGE_SET_MIN_REASON, canReopenCase, canUseStageSet, checkJump, reopenTargets, stageSetTargets } from '@/lib/stage-jump';
 import { stageText, visitedStages } from '@/lib/case-flow';
-import { setCaseStage, stageSetAvailable } from '@/lib/api';
+import { reopenAvailable, reopenCompletedCase, setCaseStage, stageSetAvailable } from '@/lib/api';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
 import { canOpenFolder } from '@/lib/folder';
@@ -474,6 +474,62 @@ export function SignaturesTab({ caseId }: { caseId: string }) {
 /* ================= Back Office ================= */
 /* «Αλλαγή σταδίου από Back Office» (staged phase2/07b): the case continues from where it really is. Any other stage, with a
    written reason; recorded with the user. It does not touch documents and does not pretend the skipped stages were done. */
+/* «Επαναφορά ολοκληρωμένου case» (staged phase2/07c): only an admin, only for a completed case, with a written reason.
+   Until the SQL is applied it is a neutral note, like the stage control. */
+function ReopenControl({ c, reload }: { c: Case; reload: () => void }) {
+  const { toast: notify } = useToast();
+  const targets = useMemo(() => reopenTargets(), []);
+  const [target, setTarget] = useState<Stage | ''>('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  useEffect(() => { setTarget(''); setReason(''); setMsg(null); }, [c.id, c.current_stage]);
+  useEffect(() => {
+    let alive = true;
+    void reopenAvailable().then(ok => { if (alive) setAvailable(ok); });
+    return () => { alive = false; };
+  }, []);
+  const submit = async () => {
+    if (!target || busy) return;
+    setBusy(true); setMsg(null);
+    const err = await reopenCompletedCase(c.id, target, reason);
+    setBusy(false);
+    if (err) {
+      setMsg(err); notify(err, 'bad');
+      void reopenAvailable().then(setAvailable);
+      return;
+    }
+    notify(`Το case άνοιξε ξανά: ${stageText(target)}`, 'ok');
+    reload();
+  };
+  return (
+    <div className="p-3 rounded-xl bg-paper border border-line" data-reopen>
+      <div className="text-[13px] font-medium text-ink">Επαναφορά ολοκληρωμένου case (διαχειριστής)</div>
+      <p className="text-xs text-ink/55 mt-1 mb-2">
+        Ανοίγει ξανά ένα case που έχει ολοκληρωθεί, από το στάδιο που θα επιλέξετε. Καταγράφεται με την αιτιολογία και τον χρήστη.
+        Η ενεργοποίηση δεν θεωρείται πλέον επιβεβαιωμένη.
+      </p>
+      {available === null ? (
+        <div className="atx-skeleton" data-reopen-checking />
+      ) : available === false ? (
+        <p className="text-xs text-ink/55 m-0" data-reopen-unavailable>Η λειτουργία δεν είναι ακόμη διαθέσιμη.</p>
+      ) : (
+        <div className="space-y-2">
+          <select className="field !py-1.5 text-[13px]" value={target} onChange={e => setTarget(e.target.value as Stage | '')} aria-label="Στάδιο επαναφοράς" id="reopen-target">
+            <option value="">Επιλέξτε στάδιο…</option>
+            {targets.map(s => <option key={s} value={s}>{stageText(s)}</option>)}
+          </select>
+          <textarea className="field text-[13px]" rows={2} id="reopen-reason" value={reason} onChange={e => setReason(e.target.value)} aria-label="Αιτιολογία"
+            placeholder={`Γιατί ανοίγει ξανά; (τουλάχιστον ${STAGE_SET_MIN_REASON} χαρακτήρες — καταγράφεται)`} />
+          {msg && <p role="alert" data-reopen-error className="text-[13px] text-bad-600 m-0">{msg}</p>}
+          <Btn variant="brand" disabled={busy || !target || reason.trim().length < STAGE_SET_MIN_REASON} onClick={() => void submit()}>{busy ? '…' : 'Επαναφορά case'}</Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StageSetControl({ c, reload }: { c: Case; reload: () => void }) {
   const { role } = useAuth();
   const { toast: notify } = useToast();
@@ -596,6 +652,7 @@ export function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
       {can(role, 'create_application') || can(role, 'submit_provider') || can(role, 'change_stage') ? (
         <div className="space-y-4">
           <StageSetControl c={c} reload={reload} />
+          {canReopenCase(role, c.current_stage) && <ReopenControl c={c} reload={reload} />}
           <div className="p-3 rounded-xl bg-paper border border-line">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div>

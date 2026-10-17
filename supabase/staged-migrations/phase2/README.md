@@ -37,7 +37,7 @@
 
 ---
 
-# 07a / 07b — Case workflow (NOT applied)
+# 07a / 07b / 07c — Case workflow (NOT applied)
 
 The former single `07_case_return_and_document_gates.sql` is split in two independent files (owner decision of 17/10/2026). Either can be applied alone, in either order, and twice. The former file is kept only as a test fixture (`supabase/tests/fixtures/phase2_07_former.sql`) to prove the upgrade path.
 
@@ -57,5 +57,14 @@ The former single `07_case_return_and_document_gates.sql` is split in two indepe
 - **Impact when applied:** direct stage writes outside the list are refused (the app already prevents them, PR #49). Nothing about documents changes.
 - Rollback: `docs/ops/rollback_phase2_07b.sql`, option A, B or C.
 
+## `07c_reopen_completed_case.sql` — an admin reopens a completed case
+- **`reopen_completed_case(case, stage, reason)`:** **admin only** (an inactive admin is refused; manager and Back Office cannot). Only a case whose stage is «Ολοκληρώθηκε». The target is one of the working stages «Νέο» … «Ενεργοποίηση» (never completed, lost or cancelled). Reason required, at least 10 characters, **checked before anything is read or written**, so the app can ask «is this installed?» with an empty reason without ever changing data.
+- **Columns:** stage = the chosen stage, `status = 'open'`, `activation_status = NULL` (the line is no longer confirmed active). `cases` has no `completed_at`, so nothing else is reset.
+- **Audit:** a timeline entry (`stage_set`, so the stepper and the history already read it; title «Επαναφορά ολοκληρωμένου case από διαχειριστή: completed → …», the reason as description) and an `activity_log` entry `case_reopened` with the actor, the move, the reason and the **previous** status and activation_status.
+- **It does not change `set_case_stage`:** a completed case stays final for everybody on the ordinary path; this is the one narrow exception. After reopening, the ordinary rules apply again.
+- Independent of 07a and 07b (alone, either order, twice); the 07b guard does not stand in its way because the function is SECURITY DEFINER.
+- **Impact when applied:** nothing changes until an admin uses it. **Until applied** the app shows «Η λειτουργία δεν είναι ακόμη διαθέσιμη.» instead of the form (admins on a completed case only).
+- Rollback: `docs/ops/rollback_phase2_07c.sql` (drops the function; cases already reopened stay reopened and can be listed from `activity_log`).
+
 ## Local evidence (PGlite, not staging)
-`node --test supabase/tests/case-workflow.test.mjs supabase/tests/stage-jump.test.mjs supabase/tests/stage-set.test.mjs` — 9 + 7 + 8. Includes: a role × from × to matrix (605 combinations) against an independent statement of the rule, the same for direct writes, the SQL role list equal to the app's, seven apply orders, and the upgrade from the former 07.
+`node --test supabase/tests/case-workflow.test.mjs supabase/tests/stage-jump.test.mjs supabase/tests/stage-set.test.mjs supabase/tests/reopen-case.test.mjs` — 9 + 7 + 9 + 9 (07c: admin only, validation, what changes, audit, probe changes nothing, independence incl. the 07b guard, ordinary rules after reopening). Includes: a role × from × to matrix (605 combinations) against an independent statement of the rule, the same for direct writes, the SQL role list equal to the app's, seven apply orders, and the upgrade from the former 07.

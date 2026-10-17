@@ -13,6 +13,7 @@ from (values
   ('phase2/06_trash_leads_customers',          exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'leads' and column_name = 'deleted_at'), 'column leads.deleted_at'),
   ('phase2/07a_document_checklist_and_return', to_regprocedure('public.return_case_for_correction(uuid,text,jsonb,text)') is not null, 'function return_case_for_correction'),
   ('phase2/07b_case_stage_guard_and_set_stage', to_regprocedure('public.set_case_stage(uuid,text,text)') is not null, 'function set_case_stage'),
+  ('phase2/07c_reopen_completed_case',         to_regprocedure('public.reopen_completed_case(uuid,text,text)') is not null, 'function reopen_completed_case'),
   ('phase3/08_b2b_prospects_review_distribution', to_regclass('public.b2b_prospects') is not null, 'table b2b_prospects'),
   ('phase3/09_contact_eligibility',            to_regclass('public.contact_objections') is not null, 'table contact_objections'),
   ('phase4/10_field_checkin_manual_flag',      exists (select 1 from pg_proc where proname = 'review_field_checkin'), 'function review_field_checkin'),

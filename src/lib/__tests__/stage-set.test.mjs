@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const js = buildSync({
-  stdin: { contents: "export { canSetStage, canUseStageSet, stageSetTargets, stageSetErrorText, STAGE_SET_MIN_REASON } from './stage-jump'; export { journeySteps, visitedStages } from './case-flow'; export { STAGES, ROLES, ACTIVITY_META } from './roles';",
+  stdin: { contents: "export { canSetStage, canUseStageSet, stageSetTargets, stageSetErrorText, STAGE_SET_MIN_REASON, canReopenCase, reopenTargets, reopenErrorText } from './stage-jump'; export { journeySteps, visitedStages } from './case-flow'; export { STAGES, ROLES, ACTIVITY_META } from './roles';",
     resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'ts' },
   bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
 });
@@ -92,6 +92,31 @@ test('until set_case_stage is installed the control is a neutral note, not a for
   assert.ok(ctl.indexOf('data-stage-set-unavailable') < ctl.indexOf('id="stage-set-reason"'), 'the form is only reachable after the availability check');
   assert.ok(/void stageSetAvailable\(\)\.then\(setAvailable\)/.test(ctl));
   // the probe sends an empty reason (the SQL refuses before reading or writing anything); only a missing function counts as «not installed»
-  assert.ok(/p_reason: ''/.test(api) && /ok: !\(error && isMissingFunction\(error\)\)/.test(api));
+  assert.ok(/rpcInstalled\('set_case_stage', 'new'\)/.test(api) && /p_reason: ''/.test(api) && /ok = !\(error && isMissingFunction\(error\)\)/.test(api));
   assert.ok(/PGRST202/.test(api) && /Could not find the function\|schema cache/.test(api));
+});
+
+test('reopening a completed case: admin only, only a completed case, to a working stage; neutral Greek errors', () => {
+  for (const r of A.ROLES.map((x) => x.id)) assert.equal(A.canReopenCase(r, 'completed'), r === 'admin', r);
+  assert.equal(A.canReopenCase('admin', 'activation'), false);
+  assert.equal(A.canReopenCase(undefined, 'completed'), false);
+  assert.deepEqual(A.reopenTargets(), ['new', 'contacted', 'offer', 'application', 'signed', 'document_check', 'submitted', 'activation']);
+  assert.equal(A.reopenErrorText('PGRST202 Could not find the function public.reopen_completed_case(p_case, p_reason, p_stage) in the schema cache'), 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.');
+  assert.equal(A.reopenErrorText('42501 reopen: not allowed'), 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.');
+  assert.match(A.reopenErrorText('22023 reopen: a reason of at least 10 characters is required'), /τουλάχιστον 10 χαρακτήρων/);
+  assert.equal(A.reopenErrorText('P0001 reopen: the case is not completed'), 'Το case δεν είναι ολοκληρωμένο.');
+  assert.equal(A.reopenErrorText('boom'), 'Η επαναφορά του case δεν αποθηκεύτηκε. Δοκιμάστε ξανά.');
+  for (const m of ['Could not find the function', 'not allowed', 'boom', 'reason of at least', 'unknown stage', 'not completed']) assert.ok(!/migration|phase\d|SQL|schema|PGRST|07c/i.test(A.reopenErrorText(m)), m);
+});
+
+test('the reopening control is for admins and completed cases only, and a note until the SQL is applied', () => {
+  const page = read('../../components/app/CaseDetailPage.tsx');
+  const api = read('../api.ts');
+  assert.ok(/canReopenCase\(role, c\.current_stage\) && <ReopenControl c=\{c\} reload=\{reload\} \/>/.test(page));
+  const ctl = page.slice(page.indexOf('function ReopenControl'), page.indexOf('function StageSetControl'));
+  assert.ok(ctl.indexOf('data-reopen-unavailable') < ctl.indexOf('id="reopen-reason"'), 'the form is only reachable after the availability check');
+  assert.ok(/available === false \? \(\s*<p[^>]*data-reopen-unavailable>Η λειτουργία δεν είναι ακόμη διαθέσιμη\.<\/p>/.test(ctl));
+  assert.ok(/void reopenAvailable\(\)\.then\(setAvailable\)/.test(ctl));
+  // both probes go through one helper: empty reason, only a missing function counts as «not installed»
+  assert.ok(/rpcInstalled\('reopen_completed_case', 'activation'\)/.test(api) && /p_reason: ''/.test(api) && /ok = !\(error && isMissingFunction\(error\)\)/.test(api));
 });

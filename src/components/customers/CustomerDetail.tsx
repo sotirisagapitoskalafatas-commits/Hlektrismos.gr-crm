@@ -7,7 +7,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Briefcase, Clock, FileText, Mail, MapPin, Pencil, Phone, Sparkles } from 'lucide-react';
 import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, VisitsTab } from '@/components/app/CaseDetailPage';
 import { CaseProgress } from '@/components/cases/CaseOverview';
-import { folderBadge, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
+import CaseDocuments from '@/components/documents/CaseDocuments';
+import { leadFiles as toLeadFiles } from '@/lib/lead-files';
+import { ORIGIN_TEXT, folderBadge, folderOrigin, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
 import type { FolderTab } from '@/lib/folder';
 import { useStaff } from '@/lib/useStaff';
 import { useAuth } from '@/lib/auth';
@@ -41,7 +43,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const [events, setEvents] = useState<(TimelineEvent & { case_no: string })[]>([]);
   const [tab, setTab] = useState<FolderTab>('overview');
   const [picked, setPicked] = useState<string | null>(null);
-  const [origin, setOrigin] = useState<Lead | null>(null);
+  const [leads, setLeads] = useState<Record<string, Lead | null>>({});
   const staff = useStaff();
   const [editing, setEditing] = useState(false);
   const [names, setNames] = useState(false);
@@ -62,9 +64,10 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
       Promise.all(mine.map(k => fetchTimeline(k.id))),
     ]);
     setDocs(Object.fromEntries(mine.map((k, i) => [k.id, d[i]])));
-    // «Προέλευση»: the lead of the oldest case that came from one
-    const fromLead = [...mine].reverse().find(k => k.lead_id);
-    setOrigin(fromLead?.lead_id ? await fetchLead(fromLead.lead_id) : null);
+    // the leads the cases came from (website-form files, «Προέλευση»); null = not readable by this user
+    const leadIds = [...new Set(mine.map(k => k.lead_id).filter((x): x is string => !!x))];
+    const fetched = await Promise.all(leadIds.map(id => fetchLead(id)));
+    setLeads(Object.fromEntries(leadIds.map((id, i) => [id, fetched[i]])));
     setEvents(visibleHistory(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no }))))
       .filter(e => COMMS.includes(e.activity_type))
       .sort((a, b) => +new Date(b.occurred_at) - +new Date(a.occurred_at)));
@@ -116,6 +119,9 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const badge = folderBadge({ isLead: false, cases });
   const subtitle = folderSubtitle({ city: cust.city, since: cust.created_at, cases, fmtDate, staffName: id => staff.find(x => x.id === id)?.full_name ?? null });
   const scopedTab = tabs.find(t => t.id === tab)?.scoped ?? false;
+  const originInfo = folderOrigin(cases, id => !!leads[id]);
+  const originLead = originInfo.leadId ? leads[originInfo.leadId] ?? null : null;
+  const otherDocs = allDocs.filter(d => d.case_id !== sel?.id);
 
   const caseRow = (k: Case) => {
     const { steps, outcome } = journeySteps(k.current_stage, []);
@@ -199,7 +205,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
         ))}
       </div>
 
-      {scopedTab && tab !== 'docs' && cases.length > 1 && sel && (
+      {scopedTab && cases.length > 1 && sel && (
         <div className="flex items-center gap-2 flex-wrap text-[13px]" data-folder-scope>
           <span className="text-[var(--atx-muted)]">Case:</span>
           {cases.map(k => (
@@ -207,7 +213,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
           ))}
         </div>
       )}
-      {scopedTab && tab !== 'docs' && !sel && (
+      {scopedTab && !sel && (
         <div className="atx-panel"><div className="atx-empty"><strong>Κανένα case</strong>Οι ενότητες αυτές αφορούν ένα case. Τα cases δημιουργούνται από τη μετατροπή ενός lead ή από τη σελίδα Cases.</div></div>
       )}
       {sel && tab === 'followups' && <FollowUpsTab key={sel.id} caseId={sel.id} load={() => void load()} />}
@@ -267,13 +273,13 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
             </div>
             <div className="atx-panel" style={{ padding: 20 }} data-folder-origin>
               <h2 className="atx-section-title mb-2">Προέλευση</h2>
-              {origin ? (
+              {originLead ? (
                 <p className="text-[14px] m-0">
-                  Lead · {leadSourceInfo(origin.source).label} · {fmtDate(origin.created_at)}
-                  {origin.converted_at && <span className="block text-[13px] text-[var(--atx-muted)]">μετατροπή {fmtDate(origin.converted_at)}</span>}
-                  {canOpenLead(role) && <button className="atx-link !p-0 text-[13px] mt-1" data-open-lead onClick={() => go('leads', { lead: origin.id })}>Στοιχεία του lead</button>}
+                  Lead · {leadSourceInfo(originLead.source).label} · {fmtDate(originLead.created_at)}
+                  {originLead.converted_at && <span className="block text-[13px] text-[var(--atx-muted)]">μετατροπή {fmtDate(originLead.converted_at)}</span>}
+                  {canOpenLead(role) && <button className="atx-link !p-0 text-[13px] mt-1" data-open-lead onClick={() => go('leads', { lead: originLead.id })}>Στοιχεία του lead</button>}
                 </p>
-              ) : <p className="text-[14px] text-[var(--atx-muted)] m-0">Καταχώρηση χωρίς lead.</p>}
+              ) : <p className="text-[14px] text-[var(--atx-muted)] m-0" data-origin-state={originInfo.kind}>{ORIGIN_TEXT[originInfo.kind === 'lead' ? 'unavailable' : originInfo.kind]}</p>}
             </div>
           </div>
         </div>
@@ -285,23 +291,30 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
         </div>
       )}
 
-      {tab === 'docs' && (
-        <div className="atx-panel">
-          {allDocs.length === 0 ? <div className="atx-empty"><strong>Δεν υπάρχουν έγγραφα</strong>Τα έγγραφα ανεβαίνουν μέσα από κάθε case (Έγγραφα).</div> : (
-            <ul className="m-0 p-0 list-none">
-              {allDocs.map(d => (
-                <li key={d.id} className="atx-row">
-                  <span className="atx-icon" aria-hidden="true"><FileText size={16} /></span>
-                  <button className="atx-row-main" onClick={() => openCase(d.case_id)}>
-                    <span className="atx-row-title">{docLabel(d.category)}</span>
-                    <span className="atx-row-sub">Case {d.case_no} · {fmtDateTime(d.created_at)}{d.description ? ` · ${d.description}` : ''}</span>
-                  </button>
-                  <span className={`atx-tag ${DOC_TONE[d.status] ?? ''}`}>{DOC_TEXT[d.status] ?? d.status}</span>
-                </li>
-              ))}
-            </ul>
+      {tab === 'docs' && sel && (
+        <div className="space-y-4" data-folder-docs={sel.case_no}>
+          <CaseDocuments key={sel.id} c={sel} onChanged={() => void load()} leadFiles={toLeadFiles(sel.lead_id ? leads[sel.lead_id]?.attached_files : null)} />
+          {otherDocs.length > 0 && (
+            <div className="atx-panel">
+              <div className="atx-section-head" style={{ padding: '16px 16px 0' }}><h2 className="atx-section-title">Έγγραφα άλλων cases</h2><span className="text-[13px] text-[var(--atx-muted)]">{otherDocs.length}</span></div>
+              <ul className="m-0 p-0 list-none">
+                {otherDocs.map(d => (
+                  <li key={d.id} className="atx-row">
+                    <span className="atx-icon" aria-hidden="true"><FileText size={16} /></span>
+                    <button className="atx-row-main" onClick={() => setPicked(d.case_id)}>
+                      <span className="atx-row-title">{docLabel(d.category)}</span>
+                      <span className="atx-row-sub">Case {d.case_no} · {fmtDateTime(d.created_at)}{d.description ? ` · ${d.description}` : ''}</span>
+                    </button>
+                    <span className={`atx-tag ${DOC_TONE[d.status] ?? ''}`}>{DOC_TEXT[d.status] ?? d.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
+      )}
+      {tab === 'docs' && !sel && (
+        <div className="atx-panel"><div className="atx-empty"><strong>Δεν υπάρχουν έγγραφα</strong>Τα έγγραφα ανήκουν σε ένα case. Τα cases δημιουργούνται από τη μετατροπή ενός lead ή από τη σελίδα Cases.</div></div>
       )}
 
       {tab === 'history' && (

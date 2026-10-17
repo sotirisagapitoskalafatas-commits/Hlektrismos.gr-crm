@@ -61,3 +61,13 @@ export function folderSubtitle(input: { city?: string | null; since: string; cas
   const owner = ownerId ? input.staffName(ownerId) : null;
   return [input.city || '', owner ? `Υπεύθυνος: ${owner}` : '', `από ${input.fmtDate(input.since)}`].filter(Boolean).join(' · ');
 }
+
+/** «Προέλευση» (Σύνοψη). A case with a lead_id whose lead cannot be read (trashed, or not visible to this user)
+ *  is NOT «χωρίς lead»: it says the lead is unavailable. «none» only when no case came from a lead. */
+export type FolderOrigin = { kind: 'none' | 'unavailable' | 'lead'; leadId: string | null };
+export function folderOrigin(cases: { lead_id?: string | null; created_at?: string }[], readable: (leadId: string) => boolean): FolderOrigin {
+  const oldest = [...cases].sort((a, b) => +new Date(a.created_at ?? 0) - +new Date(b.created_at ?? 0)).find(k => k.lead_id);
+  if (!oldest?.lead_id) return { kind: 'none', leadId: null };
+  return { kind: readable(oldest.lead_id) ? 'lead' : 'unavailable', leadId: oldest.lead_id };
+}
+export const ORIGIN_TEXT = { none: 'Καταχώρηση χωρίς lead.', unavailable: 'Το lead δεν είναι διαθέσιμο (μπορεί να έχει διαγραφεί ή να μην έχετε πρόσβαση).' } as const;

@@ -1074,6 +1074,9 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
 {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'inside_sales');
+  // a document on a case other than the one the folder shows (CS-2026-009; Part B 2)
+  await fetch('http://127.0.0.1:54399/rest/v1/case_documents', { method: 'POST', headers: { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: crypto.randomUUID(), case_id: '30000000-0000-4000-8000-000000000009', category: 'bill', status: 'received', file_url: 'x', file_name: 'bill.pdf', created_at: new Date().toISOString() }) });
   await click(page, 'Πελάτες', '#shell-rail nav button');
   await sleep(1200);
   await page.evaluate(() => { const el = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Αθηνά Κωνσταντίνου')); el && el.click(); });
@@ -1101,6 +1104,16 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
     await click(page, 'Follow-ups', '[role="tab"]'); await sleep(800);
     const scope = await page.evaluate(() => [...document.querySelectorAll('[data-folder-scope] button')].filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent));
     check('Folder: picking a case scopes Follow-ups to it, with the case panel itself', nos.length >= 2 && scope.length === 1 && scope[0].startsWith(other) && (await body()).includes('Follow-ups'), JSON.stringify({ nos, other, scope }));
+    // Part B 2: Έγγραφα = the selected case's checklist and upload, then the documents of the other cases
+    await click(page, 'Έγγραφα', '[role="tab"]'); await sleep(1200);
+    const d1 = await page.evaluate(() => ({ sel: document.querySelector('[data-folder-docs]')?.getAttribute('data-folder-docs') ?? '', text: document.querySelector('main').innerText, other: [...document.querySelectorAll('main h2')].some((h) => h.textContent.trim() === 'Έγγραφα άλλων cases') }));
+    check('Folder docs: the selected case checklist and upload are in the folder', /CS-2026-00\d/.test(d1.sel) && d1.text.includes('Τι χρειάζεται αυτό το case') && d1.text.includes('Προσθήκη εγγράφου'), d1.sel);
+    check('Folder docs: documents of other cases are listed below, with their case number', d1.other && d1.text.includes('Case CS-2026-009'));
+    await page.evaluate(() => [...document.querySelectorAll('main .atx-row-main')].find((b) => b.textContent.includes('Case CS-2026-009'))?.click()); await sleep(1200);
+    check('Folder docs: choosing another case\'s document switches the folder to that case', (await page.evaluate(() => document.querySelector('[data-folder-docs]')?.getAttribute('data-folder-docs'))) === 'CS-2026-009');
+    await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(300);
+    check('Folder: «Προέλευση» says the lead is unavailable only when it cannot be read, never «χωρίς lead» for a case with a lead',
+      await page.evaluate(() => { const o = document.querySelector('[data-folder-origin]')?.innerText ?? ''; return o.includes('Lead ·') || (/δεν είναι διαθέσιμο/.test(o) && !/χωρίς lead/.test(o)); }));
     await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(300);
   }
   await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(500);

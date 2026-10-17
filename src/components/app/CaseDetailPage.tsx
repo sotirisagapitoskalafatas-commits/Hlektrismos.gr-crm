@@ -41,23 +41,12 @@ import {
 } from 'lucide-react';
 import type { IconType } from '@/lib/ui';
 
-/* ================= Timeline ================= */
-function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
+/* Add-entry box of the history: a note or a logged contact on one case. Used by the case history and the folder. */
+export function TimelineComposer({ caseId, onAdded }: { caseId: string; onAdded: () => void }) {
   const { role } = useAuth();
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
-  const [team, setTeam] = useState('all');
   const [type, setType] = useState<ActivityType>('note');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const loadEvents = useCallback(async () => {
-    setEvents(await fetchTimeline(caseId));
-  }, [caseId]);
-
-  useEffect(() => { loadEvents(); }, [loadEvents]);
-
-  const shown = visibleHistory(events);
-  const visible = team === 'all' ? shown : shown.filter(e => entryTeam(e) === team);
 
   const opts: { value: ActivityType; label: string; icon: IconType }[] = [];
   opts.push({ value: 'note', label: 'Σημείωση', icon: StickyNote });
@@ -78,25 +67,42 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
     });
     setText('');
     setBusy(false);
-    loadEvents();
-    load();
+    onAdded();
   };
+
+  if (opts.length === 0) return null;
+  return (
+    <div className="mb-4 p-3 rounded-xl bg-paper border border-line" data-timeline-composer>
+      <div className="flex items-center gap-2 flex-wrap">
+        <select className="field !w-44 !py-1.5 text-[13px]" value={type} onChange={e => setType(e.target.value as ActivityType)}>
+          {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <input className="field flex-1 !py-1.5 text-[13px] min-w-[180px]" value={text} onChange={e => setText(e.target.value)}
+          placeholder="Περιγράψτε την επικοινωνία / ενέργεια…" onKeyDown={e => { if (e.key === 'Enter' && text.trim()) submit(); }} />
+        <Btn onClick={submit} disabled={busy || !text.trim()}><Plus className="w-3.5 h-3.5" /> Καταγραφή</Btn>
+      </div>
+    </div>
+  );
+}
+
+/* ================= Timeline ================= */
+function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [team, setTeam] = useState('all');
+
+  const loadEvents = useCallback(async () => {
+    setEvents(await fetchTimeline(caseId));
+  }, [caseId]);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  const shown = visibleHistory(events);
+  const visible = team === 'all' ? shown : shown.filter(e => entryTeam(e) === team);
 
   return (
     <Card>
       <CardHeader title="Ιστορικό" />
-      {opts.length > 0 && (
-        <div className="mb-4 p-3 rounded-xl bg-paper border border-line">
-          <div className="flex items-center gap-2 flex-wrap">
-            <select className="field !w-44 !py-1.5 text-[13px]" value={type} onChange={e => setType(e.target.value as ActivityType)}>
-              {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <input className="field flex-1 !py-1.5 text-[13px] min-w-[180px]" value={text} onChange={e => setText(e.target.value)}
-              placeholder="Περιγράψτε την επικοινωνία / ενέργεια…" onKeyDown={e => { if (e.key === 'Enter' && text.trim()) submit(); }} />
-            <Btn onClick={submit} disabled={busy || !text.trim()}><Plus className="w-3.5 h-3.5" /> Καταγραφή</Btn>
-          </div>
-        </div>
-      )}
+      <TimelineComposer caseId={caseId} onAdded={() => { void loadEvents(); load(); }} />
 
       <div className="flex gap-1.5 flex-wrap mb-4">
         {TEAM_FILTERS.map(t => (

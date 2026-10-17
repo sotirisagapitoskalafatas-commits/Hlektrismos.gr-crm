@@ -120,6 +120,7 @@ const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 // ---- Contact eligibility (mirrors staged-migrations/phase3/09; synthetic) ----
 const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
+let getFail = null; // GET /__getfail?table=activity_log → the next GET of that table fails once (read-error test)
 let patchFail = null; // GET /__patchfail?table=customers → the next PATCH to that table fails once (save-error test)
 let leadFail = null; // GET /__leadfail?code=42501 → the next POST to leads fails with that code (error-display test)
 const contactObjections = [];
@@ -222,6 +223,7 @@ http.createServer((req, res) => {
     const send = (code, obj, extra = {}) => { res.writeHead(code, { ...cors, ...extra }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
+    if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
     if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; return send(200, { patchFail }); }
     if (url.pathname === '/__leadfail') { leadFail = url.searchParams.get('code') || null; return send(200, { leadFail }); } // next leads POST fails once
     if (url.pathname === '/__gates') {
@@ -590,6 +592,7 @@ http.createServer((req, res) => {
     const m = /^\/rest\/v1\/([a-z0-9_]+)$/.exec(url.pathname);
     if (!m) return send(404, {});
     const table = m[1];
+    if (req.method === 'GET' && getFail === table) { getFail = null; return send(500, { code: 'XX000', message: 'mock: read refused', details: null, hint: null }); }
     if (req.method === 'GET' || req.method === 'HEAD') {
       const rows = applyFilters(TABLES[table] ?? [], url.searchParams);
       const range = `0-${Math.max(rows.length - 1, 0)}/${rows.length}`;

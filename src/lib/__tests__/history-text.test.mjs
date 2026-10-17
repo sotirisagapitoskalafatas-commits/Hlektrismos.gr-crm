@@ -79,3 +79,51 @@ test('W4: the case history panel has one name, «Ιστορικό»', () => {
   assert.ok(!/Χρονολόγιο|micro="Timeline"/.test(page));
   assert.ok(/<CardHeader title="Ιστορικό" \/>/.test(page));
 });
+
+test('folder history (B2): lead and case entries in one timeline, newest first, each labelled', () => {
+  const ev = (id, type, at, o = {}) => ({ id, case_id: 'c1', case_no: 'CS-1', activity_type: type, title: `t-${id}`, description: '', role: 'inside_sales', occurred_at: at, user: { full_name: 'Εύα' }, ...o });
+  const out = H.mergeHistory({
+    caseEvents: [ev('a', 'call', '2026-10-05T10:00:00Z'), ev('b', 'note', '2026-10-07T10:00:00Z')],
+    leads: [{ lead: { id: 'L1', created_at: '2026-10-01T09:00:00Z', converted_at: '2026-10-04T09:00:00Z', source_label: 'Φόρμα' }, activity: [{ id: 'x', action: 'status_change', details: { from: 'new', to: 'contacted' }, created_at: '2026-10-02T09:00:00Z' }] }],
+    statusText: (s) => ({ new: 'Νέο', contacted: 'Επικοινωνία' })[s] ?? s,
+    typeLabel: (t) => t,
+  });
+  assert.deepEqual(out.map((e) => e.key), ['c-b', 'c-a', 'lc-L1', 'l-x', 'ln-L1']);
+  assert.equal(out[0].label, 'CS-1'); assert.equal(out[0].source, 'case'); assert.equal(out[0].userName, 'Εύα');
+  const lead = out.filter((e) => e.source === 'lead');
+  assert.deepEqual(lead.map((e) => e.title), ['Μετατράπηκε σε Case', 'Κατάσταση: Νέο → Επικοινωνία', 'Νέο lead · Φόρμα']);
+  assert.ok(lead.every((e) => e.label === 'Lead' && e.caseId === null));
+});
+
+test('folder history: Back Office entries are NOT dropped (no type allowlist)', () => {
+  const types = ['document_check', 'application', 'provider_submission', 'activation', 'stage_override', 'returned', 'resubmitted', 'created', 'status_change'];
+  const caseEvents = types.map((t, i) => ({ id: `e${i}`, case_id: 'c1', case_no: 'CS-1', activity_type: t, title: `T ${t}`, description: '', role: 'back_office', occurred_at: `2026-10-0${i + 1}T10:00:00Z` }));
+  const out = H.mergeHistory({ caseEvents, leads: [], statusText: (s) => s, typeLabel: (t) => t });
+  assert.equal(out.length, types.length);
+  assert.ok(out.every((e) => e.team === 'back_office' && e.teamLabel === 'Back Office'));
+});
+
+test('folder history: a failed lead read (null) leaves the case entries and the lead\'s own dates', () => {
+  const caseEvents = [{ id: 'a', case_id: 'c1', case_no: 'CS-1', activity_type: 'note', title: 'Σημείωση', description: 'x', role: 'inside_sales', occurred_at: '2026-10-05T10:00:00Z' }];
+  const out = H.mergeHistory({ caseEvents, leads: [{ lead: { id: 'L1', created_at: '2026-10-01T09:00:00Z', converted_at: null, source_label: 'Φόρμα' }, activity: null }], statusText: (s) => s, typeLabel: (t) => t });
+  assert.deepEqual(out.map((e) => e.key), ['c-a', 'ln-L1']);
+  assert.equal(H.mergeHistory({ caseEvents: [], leads: [], statusText: (s) => s, typeLabel: (t) => t }).length, 0);
+});
+
+test('folder history: no duplicates for the legacy «Ενημέρωση Case» row or for dates the log already has', () => {
+  const caseEvents = [
+    { id: 'a', case_id: 'c1', case_no: 'CS-1', activity_type: 'status_change', title: 'Ενημέρωση Case', description: 'Στάδιο: new → contacted', role: 'inside_sales', occurred_at: '2026-10-05T10:00:00Z' },
+    { id: 'b', case_id: 'c1', case_no: 'CS-1', activity_type: 'status_change', title: 'Στάδιο: new → contacted', description: 'Στάδιο: new → contacted', role: 'inside_sales', occurred_at: '2026-10-05T10:00:00Z' },
+  ];
+  const activity = [{ id: 'c', action: 'converted', details: null, created_at: '2026-10-04T09:00:00Z' }, { id: 'd', action: 'created', details: null, created_at: '2026-10-01T09:00:00Z' }];
+  const out = H.mergeHistory({ caseEvents, leads: [{ lead: { id: 'L1', created_at: '2026-10-01T09:00:00Z', converted_at: '2026-10-04T09:00:00Z', source_label: 'Φόρμα' }, activity }], statusText: (s) => s, typeLabel: (t) => t });
+  assert.deepEqual(out.map((e) => e.key), ['c-b', 'l-c', 'l-d']);
+  assert.equal(out[0].title, 'Στάδιο: Νέο → Επικοινωνία');
+  assert.equal(out[0].description, '');
+});
+
+test('folder history: the folder reuses the case composer and no longer filters by type', () => {
+  const cust = src('../../components/customers/CustomerDetail.tsx');
+  assert.ok(/<TimelineComposer key=\{sel\.id\} caseId=\{sel\.id\}/.test(cust));
+  assert.ok(!/COMMS/.test(cust), 'the activity-type allowlist is gone');
+});

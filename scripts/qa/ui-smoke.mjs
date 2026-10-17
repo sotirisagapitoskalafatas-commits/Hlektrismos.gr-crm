@@ -1077,6 +1077,13 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   // a document on a case other than the one the folder shows (CS-2026-009; Part B 2)
   await fetch('http://127.0.0.1:54399/rest/v1/case_documents', { method: 'POST', headers: { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: crypto.randomUUID(), case_id: '30000000-0000-4000-8000-000000000009', category: 'bill', status: 'received', file_url: 'x', file_name: 'bill.pdf', created_at: new Date().toISOString() }) });
+  // Part B 3: the lead's own history (activity_log) and a Back Office entry on one of the customer's cases
+  {
+    const MH = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' };
+    const leadId = (await (await fetch('http://127.0.0.1:54399/rest/v1/cases?id=eq.30000000-0000-4000-8000-000000000001&select=lead_id', { headers: MH })).json())[0]?.lead_id;
+    await fetch('http://127.0.0.1:54399/rest/v1/activity_log', { method: 'POST', headers: MH, body: JSON.stringify({ id: crypto.randomUUID(), entity_type: 'lead', entity_id: leadId, action: 'status_change', details: { from: 'new', to: 'contacted' }, created_at: new Date(Date.now() - 3 * 86400000).toISOString() }) });
+    await fetch('http://127.0.0.1:54399/rest/v1/timeline_events', { method: 'POST', headers: MH, body: JSON.stringify({ id: crypto.randomUUID(), case_id: '30000000-0000-4000-8000-000000000009', role: 'back_office', activity_type: 'document_check', title: 'Έλεγχος εγγράφου: Ελέγχθηκε', description: '', user_id: null, occurred_at: new Date(Date.now() - 86400000).toISOString(), location: null, metadata: {}, user: null }) });
+  }
   await click(page, 'Πελάτες', '#shell-rail nav button');
   await sleep(1200);
   await page.evaluate(() => { const el = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Αθηνά Κωνσταντίνου')); el && el.click(); });
@@ -1121,6 +1128,30 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   {
     const h = await body();
     check('History: stored stage codes are shown in Greek; the «Ενημέρωση Case» duplicate is hidden', h.includes('Στάδιο: Νέο → Επικοινωνία') && !h.includes('new → contacted') && !h.includes('Ενημέρωση Case'));
+  }
+  // Part B 3: one timeline with the lead's entries; Back Office entries kept; add-entry; a failed lead read keeps the case entries
+  {
+    const M = 'http://127.0.0.1:54399';
+    const listText = () => page.evaluate(() => document.querySelector('[data-folder-history]')?.innerText ?? '');
+    const h1 = await listText();
+    const srcs = await page.evaluate(() => [...new Set([...document.querySelectorAll('[data-history-source]')].map((x) => x.getAttribute('data-history-source')))].sort());
+    check('Folder history: the lead\'s entries and the cases\' entries are in ONE timeline, in Greek', JSON.stringify(srcs) === '["case","lead"]' && /Κατάσταση: .+ → .+/.test(h1) && !/\bcontacted\b/.test(h1) && h1.includes('Νέο lead'), JSON.stringify(srcs));
+    check('Folder history: Back Office entries are kept (document check shown)', h1.includes('Έλεγχος εγγράφου: Ελέγχθηκε') && h1.includes('Τηλεφωνική επικοινωνία'));
+    await click(page, 'Back Office', '.atx-chip'); await sleep(300);
+    const bo = await listText();
+    check('Folder history: the team filter works on the merged list', bo.includes('Έλεγχος εγγράφου: Ελέγχθηκε') && !bo.includes('Τηλεφωνική επικοινωνία'));
+    await click(page, 'Όλα', '.atx-chip'); await sleep(300);
+    await page.evaluate(() => { const i = document.querySelector('[data-timeline-composer] input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Σημείωση από τον φάκελο'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+    await click(page, 'Καταγραφή'); await sleep(1500);
+    const log1 = await (await fetch(`${M}/__log`)).json();
+    const wrote = log1.filter((l) => l.method === 'POST' && l.table === 'timeline_events' && l.body?.description === 'Σημείωση από τον φάκελο').pop();
+    check('Folder history: the add-entry box writes to the selected case and the entry appears', !!wrote && wrote.body.case_id === '30000000-0000-4000-8000-000000000009' && (await listText()).includes('Σημείωση από τον φάκελο'), JSON.stringify(wrote?.body?.case_id));
+    // a failed read of the lead's log must not blank the case entries
+    await fetch(`${M}/__getfail?table=activity_log`);
+    await page.evaluate(() => { const i = document.querySelector('[data-timeline-composer] input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Δεύτερη σημείωση'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+    await click(page, 'Καταγραφή'); await sleep(1800);
+    const h2 = await listText();
+    check('Folder history: a failed read of the lead log keeps every case entry (nothing blanked)', h2.includes('Δεύτερη σημείωση') && h2.includes('Τηλεφωνική επικοινωνία') && h2.includes('Έλεγχος εγγράφου: Ελέγχθηκε') && !/Κατάσταση: .+ → .+/.test(h2) && h2.includes('Νέο lead'));
   }
   await click(page, 'Επεξεργασία'); await sleep(400);
   await page.evaluate(() => { const i = [...document.querySelectorAll('main label')].find((l) => l.textContent.startsWith('Πόλη')).querySelector('input'); i.focus(); });

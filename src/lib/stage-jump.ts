@@ -3,8 +3,8 @@
    (case_stage_transitions). Otherwise they explain what has to happen first. The app never steps through stages on
    its own: that would record work (e.g. «Καταχώρηση Παρόχου») that nobody did. */
 
-import { STAGE_TRANSITIONS } from './roles';
-import type { Stage } from './roles';
+import { STAGES, STAGE_TRANSITIONS, can } from './roles';
+import type { Role, Stage } from './roles';
 // Same wording as the case stepper («Πορεία»).
 import { stageText as stageLabel } from './case-flow';
 
@@ -41,4 +41,38 @@ export function checkJump(current: Stage, target: Stage): JumpCheck {
     allowed: false,
     message: `«${stageLabel(target)}» γίνεται μόνο από «${stageLabel(before)}». Το case είναι στο «${stageLabel(current)}» — επόμενο βήμα: «${stageLabel(p[1])}»${p.length > 3 ? ` (χρειάζονται πρώτα ${p.length - 2} βήματα)` : ''}.`,
   };
+}
+
+
+/* ---- «Αλλαγή σταδίου από Back Office» (staged phase2/07b set_case_stage) ----------------------------------------
+   Back Office works a case from where it really is, so it may move a case to any other stage with a written reason.
+   Mirrors the SQL exactly (a test compares them over every role x from x to): who = the roles that hold
+   «create_application»; not to the same stage; a completed case is final; completed only from «Ενεργοποίηση». */
+export const STAGE_SET_MIN_REASON = 10;
+
+export const canUseStageSet = (role: Role | null | undefined) => !!role && can(role, 'create_application');
+
+export function canSetStage(role: Role | null | undefined, from: string, to: string): boolean {
+  if (!canUseStageSet(role)) return false;
+  if (from === to || from === 'completed') return false;
+  if (to === 'completed' && from !== 'activation') return false;
+  return STAGES.some(s => s.id === to);
+}
+
+/** The stages the control offers for a case in `from`, in journey order (final outcomes last). */
+export const stageSetTargets = (role: Role | null | undefined, from: string): Stage[] =>
+  STAGES.map(s => s.id).filter(to => canSetStage(role, from, to));
+
+/** Greek text for a refusal of set_case_stage (or its absence). Never shows migration or developer wording. */
+export function stageSetErrorText(message: string | null | undefined): string {
+  const m = message ?? '';
+  if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
+  if (/Could not find the function|PGRST202|schema cache/i.test(m)) return 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
+  if (/not allowed|42501|permission/i.test(m)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
+  if (/reason of at least/i.test(m)) return `Χρειάζεται αιτιολογία τουλάχιστον ${STAGE_SET_MIN_REASON} χαρακτήρων.`;
+  if (/already in this stage/i.test(m)) return 'Το case είναι ήδη σε αυτό το στάδιο.';
+  if (/completed case does not change/i.test(m)) return 'Το case έχει ολοκληρωθεί· δεν αλλάζει στάδιο.';
+  if (/completed only from/i.test(m)) return `«${stageLabel('completed')}» γίνεται μόνο από «${stageLabel('activation')}».`;
+  if (/unknown stage|case not found/i.test(m)) return 'Η αλλαγή σταδίου δεν ήταν δυνατή.';
+  return 'Η αλλαγή σταδίου δεν αποθηκεύτηκε. Δοκιμάστε ξανά.';
 }

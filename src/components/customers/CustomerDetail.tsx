@@ -18,6 +18,7 @@ import { activityLabel, can, leadSourceInfo, SERVICES, STAGE_TRANSITIONS, TEAM_F
 import { leadStatusDisplay } from '@/lib/lead-status';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
+import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
 import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
@@ -258,7 +259,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
             </div>
             {sel && (
               <div data-folder-progress={sel.case_no}>
-                <CaseProgress c={sel} allowedNext={[]} canChange={false} onPick={() => undefined} />
+                <CaseProgress c={sel} allowedNext={[]} canChange={false} onPick={() => undefined} visited={visitedStages(events.filter(e => e.case_id === sel.id), sel.current_stage)} />
                 <p className="text-[12.5px] text-[var(--atx-muted)] mt-1.5 px-1">Case {sel.case_no} · {SERVICES[sel.service_type] ?? sel.service_type}. Η αλλαγή σταδίου γίνεται από το <button className="atx-link !p-0 text-[12.5px]" onClick={() => openCase(sel.id)}>case</button>.</p>
               </div>
             )}

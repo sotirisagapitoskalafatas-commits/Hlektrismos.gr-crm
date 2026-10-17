@@ -218,6 +218,9 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-step.is-current .atx-step-dot { border-color: var(--atx-blue); color: var(--atx-blue); box-shadow: 0 0 0 4px var(--atx-blue-soft); }
 .atx-step-label { font-size: 12px; line-height: 1.25; color: var(--atx-muted); overflow-wrap: anywhere; }
 .atx-step.is-current .atx-step-label { color: var(--atx-ink); font-weight: 600; }
+/* a stage the case never occupied (Back Office jumped over it): dashed, not blue, not counted as done */
+.atx-step.is-skipped .atx-step-dot { border-style: dashed; background: transparent; color: var(--atx-faint, #94a3b8); }
+.atx-step.is-skipped .atx-step-label { color: var(--atx-faint, #94a3b8); }
 @media (max-width: 760px) {
   .atx-stepper { grid-template-columns: 1fr; gap: 0; }
   .atx-step { flex-direction: row; text-align: left; gap: 10px; padding: 4px 0; }

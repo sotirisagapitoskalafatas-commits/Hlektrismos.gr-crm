@@ -471,6 +471,88 @@ if (!PREVIEW_LIVE) {
   await fetch(`${M}/rest/v1/cases?id=eq.${C7}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: 'submitted' }) });
 }
 
+/* ---- 2e4. Back Office: «Αλλαγή σταδίου» to any stage with an audited reason; the stepper does not pretend (staged phase2/07b) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' };
+  const C3 = '30000000-0000-4000-8000-000000000003';
+  // known starting point: CS-2026-003 in «Αίτηση» (set with the guard off; restored at the end)
+  await fetch(`${M}/__gates?state=off`);
+  const before = (await (await fetch(`${M}/rest/v1/cases?id=eq.${C3}&select=current_stage,status`, { headers: H })).json())[0];
+  await fetch(`${M}/rest/v1/cases?id=eq.${C3}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: 'application', status: 'open' }) });
+  await fetch(`${M}/__gates?state=on`);
+  await fetch(`${M}/__setstage?state=on`);
+  const openC3 = async (page) => {
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === 'CS-2026-003' && e.offsetParent); el && el.click(); });
+    await sleep(1800);
+  };
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const body = (page) => page.evaluate(() => document.body.innerText);
+  const rpcs = async () => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.table === 'set_case_stage');
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await openC3(page);
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(600);
+    const opts = await page.evaluate(() => [...document.querySelectorAll('#stage-set-target option')].map((o) => o.textContent.trim()));
+    check('Stage set: the control offers every other stage except «Ολοκληρώθηκε» (only from «Ενεργοποίηση»), in journey order',
+      opts[0] === 'Επιλέξτε στάδιο…' && opts.includes('Νέο') && opts.includes('Καταχώρηση παρόχου') && opts.includes('Χάθηκε') && !opts.includes('Αίτηση') && !opts.includes('Ολοκληρώθηκε'), JSON.stringify(opts));
+    await setVal(page, '#stage-set-target', 'submitted');
+    await setVal(page, '#stage-set-reason', 'λίγο');
+    await sleep(200);
+    const disabled = await page.evaluate(() => [...document.querySelectorAll('[data-stage-set] button')].find((b) => b.textContent.trim() === 'Αλλαγή σταδίου')?.disabled);
+    check('Stage set: a reason under 10 characters keeps the button disabled', disabled === true);
+    await setVal(page, '#stage-set-reason', 'Ήρθε από το Field με πλήρη φάκελο');
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('[data-stage-set] button')].find((b) => b.textContent.trim() === 'Αλλαγή σταδίου')?.click());
+    await sleep(1800);
+    const call = (await rpcs()).pop();
+    check('Stage set: goes through set_case_stage with the stage and the written reason', call?.body?.p_case === C3 && call.body.p_stage === 'submitted' && call.body.p_reason === 'Ήρθε από το Field με πλήρη φάκελο', JSON.stringify(call?.body));
+    const steps = await page.evaluate(() => ({
+      skipped: [...document.querySelectorAll('.atx-step.is-skipped .atx-step-label')].map((l) => l.textContent.replace(/Βήμα \d+: /, '').replace(' (παραλείφθηκε)', '').trim()),
+      current: document.querySelector('.atx-step.is-current .atx-step-label')?.textContent.replace(/Βήμα \d+: /, '').trim(),
+      done: [...document.querySelectorAll('.atx-step.is-done .atx-step-label')].map((l) => l.textContent.replace(/Βήμα \d+: /, '').trim()),
+      legend: !!document.querySelector('[data-steps-skipped]'),
+    }));
+    check('Stepper: the stages the case jumped over are «skipped», not done; the earlier unknown ones stay done',
+      steps.current === 'Καταχώρηση παρόχου' && JSON.stringify(steps.skipped) === JSON.stringify(['Υπογραφή', 'Έλεγχος εγγράφων']) && steps.done.includes('Αίτηση') && !steps.done.includes('Υπογραφή') && steps.legend, JSON.stringify(steps));
+    await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(800);
+    const t = await body(page);
+    check('History: one entry «Αλλαγή σταδίου από Back Office: Αίτηση → Καταχώρηση παρόχου» with the reason', t.includes('Αλλαγή σταδίου από Back Office: Αίτηση → Καταχώρηση παρόχου') && t.includes('Ήρθε από το Field με πλήρη φάκελο'));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openC3(page);
+    check('Stage set: Inside Sales has no Back Office tab and no such control', await page.evaluate(() => ![...document.querySelectorAll('[role="tab"]')].some((b) => b.textContent.trim().startsWith('Back Office')) && !document.querySelector('[data-stage-set]')));
+    await browser.close();
+  }
+  // the SQL is not applied yet (normal state for weeks): a neutral Greek sentence, no migration wording, nothing changes
+  await fetch(`${M}/__setstage?state=off`);
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'back_office');
+    await openC3(page);
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(600);
+    await setVal(page, '#stage-set-target', 'activation');
+    await setVal(page, '#stage-set-reason', 'Συνεχίζει από την ενεργοποίηση');
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('[data-stage-set] button')].find((b) => b.textContent.trim() === 'Αλλαγή σταδίου')?.click());
+    await sleep(1500);
+    const msg = await page.evaluate(() => document.querySelector('[data-stage-set-error]')?.textContent ?? '');
+    const now = (await (await fetch(`${M}/rest/v1/cases?id=eq.${C3}&select=current_stage`, { headers: H })).json())[0]?.current_stage;
+    check('Stage set: while the SQL is not applied the control says so in one neutral Greek sentence and changes nothing', msg === 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.' && !/migration|phase|SQL|schema/i.test(msg) && now === 'submitted', msg);
+    await browser.close();
+  }
+  // leave the shared mock as we found it
+  await fetch(`${M}/__setstage?state=on`);
+  await fetch(`${M}/__gates?state=off`);
+  await fetch(`${M}/rest/v1/cases?id=eq.${C3}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: before.current_stage, status: before.status }) });
+}
+
 /* ---- 2e3. Small fixes: queue row separator; a planned visit uses the case's address, not the planner's GPS ---- */
 {
   const M = 'http://127.0.0.1:54399';

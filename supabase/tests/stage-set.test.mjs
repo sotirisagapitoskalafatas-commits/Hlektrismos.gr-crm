@@ -13,7 +13,7 @@ const F07B = '../staged-migrations/phase2/07b_case_stage_guard_and_set_stage.sql
 const FORMER = './fixtures/phase2_07_former.sql';
 
 const js = buildSync({
-  stdin: { contents: "export { STAGE_TRANSITIONS, STAGES, ROLES, can } from './roles';", resolveDir: fileURLToPath(new URL('../../src/lib/', import.meta.url)), loader: 'ts' },
+  stdin: { contents: "export { STAGE_TRANSITIONS, STAGES, ROLES, can } from './roles'; export { canSetStage, stageSetTargets } from './stage-jump';", resolveDir: fileURLToPath(new URL('../../src/lib/', import.meta.url)), loader: 'ts' },
   bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
 });
 const A = await import('data:text/javascript;base64,' + Buffer.from(js.outputFiles[0].text).toString('base64'));
@@ -88,12 +88,27 @@ test('matrix: role × from × to — the database agrees with the rule, for set_
         await T.su(); await main.query('update public.cases set current_stage = $2, status = $3, activation_status = null where id = $1', [id, from, 'open']);
         const r = await T.set(U[role], id, to);
         assert.equal(r.ok, oracleSet(role, from, to), `${role}: ${from} → ${to}`);
+        assert.equal(A.canSetStage(role, from, to), r.ok, `${role}: ${from} → ${to}: the APP rule (canSetStage) = the database`);
         if (!r.ok) assert.equal((await T.row(id)).current_stage, from, 'a refusal changes nothing');
         checked++;
       }
     }
   }
   assert.equal(checked, 5 * 11 * 11);
+});
+
+test('the control offers exactly the stages the database accepts, for every role and starting stage', async () => {
+  for (const role of ['admin', 'manager', 'back_office', 'inside_sales']) {
+    for (const from of STAGE_IDS) {
+      const id = await T.newCase(from);
+      const accepted = [];
+      for (const to of STAGE_IDS) {
+        await T.su(); await main.query('update public.cases set current_stage = $2, status = $3 where id = $1', [id, from, 'open']);
+        if ((await T.set(U[role], id, to)).ok) accepted.push(to);
+      }
+      assert.deepEqual(A.stageSetTargets(role, from).sort(), accepted.sort(), `${role} from ${from}`);
+    }
+  }
 });
 
 test('matrix: role × from × to — a DIRECT write follows the list for every role (set_case_stage is the only way beyond it)', async () => {

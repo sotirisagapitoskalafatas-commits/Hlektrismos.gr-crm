@@ -17,11 +17,15 @@ import { BLOCKER_TEXT, stageErrorText } from '@/lib/case-return';
 import type { StageBlocker } from '@/lib/case-return';
 
 
-export function CaseProgress({ c, allowedNext, canChange, onPick }: {
+export function CaseProgress({ c, allowedNext, canChange, onPick, visited = null }: {
   c: Case; allowedNext: Stage[]; canChange: boolean; onPick: (s: Stage) => void;
+  /** Stages the case really occupied (from its history). Stages before the current one that it never occupied show as skipped. */
+  visited?: ReadonlySet<string> | null;
 }) {
-  const { steps, outcome } = journeySteps(c.current_stage, allowedNext);
-  const done = steps.filter(s => s.state === 'done').length;
+  const { steps, outcome } = journeySteps(c.current_stage, allowedNext, visited);
+  const cur = steps.findIndex(s => s.state === 'current');
+  const done = cur >= 0 ? cur : steps.filter(s => s.state === 'done').length;
+  const skipped = steps.filter(s => s.state === 'skipped').length;
   const forward = allowedNext.filter(s => s !== 'lost' && s !== 'cancelled');
   const exits = allowedNext.filter(s => s === 'lost' || s === 'cancelled');
   return (
@@ -35,10 +39,11 @@ export function CaseProgress({ c, allowedNext, canChange, onPick }: {
         {steps.map((s, i) => (
           <li key={s.stage} className={`atx-step is-${s.state}`} aria-current={s.state === 'current' ? 'step' : undefined}>
             <span className="atx-step-dot" aria-hidden="true" data-n={i + 1}>{s.state === 'done' ? <Check size={12} /> : null}</span>
-            <span className="atx-step-label"><span className="sr-only">Βήμα {i + 1}: </span>{s.label}</span>
+            <span className="atx-step-label"><span className="sr-only">Βήμα {i + 1}: </span>{s.label}{s.state === 'skipped' && <span className="sr-only"> (παραλείφθηκε)</span>}</span>
           </li>
         ))}
       </ol>
+      {skipped > 0 && <p className="text-[12.5px] text-[var(--atx-muted)] mt-3 mb-0" data-steps-skipped>Τα στάδια με διακεκομμένο κύκλο δεν έχουν περάσει: το case συνέχισε από αλλαγή σταδίου του Back Office.</p>}
       {canChange && (forward.length > 0 || exits.length > 0) && (
         <div className="flex items-center gap-2 flex-wrap mt-4">
           {forward.map(s => (

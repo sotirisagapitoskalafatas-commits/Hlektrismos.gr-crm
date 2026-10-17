@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Briefcase, Clock, FileText, Mail, MapPin, Pencil, Phone, Sparkles } from 'lucide-react';
-import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, VisitsTab } from '@/components/app/CaseDetailPage';
+import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, TimelineComposer, VisitsTab } from '@/components/app/CaseDetailPage';
 import { CaseProgress } from '@/components/cases/CaseOverview';
 import CaseDocuments from '@/components/documents/CaseDocuments';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
@@ -14,13 +14,14 @@ import type { FolderTab } from '@/lib/folder';
 import { useStaff } from '@/lib/useStaff';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { activityLabel, can, leadSourceInfo, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
+import { activityLabel, can, leadSourceInfo, SERVICES, STAGE_TRANSITIONS, TEAM_FILTERS } from '@/lib/roles';
+import { leadStatusDisplay } from '@/lib/lead-status';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
 import { canOpenLead } from '@/lib/lead-links';
-import { historyDescription, historyText, visibleHistory } from '@/lib/history-text';
-import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchLead, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
-import type { Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
+import { mergeHistory } from '@/lib/history-text';
+import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
+import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
 import { useToast } from '@/lib/toast';
@@ -28,7 +29,6 @@ import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import { fmtDate, fmtDateTime, fmtMoney } from '@/lib/ui';
 
-const COMMS = ['call', 'email', 'sms', 'whatsapp', 'meeting', 'visit', 'check_in', 'note', 'comment', 'offer', 'send_offer', 'signature', 'document', 'status_change', 'assignment', 'follow_up', 'completed'];
 const DOC_TONE: Record<string, string> = { verified: 't-success', received: 't-warning', rejected: 't-danger' };
 const DOC_TEXT: Record<string, string> = { verified: 'Ελέγχθηκε', received: 'Παραλήφθηκε', rejected: 'Απορρίφθηκε', required: 'Απαιτείται', missing: 'Λείπει' };
 
@@ -44,6 +44,8 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const [tab, setTab] = useState<FolderTab>('overview');
   const [picked, setPicked] = useState<string | null>(null);
   const [leads, setLeads] = useState<Record<string, Lead | null>>({});
+  const [leadActs, setLeadActs] = useState<Record<string, ActivityLogRow[] | null>>({});
+  const [histTeam, setHistTeam] = useState('all');
   const staff = useStaff();
   const [editing, setEditing] = useState(false);
   const [names, setNames] = useState(false);
@@ -68,14 +70,23 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
     const leadIds = [...new Set(mine.map(k => k.lead_id).filter((x): x is string => !!x))];
     const fetched = await Promise.all(leadIds.map(id => fetchLead(id)));
     setLeads(Object.fromEntries(leadIds.map((id, i) => [id, fetched[i]])));
-    setEvents(visibleHistory(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no }))))
-      .filter(e => COMMS.includes(e.activity_type))
-      .sort((a, b) => +new Date(b.occurred_at) - +new Date(a.occurred_at)));
+    // the lead's own history; a failed read (null) leaves the case entries untouched
+    const acts = await Promise.all(leadIds.map(id => fetchEntityActivity('lead', id)));
+    setLeadActs(Object.fromEntries(leadIds.map((id, i) => [id, acts[i]])));
+    setEvents(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no }))));
   }, [customerId]);
   useEffect(() => { void load(); }, [load]);
 
   const summary = useMemo(() => customerSummary(cases, now), [cases, now]);
   const sel = useMemo(() => selectedCase(cases, picked), [cases, picked]);
+  const history = useMemo(() => mergeHistory({
+    caseEvents: events,
+    leads: Object.entries(leads).filter((e): e is [string, Lead] => !!e[1]).map(([id, l]) => ({
+      lead: { id, created_at: l.created_at, converted_at: l.converted_at, source_label: leadSourceInfo(l.source).label }, activity: leadActs[id] ?? null,
+    })),
+    statusText: s => leadStatusDisplay(s).label,
+    typeLabel: activityLabel,
+  }), [events, leads, leadActs]);
   const focus = useMemo(() => {
     const pick = mostUrgentCase(cases);
     if (!pick) return null;
@@ -114,7 +125,8 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const tel = cust.phone ? `tel:${cust.phone.replace(/\s+/g, '')}` : null;
   const initials = cust.full_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const allDocs = cases.flatMap(k => (docs[k.id] ?? []).map(d => ({ ...d, case_no: k.case_no })));
-  const counts: Partial<Record<FolderTab, number>> = { cases: cases.length, docs: allDocs.length, history: events.length };
+  const counts: Partial<Record<FolderTab, number>> = { cases: cases.length, docs: allDocs.length, history: history.length };
+  const shownHistory = histTeam === 'all' ? history : history.filter(e => e.team === histTeam);
   const tabs = folderTabs({ backOffice: can(role, 'create_application') });
   const badge = folderBadge({ isLead: false, cases });
   const subtitle = folderSubtitle({ city: cust.city, since: cust.created_at, cases, fmtDate, staffName: id => staff.find(x => x.id === id)?.full_name ?? null });
@@ -318,18 +330,29 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
       )}
 
       {tab === 'history' && (
-        <div className="atx-panel" style={{ padding: 20 }}>
-          {events.length === 0 ? <div className="atx-empty"><strong>Δεν υπάρχει ιστορικό επικοινωνίας</strong>Κλήσεις, emails, σημειώσεις και αλλαγές εμφανίζονται εδώ από όλα τα cases του πελάτη.</div> : (
+        <div className="atx-panel" style={{ padding: 20 }} data-folder-history>
+          {sel && (
+            <>
+              {cases.length > 1 && <p className="text-[12.5px] text-[var(--atx-muted)] mt-0 mb-2">Η καταγραφή αφορά το case {sel.case_no}.</p>}
+              <TimelineComposer key={sel.id} caseId={sel.id} onAdded={() => void load()} />
+            </>
+          )}
+          <div className="flex gap-1.5 flex-wrap mb-4">
+            {TEAM_FILTERS.map(t => (
+              <button key={t.id} className="atx-chip" aria-pressed={histTeam === t.id} onClick={() => setHistTeam(t.id)}>{t.label}</button>
+            ))}
+          </div>
+          {shownHistory.length === 0 ? <div className="atx-empty"><strong>Δεν υπάρχει ιστορικό</strong>Οι ενέργειες του lead και όλων των cases του πελάτη εμφανίζονται εδώ.</div> : (
             <ol className="m-0 p-0 list-none space-y-3">
-              {events.map(e => (
-                <li key={e.id} className="flex gap-3">
+              {shownHistory.map(e => (
+                <li key={e.key} className="flex gap-3" data-history-source={e.source}>
                   <span className="atx-icon" style={{ width: 30, height: 30 }} aria-hidden="true"><Clock size={14} /></span>
                   <span className="min-w-0">
-                    <span className="block text-[14px] font-medium">{historyText(e.title) || activityLabel(e.activity_type)}</span>
+                    <span className="block text-[14px] font-medium">{e.title}</span>
                     <span className="block text-[12.5px] text-[var(--atx-muted)]">
-                      {activityLabel(e.activity_type)} · Case <button className="atx-link !p-0 text-[12.5px]" onClick={() => openCase(e.case_id)}>{e.case_no}</button> · {fmtDateTime(e.occurred_at)}{e.user?.full_name ? ` · ${e.user.full_name}` : ''}
+                      {e.source === 'lead' ? 'Lead' : <>{e.typeLabel} · Case <button className="atx-link !p-0 text-[12.5px]" onClick={() => e.caseId && openCase(e.caseId)}>{e.label}</button></>} · {fmtDateTime(e.at)}{e.userName ? ` · ${e.userName}` : ''}
                     </span>
-                    {historyDescription(e) && <span className="block text-[13px] mt-0.5 whitespace-pre-line">{historyDescription(e)}</span>}
+                    {e.description && <span className="block text-[13px] mt-0.5 whitespace-pre-line">{e.description}</span>}
                   </span>
                 </li>
               ))}

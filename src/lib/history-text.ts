@@ -82,3 +82,52 @@ export function leadActionText(a: { action: string; details?: Record<string, unk
   const reason = typeof d.reason === 'string' && d.reason.trim() && a.action === 'trashed' ? ` · ${d.reason.trim()}` : '';
   return base + reason;
 }
+
+/* ---- One timeline for the customer folder (UNIFIED_CUSTOMER_FOLDER.md §2, Ιστορικό; finding B2) ----
+   Merges the lead's entries (activity_log) with every case's entries (timeline_events), newest first, each
+   labelled «Lead» or with its case number. Nothing is dropped by type: Back Office entries (document check,
+   application, provider, activation, override, return) are part of the history. A lead read that failed (null)
+   leaves the case entries untouched. */
+export type HistoryEntry = {
+  key: string; at: string;
+  source: 'lead' | 'case'; label: string; caseId: string | null;
+  title: string; description: string; typeLabel: string;
+  team: string; teamLabel: string; userName: string | null;
+};
+type CaseEventIn = EventLike & { id: string; case_id: string; case_no: string; occurred_at: string; user?: { full_name?: string | null } | null };
+type LeadActivityIn = { id: string; action: string; details: Record<string, unknown> | null; created_at: string };
+type LeadIn = { id: string; created_at: string; converted_at?: string | null; source_label: string };
+
+export function mergeHistory(input: {
+  caseEvents: CaseEventIn[];
+  leads: { lead: LeadIn; activity: LeadActivityIn[] | null }[];
+  statusText: (s: string) => string;
+  typeLabel: (activityType: string) => string;
+}): HistoryEntry[] {
+  const out: HistoryEntry[] = [];
+  for (const e of visibleHistory(input.caseEvents)) {
+    out.push({
+      key: `c-${e.id}`, at: e.occurred_at, source: 'case', label: e.case_no, caseId: e.case_id,
+      title: historyText(e.title) || input.typeLabel(e.activity_type), description: historyDescription(e),
+      typeLabel: input.typeLabel(e.activity_type), team: entryTeam(e), teamLabel: entryTeamLabel(e), userName: e.user?.full_name ?? null,
+    });
+  }
+  for (const { lead, activity } of input.leads) {
+    const rows = activity ?? [];
+    for (const a of rows) {
+      out.push({
+        key: `l-${a.id}`, at: a.created_at, source: 'lead', label: 'Lead', caseId: null,
+        title: leadActionText(a, input.statusText), description: '', typeLabel: 'Lead',
+        team: 'system', teamLabel: 'Σύστημα', userName: null,
+      });
+    }
+    // the lead's own dates, unless the log already has the same fact
+    if (lead.converted_at && !rows.some(a => a.action === 'converted')) {
+      out.push({ key: `lc-${lead.id}`, at: lead.converted_at, source: 'lead', label: 'Lead', caseId: null, title: 'Μετατράπηκε σε Case', description: '', typeLabel: 'Lead', team: 'system', teamLabel: 'Σύστημα', userName: null });
+    }
+    if (!rows.some(a => a.action === 'created')) {
+      out.push({ key: `ln-${lead.id}`, at: lead.created_at, source: 'lead', label: 'Lead', caseId: null, title: `Νέο lead · ${lead.source_label}`, description: '', typeLabel: 'Lead', team: 'system', teamLabel: 'Σύστημα', userName: null });
+    }
+  }
+  return out.sort((a, b) => +new Date(b.at) - +new Date(a.at));
+}

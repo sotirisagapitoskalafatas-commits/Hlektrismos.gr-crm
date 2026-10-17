@@ -1170,6 +1170,30 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   const toFolder = await page.evaluate(() => !!document.querySelector('[data-open-folder]'));
   await page.evaluate(() => document.querySelector('[data-open-folder]')?.click()); await sleep(1800);
   check('Links: Case → «Φάκελος πελάτη» opens the customer folder (a converted lead has no screen of its own)', toFolder && (await page.evaluate(() => !!document.querySelector('[data-folder-badge]') && !!document.querySelector('main h1'))));
+  // Part B 6: every customer save also updates the linked lead; a failed second write is said on screen
+  {
+    const M = 'http://127.0.0.1:54399';
+    const setField = (label, v) => page.evaluate((l, val) => {
+      const inp = [...document.querySelectorAll('main label')].find((x) => x.textContent.trim().startsWith(l))?.querySelector('input');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, val); inp.dispatchEvent(new Event('input', { bubbles: true }));
+    }, label, v);
+    const leadPatches = async () => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'PATCH' && l.table === 'leads');
+    const before = (await leadPatches()).length;
+    await click(page, 'Επεξεργασία'); await sleep(500);
+    await setField('Τηλέφωνο', '6900000077');
+    await click(page, 'Αποθήκευση'); await sleep(2000);
+    const after = (await leadPatches()).slice(before);
+    check('Sync: saving the customer also updates the linked lead (only the phone changed, only the phone is sent)', after.length >= 1 && after.every((l) => l.body.phone === '6900000077' && !('full_name' in l.body) && !('email' in l.body)), JSON.stringify(after.map((l) => l.body)));
+    check('Sync: nothing to warn about when the lead was updated', !(await page.evaluate(() => !!document.querySelector('[data-sync-warning]'))));
+    await fetch(`${M}/__patchfail?table=leads`);
+    await click(page, 'Επεξεργασία'); await sleep(500);
+    await setField('Email', 'sync.test@example.gr');
+    await click(page, 'Αποθήκευση'); await sleep(2200);
+    const w = await page.evaluate(() => document.querySelector('[data-sync-warning]')?.innerText ?? '');
+    const logS = await (await fetch(`${M}/__log`)).json();
+    const custSaved = logS.filter((l) => l.method === 'PATCH' && l.table === 'customers').pop()?.body?.email === 'sync.test@example.gr';
+    check('Sync: when the lead write fails, the customer is still saved and the screen says so', custSaved && /Τα στοιχεία του πελάτη αποθηκεύτηκαν, αλλά δεν ενημερώθηκε το lead/.test(w), w.slice(0, 120));
+  }
   await browser.close();
 }
 
@@ -1252,8 +1276,38 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   const w = log.filter((l) => l.method === 'PATCH' && l.table === 'customers').pop()?.body ?? {};
   const closed = await page.evaluate(() => !document.querySelector('[data-contact-error]') && !document.querySelector('button[title="Ακύρωση"]'));
   check('Contact save (case): the retry saves and closes the form', closed && w.phone === '6900000099');
+  check('Contact save (case): a customer whose cases came from no lead causes no lead write', !log.some((l) => l.method === 'PATCH' && l.table === 'leads' && l.body.phone === '6900000099'));
   check('Contact save (case): first and last name are sent when the columns exist, full name kept in step',
     names ? (w.last_name === 'Δοκιμαστική' && typeof w.full_name === 'string' && w.full_name.endsWith('Δοκιμαστική')) : (typeof w.full_name === 'string' && !('last_name' in w)), JSON.stringify({ names, w }));
+  await browser.close();
+}
+
+/* ---- 10b2. Case → «Στοιχεία επαφής» also updates the linked lead; a failed lead write is said on screen (Part B 6) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+  await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === 'CS-2026-001' && e.offsetParent); el && el.click(); });
+  await sleep(2000);
+  const setField = (label, v) => page.evaluate((l, val) => {
+    const i = [...document.querySelectorAll('main label')].find((x) => x.textContent.trim().startsWith(l))?.querySelector('input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, val); i.dispatchEvent(new Event('input', { bubbles: true }));
+  }, label, v);
+  const leadPatches = async () => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'PATCH' && l.table === 'leads');
+  const before = (await leadPatches()).length;
+  await page.evaluate(() => document.querySelector('button[title="Επεξεργασία στοιχείων"]')?.click()); await sleep(500);
+  await setField('Τηλέφωνο', '6900000088');
+  await click(page, 'Αποθήκευση'); await sleep(2200);
+  const got = (await leadPatches()).slice(before);
+  check('Sync (case): saving the contact also updates the linked lead, and shows no warning', got.some((l) => l.body.phone === '6900000088') && !(await page.evaluate(() => !!document.querySelector('[data-sync-warning]'))), JSON.stringify(got.map((l) => l.body)));
+  await fetch(`${M}/__patchfail?table=leads`);
+  await page.evaluate(() => document.querySelector('button[title="Επεξεργασία στοιχείων"]')?.click()); await sleep(500);
+  await setField('Email', 'case.sync@example.gr');
+  await click(page, 'Αποθήκευση'); await sleep(2400);
+  const w = await page.evaluate(() => document.querySelector('[data-sync-warning]')?.innerText ?? '');
+  const saved = (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'PATCH' && l.table === 'customers').pop()?.body?.email === 'case.sync@example.gr';
+  check('Sync (case): when the lead write fails the customer is still saved and the case says so', saved && /Τα στοιχεία του πελάτη αποθηκεύτηκαν, αλλά δεν ενημερώθηκε το lead/.test(w), w.slice(0, 100));
   await browser.close();
 }
 

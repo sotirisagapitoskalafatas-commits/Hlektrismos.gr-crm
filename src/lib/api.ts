@@ -8,6 +8,8 @@ import { notTrashed } from './trash';
 import { parseStageError } from './case-return';
 import { DOC_STATUS_TEXT, statusText } from './status-text';
 import { stageChangeDescription, stageChangeTitle } from './history-text';
+import { leadSyncPatch } from './lead-sync';
+import type { LeadSyncResult, SyncCustomer } from './lead-sync';
 import { leadIdentityColumns, leadNamePatch, leadWriteErrorText, safeDiagnostics } from './lead-payload';
 import type { ReturnTeam, StageBlocker, StageError } from './case-return';
 
@@ -1500,6 +1502,26 @@ export async function updateLeadChecked(id: string, patch: LeadPatch): Promise<s
     return leadWriteErrorText(error);
   }
   return null;
+}
+
+/** After a customer save: update the lead(s) the customer's cases came from (name, phone, email; only what changed).
+ *  The customer is already saved when this runs, so a failure here is reported separately, never as a failed save. */
+export async function syncLeadsFromCustomer(customerId: string, customer: SyncCustomer): Promise<LeadSyncResult> {
+  const out: LeadSyncResult = { linked: 0, updated: 0, failed: [] };
+  if (!supabase) return out;
+  const { data, error } = await supabase.from('cases').select('lead_id').eq('customer_id', customerId);
+  if (error) { logError('syncLeadsFromCustomer', error); out.failed.push('Δεν ήταν δυνατή η ανάγνωση των cases του πελάτη. Δοκιμάστε ξανά.'); return out; }
+  const ids = [...new Set((data ?? []).map(r => (r as { lead_id: string | null }).lead_id).filter((x): x is string => !!x))];
+  for (const id of ids) {
+    const lead = await fetchLead(id);
+    if (!lead || lead.deleted_at) continue; // unreadable or in the Κάδος: nothing to keep in sync
+    out.linked++;
+    const patch = leadSyncPatch(customer, lead);
+    if (Object.keys(patch).length === 0) continue;
+    const err = await updateLeadChecked(id, patch);
+    if (err) out.failed.push(err); else out.updated++;
+  }
+  return out;
 }
 
 /* Single-write conversion RPC (SECURITY DEFINER) — preserves attribution + lineage. */

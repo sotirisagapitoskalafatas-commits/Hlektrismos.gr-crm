@@ -9,6 +9,7 @@ import { useNav } from '@/lib/nav';
 import { activityLabel, can, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
+import { canOpenLead } from '@/lib/lead-links';
 import { historyDescription, historyText, visibleHistory } from '@/lib/history-text';
 import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
 import type { Case, CaseDocument, Customer, TimelineEvent } from '@/lib/api';
@@ -119,6 +120,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
           <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}{k.next_action ? ` · ${k.next_action}` : ''}</span>
         </button>
         <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
+        {k.lead_id && canOpenLead(role) && <button className="atx-btn atx-btn-quiet" data-open-lead onClick={() => k.lead_id && go('leads', { lead: k.lead_id })} title="Το lead από το οποίο προήλθε το case">Lead</button>}
         <button className="atx-btn atx-btn-quiet" onClick={() => openCase(k.id)}>Άνοιγμα</button>
       </li>
     );

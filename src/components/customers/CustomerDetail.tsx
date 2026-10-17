@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { activityLabel, can, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
+import { caseCountText } from '@/lib/status-text';
 import { historyDescription, historyText, visibleHistory } from '@/lib/history-text';
 import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
 import type { Case, CaseDocument, Customer, TimelineEvent } from '@/lib/api';
@@ -132,7 +133,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
         <div className="flex-1 min-w-[220px]">
           <h1 className="atx-title" style={{ fontSize: 28 }}>{cust.full_name}</h1>
           <p className="atx-sub" style={{ marginTop: 2 }}>
-            Πελάτης{cust.city ? ` · ${cust.city}` : ''} · από {fmtDate(cust.created_at)} · {summary.active} ενεργά από {summary.total} cases
+            Πελάτης{cust.city ? ` · ${cust.city}` : ''} · από {fmtDate(cust.created_at)} · {caseCountText(summary)}
           </p>
         </div>
         {!cust.deleted_at && <TrashButton type="customer" id={cust.id} name={cust.full_name} onTrashed={() => { go('customers'); }} />}

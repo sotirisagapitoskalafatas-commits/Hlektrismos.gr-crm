@@ -2,6 +2,7 @@
    cases, documents and history live. Deep link: go('customers', { customer: id }). */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { caseCountText } from '@/lib/status-text';
 import { ChevronRight, Search, Users } from 'lucide-react';
 import { useNav } from '@/lib/nav';
 import { fetchCases, fetchCustomers } from '@/lib/api';
@@ -88,7 +89,7 @@ export default function CustomersPage() {
                     <span className="atx-row-sub">{[c.phone, c.email].filter(Boolean).join(' · ') || 'Χωρίς στοιχεία επικοινωνίας'}</span>
                   </button>
                   <span className="atx-row-when">
-                    {ks.length === 0 ? 'Χωρίς case' : `${active} ενεργά / ${ks.length}`}
+                    {caseCountText({ total: ks.length, active, completed: ks.filter(k => k.current_stage === 'completed').length })}
                     {known > 0 && <span className="block">{fmtMoney(known)}</span>}
                   </span>
                   <TrashButton compact type="customer" id={c.id} name={c.full_name}

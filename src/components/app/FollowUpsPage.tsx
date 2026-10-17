@@ -85,7 +85,7 @@ export default function FollowUpsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <Micro tone="brand">CRM</Micro>
-          <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Follow Ups</h2>
+          <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Follow-ups</h2>
         </div>
         {can(role, 'create_followup') && (
           <Btn onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" /> Νέο Follow Up</Btn>

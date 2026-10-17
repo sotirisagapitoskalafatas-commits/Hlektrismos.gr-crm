@@ -1081,6 +1081,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   const body = () => page.evaluate(() => document.querySelector('main').innerText);
   const t = await body();
   check('Customer detail: opens with next step, cases and contact', t.includes('Επόμενο βήμα') && t.includes('Επικοινωνία') && /CS-2026-00/.test(t));
+  check('Customer detail: case count reads «Cases: N σε εξέλιξη…», not «ενεργά από»', /Cases: \d+ σε εξέλιξη/.test(t) && !/ενεργά από/.test(t));
   await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(500);
   check('Customer detail: history merges case timeline events', (await body()).includes('Τηλεφωνική επικοινωνία'));
   {
@@ -1105,6 +1106,11 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await sleep(2000);
   const t = await page.evaluate(() => document.querySelector('main').innerText);
   check('Case detail: stepper uses full Greek labels, no 3-letter codes', t.includes('Έλεγχος εγγράφων') && t.includes('Καταχώρηση παρόχου') && !/\bΕΓΓ\b|\bΚΑΤ\b|\bΥΠΓ\b/.test(t));
+  {
+    const st = await page.evaluate(() => [...document.querySelectorAll('.atx-step')].map((li) => ({ dot: li.querySelector('.atx-step-dot').textContent, label: li.querySelector('.atx-step-label').textContent })));
+    check('Case detail: step numbers are not part of the text; a reader hears «Βήμα N: …»', st.length === 9 && st.every((s, i) => s.dot === '' && s.label.startsWith(`Βήμα ${i + 1}: `)) && !/\d(Νέο|Επικοινωνία|Προσφορά|Αίτηση|Υπογραφή)/.test(t), JSON.stringify(st.slice(0, 2)));
+    check('Case detail: tab «Follow-ups», no English panel labels', t.includes('Follow-ups') && !/Follow Ups|\bTimeline\b|\bOffers\b|\bSignatures\b|Field sales/.test(t));
+  }
   check('Case detail: next action lists missing documents as blockers', /Λείπει: Ταυτότητα/.test(t) && t.includes('Επόμενη ενέργεια') && t.includes('Επόμενες ενέργειες') && t.includes('Στοιχεία επαφής'));
   await click(page, 'Παράδοση'); await sleep(500);
   // dialog is portaled to <body>; team defaults to Back Office; pick the first colleague listed

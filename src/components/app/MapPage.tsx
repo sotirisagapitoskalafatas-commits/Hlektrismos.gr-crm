@@ -47,7 +47,7 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'active', label: 'Ενεργά' },
   { id: 'leads', label: 'Leads' },
   { id: 'today', label: 'Σημερινές Επισκέψεις' },
-  { id: 'followups', label: 'Follow Ups' },
+  { id: 'followups', label: 'Follow-ups' },
   { id: 'pending_sig', label: 'Προς Υπογραφή' },
   { id: 'backoffice', label: 'Back Office' },
   { id: 'completed', label: 'Ολοκληρωμένα' },

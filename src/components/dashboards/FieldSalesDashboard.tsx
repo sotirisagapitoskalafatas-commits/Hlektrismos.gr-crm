@@ -53,7 +53,7 @@ export default function FieldSalesDashboard({ d }: { d: DashboardData }) {
         <KpiCard label="Σε εξέλιξη" value={String(inProgress)} sub="επισκέψεις τώρα" icon={MapPin} tone={inProgress > 0 ? 'text-brand-600' : 'text-ink'} />
         <KpiCard label="Σήμερα" value={String(plannedToday)} sub="προγραμματισμένες" icon={CalendarClock} tone={plannedToday > 0 ? 'text-brand-600' : 'text-ink'} />
         <KpiCard label="Ολοκληρώθηκαν" value={String(completedToday)} sub="σήμερα" icon={MapPin} tone="text-ink" />
-        <KpiCard label="Follow Ups" value={String(overdue.length + today.length)} sub={`${today.length} σήμερα · ${overdue.length} εκπρόθεσμα`} icon={CalendarClock} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
+        <KpiCard label="Follow-ups" value={String(overdue.length + today.length)} sub={`${today.length} σήμερα · ${overdue.length} εκπρόθεσμα`} icon={CalendarClock} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
       </div>
 
       {/* Big CTAs */}
@@ -126,7 +126,7 @@ export default function FieldSalesDashboard({ d }: { d: DashboardData }) {
 
       {/* Follow ups */}
       <Card className="!p-0" pad={false}>
-        <CardHeader micro="Follow Ups" title="Σημερινά & εκπρόθεσμα" className="px-5 pt-5"
+        <CardHeader micro="Follow-ups" title="Σημερινά & εκπρόθεσμα" className="px-5 pt-5"
           action={<Pill tone={overdue.length + today.length > 0 ? 'red' : 'green'}>{overdue.length + today.length}</Pill>} />
         <div className="px-3 pb-3 space-y-1">
           {today.length === 0 && overdue.length === 0 && <EmptyState icon={CalendarClock} title="Δεν υπάρχουν εκκρεμή follow ups" hint="Όλες οι ενέργειες εντός προγράμματος." />}

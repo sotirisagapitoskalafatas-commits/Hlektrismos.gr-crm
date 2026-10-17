@@ -34,8 +34,8 @@ export function CaseProgress({ c, allowedNext, canChange, onPick }: {
       <ol className="atx-stepper" aria-label="Στάδια case">
         {steps.map((s, i) => (
           <li key={s.stage} className={`atx-step is-${s.state}`} aria-current={s.state === 'current' ? 'step' : undefined}>
-            <span className="atx-step-dot" aria-hidden="true">{s.state === 'done' ? <Check size={12} /> : i + 1}</span>
-            <span className="atx-step-label">{s.label}</span>
+            <span className="atx-step-dot" aria-hidden="true" data-n={i + 1}>{s.state === 'done' ? <Check size={12} /> : null}</span>
+            <span className="atx-step-label"><span className="sr-only">Βήμα {i + 1}: </span>{s.label}</span>
           </li>
         ))}
       </ol>

@@ -212,6 +212,8 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-step.is-done::before, .atx-step.is-current::before { background: var(--atx-blue); }
 .atx-step-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
   background: #fff; border: 2px solid var(--atx-line); color: var(--atx-muted); position: relative; z-index: 1; }
+/* the step number is drawn by CSS so it is not part of the text («4Αίτηση» when copied); readers get «Βήμα 4: » */
+.atx-step-dot:empty::before { content: attr(data-n); }
 .atx-step.is-done .atx-step-dot { background: var(--atx-blue); border-color: var(--atx-blue); color: #fff; }
 .atx-step.is-current .atx-step-dot { border-color: var(--atx-blue); color: var(--atx-blue); box-shadow: 0 0 0 4px var(--atx-blue-soft); }
 .atx-step-label { font-size: 12px; line-height: 1.25; color: var(--atx-muted); overflow-wrap: anywhere; }

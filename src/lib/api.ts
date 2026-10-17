@@ -6,6 +6,7 @@ import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 import { notTrashed } from './trash';
 import { parseStageError } from './case-return';
+import { DOC_STATUS_TEXT, statusText } from './status-text';
 import { stageChangeDescription, stageChangeTitle } from './history-text';
 import { leadIdentityColumns, leadNamePatch, leadWriteErrorText, safeDiagnostics } from './lead-payload';
 import type { ReturnTeam, StageBlocker, StageError } from './case-return';
@@ -781,8 +782,8 @@ export async function setDocumentStatus(id: string, status: string): Promise<voi
     await addActivity(data.case_id as string, {
       role: (profile?.role ?? 'back_office') as Role,
       activity_type: 'document_check',
-      title: `Έλεγχος εγγράφου: ${status}`,
-      description: status === 'verified' ? 'Έγγραφο ελέγχθηκε και είναι έγκυρο.' : `Κατάσταση εγγράφου: ${status}`,
+      title: `Έλεγχος εγγράφου: ${statusText(DOC_STATUS_TEXT, status)}`,
+      description: status === 'verified' ? 'Έγγραφο ελέγχθηκε και είναι έγκυρο.' : `Κατάσταση εγγράφου: ${statusText(DOC_STATUS_TEXT, status)}`,
     });
   }
 }

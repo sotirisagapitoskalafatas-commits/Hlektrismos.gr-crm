@@ -47,7 +47,7 @@ export default function ManagerDashboard({ d }: { d: DashboardData }) {
         <KpiCard label="Ενεργά Cases" value={String(active.length)} sub={`${total} συνολικά`} icon={Target} />
         <KpiCard label="Win rate" value={`${winRate}%`} sub={`${won.length} κερδισμένα · ${lost.length} χαμένα`} tone="text-ok-600" icon={Target} />
         <KpiCard label="Pipeline (σταθμισμένο)" value={pipe.weighted === null ? 'μη διαθέσιμο' : fmtMoney(pipe.weighted)} sub={`${pipe.withoutValue ? `${pipe.withoutValue} χωρίς αξία εκτός · ` : ''}${fmtMoney(wonValue(cases))} κερδισμένα`} icon={Target} />
-        <KpiCard label="Εκπρόθεσμα Follow Ups" value={String(overdue.length)} sub="χρειάζονται σήμερα" icon={History} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
+        <KpiCard label="Εκπρόθεσμα follow-ups" value={String(overdue.length)} sub="χρειάζονται σήμερα" icon={History} tone={overdue.length > 0 ? 'text-bad-600' : 'text-ink'} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -154,7 +154,7 @@ export default function ManagerDashboard({ d }: { d: DashboardData }) {
 
       {/* Overdue follow ups */}
       <Card className="!p-0" pad={false}>
-        <CardHeader micro="Εκκρεμότητες" title="Εκπρόθεσμα Follow Ups" className="px-5 pt-5"
+        <CardHeader micro="Εκκρεμότητες" title="Εκπρόθεσμα follow-ups" className="px-5 pt-5"
           action={<Pill tone={overdue.length > 0 ? 'red' : 'green'}>{overdue.length}</Pill>} />
         <div className="px-3 pb-3 space-y-1">
           {overdue.length === 0 && <EmptyState icon={History} title="Δεν υπάρχουν εκπρόθεσμα follow ups" hint="Όλες οι ενέργειες εντός προγράμματος." />}

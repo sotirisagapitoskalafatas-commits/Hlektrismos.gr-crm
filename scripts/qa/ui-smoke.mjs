@@ -321,10 +321,10 @@ if (!PREVIEW_LIVE) {
   }
 }
 
-/* ---- 2e. Case workflow: server document gates, override, Back Office return & resubmit ---- */
+/* ---- 2e. Case workflow: documents only warn (never block), Back Office return & resubmit ---- */
 {
   const M = 'http://127.0.0.1:54399';
-  await fetch(`${M}/__gates?state=on&mode=warn`);
+  await fetch(`${M}/__gates?state=on`);
   const openCaseNo = async (page, no) => {
     await click(page, 'Cases', '#shell-rail nav button');
     await sleep(1200);
@@ -348,7 +348,7 @@ if (!PREVIEW_LIVE) {
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Άκυρο')?.click());
     await browser.close();
   }
-  // 0b) admin sees the per-stage setting (all «Προειδοποίηση») and switches one stage through set_stage_gate_mode
+  // 0b) Αdmin Center → Έγγραφα: read-only. No «Μπλοκάρισμα», nothing to switch; documents never block
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'admin');
@@ -356,43 +356,29 @@ if (!PREVIEW_LIVE) {
     await sleep(1200);
     await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === 'Έγγραφα')?.click());
     await sleep(1200);
-    const modes = await page.evaluate(() => [...document.querySelectorAll('[data-gate-modes] [data-gate]')].map((li) => li.querySelector('[aria-checked="true"]')?.textContent.trim()));
-    await page.evaluate(() => [...document.querySelectorAll('[data-gate="submitted"] [role="radio"]')].find((b) => b.textContent.trim() === 'Μπλοκάρισμα')?.click());
-    await sleep(1200);
-    const log = await (await fetch(`${M}/__log`)).json();
-    check('Gates: every stage ships as «Προειδοποίηση»; the admin switch goes through set_stage_gate_mode', modes.length === 4 && modes.every((m) => m === 'Προειδοποίηση')
-      && log.some((l) => l.table === 'set_stage_gate_mode' && l.body.p_stage === 'submitted' && l.body.p_mode === 'block'), JSON.stringify(modes));
+    const g = await page.evaluate(() => ({ rows: document.querySelectorAll('[data-gate-modes] [data-gate]').length, radios: document.querySelectorAll('[data-gate-modes] [role="radio"], [data-gate-modes] [role="radiogroup"]').length,
+      text: document.querySelector('[data-gate-modes]')?.innerText ?? '', never: !!document.querySelector('[data-docs-never-block]') }));
+    check('Gates: Admin Center shows what each stage expects, read-only — no «Μπλοκάρισμα», nothing to switch', g.rows === 4 && g.radios === 0 && g.never && !g.text.includes('Μπλοκάρισμα') && g.text.includes('δεν εμποδίζουν ποτέ'), JSON.stringify({ rows: g.rows, radios: g.radios }));
     await browser.close();
   }
-  await fetch(`${M}/__gates?state=on&mode=block`);
-  // 1) Back Office: blocked by the server, sees what is missing, no override
+  // 1) Back Office confirms a move with documents missing: it goes through, as ONE history entry that lists what was missing
   {
+    const C5 = '30000000-0000-4000-8000-000000000005';
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'back_office');
-    await openCaseNo(page, 'CS-2026-005'); // «Υπογραφή»
+    await openCaseNo(page, 'CS-2026-005'); // «Υπογραφή», no documents
     const opened = await pickStep(page, 'Έλεγχος εγγράφων');
     await sleep(900);
     const t = await body(page);
     check('Gates: the stage action exists for Back Office', opened);
-    check('Gates: moving to «Έλεγχος εγγράφων» without documents shows the server blockers', t.includes('Δεν μπορεί να προχωρήσει ακόμη') && t.includes('Ταυτότητα — εμπρός όψη — λείπει'));
-    check('Gates: no confirm and no override for Back Office', await page.evaluate(() => ![...document.querySelectorAll('button')].some((b) => ['Επιβεβαίωση', 'Παράκαμψη & μετάβαση'].includes(b.textContent.trim()))));
-    await browser.close();
-  }
-  // 2) Admin: override with a written reason
-  {
-    const { browser, page } = await launch(1440, 900);
-    await signInAs(page, 'admin');
-    await openCaseNo(page, 'CS-2026-005');
-    await pickStep(page, 'Έλεγχος εγγράφων');
-    await sleep(900);
-    const disabled = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Παράκαμψη & μετάβαση')?.disabled);
-    await setVal(page, '#override-reason', 'Ο πάροχος δέχεται τα έγγραφα μέσα στην εβδομάδα');
-    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Παράκαμψη & μετάβαση')?.click());
-    await sleep(1500);
+    check('Gates: missing documents are listed as a warning and the move is allowed', t.includes('Λείπουν έγγραφα — η μετάβαση επιτρέπεται') && t.includes('Ταυτότητα — εμπρός όψη') && !t.includes('Δεν μπορεί να προχωρήσει ακόμη'));
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Συνέχεια με ελλείψεις')?.click());
+    await sleep(1600);
+    const now = (await (await fetch(`${M}/rest/v1/cases?id=eq.${C5}&select=current_stage`, { headers: { Authorization: 'Bearer mock-admin' } })).json())[0]?.current_stage;
     const log = await (await fetch(`${M}/__log`)).json();
-    check('Gates: admin override needs a reason, goes through change_case_stage_override and moves the case', disabled === true
-      && log.some((l) => l.table === 'change_case_stage_override' && l.body.p_stage === 'document_check' && l.body.p_reason.length >= 10)
-      && (await body(page)).includes('με παράκαμψη'));
+    const entries = log.filter((l) => l.method === 'POST' && l.table === 'timeline_events' && l.body?.case_id === C5 && l.body.activity_type === 'status_change');
+    check('Gates: the case moved to «Έλεγχος εγγράφων» with no documents, recorded once with the missing items', now === 'document_check' && entries.length === 1 && /Με ελλείψεις εγγράφων: Ταυτότητα/.test(entries[0].body.description), JSON.stringify({ now, n: entries.length }));
+    check('Gates: no override exists any more', !log.some((l) => l.table === 'change_case_stage_override' || l.table === 'set_stage_gate_mode'));
     await browser.close();
   }
   // 3) Back Office returns CS-2026-006 («Έλεγχος εγγράφων») for correction
@@ -431,10 +417,10 @@ if (!PREVIEW_LIVE) {
     check('Return: the receiving team resubmits to Back Office; banner disappears', log.some((l) => l.table === 'resubmit_returned_case') && !(await page.evaluate(() => !!document.querySelector('[data-returned]'))));
     await browser.close();
   }
-  await fetch(`${M}/__gates?state=off&mode=warn`);
+  await fetch(`${M}/__gates?state=off`);
 }
 
-/* ---- 2e2. Back Office tab: «Ενεργοποίηση» / «Ολοκλήρωση» follow the allowed moves (staged phase2/07 guard on) ---- */
+/* ---- 2e2. Back Office tab: «Ενεργοποίηση» / «Ολοκλήρωση» follow the allowed moves (staged phase2/07b guard on) ---- */
 {
   const M = 'http://127.0.0.1:54399';
   const C6 = '30000000-0000-4000-8000-000000000006';
@@ -451,7 +437,7 @@ if (!PREVIEW_LIVE) {
   };
   const press = (page, label) => page.evaluate((l) => { const b = [...document.querySelectorAll('[data-bo-actions] button')].find((x) => x.textContent.trim() === l && !x.disabled); b?.click(); return !!b; }, label);
   const jumpMsg = (page) => page.evaluate(() => document.querySelector('[data-jump-msg]')?.textContent ?? '');
-  await fetch(`${M}/__gates?state=on&mode=warn`);
+  await fetch(`${M}/__gates?state=on`);
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'back_office');
   // impossible jump: CS-2026-006 is in «Έλεγχος εγγράφων»
@@ -473,15 +459,15 @@ if (!PREVIEW_LIVE) {
   check('History: one stage move writes ONE entry, titled in Greek', tlNew7.length === 1 && tlNew7[0].title === 'Στάδιο: Καταχώρηση παρόχου → Ενεργοποίηση', JSON.stringify(tlNew7.map((b) => b.title)));
   check('BO buttons: an allowed move passes the guard and the case moves to «Ενεργοποίηση»', (await stageOf(C7)) === 'activation'
     && (await stageWrites(C7)).some((l) => l.body.current_stage === 'activation') && !(await jumpMsg(page)));
-  // a database refusal is shown: with the «block» gate and no verified documents, «Ολοκλήρωση» is refused by the server
-  await fetch(`${M}/__gates?state=on&mode=block`);
+  // a database refusal is shown: the server's list refuses a move the app believed allowed (07b guard), «Ολοκλήρωση» stays unchanged
+  await fetch(`${M}/__patchfail?table=cases&hint=transition`);
   await press(page, 'Ολοκλήρωση');
   await sleep(1400);
   const m7 = await jumpMsg(page);
-  check('BO buttons: a database refusal is shown on screen, never silent', m7.startsWith('Δεν επιτρέπεται η μετάβαση:') && (await stageOf(C7)) === 'activation', m7);
+  check('BO buttons: a database refusal is shown on screen, never silent', m7 === 'Η μετάβαση σε αυτό το στάδιο δεν επιτρέπεται από το τρέχον στάδιο.' && (await stageOf(C7)) === 'activation', m7);
   await browser.close();
   // leave the shared mock as we found it
-  await fetch(`${M}/__gates?state=off&mode=warn`);
+  await fetch(`${M}/__gates?state=off`);
   await fetch(`${M}/rest/v1/cases?id=eq.${C7}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: 'submitted' }) });
 }
 

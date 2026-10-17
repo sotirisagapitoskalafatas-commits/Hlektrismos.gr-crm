@@ -3,8 +3,8 @@
    success is claimed only after re-reading the case from the server. */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRightLeft, CalendarClock, Check, ChevronRight, MapPin, ShieldAlert, Sparkles, Undo2 } from 'lucide-react';
-import { addActivity, changeStage, fetchCase, fetchFollowUps, fetchStageBlockers, fetchVisits, overrideStage, setCaseException, updateCase } from '@/lib/api';
+import { AlertTriangle, ArrowRightLeft, CalendarClock, Check, ChevronRight, MapPin, Sparkles, Undo2 } from 'lucide-react';
+import { addActivity, changeStage, fetchCase, fetchFollowUps, fetchStageBlockers, fetchVisits, setCaseException, updateCase } from '@/lib/api';
 import { EXCEPTION_TEXT } from '@/lib/ops-queue';
 import type { Case, StaffProfile } from '@/lib/api';
 import type { Role, Stage } from '@/lib/roles';
@@ -104,12 +104,11 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   const { toast } = useToast();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  // What the SERVER says blocks this move (null = not checked / check not available yet).
+  // What the server reports as missing for this move (null = not checked / not available yet). Information only: documents never block.
   const [blockers, setBlockers] = useState<StageBlocker[] | null>(null);
-  const [override, setOverride] = useState('');
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    setNote(''); setOverride(''); setErr(null); setBlockers(null);
+    setNote(''); setErr(null); setBlockers(null);
     if (!stage) return;
     let alive = true;
     void fetchStageBlockers(c.id, stage).then(b => { if (alive) setBlockers(b); });
@@ -117,10 +116,7 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   }, [stage, c.id]);
   if (!stage) return null;
   const exit = stage === 'lost' || stage === 'cancelled';
-  // 'warn' gates (the default) list what is missing but never stop the move; only 'block' gates do.
-  const blocked = !!blockers && blockers.some(b => b.mode !== 'warn');
-  const warnings = !blocked && !!blockers && blockers.length > 0 ? blockers : [];
-  const canOverride = role === 'admin' || role === 'manager';
+  const warnings = blockers && blockers.length > 0 ? blockers : [];
 
   const verify = async (ok: string) => {
     const fresh = await fetchCase(c.id);
@@ -132,19 +128,8 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
     setBusy(true); setErr(null);
     const missing = warnings.map(b => `${b.label} — ${BLOCKER_TEXT[b.status]}`);
     const r = await changeStage(c.id, stage, role, note.trim() || undefined, missing);
-    if (r.error) {
-      setBusy(false);
-      if (r.error.kind === 'documents') setBlockers(r.error.blockers.map(b => ({ ...b, mode: 'block' as const })));
-      setErr(stageErrorText(r.error));
-      return;
-    }
-    await verify(`Στάδιο: ${stageText(stage)}${warnings.length ? ' — με ελλείψεις εγγράφων (καταγράφηκαν)' : ''}`);
-  };
-  const submitOverride = async () => {
-    setBusy(true); setErr(null);
-    const r = await overrideStage(c.id, stage, override);
     if (r.error) { setBusy(false); setErr(stageErrorText(r.error)); return; }
-    await verify(`Στάδιο: ${stageText(stage)} (με παράκαμψη — καταγράφηκε)`);
+    await verify(`Στάδιο: ${stageText(stage)}${warnings.length ? ' — με ελλείψεις εγγράφων (καταγράφηκαν)' : ''}`);
   };
 
   return (
@@ -152,15 +137,6 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
       <p className="text-[14px] text-[var(--atx-muted,#64748b)] mb-3">
         {stageText(c.current_stage)} → <strong>{stageText(stage)}</strong>
       </p>
-      {blocked && (
-        <div className="atx-blockers" role="alert" data-blockers="true">
-          <strong className="flex items-center gap-1.5"><ShieldAlert size={15} aria-hidden="true" /> Δεν μπορεί να προχωρήσει ακόμη</strong>
-          <ul className="m-0 mt-1.5 p-0 list-none space-y-1">
-            {blockers!.map(b => <li key={b.label} className="text-[13.5px]">{b.label} — <span className="font-medium">{BLOCKER_TEXT[b.status]}</span></li>)}
-          </ul>
-          <span className="block text-[12px] mt-1.5 opacity-80">Ελέγχεται από τον server· ανεβάστε/ελέγξτε τα έγγραφα στην καρτέλα «Έγγραφα».</span>
-        </div>
-      )}
       {warnings.length > 0 && (
         <div className="atx-notice mb-3" role="status" data-doc-warnings="true">
           <strong className="flex items-center gap-1.5"><AlertTriangle size={15} aria-hidden="true" /> Λείπουν έγγραφα — η μετάβαση επιτρέπεται</strong>
@@ -170,24 +146,12 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
           <span className="block text-[12px] mt-1.5 opacity-80">Οι ελλείψεις καταγράφονται στο ιστορικό του case, για να τις συμπληρώσει το Back Office.</span>
         </div>
       )}
-      {!blocked && (
-        <textarea className="field" rows={3} value={note} onChange={e => setNote(e.target.value)}
-          placeholder={exit ? 'Αιτία (απαιτείται), π.χ. «Επέλεξε άλλον πάροχο»' : 'Σημείωση (προαιρετική)'} aria-label={exit ? 'Αιτία' : 'Σημείωση'} />
-      )}
-      {blocked && canOverride && (
-        <div className="mt-3">
-          <label className="text-[13px] font-semibold" htmlFor="override-reason">Παράκαμψη (Διαχειριστής / Διευθυντής)</label>
-          <textarea id="override-reason" className="field mt-1" rows={2} value={override} onChange={e => setOverride(e.target.value)}
-            placeholder="Γιατί προχωράει χωρίς τα έγγραφα; (τουλάχιστον 10 χαρακτήρες — καταγράφεται)" />
-        </div>
-      )}
-      {err && !blocked && <div className="atx-notice mt-3" role="alert">{err}</div>}
+      <textarea className="field" rows={3} value={note} onChange={e => setNote(e.target.value)}
+        placeholder={exit ? 'Αιτία (απαιτείται), π.χ. «Επέλεξε άλλον πάροχο»' : 'Σημείωση (προαιρετική)'} aria-label={exit ? 'Αιτία' : 'Σημείωση'} />
+      {err && <div className="atx-notice mt-3" role="alert">{err}</div>}
       <div className="flex justify-end gap-2 mt-4">
         <button className="atx-btn atx-btn-quiet" disabled={busy} onClick={onClose}>Άκυρο</button>
-        {blocked && canOverride && (
-          <button className="atx-btn atx-btn-quiet" disabled={busy || override.trim().length < 10} onClick={() => void submitOverride()}>{busy ? '…' : 'Παράκαμψη & μετάβαση'}</button>
-        )}
-        {!blocked && <button className="atx-btn atx-btn-primary" disabled={busy || (exit && note.trim().length < 3)} onClick={() => void submit()}>{busy ? '…' : warnings.length ? 'Συνέχεια με ελλείψεις' : 'Επιβεβαίωση'}</button>}
+        <button className="atx-btn atx-btn-primary" disabled={busy || (exit && note.trim().length < 3)} onClick={() => void submit()}>{busy ? '…' : warnings.length ? 'Συνέχεια με ελλείψεις' : 'Επιβεβαίωση'}</button>
       </div>
     </Modal>
   );

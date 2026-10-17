@@ -1,8 +1,8 @@
 # Live runbook — production smoke test
 
-**When:** after the staged SQL is applied to production (order: phase2/07 → phase4/10 → 11 → 12 → 13 → 14), with a backup taken first.
+**When:** after the staged SQL is applied to production (order: phase2/07a, phase2/07b — independent, either order — then phase4/10 → 11 → 12 → 13 → 14), with a backup taken first.
 
-**Before applying 07:** the app fix for the Back Office «Ενεργοποίηση» / «Ολοκλήρωση» buttons (branch `fix/bo-stage-buttons-handover`) must be merged **and live on Vercel Production** first. Without it these two buttons fail silently once 07 is on. Check: on a test case in «Έλεγχος εγγράφων», press «Ενεργοποίηση» on the Back Office tab. A message must appear: «Ενεργοποίηση» γίνεται μόνο από «Καταχώρηση παρόχου»…
+**Before applying 07b:** the app fix for the Back Office «Ενεργοποίηση» / «Ολοκλήρωση» buttons (branch `fix/bo-stage-buttons-handover`) must be merged **and live on Vercel Production** first. Without it these two buttons fail silently once 07b is on. Check: on a test case in «Έλεγχος εγγράφων», press «Ενεργοποίηση» on the Back Office tab. A message must appear: «Ενεργοποίηση» γίνεται μόνο από «Καταχώρηση παρόχου»…
 
 **Ground rules:**
 - Use test data only, with your own phone and email.

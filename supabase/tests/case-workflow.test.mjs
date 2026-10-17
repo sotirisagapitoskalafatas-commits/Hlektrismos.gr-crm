@@ -1,5 +1,5 @@
-// LOCAL verification only (PGlite) of supabase/staged-migrations/phase2/07 (document gates, transitions, return).
-// NOT staging or production verification.
+// LOCAL verification only (PGlite) of supabase/staged-migrations/phase2/07a (document checklist, return for correction) and
+// 07b (allowed moves). NOT staging or production verification.
 import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,7 +40,8 @@ before(async () => {
       as $$ select (select p.role from public.profiles p where p.id = auth.uid()) = r $$;
     create table public.cases (id uuid primary key, title text not null default '', service_type text not null default 'energy', property_type text, case_type text,
       current_stage text not null default 'new', owner_id uuid, inside_sales_owner uuid references public.profiles(id), field_sales_owner uuid references public.profiles(id),
-      back_office_owner uuid references public.profiles(id), next_action text not null default '', next_action_owner_id uuid, updated_at timestamptz default now());
+      back_office_owner uuid references public.profiles(id), next_action text not null default '', next_action_owner_id uuid,
+      status text not null default 'open', activation_status text, updated_at timestamptz default now());
     create table public.case_documents (id uuid primary key default gen_random_uuid(), case_id uuid references public.cases(id), category text, status text not null default 'received');
     create table public.timeline_events (id uuid primary key default gen_random_uuid(), case_id uuid, role text, activity_type text, title text, description text, user_id uuid, occurred_at timestamptz default now(), metadata jsonb);
     create table public.app_notifications (id uuid primary key default gen_random_uuid(), user_id uuid, case_id uuid, title text, body text, type text, created_at timestamptz default now());
@@ -53,87 +54,58 @@ before(async () => {
     insert into public.cases (id, title, current_stage, inside_sales_owner, field_sales_owner, back_office_owner) values ('${CASE}', 'Ρεύμα — Πελάτης', 'signed', '${INSIDE}', '${FIELD}', '${BO}');
     insert into public.cases (id, title, current_stage, property_type) values ('${BIZ}', 'Κατάστημα', 'signed', 'Κατάστημα');
   `);
-  await db.exec(read('../staged-migrations/phase2/07_case_return_and_document_gates.sql'));
+  await db.exec(read('../staged-migrations/phase2/07a_document_checklist_and_return.sql'));
+  await db.exec(read('../staged-migrations/phase2/07b_case_stage_guard_and_set_stage.sql'));
 });
 
-test('gate mode: every stage ships as «warn»; a move with missing documents goes through and reports them', async () => {
+
+test('documents never block: no mode, no override, and every stage move goes through with documents missing', async () => {
   await su();
-  const modes = (await db.query('select stage, mode from public.stage_document_gates order by stage')).rows;
-  assert.ok(modes.length >= 4 && modes.every((m) => m.mode === 'warn'), JSON.stringify(modes));
+  const cols = (await db.query("select column_name from information_schema.columns where table_schema = 'public' and table_name = 'stage_document_gates' order by 1")).rows.map((r) => r.column_name);
+  assert.deepEqual(cols, ['enabled', 'min_status', 'stage'], 'there is no blocking mode');
+  const fns = (await db.query("select proname from pg_proc where proname in ('set_stage_gate_mode', 'change_case_stage_override')")).rows;
+  assert.deepEqual(fns, [], 'the block-mode functions are gone');
+  // the whole ladder with NO documents at all: signed → document_check → submitted → activation → completed
   await db.exec(`insert into public.cases (id, title, current_stage, inside_sales_owner) values ('${WARN}', 'Warn', 'signed', '${INSIDE}')`);
-  await as(INSIDE);
-  const b = (await run("select public.case_document_blockers($1, 'document_check') b", [WARN])).rows[0].b;
-  assert.ok(b.length === 5 && b.every((x) => x.mode === 'warn'), 'the app still sees what is missing, marked warn');
-  assert.equal((await setStage(INSIDE, 'document_check', WARN)).ok, true, 'handover to Back Office is not blocked');
-  assert.equal(await stage(WARN), 'document_check');
-  assert.equal((await setStage(BO, 'completed', WARN)).hint, 'transition', 'the allowed-transition rule still applies');
-});
-
-test('gate mode: only an admin switches a stage to «block», and it is audited', async () => {
-  await as(MANAGER);
-  assert.equal((await run("select public.set_stage_gate_mode('document_check', 'block')")).ok, false, 'manager cannot');
-  await as(ADMIN);
-  assert.equal((await run("select public.set_stage_gate_mode('document_check', 'stop')")).ok, false, 'invalid mode');
-  assert.equal((await run("select public.set_stage_gate_mode('offer', 'block')")).ok, false, 'no gate on that stage');
-  for (const st of ['document_check', 'submitted', 'activation', 'completed']) {
-    assert.equal((await run('select public.set_stage_gate_mode($1, $2)', [st, 'block'])).ok, true, st);
+  for (const to of ['document_check', 'submitted', 'activation', 'completed']) {
+    assert.equal((await setStage(to === 'document_check' ? INSIDE : BO, to, WARN)).ok, true, `→ ${to} with no documents`);
   }
+  assert.equal(await stage(WARN), 'completed');
+});
+
+test('the checklist still reports what is missing, informationally: statuses, no mode', async () => {
   await su();
-  const a = (await db.query("select details from public.activity_log where action = 'stage_gate_mode' and details->>'stage' = 'document_check'")).rows[0];
-  assert.equal(a.details.from, 'warn'); assert.equal(a.details.to, 'block'); assert.equal(a.details.by, ADMIN);
-  // the following tests exercise «block» mode
+  await db.exec("insert into public.cases (id, title, current_stage, inside_sales_owner) values ('cccccccc-0000-4000-8000-0000000000c1', 'Λίστα', 'signed', '" + INSIDE + "')");
+  const C1 = 'cccccccc-0000-4000-8000-0000000000c1';
+  await as(INSIDE);
+  const b = (await run("select public.case_document_blockers($1, 'document_check') b", [C1])).rows[0].b;
+  assert.deepEqual(b.map((x) => x.label), ['Ταυτότητα — εμπρός όψη', 'Ταυτότητα — πίσω όψη', 'Λογαριασμός ρεύματος', 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)', 'Υπογεγραμμένη σύμβαση / αίτηση']);
+  assert.ok(b.every((x) => !('mode' in x) && x.status === 'missing'));
+  await addDoc('identity', 'received', C1); // a legacy category satisfies the ID requirement
+  await addDoc('bill_electricity', 'received', C1);
+  await addDoc('lease', 'rejected', C1);
+  await addDoc('signed', 'received', C1);
+  await as(INSIDE);
+  assert.deepEqual((await run("select public.case_document_blockers($1, 'document_check') b", [C1])).rows[0].b.map((x) => x.status), ['rejected']);
+  // «Καταχώρηση παρόχου» asks for VERIFIED documents: received ones are listed as unverified, and still do not block
+  assert.ok((await run("select public.case_document_blockers($1, 'submitted') b", [C1])).rows[0].b.every((x) => x.status === 'rejected' || x.status === 'unverified'));
+  assert.equal((await setStage(INSIDE, 'document_check', C1)).ok, true, 'a rejected document does not stop the move either');
 });
 
-test('gate: cannot enter «Έλεγχος εγγράφων» with required documents missing; the error lists them', async () => {
-  const r = await setStage(INSIDE, 'document_check');
-  assert.equal(r.ok, false);
-  assert.equal(r.hint, 'document_blockers');
-  const missing = JSON.parse(r.detail).map((b) => b.label);
-  assert.deepEqual(missing, ['Ταυτότητα — εμπρός όψη', 'Ταυτότητα — πίσω όψη', 'Λογαριασμός ρεύματος', 'Αποδεικτικό χρήσης ακινήτου (Ε9, μισθωτήριο ή παραχώρηση)', 'Υπογεγραμμένη σύμβαση / αίτηση']);
-  assert.equal(await stage(), 'signed');
-});
-
-test('gate: received documents (incl. legacy categories) allow «Έλεγχος εγγράφων»; a rejected one does not', async () => {
-  await addDoc('identity', 'received'); // legacy category satisfies the ID requirement
-  await addDoc('bill_electricity', 'received');
-  await addDoc('lease', 'rejected');
-  await addDoc('signed', 'received');
-  const r = await setStage(BO, 'document_check');
-  assert.equal(r.ok, false);
-  assert.deepEqual(JSON.parse(r.detail).map((b) => b.status), ['rejected']);
-  await addDoc('e9', 'received');
-  assert.equal((await setStage(BO, 'document_check')).ok, true);
-  assert.equal(await stage(), 'document_check');
-});
-
-test('gate: «Καταχώρηση παρόχου» needs every required document VERIFIED', async () => {
-  const r = await setStage(BO, 'submitted');
-  assert.equal(r.ok, false);
-  assert.ok(JSON.parse(r.detail).every((b) => b.status === 'unverified'));
-  await su(); await db.exec(`update public.case_documents set status = 'verified' where case_id = '${CASE}' and status = 'received'`);
-  assert.equal((await setStage(BO, 'submitted')).ok, true);
-});
-
-test('transitions: only the allowed matrix; going back one step and closing as lost are allowed', async () => {
+test('transitions (07b): only the allowed matrix for direct writes; back one step and closing as lost are allowed', async () => {
+  await su();
+  await db.exec("update public.cases set current_stage = 'submitted' where id = '" + CASE + "'");
   const skip = await setStage(BO, 'completed');
   assert.equal(skip.ok, false); assert.equal(skip.hint, 'transition');
   assert.equal((await setStage(BO, 'document_check')).ok, true, 'submitted → document_check (back) is allowed');
   assert.equal((await setStage(BO, 'submitted')).ok, true);
 });
 
-test('business case also needs «Έναρξη εργασιών ή ΓΕΜΗ»; override is admin/manager only, needs a reason, and is audited', async () => {
-  const r = await setStage(INSIDE, 'document_check', BIZ);
-  assert.ok(JSON.parse(r.detail).some((b) => b.label === 'Έναρξη εργασιών ή βεβαίωση ΓΕΜΗ'));
-  await as(BO);
-  assert.equal((await run("select public.change_case_stage_override($1, 'document_check', 'Ο πάροχος δέχεται τα έγγραφα αργότερα')", [BIZ])).ok, false, 'back office cannot override');
-  await as(MANAGER);
-  assert.equal((await run("select public.change_case_stage_override($1, 'document_check', 'λίγο')", [BIZ])).ok, false, 'reason too short');
-  assert.equal((await run("select public.change_case_stage_override($1, 'completed', 'Ο πάροχος δέχεται τα έγγραφα αργότερα')", [BIZ])).ok, false, 'override does not skip the transition rules');
-  assert.equal((await run("select public.change_case_stage_override($1, 'document_check', 'Ο πάροχος δέχεται τα έγγραφα αργότερα')", [BIZ])).ok, true);
-  assert.equal(await stage(BIZ), 'document_check');
-  await su();
-  const ev = (await db.query("select metadata from public.timeline_events where case_id = $1 and activity_type = 'stage_override'", [BIZ])).rows[0];
-  assert.ok(ev && ev.metadata.blockers.length >= 1, 'timeline records what was overridden');
+test('a business case lists «Έναρξη εργασιών ή ΓΕΜΗ» as a missing item (information only)', async () => {
+  await as(INSIDE);
+  const b = (await run("select public.case_document_blockers($1, 'document_check') b", [BIZ])).rows[0].b;
+  assert.ok(b.some((x) => x.label === 'Έναρξη εργασιών ή βεβαίωση ΓΕΜΗ'));
+  assert.equal((await setStage(INSIDE, 'document_check', BIZ)).ok, true, 'and the move is not blocked');
 });
 
 test('return for correction: back office only, reason + items required, keeps stage, moves responsibility, notifies, audits', async () => {
@@ -180,11 +152,21 @@ test('a case outside the Back Office stages cannot be returned; with no owner, m
   assert.equal((await db.query("select count(*)::int n from public.app_notifications where case_id = 'cccccccc-0000-4000-8000-000000000003' and user_id = $1", [MANAGER])).rows[0].n, 1);
 });
 
-test('rollback option A (docs/ops/rollback_phase2_07_transitions.sql) stops the transition check, keeps block-mode gates', async () => {
+test('rollback 07b option A (docs/ops/rollback_phase2_07b.sql) stops the transition check and keeps set_case_stage', async () => {
   await su();
-  await db.exec(read('../../docs/ops/rollback_phase2_07_transitions.sql'));
-  await db.exec("insert into public.cases (id, title, current_stage) values ('cccccccc-0000-4000-8000-0000000000bb', 'Skip', 'new')");
-  assert.equal((await setStage(ADMIN, 'offer', 'cccccccc-0000-4000-8000-0000000000bb')).ok, true, 'new → offer (not in the list) now passes');
-  const blocked = await setStage(ADMIN, 'submitted', 'cccccccc-0000-4000-8000-0000000000bb');
-  assert.equal(blocked.hint, 'document_blockers', 'a stage set to «block» still blocks');
+  await db.exec(read('../../docs/ops/rollback_phase2_07b.sql'));
+  const X = 'cccccccc-0000-4000-8000-0000000000bb';
+  await db.exec(`insert into public.cases (id, title, current_stage) values ('${X}', 'Skip', 'new')`);
+  assert.equal((await setStage(ADMIN, 'offer', X)).ok, true, 'new → offer (not in the list) now passes');
+  await as(BO);
+  assert.equal((await run("select public.set_case_stage($1, 'submitted', 'Ο πάροχος ζήτησε διόρθωση στοιχείων')", [X])).ok, true, 'set_case_stage is kept');
+});
+
+test('rollback 07a (docs/ops/rollback_phase2_07a.sql) removes the return functions and the guard, keeps the data columns', async () => {
+  await su();
+  await db.exec(read('../../docs/ops/rollback_phase2_07a.sql'));
+  const fns = (await db.query("select proname from pg_proc where proname in ('return_case_for_correction', 'resubmit_returned_case', 'cases_return_guard') order by 1")).rows;
+  assert.deepEqual(fns, []);
+  assert.equal((await db.query("select count(*)::int n from information_schema.columns where table_name = 'cases' and column_name in ('returned_at', 'return_reason', 'return_items')")).rows[0].n, 3, 'columns (and their data) stay');
+  assert.equal((await db.query("select count(*)::int n from pg_trigger where tgname = 'cases_return_guard'")).rows[0].n, 0);
 });

@@ -122,6 +122,7 @@ const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
 let contactOff = false; // GET /__contact?state=off → the consent functions are missing (phase3/09 not applied)
 let getFail = null; // GET /__getfail?table=activity_log → the next GET of that table fails once (read-error test)
+let patchFailHint = null; // GET /__patchfail?table=cases&hint=transition → the refusal looks like the 07b guard's (stage_transition_not_allowed)
 let patchFail = null; // GET /__patchfail?table=customers → the next PATCH to that table fails once (save-error test)
 let leadFail = null; // GET /__leadfail?code=42501 → the next POST to leads fails with that code (error-display test)
 const contactObjections = [];
@@ -136,10 +137,8 @@ const b2bJobs = [];
 const b2bProfiles = [];
 const B2B_SEARCH = ['admin', 'manager', 'inside_sales', 'back_office'];
 const B2B_REVIEW = ['admin', 'manager', 'back_office'];
-let gatesOn = process.env.MOCK_GATES === 'on'; // GET /__gates?state=on|off[&mode=warn|block]
+let gatesOn = process.env.MOCK_GATES === 'on'; // GET /__gates?state=on|off — phase2/07a + 07b applied or not (checklist function, allowed-moves guard)
 const GATES = { document_check: 'received', submitted: 'verified', activation: 'verified', completed: 'verified' };
-// Per-stage gate mode (staged phase2/07): 'warn' by default — blockers are reported, the move is allowed.
-const gateMode = Object.fromEntries(Object.keys(GATES).map((k) => [k, 'warn']));
 const ALLOWED = { new: ['contacted', 'lost', 'cancelled'], contacted: ['offer', 'application', 'lost', 'cancelled'], offer: ['application', 'signed', 'lost', 'cancelled'],
   application: ['signed', 'document_check', 'lost', 'cancelled'], signed: ['document_check', 'lost', 'cancelled'], document_check: ['submitted', 'application', 'lost', 'cancelled'],
   submitted: ['activation', 'document_check', 'lost', 'cancelled'], activation: ['completed', 'submitted', 'lost', 'cancelled'], lost: ['new'], cancelled: ['new'] };
@@ -161,7 +160,7 @@ const blockersFor = (caseId, stage) => {
   return reqsFor(c).flatMap((r) => {
     const f = docs.filter((d) => r.any.includes(d.category));
     const st = f.some((d) => d.status === 'verified') ? 'verified' : f.some((d) => d.status !== 'rejected') ? 'received' : f.length ? 'rejected' : 'missing';
-    return st === 'missing' || st === 'rejected' || (g === 'verified' && st !== 'verified') ? [{ label: r.label, status: st === 'received' ? 'unverified' : st, mode: gateMode[stage] ?? 'warn' }] : [];
+    return st === 'missing' || st === 'rejected' || (g === 'verified' && st !== 'verified') ? [{ label: r.label, status: st === 'received' ? 'unverified' : st }] : [];
   });
 };
 let previewState = process.env.MOCK_PREVIEW ?? 'on'; // switch at runtime: GET /__preview?state=expired|on
@@ -175,7 +174,7 @@ const TABLES = { b2b_prospects: b2bProspects, b2b_search_jobs: b2bJobs, b2b_sear
     { id: '70000000-0000-4000-8000-000000000003', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'status_change', title: 'Στάδιο: new → contacted', description: 'Στάδιο: new → contacted', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: null },
     { id: '70000000-0000-4000-8000-000000000004', case_id: caseRows[0].id, role: 'inside_sales', activity_type: 'status_change', title: 'Ενημέρωση Case', description: 'Στάδιο: new → contacted', user_id: U('inside_sales'), occurred_at: iso(-2 * D), location: null, metadata: {}, user: null },
   ] };
-Object.defineProperty(TABLES, 'stage_document_gates', { enumerable: true, get: () => Object.entries(GATES).map(([stage, min_status]) => ({ stage, min_status, mode: gateMode[stage], enabled: true })) });
+Object.defineProperty(TABLES, 'stage_document_gates', { enumerable: true, get: () => Object.entries(GATES).map(([stage, min_status]) => ({ stage, min_status, enabled: true })) });
 const log = [];
 
 function applyFilters(rows, params) {
@@ -226,13 +225,11 @@ http.createServer((req, res) => {
     if (url.pathname === '/__log') return send(200, log);
     if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
-    if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; return send(200, { patchFail }); }
+    if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; patchFailHint = url.searchParams.get('hint') || null; return send(200, { patchFail }); }
     if (url.pathname === '/__leadfail') { leadFail = url.searchParams.get('code') || null; return send(200, { leadFail }); } // next leads POST fails once
     if (url.pathname === '/__gates') {
       gatesOn = url.searchParams.get('state') === 'on';
-      const m = url.searchParams.get('mode');
-      if (m === 'warn' || m === 'block') for (const k of Object.keys(gateMode)) gateMode[k] = m;
-      return send(200, { gatesOn, gateMode });
+      return send(200, { gatesOn });
     }
     if (url.pathname === '/__preview') { previewState = url.searchParams.get('state') ?? 'on'; return send(200, { previewState }); }
 
@@ -316,18 +313,8 @@ http.createServer((req, res) => {
         table.splice(table.indexOf(row), 1);
         return send(200, { deleted: true, files });
       }
-      // ---- case workflow (mirrors staged-migrations/phase2/07) ----
+      // ---- case workflow (mirrors staged-migrations/phase2/07a + 07b) ----
       if (name === 'case_document_blockers') return gatesOn ? send(200, blockersFor(json.p_case, json.p_stage)) : send(404, { code: 'PGRST202', message: 'Could not find the function public.case_document_blockers' });
-      if (name === 'change_case_stage_override') {
-        log.push({ method: 'RPC', table: name, body: json });
-        if (!['admin', 'manager'].includes(u?.role)) return deny('override: not allowed');
-        if (String(json.p_reason ?? '').trim().length < 10) return send(400, { code: '22023', message: 'override: a reason of at least 10 characters is required' });
-        const c = caseRows.find((x) => x.id === json.p_case);
-        if (!(ALLOWED[c.current_stage] ?? []).includes(json.p_stage)) return send(400, { code: 'P0001', message: `stage_transition_not_allowed: ${c.current_stage} -> ${json.p_stage}`, hint: 'transition' });
-        c.current_stage = json.p_stage;
-        TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'stage_override', title: 'Παράκαμψη ελέγχου εγγράφων', description: json.p_reason, user_id: u.id, occurred_at: new Date().toISOString(), metadata: {}, user: null });
-        return send(200, null);
-      }
       if (name === 'return_case_for_correction') {
         log.push({ method: 'RPC', table: name, body: json });
         if (!['back_office', 'admin', 'manager'].includes(u?.role)) return deny('return: not allowed');
@@ -393,12 +380,6 @@ http.createServer((req, res) => {
         const x = flaggedCheckins.find((y) => y.id === json.p_id && !y.reviewed);
         if (!x) return send(200, false);
         x.reviewed = true; return send(200, true);
-      }
-      if (name === 'set_stage_gate_mode') {
-        log.push({ method: 'RPC', table: name, body: json });
-        if (u?.role !== 'admin') return deny('gate mode: not allowed');
-        if (!['warn', 'block'].includes(json.p_mode) || !(json.p_stage in gateMode)) return send(400, { code: '22023', message: 'gate mode: invalid' });
-        gateMode[json.p_stage] = json.p_mode; return send(200, true);
       }
       // ---- Contact eligibility ----
       if (['contact_facts', 'record_contact_objection', 'lift_contact_objection', 'record_contact_consent', 'withdraw_contact_consent', 'record_article11_screening'].includes(name)) {
@@ -607,15 +588,13 @@ http.createServer((req, res) => {
     // writes: applied IN MEMORY so UI flows can be verified end-to-end (reset by restarting the mock)
     log.push({ method: req.method, table, query: url.search, body: json });
     const tbl = (TABLES[table] ??= []);
-    if (req.method === 'PATCH' && patchFail === table) { patchFail = null; return send(400, { code: '23514', message: 'mock: write refused', details: null, hint: null }); }
+    if (req.method === 'PATCH' && patchFail === table) { patchFail = null; const t = patchFailHint === 'transition'; patchFailHint = null; return send(400, t ? { code: 'P0001', message: 'stage_transition_not_allowed: activation -> completed', details: null, hint: 'transition' } : { code: '23514', message: 'mock: write refused', details: null, hint: null }); }
     if (req.method === 'PATCH') {
       const hit = applyFilters(tbl, url.searchParams);
       if (gatesOn && table === 'cases' && json.current_stage) {
         for (const r of hit) {
           if (r.current_stage === json.current_stage) continue;
           if (!(ALLOWED[r.current_stage] ?? []).includes(json.current_stage)) return send(400, { code: 'P0001', message: `stage_transition_not_allowed: ${r.current_stage} -> ${json.current_stage}`, details: null, hint: 'transition' });
-          const b = blockersFor(r.id, json.current_stage);
-          if (b.length && gateMode[json.current_stage] === 'block') return send(400, { code: 'P0001', message: 'stage_blocked: required documents', details: JSON.stringify(b), hint: 'document_blockers' });
         }
       }
       if (table === 'leads') {

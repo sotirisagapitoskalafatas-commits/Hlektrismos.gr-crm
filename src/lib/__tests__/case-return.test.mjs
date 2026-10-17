@@ -22,11 +22,16 @@ test('who may return / resubmit', () => {
 });
 
 test('database refusals become clear messages', () => {
-  const e = R.parseStageError({ message: 'stage_blocked: required documents', hint: 'document_blockers', details: '[{"label":"Ταυτότητα ή διαβατήριο","status":"missing"},{"label":"Υπογεγραμμένη σύμβαση / αίτηση","status":"unverified"}]' });
-  assert.equal(e.kind, 'documents');
-  assert.equal(R.stageErrorText(e), 'Δεν επιτρέπεται η μετάβαση: Ταυτότητα ή διαβατήριο (λείπει) · Υπογεγραμμένη σύμβαση / αίτηση (δεν έχει ελεγχθεί).');
   assert.equal(R.parseStageError({ message: 'stage_transition_not_allowed: signed -> completed', hint: 'transition' }).kind, 'transition');
+  assert.equal(R.stageErrorText(R.parseStageError({ message: 'stage_transition_not_allowed: signed -> completed', hint: 'transition' })), 'Η μετάβαση σε αυτό το στάδιο δεν επιτρέπεται από το τρέχον στάδιο.');
   assert.equal(R.parseStageError(null), null);
   assert.match(R.stageErrorText({ kind: 'other', message: 'return: a reason of at least 10 characters is required' }), /10 χαρακτήρων/);
-  assert.match(R.stageErrorText({ kind: 'other', message: 'Could not find the function public.return_case_for_correction' }), /^Η λειτουργία δεν είναι ακόμη διαθέσιμη\.$/, 'neutral wording, no migration names');
+  assert.match(R.stageErrorText({ kind: 'other', message: 'Could not find the function public.return_case_for_correction' }), /^Η λειτουργία δεν είναι ακόμη διαθέσιμη\.$/, 'neutral wording, no migration text');
+});
+
+test('documents never block: an old "stage_blocked" message is just another failure, not a document list', () => {
+  const e = R.parseStageError({ message: 'stage_blocked: required documents', hint: 'document_blockers', details: '[{"label":"Ταυτότητα","status":"missing"}]' });
+  assert.equal(e.kind, 'other');
+  assert.equal(R.stageErrorText(e), 'Η ενέργεια απέτυχε. Δοκιμάστε ξανά.');
+  assert.deepEqual(Object.keys(R.BLOCKER_TEXT).sort(), ['missing', 'rejected', 'unverified']);
 });

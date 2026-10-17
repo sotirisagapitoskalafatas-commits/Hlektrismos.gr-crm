@@ -30,6 +30,7 @@ These files sit outside `supabase/migrations/`, so the GitHub integration never 
 | 9b | `phase2/07b_case_stage_guard_and_set_stage.sql` | Allowed stage moves for direct writes (trigger) + **«Αλλαγή σταδίου από Back Office»**: Back Office/admin/manager set any stage, with a written reason, audited | **No**: new trigger on `cases.current_stage` | **PR #49 must be live first** (it is). The app control for set_case_stage degrades to a neutral Greek sentence until this is applied | No (the trigger is UPDATE-only and the service role is not affected) | Normal |
 | 9c | `phase2/07c_reopen_completed_case.sql` *(new)* | **«Επαναφορά ολοκληρωμένου case»**: an admin reopens a completed case to a working stage, with a written reason, audited | Yes: one function, no table, column or trigger | none (independent of 07a and 07b) | No (nothing changes until an admin uses it) | Low |
 | 9d | `phase4/16_import_legacy_leads.sql` *(new, data script)* | One-time copy of the 130 legacy leads (`hlektrismos_leads`) into `public.leads`, marked as imported, duplicates skipped. **Run the read-only dry run first** (`docs/ops/LEGACY_LEADS_IMPORT_DRYRUN.sql`) | Inserts rows only; the old table is untouched | Owner decisions: the status mapping, and whether rows without recorded consent are shown | No | Normal (the team cannot see its lead history) |
+| 9e | `phase5/17_customer_supply_points.sql` *(new)* | **«Παροχές»**: several independent electricity connections per customer (home and business), each with its own address, Αριθμός Παροχής, meter, tariff category and name, dates, documents and cases. Configurable tariff list. Duplicate numbers are flagged, never blocked or merged | Yes: two tables, two nullable columns, functions and triggers. The legacy `supply_points` / `customer_meters` are not touched | none | No | Normal |
 | 10 | `phase4/10_field_checkin_manual_flag.sql` | Check-in always accepted, with a review flag (no 150 m rejection) | Function replaced | none | No | Normal (field complaint) |
 | 11 | `phase4/11_customer_names.sql` | `customers.first_name / last_name` | Yes | none | No | Low |
 | 12 | `phase4/12_default_backoffice_assignee.sql` | Default Back Office assignee setting + routing | Yes | role model (who counts as "Back Office") | No | Normal |
@@ -54,6 +55,7 @@ Item 8 (06) can move anywhere after 05. Items 10–14 are independent of each ot
 | phase2/07a | Document gaps are shown as warnings (never block). Return for correction is unavailable |
 | phase2/07b | Stage moves are checked only in the app. Back Office cannot jump to another stage: «Αλλαγή σταδίου από Back Office» is unavailable (the app shows a neutral sentence) |
 | phase2/07c | An admin cannot reopen a completed case; the control shows «Η λειτουργία δεν είναι ακόμη διαθέσιμη.» |
+| phase5/17 | The «Παροχές» tab shows «Η λειτουργία δεν είναι ακόμη διαθέσιμη.»; the customer has one address and the old single supply number field |
 | phase4/10 | The server refuses check-ins more than 150 m away; the app offers «Καταγραφή χωρίς GPS» |
 | phase4/11 | One «Ονοματεπώνυμο» field (the app checks once per session) |
 | phase4/12 | Leads with documents stay with their creator, who is told routing is not active |
@@ -77,6 +79,7 @@ Item 8 (06) can move anywhere after 05. Items 10–14 are independent of each ot
 | phase2/07a | [`rollback_phase2_07a.sql`](rollback_phase2_07a.sql) (tested; data columns stay) |
 | phase2/07b | [`rollback_phase2_07b.sql`](rollback_phase2_07b.sql), option A, B or C (tested) |
 | phase2/07c | [`rollback_phase2_07c.sql`](rollback_phase2_07c.sql) (drops the function; reopened cases stay reopened, listed from `activity_log`) |
+| phase5/17 | [`rollback_phase5_17_supply_points.sql`](rollback_phase5_17_supply_points.sql): A switches it off and keeps the data, B removes everything (tested) |
 | phase4/10 | [`rollback_phase4_10_field_checkin.sql`](rollback_phase4_10_field_checkin.sql) (tested) |
 | phase4/11–14 | Comment at the end of each file; the columns can stay |
 | phase3/08 | Drop the new tables, functions and trigger; redeploy the previous `scrape-b2b` |

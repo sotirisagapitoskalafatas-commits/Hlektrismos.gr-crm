@@ -142,7 +142,7 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
 }
 
 /* ================= Follow-ups ================= */
-function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
+export function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
   const { role } = useAuth();
   const [items, setItems] = useState<FollowUp[]>([]);
   const [open, setOpen] = useState(false);
@@ -250,7 +250,7 @@ function FollowUpsTab({ caseId, load }: { caseId: string; load: () => void }) {
 
 
 /* ================= Visits ================= */
-function VisitsTab({ c }: { c: Case }) {
+export function VisitsTab({ c }: { c: Case }) {
   const caseId = c.id;
   const { role } = useAuth();
   const point = meetingPoint(c);
@@ -340,7 +340,7 @@ function VisitsTab({ c }: { c: Case }) {
 }
 
 /* ================= Offers ================= */
-function OffersTab({ caseId }: { caseId: string }) {
+export function OffersTab({ caseId }: { caseId: string }) {
   const { role } = useAuth();
   const [items, setItems] = useState<CaseOffer[]>([]);
   const [open, setOpen] = useState(false);
@@ -405,7 +405,7 @@ function OffersTab({ caseId }: { caseId: string }) {
 }
 
 /* ================= Signatures ================= */
-function SignaturesTab({ caseId }: { caseId: string }) {
+export function SignaturesTab({ caseId }: { caseId: string }) {
   const { role } = useAuth();
   const [items, setItems] = useState<CaseSignature[]>([]);
   const [padOpen, setPadOpen] = useState(false);
@@ -463,7 +463,7 @@ function SignaturesTab({ caseId }: { caseId: string }) {
 }
 
 /* ================= Back Office ================= */
-function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
+export function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
   const { role } = useAuth();
   const [docs, setDocs] = useState<CaseDocument[]>([]);
   const [note, setNote] = useState('');

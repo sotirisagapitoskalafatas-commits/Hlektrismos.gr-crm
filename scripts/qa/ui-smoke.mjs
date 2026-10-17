@@ -1082,6 +1082,27 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   const t = await body();
   check('Customer detail: opens with next step, cases and contact', t.includes('Επόμενο βήμα') && t.includes('Επικοινωνία') && /CS-2026-00/.test(t));
   check('Customer detail: case count reads «Cases: N σε εξέλιξη…», not «ενεργά από»', /Cases: \d+ σε εξέλιξη/.test(t) && !/ενεργά από/.test(t));
+  // Part B: one folder header, computed badge, fixed tabs; selecting a case scopes the case tabs
+  {
+    const f = await page.evaluate(() => ({
+      badge: document.querySelector('[data-folder-badge]')?.textContent ?? '',
+      tabs: [...document.querySelectorAll('main [role="tab"]')].map((b) => b.childNodes[0]?.textContent?.trim()),
+      origin: document.querySelector('[data-folder-origin]')?.innerText ?? '',
+      progress: document.querySelector('[data-folder-progress]')?.getAttribute('data-folder-progress') ?? '',
+      header: document.querySelector('main h1')?.parentElement?.parentElement?.innerText ?? '',
+    }));
+    check('Folder: one computed badge in the header', f.badge === 'Case σε εξέλιξη', f.badge);
+    check('Folder: tabs in the fixed order (no Back Office for Inside Sales)', JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f.tabs));
+    check('Folder: header shows phone and «από …»; Σύνοψη shows the selected case stepper and the origin', /από \d/.test(f.header) && /CS-2026-00\d/.test(f.progress) && f.origin.includes('Lead ·'), JSON.stringify({ p: f.progress, o: f.origin.slice(0, 60) }));
+    await click(page, 'Cases', '[role="tab"]'); await sleep(300);
+    const nos = await page.$$eval('main [data-folder-case]', (b) => b.map((x) => x.getAttribute('data-folder-case')));
+    const other = nos.find((n) => n !== f.progress);
+    await page.evaluate((n) => document.querySelector(`main [data-folder-case="${n}"]`)?.click(), other); await sleep(300);
+    await click(page, 'Follow-ups', '[role="tab"]'); await sleep(800);
+    const scope = await page.evaluate(() => [...document.querySelectorAll('[data-folder-scope] button')].filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent));
+    check('Folder: picking a case scopes Follow-ups to it, with the case panel itself', nos.length >= 2 && scope.length === 1 && scope[0].startsWith(other) && (await body()).includes('Follow-ups'), JSON.stringify({ nos, other, scope }));
+    await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(300);
+  }
   await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(500);
   check('Customer detail: history merges case timeline events', (await body()).includes('Τηλεφωνική επικοινωνία'));
   {

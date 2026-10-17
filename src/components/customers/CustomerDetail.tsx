@@ -1,18 +1,24 @@
-/* Customer details — one place for the customer: overview, next step, cases with progress, documents across cases
-   and a chronological communication history (from the existing case timelines). Read paths: fetchCustomer,
-   fetchCases, fetchDocuments, fetchTimeline (all RLS-scoped). Write path: the existing updateCustomer only. */
+/* «Φάκελος πελάτη» (docs/product/UNIFIED_CUSTOMER_FOLDER.md §2, Part B): one header with a computed badge and the
+   same tabs everywhere. Selecting a case scopes Έγγραφα … Back Office to it; those tabs reuse the case screen's own
+   panels. Read paths: fetchCustomer, fetchCases, fetchDocuments, fetchTimeline, fetchLead (all RLS-scoped). Write
+   paths: the existing ones only (updateCustomer here, the case panels' own writes). */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Briefcase, Clock, FileText, Mail, MapPin, Pencil, Phone, Sparkles } from 'lucide-react';
+import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, VisitsTab } from '@/components/app/CaseDetailPage';
+import { CaseProgress } from '@/components/cases/CaseOverview';
+import { folderBadge, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
+import type { FolderTab } from '@/lib/folder';
+import { useStaff } from '@/lib/useStaff';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { activityLabel, can, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
+import { activityLabel, can, leadSourceInfo, SERVICES, STAGE_TRANSITIONS } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
 import { canOpenLead } from '@/lib/lead-links';
 import { historyDescription, historyText, visibleHistory } from '@/lib/history-text';
-import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
-import type { Case, CaseDocument, Customer, TimelineEvent } from '@/lib/api';
+import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchLead, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
+import type { Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
 import { useToast } from '@/lib/toast';
@@ -24,7 +30,6 @@ const COMMS = ['call', 'email', 'sms', 'whatsapp', 'meeting', 'visit', 'check_in
 const DOC_TONE: Record<string, string> = { verified: 't-success', received: 't-warning', rejected: 't-danger' };
 const DOC_TEXT: Record<string, string> = { verified: 'Ελέγχθηκε', received: 'Παραλήφθηκε', rejected: 'Απορρίφθηκε', required: 'Απαιτείται', missing: 'Λείπει' };
 
-type Tab = 'overview' | 'cases' | 'docs' | 'history';
 
 export default function CustomerDetail({ customerId }: { customerId: string }) {
   const { role } = useAuth();
@@ -34,7 +39,10 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const [cases, setCases] = useState<Case[]>([]);
   const [docs, setDocs] = useState<Record<string, CaseDocument[]>>({});
   const [events, setEvents] = useState<(TimelineEvent & { case_no: string })[]>([]);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<FolderTab>('overview');
+  const [picked, setPicked] = useState<string | null>(null);
+  const [origin, setOrigin] = useState<Lead | null>(null);
+  const staff = useStaff();
   const [editing, setEditing] = useState(false);
   const [names, setNames] = useState(false);
   useEffect(() => { void customerNamesAvailable().then(setNames); }, []);
@@ -54,6 +62,9 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
       Promise.all(mine.map(k => fetchTimeline(k.id))),
     ]);
     setDocs(Object.fromEntries(mine.map((k, i) => [k.id, d[i]])));
+    // «Προέλευση»: the lead of the oldest case that came from one
+    const fromLead = [...mine].reverse().find(k => k.lead_id);
+    setOrigin(fromLead?.lead_id ? await fetchLead(fromLead.lead_id) : null);
     setEvents(visibleHistory(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no }))))
       .filter(e => COMMS.includes(e.activity_type))
       .sort((a, b) => +new Date(b.occurred_at) - +new Date(a.occurred_at)));
@@ -61,14 +72,10 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const summary = useMemo(() => customerSummary(cases, now), [cases, now]);
+  const sel = useMemo(() => selectedCase(cases, picked), [cases, picked]);
   const focus = useMemo(() => {
-    const active = cases.filter(k => !['completed', 'lost', 'cancelled'].includes(k.current_stage));
-    if (!active.length) return null;
-    const pick = [...active].sort((a, b) => {
-      const fa = a.next_follow_up_at ? +new Date(a.next_follow_up_at) : Infinity;
-      const fb = b.next_follow_up_at ? +new Date(b.next_follow_up_at) : Infinity;
-      return fa - fb || +new Date(a.updated_at) - +new Date(b.updated_at);
-    })[0];
+    const pick = mostUrgentCase(cases);
+    if (!pick) return null;
     return { kase: pick, step: caseNextStep(pick, STAGE_TRANSITIONS[pick.current_stage as Stage] ?? [], buildChecklist(pick, docs[pick.id] ?? []), now) };
   }, [cases, docs, now]);
 
@@ -104,10 +111,11 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
   const tel = cust.phone ? `tel:${cust.phone.replace(/\s+/g, '')}` : null;
   const initials = cust.full_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const allDocs = cases.flatMap(k => (docs[k.id] ?? []).map(d => ({ ...d, case_no: k.case_no })));
-  const tabs: { id: Tab; label: string; n?: number }[] = [
-    { id: 'overview', label: 'Σύνοψη' }, { id: 'cases', label: 'Cases', n: cases.length },
-    { id: 'docs', label: 'Έγγραφα', n: allDocs.length }, { id: 'history', label: 'Ιστορικό', n: events.length },
-  ];
+  const counts: Partial<Record<FolderTab, number>> = { cases: cases.length, docs: allDocs.length, history: events.length };
+  const tabs = folderTabs({ backOffice: can(role, 'create_application') });
+  const badge = folderBadge({ isLead: false, cases });
+  const subtitle = folderSubtitle({ city: cust.city, since: cust.created_at, cases, fmtDate, staffName: id => staff.find(x => x.id === id)?.full_name ?? null });
+  const scopedTab = tabs.find(t => t.id === tab)?.scoped ?? false;
 
   const caseRow = (k: Case) => {
     const { steps, outcome } = journeySteps(k.current_stage, []);
@@ -115,8 +123,8 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
     return (
       <li key={k.id} className="atx-row">
         <span className="atx-icon" aria-hidden="true"><Briefcase size={16} /></span>
-        <button className="atx-row-main" onClick={() => openCase(k.id)}>
-          <span className="atx-row-title">{SERVICES[k.service_type] ?? k.service_type} · {k.case_no}</span>
+        <button className="atx-row-main" aria-pressed={sel?.id === k.id} data-folder-case={k.case_no} onClick={() => setPicked(k.id)} title="Επιλογή case για τις καρτέλες του φακέλου">
+          <span className="atx-row-title">{SERVICES[k.service_type] ?? k.service_type} · {k.case_no}{sel?.id === k.id && cases.length > 1 ? <span className="font-normal text-[var(--atx-muted)]"> · επιλεγμένο</span> : null}</span>
           <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}{k.next_action ? ` · ${k.next_action}` : ''}</span>
         </button>
         <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
@@ -133,9 +141,14 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
       <div className="flex items-center gap-4 flex-wrap">
         <span className="w-14 h-14 rounded-full grid place-items-center text-[18px] font-bold shrink-0" style={{ background: 'var(--atx-blue-soft)', color: 'var(--atx-blue)' }} aria-hidden="true">{initials || '?'}</span>
         <div className="flex-1 min-w-[220px]">
-          <h1 className="atx-title" style={{ fontSize: 28 }}>{cust.full_name}</h1>
-          <p className="atx-sub" style={{ marginTop: 2 }}>
-            Πελάτης{cust.city ? ` · ${cust.city}` : ''} · από {fmtDate(cust.created_at)} · {caseCountText(summary)}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="atx-title" style={{ fontSize: 28 }}>{cust.full_name}</h1>
+            <span className={`atx-tag ${badge.id === 'open' ? 't-warning' : badge.id === 'customer' ? 't-success' : ''}`} data-folder-badge={badge.id}>{badge.label}</span>
+          </div>
+          <p className="atx-sub flex items-center gap-x-3 gap-y-1 flex-wrap" style={{ marginTop: 4 }}>
+            {tel && <a className="atx-link !p-0 inline-flex items-center gap-1" href={tel}><Phone size={13} aria-hidden="true" />{cust.phone}</a>}
+            {cust.email && <a className="atx-link !p-0 inline-flex items-center gap-1 truncate" href={`mailto:${cust.email}`}><Mail size={13} aria-hidden="true" />{cust.email}</a>}
+            <span data-folder-subtitle>{subtitle}</span>
           </p>
         </div>
         {!cust.deleted_at && <TrashButton type="customer" id={cust.id} name={cust.full_name} onTrashed={() => { go('customers'); }} />}
@@ -178,13 +191,30 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
         </div>
       )}
 
-      <div className="atx-pagetabs" role="tablist" aria-label="Ενότητες πελάτη">
+      <div className="atx-pagetabs" role="tablist" aria-label="Ενότητες φακέλου">
         {tabs.map(t => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} className="atx-pagetab" onClick={() => setTab(t.id)}>
-            {t.label}{t.n !== undefined && <span className="opacity-60">{t.n}</span>}
+            {t.label}{counts[t.id] !== undefined && <span className="opacity-60">{counts[t.id]}</span>}
           </button>
         ))}
       </div>
+
+      {scopedTab && tab !== 'docs' && cases.length > 1 && sel && (
+        <div className="flex items-center gap-2 flex-wrap text-[13px]" data-folder-scope>
+          <span className="text-[var(--atx-muted)]">Case:</span>
+          {cases.map(k => (
+            <button key={k.id} className="atx-chip" aria-pressed={sel.id === k.id} onClick={() => setPicked(k.id)}>{k.case_no} · {SERVICES[k.service_type] ?? k.service_type}</button>
+          ))}
+        </div>
+      )}
+      {scopedTab && tab !== 'docs' && !sel && (
+        <div className="atx-panel"><div className="atx-empty"><strong>Κανένα case</strong>Οι ενότητες αυτές αφορούν ένα case. Τα cases δημιουργούνται από τη μετατροπή ενός lead ή από τη σελίδα Cases.</div></div>
+      )}
+      {sel && tab === 'followups' && <FollowUpsTab key={sel.id} caseId={sel.id} load={() => void load()} />}
+      {sel && tab === 'visits' && <VisitsTab key={sel.id} c={sel} />}
+      {sel && tab === 'offers' && <OffersTab key={sel.id} caseId={sel.id} />}
+      {sel && tab === 'signatures' && <SignaturesTab key={sel.id} caseId={sel.id} />}
+      {sel && tab === 'backoffice' && <BackOfficeTab key={sel.id} c={sel} reload={() => void load()} />}
 
       {tab === 'overview' && (
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
@@ -200,8 +230,14 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
                 </>
               ) : <p className="text-[14px] text-[var(--atx-muted)] mt-1.5">Δεν υπάρχει ενεργό case για αυτόν τον πελάτη.</p>}
             </div>
+            {sel && (
+              <div data-folder-progress={sel.case_no}>
+                <CaseProgress c={sel} allowedNext={[]} canChange={false} onPick={() => undefined} />
+                <p className="text-[12.5px] text-[var(--atx-muted)] mt-1.5 px-1">Case {sel.case_no} · {SERVICES[sel.service_type] ?? sel.service_type}. Η αλλαγή σταδίου γίνεται από το <button className="atx-link !p-0 text-[12.5px]" onClick={() => openCase(sel.id)}>case</button>.</p>
+              </div>
+            )}
             <div className="atx-panel">
-              <div className="atx-section-head" style={{ padding: '16px 16px 0' }}><h2 className="atx-section-title">Cases</h2></div>
+              <div className="atx-section-head" style={{ padding: '16px 16px 0' }}><h2 className="atx-section-title">Cases</h2><span className="text-[13px] text-[var(--atx-muted)]">{caseCountText(summary)}</span></div>
               {cases.length === 0 ? <div className="atx-empty"><strong>Κανένα case</strong>Τα cases δημιουργούνται από τη μετατροπή ενός lead ή από τη σελίδα Cases.</div>
                 : <ul className="m-0 p-0 list-none">{cases.slice(0, 3).map(caseRow)}</ul>}
               {cases.length > 3 && <button className="atx-link m-3" onClick={() => setTab('cases')}>Όλα τα cases ({cases.length})</button>}
@@ -228,6 +264,16 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
                 <dd className="m-0 font-semibold" style={summary.overdueFollowUp ? { color: 'var(--atx-red)' } : undefined}>{summary.nextFollowUp ? fmtDateTime(summary.nextFollowUp) : '—'}</dd>
               </dl>
               {summary.withoutValue > 0 && <p className="text-[12px] text-[var(--atx-faint)] mt-2">{summary.withoutValue} case χωρίς καταχωρημένη αξία δεν περιλαμβάνονται.</p>}
+            </div>
+            <div className="atx-panel" style={{ padding: 20 }} data-folder-origin>
+              <h2 className="atx-section-title mb-2">Προέλευση</h2>
+              {origin ? (
+                <p className="text-[14px] m-0">
+                  Lead · {leadSourceInfo(origin.source).label} · {fmtDate(origin.created_at)}
+                  {origin.converted_at && <span className="block text-[13px] text-[var(--atx-muted)]">μετατροπή {fmtDate(origin.converted_at)}</span>}
+                  {canOpenLead(role) && <button className="atx-link !p-0 text-[13px] mt-1" data-open-lead onClick={() => go('leads', { lead: origin.id })}>Στοιχεία του lead</button>}
+                </p>
+              ) : <p className="text-[14px] text-[var(--atx-muted)] m-0">Καταχώρηση χωρίς lead.</p>}
             </div>
           </div>
         </div>

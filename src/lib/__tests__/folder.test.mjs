@@ -1,0 +1,47 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildSync } from 'esbuild';
+import { fileURLToPath } from 'node:url';
+
+const bundle = (rel) => {
+  const out = buildSync({ entryPoints: [fileURLToPath(new URL(rel, import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent' });
+  return import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
+};
+const F = await bundle('../folder.ts');
+const k = (id, current_stage, o = {}) => ({ id, current_stage, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z', ...o });
+
+test('badge: computed, one of four, never typed in', () => {
+  assert.equal(F.folderBadge({ isLead: true, cases: [] }).label, 'Lead');
+  assert.equal(F.folderBadge({ isLead: false, cases: [k('a', 'offer'), k('b', 'completed')] }).label, 'Case σε εξέλιξη');
+  assert.equal(F.folderBadge({ isLead: false, cases: [k('a', 'completed'), k('b', 'lost')] }).label, 'Πελάτης');
+  assert.equal(F.folderBadge({ isLead: false, cases: [k('a', 'lost'), k('b', 'cancelled')] }).id, 'none');
+  assert.equal(F.folderBadge({ isLead: false, cases: [] }).id, 'none');
+});
+
+test('tabs: the same order everywhere; Back Office only for roles that have it', () => {
+  const order = ['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές', 'Back Office'];
+  assert.deepEqual(F.folderTabs({ backOffice: true }).map((t) => t.label), order);
+  assert.deepEqual(F.folderTabs({ backOffice: false }).map((t) => t.label), order.slice(0, -1));
+  // the five case tabs plus documents are scoped to the selected case
+  assert.deepEqual(F.FOLDER_TABS.filter((t) => t.scoped).map((t) => t.id), ['docs', 'followups', 'visits', 'offers', 'signatures', 'backoffice']);
+  assert.deepEqual(F.FOLDER_TABS.filter((t) => t.needsCase).map((t) => t.id), ['cases', 'followups', 'visits', 'offers', 'signatures', 'backoffice']);
+});
+
+test('selected case: the picked one; else the only one; else the most urgent open; else the newest', () => {
+  const one = [k('a', 'completed')];
+  assert.equal(F.selectedCase(one, null).id, 'a');
+  const many = [k('a', 'offer', { next_follow_up_at: '2026-10-20T10:00:00Z' }), k('b', 'application', { next_follow_up_at: '2026-10-18T10:00:00Z' }), k('c', 'completed')];
+  assert.equal(F.selectedCase(many, null).id, 'b');
+  assert.equal(F.selectedCase(many, 'c').id, 'c');
+  assert.equal(F.selectedCase(many, 'gone').id, 'b');
+  const closed = [k('a', 'lost', { created_at: '2026-09-01T00:00:00Z' }), k('b', 'completed', { created_at: '2026-10-05T00:00:00Z' })];
+  assert.equal(F.selectedCase(closed, null).id, 'b');
+  assert.equal(F.selectedCase([], null), null);
+});
+
+test('subtitle: πόλη · υπεύθυνος (next-action owner of the open case) · από', () => {
+  const staffName = (id) => ({ u1: 'Εύα' })[id] ?? null;
+  const fmtDate = () => '12/10';
+  assert.equal(F.folderSubtitle({ city: 'Αθήνα', since: 'x', cases: [k('a', 'offer', { next_action_owner_id: 'u1' })], staffName, fmtDate }), 'Αθήνα · Υπεύθυνος: Εύα · από 12/10');
+  assert.equal(F.folderSubtitle({ city: null, since: 'x', cases: [k('a', 'completed', { next_action_owner_id: 'u1' })], staffName, fmtDate }), 'από 12/10');
+});

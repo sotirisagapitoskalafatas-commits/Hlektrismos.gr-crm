@@ -71,3 +71,19 @@ export function folderOrigin(cases: { lead_id?: string | null; created_at?: stri
   return { kind: readable(oldest.lead_id) ? 'lead' : 'unavailable', leadId: oldest.lead_id };
 }
 export const ORIGIN_TEXT = { none: 'Καταχώρηση χωρίς lead.', unavailable: 'Το lead δεν είναι διαθέσιμο (μπορεί να έχει διαγραφεί ή να μην έχετε πρόσβαση).' } as const;
+
+/* ---- Lead → folder (Part B, 4/6) ---- */
+/** A converted lead no longer has its own screen: opening it goes to the customer folder. */
+export const shouldRedirectLead = (lead: { status?: string | null; converted_case_id?: string | null }) =>
+  lead.status === 'converted' && !!lead.converted_case_id;
+
+/** One-line notice at the top of the folder after the redirect: «Το lead μετατράπηκε στις 14/10 — εδώ συνεχίζεται η εργασία». */
+export function convertedNotice(convertedAt?: string | null): string {
+  const d = convertedAt ? new Date(convertedAt) : null;
+  const when = d && !Number.isNaN(+d) ? ` στις ${d.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' })}` : '';
+  return `Το lead μετατράπηκε${when} — εδώ συνεχίζεται η εργασία`;
+}
+
+/** The roles that have the Πελάτες page (the folder); Back Office reaches a customer through the case. */
+const OPENS_FOLDER = ['admin', 'manager', 'inside_sales', 'field_sales'];
+export const canOpenFolder = (role: string) => OPENS_FOLDER.includes(role);

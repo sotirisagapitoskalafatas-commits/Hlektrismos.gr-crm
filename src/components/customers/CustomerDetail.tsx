@@ -9,7 +9,7 @@ import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, TimelineComposer
 import { CaseProgress } from '@/components/cases/CaseOverview';
 import CaseDocuments from '@/components/documents/CaseDocuments';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
-import { ORIGIN_TEXT, folderBadge, folderOrigin, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
+import { ORIGIN_TEXT, convertedNotice, folderBadge, folderOrigin, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
 import type { FolderTab } from '@/lib/folder';
 import { useStaff } from '@/lib/useStaff';
 import { useAuth } from '@/lib/auth';
@@ -18,7 +18,6 @@ import { activityLabel, can, leadSourceInfo, SERVICES, STAGE_TRANSITIONS, TEAM_F
 import { leadStatusDisplay } from '@/lib/lead-status';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
-import { canOpenLead } from '@/lib/lead-links';
 import { mergeHistory } from '@/lib/history-text';
 import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
@@ -33,7 +32,7 @@ const DOC_TONE: Record<string, string> = { verified: 't-success', received: 't-w
 const DOC_TEXT: Record<string, string> = { verified: 'Ελέγχθηκε', received: 'Παραλήφθηκε', rejected: 'Απορρίφθηκε', required: 'Απαιτείται', missing: 'Λείπει' };
 
 
-export default function CustomerDetail({ customerId }: { customerId: string }) {
+export default function CustomerDetail({ customerId, convertedNotice: notice = null }: { customerId: string; convertedNotice?: string | null }) {
   const { role } = useAuth();
   const { go, openCase } = useNav();
   const { toast } = useToast();
@@ -146,7 +145,6 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
           <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}{k.next_action ? ` · ${k.next_action}` : ''}</span>
         </button>
         <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
-        {k.lead_id && canOpenLead(role) && <button className="atx-btn atx-btn-quiet" data-open-lead onClick={() => k.lead_id && go('leads', { lead: k.lead_id })} title="Το lead από το οποίο προήλθε το case">Lead</button>}
         <button className="atx-btn atx-btn-quiet" onClick={() => openCase(k.id)}>Άνοιγμα</button>
       </li>
     );
@@ -172,6 +170,7 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
         {!cust.deleted_at && <TrashButton type="customer" id={cust.id} name={cust.full_name} onTrashed={() => { go('customers'); }} />}
         {canEdit && !editing && !cust.deleted_at && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={openEdit}><Pencil size={14} /> Επεξεργασία</button>}
       </div>
+      {notice !== null && <div className="atx-notice" data-folder-notice>{convertedNotice(notice)}</div>}
       {cust.deleted_at && <InTrashBanner type="customer" id={cust.id} deletedAt={cust.deleted_at} onRestored={() => void load()} />}
 
       {editing && (
@@ -286,11 +285,12 @@ export default function CustomerDetail({ customerId }: { customerId: string }) {
             <div className="atx-panel" style={{ padding: 20 }} data-folder-origin>
               <h2 className="atx-section-title mb-2">Προέλευση</h2>
               {originLead ? (
-                <p className="text-[14px] m-0">
-                  Lead · {leadSourceInfo(originLead.source).label} · {fmtDate(originLead.created_at)}
-                  {originLead.converted_at && <span className="block text-[13px] text-[var(--atx-muted)]">μετατροπή {fmtDate(originLead.converted_at)}</span>}
-                  {canOpenLead(role) && <button className="atx-link !p-0 text-[13px] mt-1" data-open-lead onClick={() => go('leads', { lead: originLead.id })}>Στοιχεία του lead</button>}
-                </p>
+                <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[14px]" data-origin-lead>
+                  <dt className="text-[var(--atx-muted)]">Πηγή</dt><dd className="m-0 font-medium">{leadSourceInfo(originLead.source).label}{originLead.campaign_name ? ` · ${originLead.campaign_name}` : ''}</dd>
+                  <dt className="text-[var(--atx-muted)]">Καταχώρηση</dt><dd className="m-0 font-medium">{fmtDate(originLead.created_at)}</dd>
+                  {originLead.converted_at && (<><dt className="text-[var(--atx-muted)]">Μετατροπή</dt><dd className="m-0 font-medium">{fmtDate(originLead.converted_at)}</dd></>)}
+                  {originLead.partner && (<><dt className="text-[var(--atx-muted)]">Συνεργάτης</dt><dd className="m-0 font-medium">{originLead.partner}</dd></>)}
+                </dl>
               ) : <p className="text-[14px] text-[var(--atx-muted)] m-0" data-origin-state={originInfo.kind}>{ORIGIN_TEXT[originInfo.kind === 'lead' ? 'unavailable' : originInfo.kind]}</p>}
             </div>
           </div>

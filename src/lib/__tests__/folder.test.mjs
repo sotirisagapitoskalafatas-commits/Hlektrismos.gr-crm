@@ -54,3 +54,26 @@ test('origin: a lead that cannot be read is «μη διαθέσιμο», not «�
   assert.deepEqual(F.folderOrigin([], () => true), { kind: 'none', leadId: null });
   assert.notEqual(F.ORIGIN_TEXT.none, F.ORIGIN_TEXT.unavailable);
 });
+
+test('lead → folder: a converted lead redirects; the notice reads «Το lead μετατράπηκε στις 14/10 — …»', () => {
+  assert.equal(F.shouldRedirectLead({ status: 'converted', converted_case_id: 'c1' }), true);
+  assert.equal(F.shouldRedirectLead({ status: 'converted', converted_case_id: null }), false);
+  assert.equal(F.shouldRedirectLead({ status: 'qualified', converted_case_id: 'c1' }), false);
+  assert.equal(F.convertedNotice('2026-10-14T09:00:00Z'), 'Το lead μετατράπηκε στις 14/10 — εδώ συνεχίζεται η εργασία');
+  assert.equal(F.convertedNotice(''), 'Το lead μετατράπηκε — εδώ συνεχίζεται η εργασία');
+  assert.equal(F.convertedNotice(null), 'Το lead μετατράπηκε — εδώ συνεχίζεται η εργασία');
+});
+
+test('folder link: only the roles that have the Πελάτες page; the old lead buttons are gone', async () => {
+  for (const r of ['admin', 'manager', 'inside_sales', 'field_sales']) assert.equal(F.canOpenFolder(r), true, r);
+  assert.equal(F.canOpenFolder('back_office'), false);
+  const { readFileSync } = await import('node:fs');
+  const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const cust = read('../../components/customers/CustomerDetail.tsx');
+  assert.ok(!/data-open-lead/.test(cust) && !/lead-links/.test(cust), 'no button from the folder back to a lead that redirects');
+  const kase = read('../../components/app/CaseDetailPage.tsx');
+  assert.ok(/data-open-folder/.test(kase) && !/data-open-lead/.test(kase));
+  const lead = read('../../components/leads/LeadDetail.tsx');
+  assert.ok(/shouldRedirectLead/.test(lead) && /NEEDS_CASE_TEXT/.test(lead) && !/Σχετικό Case/.test(lead), 'lead screen: redirect, case-needed tabs, no second «Σχετικό Case» card');
+  assert.ok(/Μετατράπηκε → Φάκελος/.test(read('../../components/app/LeadsPage.tsx')));
+});

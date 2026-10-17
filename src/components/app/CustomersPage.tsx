@@ -45,7 +45,7 @@ export default function CustomersPage() {
       .sort((a, b) => a.full_name.localeCompare(b.full_name, 'el'));
   }, [customers, q, onlyActive, byCustomer]);
 
-  if (detailId) return <CustomerDetail customerId={detailId} />;
+  if (detailId) return <CustomerDetail customerId={detailId} convertedNotice={view.filters?.notice === 'lead-converted' ? (view.filters.since || '') : null} />;
 
   const withActive = customers.filter(c => (byCustomer.get(c.id) ?? []).some(ACTIVE)).length;
 

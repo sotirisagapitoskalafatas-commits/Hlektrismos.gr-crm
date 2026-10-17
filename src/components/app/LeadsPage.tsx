@@ -262,9 +262,11 @@ export default function LeadsPage() {
                     </>
                   )}
                   {converted && l.converted_case_id && (
-                    <Btn variant="outline" onClick={() => openCase(l.converted_case_id!)}>
-                      <ExternalLink className="w-3.5 h-3.5" /> Άνοιγμα Case
-                    </Btn>
+                    <span data-lead-to-folder>
+                      <Btn variant="outline" onClick={() => go('leads', { lead: l.id })} title="Ανοίγει τον φάκελο του πελάτη">
+                        <ExternalLink className="w-3.5 h-3.5" /> Μετατράπηκε → Φάκελος
+                      </Btn>
+                    </span>
                   )}
                   <TrashButton compact type="lead" id={l.id} name={name}
                     onTrashed={async () => { const list = await fetchLeads(); setItems(list); return !list.some(x => x.id === l.id); }} />

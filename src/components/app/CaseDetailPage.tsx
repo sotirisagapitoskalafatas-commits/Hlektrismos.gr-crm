@@ -9,7 +9,7 @@ import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
 import { STAGE_SET_MIN_REASON, canUseStageSet, checkJump, stageSetTargets } from '@/lib/stage-jump';
 import { stageText, visitedStages } from '@/lib/case-flow';
-import { setCaseStage } from '@/lib/api';
+import { setCaseStage, stageSetAvailable } from '@/lib/api';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
 import { canOpenFolder } from '@/lib/folder';
@@ -482,14 +482,27 @@ function StageSetControl({ c, reload }: { c: Case; reload: () => void }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // null = still asking; false = the SQL is not applied yet (the normal state for weeks): a neutral note instead of a form that cannot work
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const allowed = canUseStageSet(role);
   useEffect(() => { setTarget(''); setReason(''); setMsg(null); }, [c.id, c.current_stage]);
-  if (!canUseStageSet(role)) return null;
+  useEffect(() => {
+    if (!allowed) return;
+    let alive = true;
+    void stageSetAvailable().then(ok => { if (alive) setAvailable(ok); });
+    return () => { alive = false; };
+  }, [allowed]);
+  if (!allowed) return null;
   const submit = async () => {
     if (!target || busy) return;
     setBusy(true); setMsg(null);
     const err = await setCaseStage(c.id, target, reason);
     setBusy(false);
-    if (err) { setMsg(err); notify(err, 'bad'); return; }
+    if (err) {
+      setMsg(err); notify(err, 'bad');
+      void stageSetAvailable().then(setAvailable); // the SQL may have been removed since the page opened: fall back to the note
+      return;
+    }
     notify(`Στάδιο: ${stageText(target)}`, 'ok');
     reload();
   };
@@ -500,7 +513,11 @@ function StageSetControl({ c, reload }: { c: Case; reload: () => void }) {
         Για case που πρέπει να συνεχίσει από άλλο στάδιο, π.χ. ήρθε με πλήρη φάκελο ή γυρίζει πίσω για διόρθωση. Καταγράφεται με την αιτιολογία και τον χρήστη.
         Δεν αλλάζει τα έγγραφα και τα στάδια που παραλείπονται δεν θεωρούνται ολοκληρωμένα.
       </p>
-      {targets.length === 0 ? (
+      {available === null ? (
+        <div className="atx-skeleton" data-stage-set-checking />
+      ) : available === false ? (
+        <p className="text-xs text-ink/55 m-0" data-stage-set-unavailable>Η λειτουργία δεν είναι ακόμη διαθέσιμη.</p>
+      ) : targets.length === 0 ? (
         <p className="text-xs text-ink/55 m-0" data-stage-set-final>Το case έχει ολοκληρωθεί· δεν αλλάζει στάδιο.</p>
       ) : (
         <div className="space-y-2">

@@ -122,6 +122,7 @@ const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
 let setStageOn = true; // GET /__setstage?state=on|off — phase2/07b set_case_stage applied or not (needs /__gates?state=on too)
 let reopenOn = true; // GET /__reopen?state=on|off — phase2/07c reopen_completed_case applied or not
+let supplyOn = true; // GET /__supply?state=on|off — phase5/17 customer_supply_points + tariff_categories applied or not
 let contactOff = false; // GET /__contact?state=off → the consent functions are missing (phase3/09 not applied)
 let getFail = null; // GET /__getfail?table=activity_log → the next GET of that table fails once (read-error test)
 let patchFailHint = null; // GET /__patchfail?table=cases&hint=transition → the refusal looks like the 07b guard's (stage_transition_not_allowed)
@@ -227,6 +228,7 @@ http.createServer((req, res) => {
     if (url.pathname === '/__log') return send(200, log);
     if (url.pathname === '/__setstage') { setStageOn = url.searchParams.get('state') !== 'off'; return send(200, { setStageOn }); }
     if (url.pathname === '/__reopen') { reopenOn = url.searchParams.get('state') !== 'off'; return send(200, { reopenOn }); }
+    if (url.pathname === '/__supply') { supplyOn = url.searchParams.get('state') !== 'off'; return send(200, { supplyOn }); }
     if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
     if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; patchFailHint = url.searchParams.get('hint') || null; return send(200, { patchFail }); }
@@ -614,6 +616,23 @@ http.createServer((req, res) => {
     const m = /^\/rest\/v1\/([a-z0-9_]+)$/.exec(url.pathname);
     if (!m) return send(404, {});
     const table = m[1];
+    if (!supplyOn && (table === 'customer_supply_points' || table === 'tariff_categories')) return send(404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache`, details: null, hint: null });
+    if (table === 'customer_supply_points' && (req.method === 'POST' || req.method === 'PATCH')) { // what the staged SQL does: generated flags, defaults, the customer never moves
+      const key = (v) => { const d = String(v ?? '').replace(/\D/g, ''); return d === '' ? null : d; };
+      const ok = (v) => { const t = String(v ?? '').replace(/^ +| +$/g, ''); return t === '' || (/^[0-9][0-9 -]*$/.test(t) && key(t).length === 11); };
+      const fix = (r) => ({ ...r, supply_number_key: key(r.supply_number), supply_number_ok: ok(r.supply_number) });
+      if (req.method === 'POST') {
+        const rows = (Array.isArray(json) ? json : [json]).map((r) => fix({ id: crypto.randomUUID(), property_address: '', supply_number: null, meter_identifier: null, meter_type: null, meter_note: null, tariff_category_code: null, tariff_name: null, application_date: null, contract_months: null, notes: '', needs_review: false, review_note: null, reviewed_at: null, archived_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...r }));
+        log.push({ method: 'POST', table, body: json });
+        (TABLES[table] ??= []).push(...rows);
+        return send(201, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? rows[0] : rows);
+      }
+      if ('customer_id' in json) return send(400, { code: 'P0001', message: 'supply_point: a connection never moves to another customer' });
+      const hit = applyFilters(TABLES[table] ?? [], url.searchParams);
+      log.push({ method: 'PATCH', table, query: url.search, body: json });
+      for (const r of hit) Object.assign(r, fix({ ...r, ...json }), { updated_at: new Date().toISOString() });
+      return send(200, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? hit[0] ?? null : hit);
+    }
     if (req.method === 'GET' && getFail === table) { getFail = null; return send(500, { code: 'XX000', message: 'mock: read refused', details: null, hint: null }); }
     if (req.method === 'GET' || req.method === 'HEAD') {
       const rows = applyFilters(TABLES[table] ?? [], url.searchParams);

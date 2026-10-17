@@ -27,6 +27,15 @@ test('tabs: the same order everywhere; Back Office only for roles that have it',
   assert.deepEqual(F.FOLDER_TABS.filter((t) => t.needsCase).map((t) => t.id), ['cases', 'followups', 'visits', 'offers', 'signatures', 'backoffice']);
 });
 
+test('«Παροχές» is a customer tab right after Σύνοψη; an unconverted lead has no such tab; it needs no case', () => {
+  const withSupply = ['Σύνοψη', 'Παροχές', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές', 'Back Office'];
+  assert.deepEqual(F.folderTabs({ backOffice: true, supply: true }).map((t) => t.label), withSupply);
+  assert.deepEqual(F.folderTabs({ backOffice: false, supply: true }).map((t) => t.label), withSupply.slice(0, -1));
+  assert.ok(!F.folderTabs({ backOffice: true }).some((t) => t.id === 'supply'), 'the lead folder never gets it');
+  const t = F.FOLDER_TABS.find((x) => x.id === 'supply');
+  assert.equal(t.needsCase, false); assert.equal(t.scoped, false);
+});
+
 test('selected case: the picked one; else the only one; else the most urgent open; else the newest', () => {
   const one = [k('a', 'completed')];
   assert.equal(F.selectedCase(one, null).id, 'a');

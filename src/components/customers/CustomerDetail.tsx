@@ -21,13 +21,15 @@ import { caseCountText } from '@/lib/status-text';
 import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
-import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import type { SupplyPoint } from '@/lib/supply-points';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
 import { useToast } from '@/lib/toast';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import ContactEligibility from '@/components/contact/ContactEligibility';
+import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
 import { fmtDate, fmtDateTime, fmtMoney } from '@/lib/ui';
 
 const DOC_TONE: Record<string, string> = { verified: 't-success', received: 't-warning', rejected: 't-danger' };
@@ -47,6 +49,8 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [leads, setLeads] = useState<Record<string, Lead | null>>({});
   const [leadActs, setLeadActs] = useState<Record<string, ActivityLogRow[] | null>>({});
   const [histTeam, setHistTeam] = useState('all');
+  // undefined = loading; null = the staged SQL (phase5/17) is not applied yet
+  const [supplyPoints, setSupplyPoints] = useState<SupplyPoint[] | null | undefined>(undefined);
   const [syncWarn, setSyncWarn] = useState<string | null>(null);
   const staff = useStaff();
   const [editing, setEditing] = useState(false);
@@ -59,8 +63,9 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const canEdit = can(role, 'edit_case');
 
   const load = useCallback(async () => {
-    const [c, all] = await Promise.all([fetchCustomer(customerId), fetchCases({ includeDone: true })]);
+    const [c, all, sp] = await Promise.all([fetchCustomer(customerId), fetchCases({ includeDone: true }), fetchSupplyPoints(customerId)]);
     setCust(c);
+    setSupplyPoints(sp);
     const mine = all.filter(k => k.customer_id === customerId).sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     setCases(mine);
     const [d, t] = await Promise.all([
@@ -133,9 +138,9 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const tel = cust.phone ? `tel:${cust.phone.replace(/\s+/g, '')}` : null;
   const initials = cust.full_name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const allDocs = cases.flatMap(k => (docs[k.id] ?? []).map(d => ({ ...d, case_no: k.case_no })));
-  const counts: Partial<Record<FolderTab, number>> = { cases: cases.length, docs: allDocs.length, history: history.length };
+  const counts: Partial<Record<FolderTab, number>> = { cases: cases.length, docs: allDocs.length, history: history.length, ...(supplyPoints ? { supply: supplyPoints.filter(p => !p.archived_at).length } : {}) };
   const shownHistory = histTeam === 'all' ? history : history.filter(e => e.team === histTeam);
-  const tabs = folderTabs({ backOffice: can(role, 'create_application') });
+  const tabs = folderTabs({ backOffice: can(role, 'create_application'), supply: true });
   const badge = folderBadge({ isLead: false, cases });
   const subtitle = folderSubtitle({ city: cust.city, since: cust.created_at, cases, fmtDate, staffName: id => staff.find(x => x.id === id)?.full_name ?? null });
   const scopedTab = tabs.find(t => t.id === tab)?.scoped ?? false;
@@ -306,6 +311,8 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
           </div>
         </div>
       )}
+
+      {tab === 'supply' && <SupplyPointsTab customerId={cust.id} points={supplyPoints} canEdit={canEdit && !cust.deleted_at} reload={() => void load()} />}
 
       {tab === 'cases' && (
         <div className="atx-panel">

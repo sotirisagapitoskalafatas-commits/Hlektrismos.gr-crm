@@ -1286,7 +1286,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
       header: document.querySelector('main h1')?.parentElement?.parentElement?.innerText ?? '',
     }));
     check('Folder: one computed badge in the header', f.badge === 'Case σε εξέλιξη', f.badge);
-    check('Folder: tabs in the fixed order (no Back Office for Inside Sales)', JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f.tabs));
+    check('Folder: tabs in the fixed order, «Παροχές» right after Σύνοψη (no Back Office for Inside Sales)', JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Παροχές', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f.tabs));
     check('Folder: header shows phone and «από …»; Σύνοψη shows the selected case stepper and the origin', /από \d/.test(f.header) && /CS-2026-00\d/.test(f.progress) && /Πηγή/.test(f.origin), JSON.stringify({ p: f.progress, o: f.origin.slice(0, 60) }));
     await click(page, 'Cases', '[role="tab"]'); await sleep(300);
     const nos = await page.$$eval('main [data-folder-case]', (b) => b.map((x) => x.getAttribute('data-folder-case')));
@@ -1377,6 +1377,90 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
     check('Sync: when the lead write fails, the customer is still saved and the screen says so', custSaved && /Τα στοιχεία του πελάτη αποθηκεύτηκαν, αλλά δεν ενημερώθηκε το lead/.test(w), w.slice(0, 120));
   }
   await browser.close();
+}
+
+/* ---- 9d. Παροχές: a customer's connections, right after Σύνοψη (staged phase5/17; neutral note until applied) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const DIMITRIS = '20000000-0000-4000-8000-000000000002';
+  const seedPoint = async (customer_id, fields) => (await (await fetch(`${M}/rest/v1/customer_supply_points`, { method: 'POST', headers: H, body: JSON.stringify({ customer_id, ...fields }) })).json())[0];
+  const wipe = async () => { await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H }); };
+  const openCustomer = async (page, name) => {
+    await click(page, 'Πελάτες', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate((n) => { const el = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes(n)); el && el.click(); }, name);
+    await sleep(1800);
+  };
+  const cards = (page) => page.evaluate(() => [...document.querySelectorAll('[data-supply-card]')].map((c) => ({
+    title: c.querySelector('[data-supply-title]')?.textContent ?? '', usage: c.getAttribute('data-supply-usage'),
+    address: c.querySelector('[data-supply-field="address"]')?.textContent ?? '', number: c.querySelector('[data-supply-field="number"]')?.childNodes[0]?.textContent ?? '',
+    warning: c.querySelector('[data-supply-number-warning]')?.textContent ?? '', meter: c.querySelector('[data-supply-field="meter"]')?.textContent ?? '',
+    category: c.querySelector('[data-supply-field="category"]')?.textContent ?? '', tariff: c.querySelector('[data-supply-field="tariff"]')?.textContent ?? '',
+    applied: c.querySelector('[data-supply-field="applied"]')?.textContent ?? '', contract: c.querySelector('[data-supply-field="contract"]')?.textContent ?? '' })));
+  await fetch(`${M}/__supply?state=on`);
+  await wipe();
+  // two connections of Αθηνά, entered "by the office": a home one with a valid number and a business one with a short number; one for another customer
+  await seedPoint(ATHINA, { usage: 'residential', property_address: 'Οδός Α 1, Αθήνα', supply_number: '12345678901', meter_identifier: 'ΜΤ-1001', meter_type: 'single_phase', tariff_category_code: 'Γ1', tariff_name: 'Πράσινο Οικιακό', application_date: '2026-10-01', contract_months: 24 });
+  await seedPoint(ATHINA, { usage: 'commercial', property_address: 'Οδός Β 2, Αθήνα', supply_number: '123', tariff_category_code: 'Γ21', tariff_name: 'Επαγγελματικό Κ' });
+  await seedPoint(DIMITRIS, { usage: 'residential', property_address: 'Άλλη οδός 9, Πειραιάς', supply_number: '99999999999' });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCustomer(page, 'Αθηνά Κωνσταντίνου');
+    const tabs = await page.evaluate(() => [...document.querySelectorAll('main [role="tab"]')].map((b) => ({ label: b.childNodes[0]?.textContent?.trim(), count: b.querySelector('span')?.textContent ?? null })));
+    check('Παροχές: the tab is right after Σύνοψη and shows the number of connections', tabs[0].label === 'Σύνοψη' && tabs[1].label === 'Παροχές' && tabs[1].count === '2', JSON.stringify(tabs.slice(0, 3)));
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(600);
+    let c = await cards(page);
+    check('Παροχές: one card per connection, «Παροχή 1 — Οικιακό» and «Παροχή 2 — Επαγγελματικό», each with its own address', c.length === 2 && c[0].title === 'Παροχή 1 — Οικιακό' && c[1].title === 'Παροχή 2 — Επαγγελματικό' && c[0].address.includes('Οδός Α 1') && c[1].address.includes('Οδός Β 2'), JSON.stringify(c.map((x) => [x.title, x.address])));
+    check('Παροχές: supply number, meter, category code and commercial tariff name are separate fields on the card',
+      c[0].number === '12345678901' && c[0].meter.includes('ΜΤ-1001') && c[0].meter.includes('Μονοφασικός') && c[0].category === 'Γ1' && c[0].tariff === 'Πράσινο Οικιακό' && /2026|1\/10|01/.test(c[0].applied) && c[0].contract === '2 έτη', JSON.stringify(c[0]));
+    check('Παροχές: a given number that is not 11 digits shows a warning on that card only; nothing is blocked', c[0].warning === '' && c[1].warning.includes('11 ψηφία') && c[1].meter === '—', JSON.stringify([c[0].warning, c[1].warning]));
+    check('Παροχές: another customer\'s connection is not shown here', !(await page.evaluate(() => document.body.innerText.includes('Άλλη οδός 9'))));
+    // add a new connection: choose the usage, one POST with nothing but the customer and the usage (nothing mandatory)
+    await page.evaluate(() => document.querySelector('[data-supply-add]')?.click()); await sleep(300);
+    await page.evaluate(() => document.querySelector('[data-supply-new="commercial"]')?.click()); await sleep(1800);
+    c = await cards(page);
+    const post = (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'POST' && l.table === 'customer_supply_points').pop()?.body;
+    check('Παροχές: «+ Νέα παροχή» → Επαγγελματικό adds «Παροχή 3 — Επαγγελματικό» with nothing required (no number, no documents)',
+      c.length === 3 && c[2].title === 'Παροχή 3 — Επαγγελματικό' && c[2].number === '—' && post?.customer_id === ATHINA && post?.usage === 'commercial' && post?.supply_number === null, JSON.stringify({ n: c.length, t: c[2]?.title, post }));
+    check('Παροχές: the other cards did not change when a new one was added', JSON.stringify(c.slice(0, 2).map((x) => x.address + x.number + x.category)) === JSON.stringify(['Οδός Α 1, Αθήνα12345678901Γ1', 'Οδός Β 2, Αθήνα123Γ21']));
+    const count = await page.evaluate(() => [...document.querySelectorAll('main [role="tab"]')].find((b) => b.childNodes[0]?.textContent?.trim() === 'Παροχές')?.querySelector('span')?.textContent);
+    check('Παροχές: the tab count follows (3)', count === '3', String(count));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCustomer(page, 'Δημήτρης Βλάχος');
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(600);
+    const c = await cards(page);
+    check('Παροχές: each customer sees only their own connections', c.length === 1 && c[0].title === 'Παροχή 1 — Οικιακό' && c[0].address.includes('Άλλη οδός 9'), JSON.stringify(c.map((x) => x.title)));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCustomer(page, 'Σοφία Ιωάννου');
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(600);
+    const empty = await page.evaluate(() => ({ empty: !!document.querySelector('[data-supply-empty]'), add: !!document.querySelector('[data-supply-add]') }));
+    check('Παροχές: a customer without connections shows an empty state and the «Νέα παροχή» button', empty.empty && empty.add, JSON.stringify(empty));
+    await browser.close();
+  }
+  // the SQL is not applied yet: one neutral Greek sentence, no error, no technical wording
+  await fetch(`${M}/__supply?state=off`);
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCustomer(page, 'Αθηνά Κωνσταντίνου');
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(800);
+    const st = await page.evaluate(() => ({ note: document.querySelector('[data-supply-unavailable]')?.innerText ?? '', cards: document.querySelectorAll('[data-supply-card]').length, add: !!document.querySelector('[data-supply-add]'), tab: [...document.querySelectorAll('main [role="tab"]')].map((b) => b.childNodes[0]?.textContent?.trim()).slice(0, 2) }));
+    check('Παροχές: while the SQL is not applied the tab is one neutral Greek sentence — no cards, no button, no technical wording',
+      st.note.includes('Η λειτουργία δεν είναι ακόμη διαθέσιμη.') && st.cards === 0 && !st.add && !/migration|phase|SQL|schema|PGRST|relation|customer_supply_points/i.test(st.note) && st.tab[1] === 'Παροχές', JSON.stringify(st));
+    await browser.close();
+  }
+  await fetch(`${M}/__supply?state=on`);
+  await wipe();
 }
 
 /* ---- 9b. A converted lead opens the customer folder: «Μετατράπηκε → Φάκελος», one-line notice (Part B 4) ---- */

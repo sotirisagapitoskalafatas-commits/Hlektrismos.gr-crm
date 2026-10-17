@@ -1,6 +1,6 @@
 # Master prompt (v2) — Phase One: audit, Lead-creation root cause, implementation plan
 
-**Status:** report for decision. Nothing is built, applied, deployed or merged for any item below.
+**Status:** report for decision, **updated 17/10/2026 after the owner's decisions** (section 9). Nothing is applied or deployed. Only the 07a/07b split is built (as staged SQL and app code, PRs #70 and #72); everything else below is unbuilt.
 **Basis:** `main` after #63 (`7e80ce7`), plus the Part B PRs #64, #65 and #67 that were open when this was written; the master prompt v2 (§6.2 / §12.5 with multiple residential and commercial supply points; docs PR #66).
 **Not read:** production. The Supabase and Vercel connectors were **not** used, not even read-only. Every statement about the live database is inferred from the migrations in this repository; section 8 has read-only queries for you to run.
 **Prices and limits:** fetched from the vendors' own pages on 17/10/2026 (URLs in section 4). Where a page did not give a number, this report says "not verified" instead of using memory.
@@ -14,10 +14,10 @@ This report refreshes `FIELD_SALES_GAP_AUDIT.md` (written against v1 of the prom
 
 | # | Item | Answer |
 |---|---|---|
-| 1 | **Staged 07 vs §8 (non-linear Back Office stages)** | They conflict in one part only: the **fixed transition list** enforced by `cases_stage_guard`. Proposal: **split 07**. 07a (document gates, return for correction, override) is safe to apply; 07b (the stage guard) is rewritten so Back Office/admin may set any stage, audited, while Sales keeps the list. 2–3 days. 07 stays unapplied until you agree (section 3). |
+| 1 | **Staged 07 vs §8 (non-linear Back Office stages)** | They conflict in one part only: the **fixed transition list** enforced by `cases_stage_guard`. Proposal: **split 07**. 07a (document gates, return for correction, override) is safe to apply; 07b (the stage guard) is rewritten so Back Office/admin may set any stage, audited, while Sales keeps the list. 2–3 days. **Approved on 17/10 and built as staged SQL (PRs #70, #72); still unapplied** (section 3). |
 | 2 | **«Μπλοκάρισμα»** | Remove it (§7: documents never block). It exists in the staged SQL (`mode = 'block'`), in the admin screen (`GateModes.tsx`) and in one screen test. Since 07 is unapplied there is no live data to migrate. A replacement for the one database refusal the tests use is proposed (section 3.2). 1 day (inside item 1). |
-| 3 | **Shared login + Sales Agents vs the five roles** | Path A of `ROLE_MODEL.md`: the shared office login is **one `admin` user**; Sales Agents stay `inside_sales` / `field_sales`; `back_office` and `manager` stay in the database, unused unless you want them. This replaces the open role decision. **But §2.2 implies agents see only their own work, and today every staff member sees everything**: that is a large piece of work not on your list (section 5, 5–8 days). |
-| 4 | **Maps provider and key** | Four things need a provider and a key; one does not (section 4). At the volumes assumed, optimization and directions cost **$0** on either Google or Mapbox free tiers; the real cost is **place discovery** (about $0 / $0 / $157 per month for 5 / 15 / 30 agents on Google, $75 / $75 / $150 on the SerpApi route we already use). I need the agent count. |
+| 3 | **Shared login + Sales Agents vs the five roles** | Path A of `ROLE_MODEL.md`: the shared office login is **one `admin` user**; Sales Agents stay `inside_sales` / `field_sales`; `back_office` and `manager` stay in the database, unused unless you want them. This replaces the open role decision; whether agents see only their own records, and shared login versus individual office accounts, are **waiting for the client** (section 9). **But §2.2 implies agents see only their own work, and today every staff member sees everything**: that is a large piece of work not on your list (section 5, 5–8 days). |
+| 4 | **Maps provider and key** | Four things need a provider and a key; one does not (section 4). At **20 agents** optimization, directions and geocoding cost **$0** on either Google or Mapbox free tiers; the cost is **place discovery**, and it depends on searches per agent per day: **$0** (Mapbox, if its Greek coverage is good enough), **$51 / $262 / $544** per month on Google (name + address + location) at 15 / 30 / 50 searches a day, **$196 / $427 / $735** if phone numbers are requested, **$150 / $150 / $275** on SerpApi. Every figure is marked verified or not in 4.3. |
 | 5 | **Paid items, days** | Saved daily routes **12–17**, duplicate/ownership approvals **6–9**, multiple supply points **8–12**, global custom fields **7–10**: total **33–48 days**. Not included: per-agent record visibility (5–8), see section 5. |
 | 6 | **Contradictions** | Eleven, in section 7. The most important: §2.2 (agents see only their own) vs §4.5/§5 (agents must be warned about *other* agents' visits), and a shared login vs individual accountability for ID images. |
 
@@ -108,23 +108,63 @@ A) `document_requirements` and `stage_document_gates` (`mode` = `warn` default, 
 ### 4.2 Items that need a provider + key
 1. **Stop optimization** (true optimization; today only nearest-neighbour). 2. **Directions / ETAs for segments** (≤25 waypoints per request). 3. **Place discovery** for new candidates. 4. **Geocoding** of new addresses and supply-point addresses. Navigation deep links need no key.
 
-### 4.3 Cost at our scale — assumptions (please correct)
-22 working days per month; per agent per day: 2 optimization requests (build + one re-sort), 2 directions requests (50 stops in segments of ≤25), 15 place searches, 10 geocodes. **Agents: 5 / 15 / 30 (I do not know the real number).**
+### 4.3 Cost at our scale — 20 agents (updated 17/10/2026)
 
-| Per month | 5 agents | 15 agents | 30 agents |
+**Agents: 20** (confirmed by the owner). This replaces the earlier 5 / 15 / 30 table. Every figure is marked **✔ verified** (read from the vendor's own page on 17/10/2026; URLs in 4.4) or **✘ not verified** (my assumption, or something the page did not state).
+
+**Usage assumptions — all ✘ (mine, please correct):** 22 working days per month. Per agent per day: 2 optimization requests (build + one re-sort), 2 directions requests (50 stops in segments of ≤25), 10 geocodes, and **15 / 30 / 50 place searches**. The number of place searches per agent per day is the only thing that moves the bill, so it is shown as a grid.
+
+| Per month, 20 agents | 15 searches/agent/day | 30 | 50 |
 |---|---|---|---|
-| Optimization / directions requests | 220 / 220 | 660 / 660 | 1,320 / 1,320 |
-| Place searches | 1,650 | 4,950 | 9,900 |
-| Geocodes | 1,100 | 3,300 | 6,600 |
+| **Place searches** | 6,600 | 13,200 | 22,000 |
+| Optimization requests | 880 | 880 | 880 |
+| Directions requests | 880 | 880 | 880 |
+| Geocodes | 4,400 | 4,400 | 4,400 |
 
-| Provider (official page, 17/10/2026) | 5 agents | 15 agents | 30 agents | Notes |
+**Place discovery — the only line that costs money**
+
+| Provider and SKU | 15/day | 30/day | 50/day | Verified? |
 |---|---|---|---|---|
-| **Google Maps Platform**: Route Optimization single-vehicle (5,000 free, then $10/1,000), Routes Pro (5,000 free, $10/1,000), Geocoding (10,000 free, $5/1,000), **Places Text Search Pro (5,000 free, then $32/1,000)** | **$0** | **$0** (4,950 searches, just under the cap) | **≈ $157** (4,900 searches over the cap × $32/1,000) | Routes Pro "up to 25 waypoints". Storage: Place ID may be stored indefinitely; other Places content "must not [be] pre-fetch[ed], cache[d], or store[d] beyond the allowed exceptions" (time limits are in the Service Terms; not retrieved). **Importing discovered businesses into the CRM needs legal confirmation.** |
-| **Mapbox**: Optimization (100,000 free, then $2/1,000), Directions (100,000 free), Matrix (100,000 elements free), Temporary geocoding (100,000 free), Search Box (25,000 free, then $1.70/1,000) | **$0** | **$0** | **$0** | Optimization v2: up to **1,000 locations** per problem, 300 problems/minute. v1 limits not verified. **Temporary** geocoding results are not for storing; **Permanent** geocoding is $5/1,000 with no free tier: saving geocoded coordinates into CRM records would be ≈ $5.50 / $16.50 / $33 per month. Greek POI coverage unverified. |
-| **SerpApi** (discovery we already use): Developer $75 (5,000 searches/month), Production $150 (15,000) | $75 | $75 (4,950 of 5,000) | $150 | Scraped Google Maps results: ToS risk to confirm with counsel. Only successful searches count. |
-| **OpenRouteService** (HeiGIT) | not verified | not verified | not verified | The plan and quota pages did not load; check the quotas in your ORS account. |
+| **Google** Places Text Search, name + address + location only (**Pro SKU**: 5,000 free, then $32 per 1,000) | **$51.20** | **$262.40** | **$544.00** | ✔ prices and free cap (pricing page); ✔ these three fields bill as Pro (field list, two pages) |
+| **Google** Places Text Search **with phone number or website** (**Enterprise SKU**: 1,000 free, then $35 per 1,000) | **$196.00** | **$427.00** | **$735.00** | ✔ prices and free cap; ✔ phone and website bill as Enterprise (two pages agree; part of one field list was cut off when read); the page says a request is billed at the highest SKU of the fields requested |
+| **Mapbox** Search Box (standard pricing: 25,000 free, then $1.70 per 1,000) | **$0** | **$0** | **$0** | ✔ price and cap. ✘ whether the standard (25,000 free) or the introductory (50,000 free) pricing applies now. ✘ **Greek business coverage and quality.** ✘ whether phone and website come back |
+| **SerpApi** (the Google Maps scraper already in the B2B pipeline): Developer $75 (5,000/month), Production $150 (15,000), Big Data $275 (30,000) | **$150** | **$150** | **$275** | ✔ plans and limits. ✘ **not like-for-like**: SerpApi bills per search whatever fields come back and returns one page of results per search; Google bills per request and per field tier |
 
-**Reading:** at these volumes, optimization and directions are **free** on both Google and Mapbox. Choose on **Greek coverage quality and terms**, not on price. **Recommendation:** one provider behind one edge function (key server-side), keep Google deep links for turn-by-turn, keep the existing SerpApi route for discovery until the terms question is answered. Before committing: a **1-day spike** on 50 real Greek addresses, comparing Google Route Optimization and Mapbox Optimization v2.
+**Everything else is free at 20 agents**
+
+| Function | Google | Mapbox |
+|---|---|---|
+| Stop optimization, 880/month | **$0** ✔ (Route Optimization single-vehicle: 5,000 free, then $10 per 1,000) | **$0** ✔ (Optimization: 100,000 free, then $2 per 1,000) |
+| Directions, 880/month | **$0** ✔ (Routes Pro: 5,000 free, then $10 per 1,000; "up to 25 waypoints") | **$0** ✔ (Directions: 100,000 free) |
+| Geocoding, 4,400/month | **$0** ✔ (10,000 free, then $5 per 1,000) | **$0** ✔ (temporary geocoding: 100,000 free). If coordinates are **saved** into CRM records: permanent geocoding **$22.00/month** ✔ price (4,400 × $5 per 1,000); ✘ whether our use counts as "permanent" |
+
+**What a whole setup costs per month (20 agents, 15 / 30 / 50 searches per agent per day)**
+
+| Setup | 15/day | 30/day | 50/day |
+|---|---|---|---|
+| All Google, name + address + location only | $51 | $262 | $544 |
+| All Google, with phone/website | $196 | $427 | $735 |
+| Mapbox for everything (+ $22 if coordinates are stored) | $0 | $0 | $0 |
+| Mapbox for optimization and directions, SerpApi for discovery | $150 | $150 | $275 |
+
+**Not verified — said plainly**
+- The usage assumptions above (searches, requests and geocodes per agent per day, 22 days).
+- OpenRouteService quotas (the plan page did not load) and the terms of the public Photon geocoder.
+- Mapbox Optimization **v1** limits (only v2 was read: up to 1,000 locations per problem, 300 problems per minute).
+- Google's time limits on caching Places content (the Service Terms page did not load; only "a Place ID may be stored indefinitely" and "other Places content must not be pre-fetched, cached or stored beyond the allowed exceptions" were read).
+- The maximum number of stops per Google Route Optimization request (the pricing page does not say).
+- Greek business-listing coverage and quality of every provider.
+
+**Reading:** at 20 agents, optimization, directions and geocoding are free on both Google and Mapbox. The cost is discovery, and it scales with searches per agent per day: from **$0** (Mapbox, if its Greek coverage is good enough) to **$735** (Google with phone numbers at 50 searches a day). Recommendation unchanged: one provider behind one edge function with the key server-side, keep the Google deep links for turn-by-turn, and keep SerpApi for discovery until the terms question is answered. The 1-day spike should now also measure **how many searches a real agent day needs** and whether Mapbox's results for Greek businesses are good enough, because that is the difference between $0 and $200–700 a month.
+
+### 4.4 Sources (fetched 17/10/2026)
+- Google pricing: https://developers.google.com/maps/billing-and-pricing/pricing
+- Google Text Search fields and SKUs: https://developers.google.com/maps/documentation/places/web-service/text-search and https://developers.google.com/maps/billing-and-pricing/sku-details
+- Google Places storage policy: https://developers.google.com/maps/documentation/places/web-service/policies
+- Google Maps URLs (navigation links, waypoint limits): https://developers.google.com/maps/documentation/urls/get-started
+- Mapbox pricing: https://www.mapbox.com/pricing · Optimization limits: https://docs.mapbox.com/api/navigation/optimization/
+- SerpApi plans: https://serpapi.com/pricing
+- OSRM public demo server policy: https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server
 
 ---
 
@@ -192,7 +232,7 @@ The prompt says reuse. I looked for what can be reused **safely** and recommend 
 - **Tests (PGlite):** two connections of one customer do not overwrite each other; a duplicate number is flagged, not rejected; 11-digit rule; a legacy value is preserved; RLS for staff vs anon; rollback.
 
 ### 6.5 UI plan (inside the customer folder)
-A new tab **«Παροχές»** (count badge) after «Cases» — this changes the tab order approved in Part A, so it needs your OK; the alternative is a panel in Σύνοψη. The tab shows a **list of connections** (usage badge Οικιακό/Επαγγελματικό, address, number, category code, tariff name, status), **«+ Νέα παροχή»**, and an editor per connection (own form, own save; nothing shared between rows). The 11-digit rule shows a **warning/error in the form**, never blocking anything else; a number that already exists elsewhere shows «Υπάρχει ήδη σε …» with a link, and a button to flag for review. Έγγραφα gets a connection filter; the case shows its connection.
+A new tab **«Παροχές»** (count badge) **right after Σύνοψη** (decided 17/10/2026; this changes the tab order approved in Part A). The tab shows a **list of connections** (usage badge Οικιακό/Επαγγελματικό, address, number, category code, tariff name, status), **«+ Νέα παροχή»**, and an editor per connection (own form, own save; nothing shared between rows). The 11-digit rule shows a **warning/error in the form**, never blocking anything else; a number that already exists elsewhere shows «Υπάρχει ήδη σε …» with a link, and a button to flag for review. Έγγραφα gets a connection filter; the case shows its connection.
 
 ### 6.6 Effort: **8–12 days**
 SQL + RLS + PGlite + rollback 1.5–2 · API, validation, duplicate function 1–1.5 · folder UI (list, add, edit, warnings) 2.5–3.5 · documents/case link and checklist per connection 1.5–2 · category configuration screen 0.5–1 · legacy audit/flag tool 0.5–1 · unit + screen tests 1–1.5.
@@ -207,7 +247,7 @@ SQL + RLS + PGlite + rollback 1.5–2 · API, validation, duplicate function 1�
 4. **§8 vs the stepper.** See 3.2.
 5. **§7 vs staged 07** (`block`). See 3.
 6. **«Μπλοκάρισμα» removal** removes the only database refusal used by screen test 2e2 (replacement in 3.3).
-7. **«Not interested»** (§3.1) vs the contact-objection register (phase3/09). Which one is meant? They should not be conflated; the register is a legal record, the outcome is a sales note.
+7. **«Not interested»** (§3.1) vs the contact-objection register (phase3/09): **resolved 17/10/2026.** It is always a sales note. It goes to the register only when the customer explicitly asks not to be contacted again.
 8. **§3.3 "do not invent an unsolicited-contact policy"** vs phase3/09 (Article 11 / objection checks shown to staff). Already flagged for counsel in the earlier audit.
 9. **Legacy `supply_points` commission fields** vs the earlier decision "no commissions".
 10. **Your rules vs the prompt:** the prompt says "do not stop after an audit"; your rule is to stop and report. Your rule wins; nothing below is started.
@@ -257,18 +297,28 @@ Do not paste personal data back; counts and policy text are enough.
 
 ---
 
-## 9. Decisions and questions
+## 9. Decisions and what is still open (updated 17/10/2026)
 
-1. **Agent count** (and working days) for the cost table.
-2. **Per-agent visibility** (§2.2): confirm agents see only their own records. It is the biggest unlisted item (5–8 days).
-3. **Shared office login** accepted despite the audit loss, or individual office accounts with the same role?
-4. **Keep the `manager` role** (supervisor view) or hide it? Who is the second admin for emergencies?
-5. **07 split** as in section 3 and removal of «Μπλοκάρισμα»: approve.
-6. **New tab «Παροχές»** (changes the Part A tab order) or a panel in Σύνοψη.
-7. **Tariff categories:** who may edit the list (Sales and Back Office, per §6.2)? Seeds Γ1, Γ1Ν, Γ21, Γ22, Γ23 as given; the kVA descriptions stay informational.
-8. **Legacy supply data:** flag only, or also import the rows that match a CRM customer (after the section 8 results)?
-9. **Maps:** run the 1-day provider spike? Choose the provider after it. Confirm with counsel whether importing Google-sourced businesses into the CRM is allowed.
-10. **«Not interested»:** sales note, or contact-objection register, or both?
-11. **Paid scope:** confirm items and ranges with the client before any build.
+### Decided by the owner on 17/10/2026
+| # | Decision | Where it landed |
+|---|---|---|
+| 1 | **20 sales agents** | Section 4.3 (cost table recalculated) |
+| 2 | **07 split into 07a / 07b**, and **«Μπλοκάρισμα» removed** from the document setting; Back Office/admin may choose any stage with an audited reason | Built as staged SQL and app code in PRs #70 and #72 (not applied) |
+| 3 | **«Παροχές» is a new tab, right after Σύνοψη** | Section 6.5 |
+| 4 | **«Not interested» is always a sales note.** It goes to the contact-objection register **only** when the customer explicitly asks not to be contacted again | Section 7, item 7 |
 
-**Nothing is started.** After your answers I can start with the lowest-risk, highest-value pieces: the 07 split (3), the lead-create idempotency (2), and the supply-point staged SQL with its PGlite tests (6).
+### Waiting for the client
+| # | Question | Why it matters |
+|---|---|---|
+| 5 | **Do agents see only their own records?** (§2.2) | The biggest item not on the paid list: ownership-scoped RLS on leads, customers, cases, documents, follow-ups and visits, 5–8 days. Duplicate warnings need a database function that returns only "exists / owned by someone else". |
+| 6 | **Shared office login, or individual office accounts with the same role?** The owner is recommending individual accounts | A shared login cannot show who handled an ID image, and weakens the user audit built in #39 |
+| 7 | **Written approval of the paid items:** saved daily routes (12–17 days), duplicate/ownership approvals (6–9), multiple supply points (8–12), global custom fields (7–10) | Nothing in section 5 is built until then |
+
+### Still to decide (smaller)
+8. **Keep the `manager` role** (a supervisor view) or hide it? Who is the second admin for emergencies?
+9. **Tariff categories:** who may edit the list (Sales and Back Office, per §6.2)? Seeds Γ1, Γ1Ν, Γ21, Γ22, Γ23 as given; the kVA descriptions stay informational.
+10. **Legacy supply data:** flag only, or also import the rows that match a CRM customer (after the results of the section 8 queries)?
+11. **Maps:** run the 1-day provider spike (50 real Greek addresses, and how many searches a real agent day needs)? Confirm with counsel whether importing Google-sourced businesses into the CRM is allowed.
+12. **Lead creation in production:** run `docs/ops/LEAD_CREATION_CHECK.sql` (one file, read-only; PR #73) and send the grid back. It settles the question in section 2.
+
+**Nothing in sections 3–6 beyond the 07 split is started.** After your answers the lowest-risk first pieces are the lead-create idempotency (section 2) and the supply-point staged SQL with its PGlite tests (section 6).

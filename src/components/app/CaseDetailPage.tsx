@@ -10,6 +10,7 @@ import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorT
 import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
 import ContactEligibility from '@/components/contact/ContactEligibility';
+import { syncToast, syncWarningText } from '@/lib/lead-sync';
 import { canOpenFolder } from '@/lib/folder';
 import { casePatch, contactFormFrom, contactNameOk, contactSaveError, customerPatch } from '@/lib/contact-save';
 import type { ContactForm } from '@/lib/contact-save';
@@ -29,7 +30,7 @@ import {
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
   fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
-  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, updateCase, updateCustomer, customerNamesAvailable,
+  markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, syncLeadsFromCustomer, updateCase, updateCustomer, customerNamesAvailable,
   uploadDocumentFile,
 } from '@/lib/api';
 import {
@@ -629,6 +630,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const [contactForm, setContactForm] = useState<ContactForm>(contactFormFrom(null, {}));
   const [contactSaving, setContactSaving] = useState(false);
   const [contactErr, setContactErr] = useState<string | null>(null);
+  const [syncWarn, setSyncWarn] = useState<string | null>(null);
   const { toast: notify } = useToast();
   const [names, setNames] = useState(false);
   useEffect(() => { void customerNamesAvailable().then(setNames); }, []);
@@ -651,13 +653,18 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const saveContact = async () => {
     if (!c) return;
     setContactSaving(true); setContactErr(null);
-    const customerSaved = c.customer_id ? await updateCustomer(c.customer_id, customerPatch(contactForm, names, c.customer?.full_name || '—')) : true;
+    const cPatch = customerPatch(contactForm, names, c.customer?.full_name || '—');
+    const customerSaved = c.customer_id ? await updateCustomer(c.customer_id, cPatch) : true;
     const { error: caseError } = await updateCase(c.id, casePatch(contactForm));
     setContactSaving(false);
     const err = contactSaveError(customerSaved, caseError);
     if (err) { setContactErr(err); notify(err, 'bad'); return; }
+    // the customer is saved; the linked lead is a second write and is reported on its own (D3)
+    const sync = c.customer_id ? await syncLeadsFromCustomer(c.customer_id, { full_name: cPatch.full_name, phone: cPatch.phone, email: cPatch.email }) : { linked: 0, updated: 0, failed: [] as string[] };
+    setSyncWarn(syncWarningText(sync));
     setEditContact(false);
-    notify('Τα στοιχεία αποθηκεύτηκαν', 'ok');
+    const st = syncToast(sync);
+    notify(st.text, st.tone);
     await reload();
   };
 
@@ -820,6 +827,8 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
             </div>
           )}
         </Card>
+
+        {syncWarn && <p role="alert" data-sync-warning className="text-[13px] text-bad-600 mt-2 px-1">{syncWarn}</p>}
 
         {c.customer_id && <ContactEligibility subject={{ phone: c.customer?.phone ?? null, email: c.customer?.email ?? null, customerId: c.customer_id }} />}
 

@@ -19,7 +19,8 @@ import { leadStatusDisplay } from '@/lib/lead-status';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
 import { mergeHistory } from '@/lib/history-text';
-import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, updateCustomer } from '@/lib/api';
+import { syncToast, syncWarningText } from '@/lib/lead-sync';
+import { customerNamesAvailable, fetchCases, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
@@ -45,6 +46,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [leads, setLeads] = useState<Record<string, Lead | null>>({});
   const [leadActs, setLeadActs] = useState<Record<string, ActivityLogRow[] | null>>({});
   const [histTeam, setHistTeam] = useState('all');
+  const [syncWarn, setSyncWarn] = useState<string | null>(null);
   const staff = useStaff();
   const [editing, setEditing] = useState(false);
   const [names, setNames] = useState(false);
@@ -116,9 +118,15 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
       address: form.address || null, city: form.city || null, postal_code: form.postal_code || null, notes: form.notes,
       lat: form.lat.trim() === '' ? null : Number(form.lat), lng: form.lng.trim() === '' ? null : Number(form.lng),
     });
+    if (!ok) { setSaving(false); toast('Η αποθήκευση απέτυχε. Δοκιμάστε ξανά.', 'bad'); return; }
+    // the customer is saved; the linked lead is a second write and is reported on its own (D3)
+    const sync = await syncLeadsFromCustomer(cust.id, { full_name: (names ? composed : form.full_name.trim()) || cust.full_name, phone: form.phone, email: form.email });
     setSaving(false);
-    if (ok) { setEditing(false); toast('Τα στοιχεία αποθηκεύτηκαν', 'ok'); void load(); }
-    else toast('Η αποθήκευση απέτυχε. Δοκιμάστε ξανά.', 'bad');
+    setSyncWarn(syncWarningText(sync));
+    setEditing(false);
+    const t = syncToast(sync);
+    toast(t.text, t.tone);
+    void load();
   };
 
   const tel = cust.phone ? `tel:${cust.phone.replace(/\s+/g, '')}` : null;
@@ -171,6 +179,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
         {canEdit && !editing && !cust.deleted_at && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={openEdit}><Pencil size={14} /> Επεξεργασία</button>}
       </div>
       {notice !== null && <div className="atx-notice" data-folder-notice>{convertedNotice(notice)}</div>}
+      {syncWarn && <div className="atx-notice" role="alert" data-sync-warning>{syncWarn}</div>}
       {cust.deleted_at && <InTrashBanner type="customer" id={cust.id} deletedAt={cust.deleted_at} onRestored={() => void load()} />}
 
       {editing && (

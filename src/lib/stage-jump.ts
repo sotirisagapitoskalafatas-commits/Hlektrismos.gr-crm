@@ -76,3 +76,25 @@ export function stageSetErrorText(message: string | null | undefined): string {
   if (/unknown stage|case not found/i.test(m)) return 'Η αλλαγή σταδίου δεν ήταν δυνατή.';
   return 'Η αλλαγή σταδίου δεν αποθηκεύτηκε. Δοκιμάστε ξανά.';
 }
+
+
+/* ---- «Επαναφορά ολοκληρωμένου case» (staged phase2/07c reopen_completed_case) ----------------------------------
+   A completed case is final on the ordinary path. The one exception is an ADMIN, with a written reason, to one of the
+   working stages. Mirrors the SQL (a test compares them): who = admin only; only a completed case; the target is one of
+   new … activation, never completed, lost or cancelled. */
+export const canReopenCase = (role: Role | null | undefined, stage: string | null | undefined) => role === 'admin' && stage === 'completed';
+
+/** The stages the reopening may go to, in journey order. */
+export const reopenTargets = (): Stage[] => STAGES.map(s => s.id).filter(id => id !== 'completed' && id !== 'lost' && id !== 'cancelled');
+
+/** Greek text for a refusal of reopen_completed_case (or its absence). Never shows migration or developer wording. */
+export function reopenErrorText(message: string | null | undefined): string {
+  const m = message ?? '';
+  if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
+  if (/Could not find the function|PGRST202|schema cache/i.test(m)) return 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
+  if (/not allowed|42501|permission/i.test(m)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
+  if (/reason of at least/i.test(m)) return `Χρειάζεται αιτιολογία τουλάχιστον ${STAGE_SET_MIN_REASON} χαρακτήρων.`;
+  if (/not completed/i.test(m)) return 'Το case δεν είναι ολοκληρωμένο.';
+  if (/unknown stage|case not found/i.test(m)) return 'Η επαναφορά δεν ήταν δυνατή.';
+  return 'Η επαναφορά του case δεν αποθηκεύτηκε. Δοκιμάστε ξανά.';
+}

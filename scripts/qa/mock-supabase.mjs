@@ -121,6 +121,7 @@ const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
 let setStageOn = true; // GET /__setstage?state=on|off — phase2/07b set_case_stage applied or not (needs /__gates?state=on too)
+let reopenOn = true; // GET /__reopen?state=on|off — phase2/07c reopen_completed_case applied or not
 let contactOff = false; // GET /__contact?state=off → the consent functions are missing (phase3/09 not applied)
 let getFail = null; // GET /__getfail?table=activity_log → the next GET of that table fails once (read-error test)
 let patchFailHint = null; // GET /__patchfail?table=cases&hint=transition → the refusal looks like the 07b guard's (stage_transition_not_allowed)
@@ -225,6 +226,7 @@ http.createServer((req, res) => {
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
     if (url.pathname === '/__setstage') { setStageOn = url.searchParams.get('state') !== 'off'; return send(200, { setStageOn }); }
+    if (url.pathname === '/__reopen') { reopenOn = url.searchParams.get('state') !== 'off'; return send(200, { reopenOn }); }
     if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
     if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; patchFailHint = url.searchParams.get('hint') || null; return send(200, { patchFail }); }
@@ -335,6 +337,20 @@ http.createServer((req, res) => {
         else if (['lost', 'cancelled'].includes(json.p_stage)) c.status = 'lost';
         else if (['lost', 'cancelled'].includes(from)) c.status = 'open';
         TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'stage_set', title: `Αλλαγή σταδίου από Back Office: ${from} → ${json.p_stage}`, description: reason, user_id: u.id, occurred_at: new Date().toISOString(), location: null, metadata: { from, to: json.p_stage }, user: null });
+        return send(200, null);
+      }
+      if (name === 'reopen_completed_case') {
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!reopenOn) return send(404, { code: 'PGRST202', message: 'Could not find the function public.reopen_completed_case(p_case, p_reason, p_stage) in the schema cache', details: null, hint: null });
+        if (u?.role !== 'admin') return deny('reopen: not allowed');
+        const reason = String(json.p_reason ?? '').trim();
+        if (reason.length < 10) return send(400, { code: '22023', message: 'reopen: a reason of at least 10 characters is required' });
+        if (!['new', 'contacted', 'offer', 'application', 'signed', 'document_check', 'submitted', 'activation'].includes(json.p_stage)) return send(400, { code: '22023', message: 'reopen: unknown stage' });
+        const c = caseRows.find((x) => x.id === json.p_case);
+        if (!c) return send(400, { code: 'P0002', message: 'reopen: case not found' });
+        if (c.current_stage !== 'completed') return send(400, { code: 'P0001', message: 'reopen: the case is not completed' });
+        Object.assign(c, { current_stage: json.p_stage, status: 'open', activation_status: null });
+        TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'stage_set', title: `Επαναφορά ολοκληρωμένου case από διαχειριστή: completed → ${json.p_stage}`, description: reason, user_id: u.id, occurred_at: new Date().toISOString(), location: null, metadata: { from: 'completed', to: json.p_stage, reopened: true }, user: null });
         return send(200, null);
       }
       if (name === 'return_case_for_correction') {

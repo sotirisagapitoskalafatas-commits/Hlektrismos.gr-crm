@@ -6,7 +6,7 @@ import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 import { notTrashed } from './trash';
 import { parseStageError } from './case-return';
-import { stageSetErrorText } from './stage-jump';
+import { reopenErrorText, stageSetErrorText } from './stage-jump';
 import { DOC_STATUS_TEXT, statusText } from './status-text';
 import { stageChangeDescription, stageChangeTitle } from './history-text';
 import { leadSyncPatch } from './lead-sync';
@@ -581,7 +581,7 @@ export async function setCaseStage(caseId: string, stage: Stage, reason: string)
   const { error } = await supabase.rpc('set_case_stage', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
   if (!error) return null;
   logError('setCaseStage', error);
-  if (isMissingFunction(error)) stageSetProbe = { at: Date.now(), ok: false };
+  if (isMissingFunction(error)) installed.set('set_case_stage', { at: Date.now(), ok: false });
   return stageSetErrorText(`${error.code ?? ''} ${error.message ?? ''}`);
 }
 
@@ -589,16 +589,30 @@ export async function setCaseStage(caseId: string, stage: Stage, reason: string)
 const isMissingFunction = (e: { code?: string | null; message?: string | null }) =>
   /PGRST202/.test(e.code ?? '') || /Could not find the function|schema cache/i.test(e.message ?? '');
 
-/** Is set_case_stage installed? Asked with an EMPTY reason: the function checks the role and the reason before it reads or
- *  writes anything, so this call can never change data (a test proves it). Remembered for the session: «yes» for good,
- *  «no» for two minutes, so the control appears soon after the SQL is applied. Any other error counts as «installed». */
-let stageSetProbe: { at: number; ok: boolean } | null = null;
-export async function stageSetAvailable(): Promise<boolean> {
+/** Is a staged function installed? Asked with an EMPTY reason: both functions check the role and the reason before they read
+ *  or write anything, so this call can never change data (a test proves it for each). Remembered for the session: «yes» for
+ *  good, «no» for two minutes, so the control appears soon after the SQL is applied. Any other error counts as «installed». */
+const installed = new Map<string, { at: number; ok: boolean }>();
+async function rpcInstalled(name: string, stage: string): Promise<boolean> {
   if (!supabase) return false;
-  if (stageSetProbe && (stageSetProbe.ok || Date.now() - stageSetProbe.at < 120_000)) return stageSetProbe.ok;
-  const { error } = await supabase.rpc('set_case_stage', { p_case: '00000000-0000-0000-0000-000000000000', p_stage: 'new', p_reason: '' });
-  stageSetProbe = { at: Date.now(), ok: !(error && isMissingFunction(error)) };
-  return stageSetProbe.ok;
+  const seen = installed.get(name);
+  if (seen && (seen.ok || Date.now() - seen.at < 120_000)) return seen.ok;
+  const { error } = await supabase.rpc(name, { p_case: '00000000-0000-0000-0000-000000000000', p_stage: stage, p_reason: '' });
+  const ok = !(error && isMissingFunction(error));
+  installed.set(name, { at: Date.now(), ok });
+  return ok;
+}
+export const stageSetAvailable = () => rpcInstalled('set_case_stage', 'new');
+export const reopenAvailable = () => rpcInstalled('reopen_completed_case', 'activation');
+
+/** «Επαναφορά ολοκληρωμένου case» (staged phase2/07c): an admin reopens a completed case at a working stage, with a written reason. */
+export async function reopenCompletedCase(caseId: string, stage: Stage, reason: string): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('reopen_completed_case', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
+  if (!error) return null;
+  logError('reopenCompletedCase', error);
+  if (isMissingFunction(error)) installed.set('reopen_completed_case', { at: Date.now(), ok: false });
+  return reopenErrorText(`${error.code ?? ''} ${error.message ?? ''}`);
 }
 
 /** Set or clear (state null) a Back Office exception on a case (staged phase4/13). Returns a Greek error or null. */

@@ -576,6 +576,83 @@ if (!PREVIEW_LIVE) {
   await fetch(`${M}/rest/v1/cases?id=eq.${C3}`, { method: 'PATCH', headers: H, body: JSON.stringify({ current_stage: before.current_stage, status: before.status }) });
 }
 
+/* ---- 2e5. Admin reopens a completed case with a written reason; everyone else does not see it (staged phase2/07c) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json' };
+  const C3 = '30000000-0000-4000-8000-000000000003';
+  const patch = (body) => fetch(`${M}/rest/v1/cases?id=eq.${C3}`, { method: 'PATCH', headers: H, body: JSON.stringify(body) });
+  const getCase = async () => (await (await fetch(`${M}/rest/v1/cases?id=eq.${C3}&select=current_stage,status,activation_status`, { headers: H })).json())[0];
+  const before = await getCase();
+  const rpcs = async () => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.table === 'reopen_completed_case');
+  const completeIt = async () => { await fetch(`${M}/__gates?state=off`); await patch({ current_stage: 'completed', status: 'completed', activation_status: 'active' }); await fetch(`${M}/__gates?state=on`); };
+  const openC3 = async (page) => {
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === 'CS-2026-003' && e.offsetParent); el && el.click(); });
+    await sleep(1800);
+  };
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const reopenBtn = (page) => page.evaluate(() => [...document.querySelectorAll('[data-reopen] button')].find((b) => b.textContent.trim() === 'Επαναφορά case'));
+  await fetch(`${M}/__reopen?state=on`);
+  await completeIt();
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await openC3(page);
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(1200);
+    const opts = await page.evaluate(() => [...document.querySelectorAll('#reopen-target option')].map((o) => o.textContent.trim()));
+    check('Reopen: an admin sees the control on a completed case, with the working stages only (no «Ολοκληρώθηκε», «Χάθηκε», «Ακυρώθηκε»)',
+      opts[0] === 'Επιλέξτε στάδιο…' && opts.includes('Νέο') && opts.includes('Ενεργοποίηση') && opts.includes('Έλεγχος εγγράφων') && !opts.some((o) => ['Ολοκληρώθηκε', 'Χάθηκε', 'Ακυρώθηκε'].includes(o)), JSON.stringify(opts));
+    await setVal(page, '#reopen-target', 'document_check');
+    await setVal(page, '#reopen-reason', 'λίγο');
+    await sleep(200);
+    const disabled = await page.evaluate(() => [...document.querySelectorAll('[data-reopen] button')].find((b) => b.textContent.trim() === 'Επαναφορά case')?.disabled);
+    check('Reopen: a reason under 10 characters keeps the button disabled', disabled === true);
+    await setVal(page, '#reopen-reason', 'Ο πάροχος απέρριψε την ενεργοποίηση');
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('[data-reopen] button')].find((b) => b.textContent.trim() === 'Επαναφορά case')?.click());
+    await sleep(1800);
+    const call = (await rpcs()).pop();
+    check('Reopen: goes through reopen_completed_case with the stage and the written reason', call?.body?.p_case === C3 && call.body.p_stage === 'document_check' && call.body.p_reason === 'Ο πάροχος απέρριψε την ενεργοποίηση', JSON.stringify(call?.body));
+    const now = await getCase();
+    check('Reopen: the case is back in «Έλεγχος εγγράφων», open, and the activation is no longer confirmed', now.current_stage === 'document_check' && now.status === 'open' && now.activation_status === null, JSON.stringify(now));
+    await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(800);
+    const t = await page.evaluate(() => document.body.innerText);
+    check('History: one entry «Επαναφορά ολοκληρωμένου case από διαχειριστή: completed → document_check» with the reason', t.includes('Επαναφορά ολοκληρωμένου case από διαχειριστή') && t.includes('Ο πάροχος απέρριψε την ενεργοποίηση'));
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(800);
+    check('Reopen: once reopened the control is gone (the case is no longer completed)', await page.evaluate(() => !document.querySelector('[data-reopen]')));
+    await browser.close();
+  }
+  await completeIt();
+  for (const role of ['back_office', 'manager', 'inside_sales']) {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, role);
+    await openC3(page);
+    if (role !== 'inside_sales') { await click(page, 'Back Office', '[role="tab"]'); await sleep(1000); }
+    check(`Reopen: ${role} does not see the control on a completed case`, await page.evaluate(() => !document.querySelector('[data-reopen]')));
+    await browser.close();
+  }
+  // the SQL is not applied yet: one neutral Greek sentence, no form, nothing sent but the empty-reason question
+  await fetch(`${M}/__reopen?state=off`);
+  {
+    const seen = (await rpcs()).length;
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await openC3(page);
+    await click(page, 'Back Office', '[role="tab"]'); await sleep(1200);
+    const st = await page.evaluate(() => ({ note: document.querySelector('[data-reopen-unavailable]')?.textContent?.trim() ?? '', form: !!document.querySelector('#reopen-target, #reopen-reason'), box: document.querySelector('[data-reopen]')?.innerText ?? '' }));
+    const writes = (await rpcs()).slice(seen).filter((l) => String(l.body?.p_reason ?? '').trim() !== '');
+    check('Reopen: while the SQL is not applied there is one neutral Greek sentence and no form, and nothing is written',
+      st.note === 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.' && !st.form && writes.length === 0 && !/migration|phase|SQL|schema|PGRST|07c/i.test(st.box) && (await getCase()).current_stage === 'completed', JSON.stringify(st));
+    await browser.close();
+  }
+  // leave the shared mock as we found it
+  await fetch(`${M}/__reopen?state=on`);
+  await fetch(`${M}/__gates?state=off`);
+  await patch({ current_stage: before.current_stage, status: before.status, activation_status: before.activation_status ?? null });
+}
+
 /* ---- 2e3. Small fixes: queue row separator; a planned visit uses the case's address, not the planner's GPS ---- */
 {
   const M = 'http://127.0.0.1:54399';

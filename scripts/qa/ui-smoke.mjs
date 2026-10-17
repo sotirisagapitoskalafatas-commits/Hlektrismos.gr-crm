@@ -982,6 +982,18 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await sleep(1500);
   const body = () => page.evaluate(() => document.body.innerText);
   check('Lead detail: opens from My Work with the recommended action', (await body()).includes('Προτεινόμενη ενέργεια') && (await body()).includes('Καταγραφή πρώτης επικοινωνίας'));
+  {
+    const f = await page.evaluate(() => ({ badge: document.querySelector('[data-folder-badge]')?.textContent ?? '', tabs: [...document.querySelectorAll('main [role="tab"]')].map((b) => b.childNodes[0]?.textContent?.trim()) }));
+    check('Lead folder: badge «Lead» and the same tabs as the customer folder (no Back Office for Inside Sales)', f.badge === 'Lead' && JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f));
+    await click(page, 'Cases', '[role="tab"]'); await sleep(300);
+    const need1 = await page.evaluate(() => document.querySelector('[data-needs-case]')?.innerText ?? '');
+    await click(page, 'Υπογραφές', '[role="tab"]'); await sleep(300);
+    const need2 = await page.evaluate(() => document.querySelector('[data-needs-case]')?.innerText ?? '');
+    check('Lead folder: tabs that need a case say «Διαθέσιμο μετά τη μετατροπή σε Case»', need1.includes('Διαθέσιμο μετά τη μετατροπή σε Case') && need2.includes('Διαθέσιμο μετά τη μετατροπή σε Case'));
+    await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(300);
+    check('Lead folder: Ιστορικό holds the lead history', (await body()).includes('Νέο lead ·'));
+    await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(300);
+  }
   await click(page, 'Καταγραφή πρώτης επικοινωνίας');
   await sleep(1500);
   const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
@@ -1065,8 +1077,12 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
     el && el.click();
   });
   await sleep(1500);
+  // the lead is converted, so it opens the customer folder (Part B 4); its website files are in the folder's Έγγραφα
+  const redirected = await page.evaluate(() => !!document.querySelector('[data-folder-notice]'));
+  await click(page, 'Έγγραφα', '[role="tab"]'); await sleep(900);
+  await page.evaluate(() => [...document.querySelectorAll('[data-folder-scope] button')].find((b) => b.textContent.startsWith('CS-2026-001'))?.click()); await sleep(900);
   const t2 = await page.evaluate(() => document.body.innerText);
-  check('Website files: shown on the lead details', t2.includes('Αρχεία από τη φόρμα (2)') && t2.includes('IMG_4021.HEIC'));
+  check('Website files: a converted lead opens the folder, and its files are listed in Έγγραφα', redirected && t2.includes('Αρχεία που έστειλε ο πελάτης') && t2.includes('IMG_4021.HEIC'), String(redirected));
   await browser.close();
 }
 
@@ -1103,7 +1119,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
     }));
     check('Folder: one computed badge in the header', f.badge === 'Case σε εξέλιξη', f.badge);
     check('Folder: tabs in the fixed order (no Back Office for Inside Sales)', JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f.tabs));
-    check('Folder: header shows phone and «από …»; Σύνοψη shows the selected case stepper and the origin', /από \d/.test(f.header) && /CS-2026-00\d/.test(f.progress) && f.origin.includes('Lead ·'), JSON.stringify({ p: f.progress, o: f.origin.slice(0, 60) }));
+    check('Folder: header shows phone and «από …»; Σύνοψη shows the selected case stepper and the origin', /από \d/.test(f.header) && /CS-2026-00\d/.test(f.progress) && /Πηγή/.test(f.origin), JSON.stringify({ p: f.progress, o: f.origin.slice(0, 60) }));
     await click(page, 'Cases', '[role="tab"]'); await sleep(300);
     const nos = await page.$$eval('main [data-folder-case]', (b) => b.map((x) => x.getAttribute('data-folder-case')));
     const other = nos.find((n) => n !== f.progress);
@@ -1120,7 +1136,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
     check('Folder docs: choosing another case\'s document switches the folder to that case', (await page.evaluate(() => document.querySelector('[data-folder-docs]')?.getAttribute('data-folder-docs'))) === 'CS-2026-009');
     await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(300);
     check('Folder: «Προέλευση» says the lead is unavailable only when it cannot be read, never «χωρίς lead» for a case with a lead',
-      await page.evaluate(() => { const o = document.querySelector('[data-folder-origin]')?.innerText ?? ''; return o.includes('Lead ·') || (/δεν είναι διαθέσιμο/.test(o) && !/χωρίς lead/.test(o)); }));
+      await page.evaluate(() => { const o = document.querySelector('[data-folder-origin]')?.innerText ?? ''; return /Πηγή/.test(o) || (/δεν είναι διαθέσιμο/.test(o) && !/χωρίς lead/.test(o)); }));
     await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(300);
   }
   await click(page, 'Ιστορικό', '[role="tab"]'); await sleep(500);
@@ -1159,11 +1175,30 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await click(page, 'Αποθήκευση'); await sleep(1500);
   const log = await (await fetch('http://127.0.0.1:54399/__log')).json();
   check('Customer detail: edit saves via PATCH customers', log.some((l) => l.method === 'PATCH' && l.table === 'customers' && /Κέντρο/.test(l.body.city || '')));
-  // B4: Customer → Lead and Case → Lead links (inside_sales opens leads)
+  // Part B 4: the origin is read-only inside the folder (no bounce to a lead screen that redirects back); the case links to the folder
+  await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(400);
+  const o = await page.evaluate(() => ({ lead: !!document.querySelector('[data-origin-lead]'), btn: !!document.querySelector('main [data-open-lead]'), text: document.querySelector('[data-origin-lead]')?.innerText ?? '' }));
+  check('Folder: «Προέλευση» shows the lead read-only (source, dates) with no button back to a lead screen', o.lead && !o.btn && /Πηγή/.test(o.text) && /Μετατροπή/.test(o.text), o.text.slice(0, 80));
   await click(page, 'Cases', '[role="tab"]'); await sleep(400);
-  await page.evaluate(() => document.querySelector('main [data-open-lead]')?.click()); await sleep(1500);
-  const leadPage = await body();
-  check('Links: Customer → Lead opens the lead the case came from', /Επιστροφή σ/.test(leadPage) && leadPage.includes('Μετατράπηκε'), leadPage.slice(0, 120));
+  await page.evaluate(() => document.querySelector('[data-folder-case="CS-2026-001"]')?.closest('li')?.querySelector('button:last-child')?.click()); await sleep(1800);
+  const toFolder = await page.evaluate(() => !!document.querySelector('[data-open-folder]'));
+  await page.evaluate(() => document.querySelector('[data-open-folder]')?.click()); await sleep(1800);
+  check('Links: Case → «Φάκελος πελάτη» opens the customer folder (a converted lead has no screen of its own)', toFolder && (await page.evaluate(() => !!document.querySelector('[data-folder-badge]') && !!document.querySelector('main h1'))));
+  await browser.close();
+}
+
+/* ---- 9b. A converted lead opens the customer folder: «Μετατράπηκε → Φάκελος», one-line notice (Part B 4) ---- */
+{
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Leads', '#shell-rail nav button'); await sleep(1200);
+  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /ΜΕΤ/.test(b.textContent))?.click()); // converted tab
+  await sleep(600);
+  const btns = await page.$$eval('main [data-lead-to-folder]', (b) => b.map((x) => x.textContent.trim()));
+  check('Leads list: a converted row says «Μετατράπηκε → Φάκελος»', btns.length > 0 && btns.every((t) => t.includes('Μετατράπηκε → Φάκελος')), JSON.stringify(btns.slice(0, 2)));
+  await page.evaluate(() => document.querySelector('main [data-lead-to-folder] button')?.click()); await sleep(2500);
+  const r = await page.evaluate(() => ({ notice: document.querySelector('[data-folder-notice]')?.innerText ?? '', badge: document.querySelector('[data-folder-badge]')?.textContent ?? '', back: document.querySelector('main')?.innerText.includes('Επιστροφή στους πελάτες') }));
+  check('Converted lead: opens the customer folder with the one-line notice', /Το lead μετατράπηκε( στις \d\d\/\d\d)? — εδώ συνεχίζεται η εργασία/.test(r.notice) && r.back && r.badge !== 'Lead', JSON.stringify(r));
   await browser.close();
 }
 

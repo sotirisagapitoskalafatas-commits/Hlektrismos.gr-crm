@@ -9,7 +9,7 @@ import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
 import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
-import { canOpenLead } from '@/lib/lead-links';
+import { canOpenFolder } from '@/lib/folder';
 import { casePatch, contactFormFrom, contactNameOk, contactSaveError, customerPatch } from '@/lib/contact-save';
 import type { ContactForm } from '@/lib/contact-save';
 import { APPLICATION_STATUS_TEXT, OFFER_STATUS_TEXT, SIGNATURE_STATUS_TEXT, statusText } from '@/lib/status-text';
@@ -808,7 +808,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
                 <div className="mt-3 pt-3 border-t border-line">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="micro text-ink/40">Προέλευση · Lead</div>
-                    {canOpenLead(role) && <button type="button" data-open-lead className="text-[12px] font-medium text-brand-600 hover:underline" onClick={() => go('leads', { lead: lead.id })}>Άνοιγμα lead</button>}
+                    {c.customer_id && canOpenFolder(role) && <button type="button" data-open-folder className="text-[12px] font-medium text-brand-600 hover:underline" onClick={() => go('customers', { customer: c.customer_id! })}>Φάκελος πελάτη</button>}
                   </div>
                   <div className="text-xs text-ink/70 space-y-0.5">
                     <div>{leadSourceInfo(lead.source).emoji} {leadSourceInfo(lead.source).label}{lead.campaign_name ? ` · 📢 ${lead.campaign_name}` : ''}</div>

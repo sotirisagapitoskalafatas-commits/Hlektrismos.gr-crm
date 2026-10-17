@@ -27,20 +27,53 @@ export const teamForStage = (s: string): Team | null => STAGE_TEAM[s] ?? null;
 /** Stages where missing customer documents block progress. */
 const DOC_STAGES = ['application', 'signed', 'document_check', 'submitted'];
 
-export type StepState = 'done' | 'current' | 'upcoming';
+export type StepState = 'done' | 'current' | 'upcoming' | 'skipped';
 export interface Step { stage: string; label: string; state: StepState; reachable: boolean }
 
 /** Stepper model for the 9-step journey. Terminal outcomes are reported separately, never as a step. */
-export function journeySteps(current: string, allowedNext: readonly string[]): { steps: Step[]; outcome: string | null } {
+export function journeySteps(current: string, allowedNext: readonly string[], visited?: ReadonlySet<string> | null): { steps: Step[]; outcome: string | null } {
   const idx = JOURNEY.indexOf(current as (typeof JOURNEY)[number]);
   const outcome = (OUTCOMES as readonly string[]).includes(current) ? current : null;
   const steps = JOURNEY.map((stage, i) => ({
     stage,
     label: stageText(stage),
-    state: (idx < 0 ? 'upcoming' : i < idx ? 'done' : i === idx ? (stage === 'completed' ? 'done' : 'current') : 'upcoming') as StepState,
+    // With a known history, a stage before the current one that the case never occupied is «skipped», not «done»
+    // (a Back Office jump must not make it look as if the earlier work happened). Without history: as before.
+    state: (idx < 0 ? 'upcoming' : i < idx ? (visited && !visited.has(stage) ? 'skipped' : 'done') : i === idx ? (stage === 'completed' ? 'done' : 'current') : 'upcoming') as StepState,
     reachable: allowedNext.includes(stage),
   }));
   return { steps, outcome };
+}
+
+/* The stages a case really occupied, read from its stage entries (status_change / completed / stage_set), newest or
+   oldest first does not matter. null = no stage entry at all (older data): the stepper then behaves as before.
+   Stages below the lowest stage with evidence count as visited (unknown history is not «skipped»). */
+const STAGE_BY_TEXT: Record<string, string> = Object.fromEntries([
+  ...Object.keys(STAGE_LABEL).map(k => [k, k]), ...Object.entries(STAGE_LABEL).map(([k, v]) => [v, k]),
+]);
+const ARROW = /(?:Στάδιο|Αλλαγή σταδίου από Back Office):\s*(.+?)\s*→\s*(.+?)\s*$/;
+export function visitedStages(events: { activity_type: string; title?: string | null; metadata?: unknown }[], current: string): Set<string> | null {
+  const out = new Set<string>();
+  let found = false;
+  for (const e of events) {
+    if (!['status_change', 'completed', 'stage_set'].includes(e.activity_type)) continue;
+    const md = (e.metadata && typeof e.metadata === 'object' ? e.metadata : {}) as { from?: unknown; to?: unknown };
+    let from = typeof md.from === 'string' ? md.from : null;
+    let to = typeof md.to === 'string' ? md.to : null;
+    if (!from || !to) {
+      const m = ARROW.exec(e.title ?? '');
+      if (m) { from = STAGE_BY_TEXT[m[1]] ?? null; to = STAGE_BY_TEXT[m[2]] ?? null; }
+    }
+    if (!from || !to) continue;
+    found = true; out.add(from); out.add(to);
+  }
+  if (!found) return null;
+  out.add(current);
+  // Below the lowest stage we have evidence for, the history is simply unknown (older or partial data): keep those as before
+  // (done) instead of claiming they were skipped. «Skipped» only applies between known stages.
+  const known = [...out].map(st => JOURNEY.indexOf(st as (typeof JOURNEY)[number])).filter(i => i >= 0);
+  for (let i = 0; i < Math.min(...known); i++) out.add(JOURNEY[i]);
+  return out;
 }
 
 export interface CaseLikeForFlow {

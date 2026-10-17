@@ -6,6 +6,7 @@ import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
 import { notTrashed } from './trash';
 import { parseStageError } from './case-return';
+import { stageSetErrorText } from './stage-jump';
 import { DOC_STATUS_TEXT, statusText } from './status-text';
 import { stageChangeDescription, stageChangeTitle } from './history-text';
 import { leadIdentityColumns, leadNamePatch, leadWriteErrorText, safeDiagnostics } from './lead-payload';
@@ -569,6 +570,16 @@ export async function fetchStageGates(): Promise<StageGate[] | null> {
   const { data, error } = await supabase.from('stage_document_gates').select('stage, min_status, enabled').order('stage');
   if (error) return null;
   return (data ?? []) as StageGate[];
+}
+
+/** «Αλλαγή σταδίου από Back Office» (staged phase2/07b set_case_stage): Back Office/admin/manager move a case to any other stage
+ *  with a written reason; audited by the database. Returns a Greek error or null. Degrades to a neutral sentence while the SQL is not applied. */
+export async function setCaseStage(caseId: string, stage: Stage, reason: string): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.rpc('set_case_stage', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
+  if (!error) return null;
+  logError('setCaseStage', error);
+  return stageSetErrorText(error.message);
 }
 
 /** Set or clear (state null) a Back Office exception on a case (staged phase4/13). Returns a Greek error or null. */

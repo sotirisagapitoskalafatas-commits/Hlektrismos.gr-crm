@@ -1,40 +1,42 @@
-# Rollback material for the non-additive staged files (07, 10, 14)
+# Rollback material for the non-additive staged files (07b, 10, 14; 07a has its own file)
 
 Documentation only — nothing here has been applied anywhere. Run on **staging first**. Take a backup before production.
 
 Apply order (unchanged, matches the files and PR #46's table):
-1. `phase2/07`
+1. `phase2/07a` and `phase2/07b` (independent of each other, either order)
 2. `phase4/10`
 3. `phase4/11`
 4. `phase4/12`
 5. `phase4/13`
 6. `phase4/14`
 
-## phase2/07 — stage-transition list
+## phase2/07b — stage-transition list and «Αλλαγή σταδίου από Back Office»
 
 **What enforces it:**
 - trigger `cases_stage_guard` (`BEFORE UPDATE OF current_stage ON public.cases`) → function `public.cases_stage_guard()`;
 - it refuses a stage change made by a signed-in user unless the pair is in `public.case_stage_transitions`: `raise exception 'stage_transition_not_allowed: % -> %' ... hint = 'transition'`;
 - the service role (edge functions) and SECURITY DEFINER functions are not affected.
 
-**To turn it off:** `rollback_phase2_07_transitions.sql`.
-- **Option A** keeps the document gates and drops only the transition check (tested locally: `case-workflow.test.mjs`, last test).
+**To turn it off:** `rollback_phase2_07b.sql`.
+- **Option A** drops only the transition check and keeps `set_case_stage` (tested locally: `case-workflow.test.mjs`).
 - **Option B** drops the trigger.
+- **Option C** removes `set_case_stage` (its history stays).
+- 07a (checklist + return for correction) is rolled back separately with `rollback_phase2_07a.sql`; it keeps all data columns.
 
-### Every stage move the CRM makes today, and what happens after 07
+### Every stage move the CRM makes today, and what happens after 07b
 
-| Where | Move | After 07 |
+| Where | Move | After 07b |
 |---|---|---|
 | Case stepper / «Επόμενη ενέργεια» / stage dialog | only moves in the app's own list (`STAGE_TRANSITIONS`, same pairs as the table) | ✅ allowed |
 | Διεκπεραίωση (Back Office queue) forward button | next stage from the same list | ✅ allowed |
 | Reopen a lost / cancelled case | `lost → new`, `cancelled → new` | ✅ allowed |
 | Reopen a completed case | not offered today either (`completed` has no next stage) | — unchanged |
 | «Νέο Sale» handover (field) | **no stage change** (owner + next action only) | ✅ unaffected |
-| «Επιστροφή για διόρθωση» / «Επανυποβολή» | **no stage change** (function from 07 itself) | ✅ unaffected |
-| Admin/manager «Παράκαμψη» | only document blockers; the transition must still be in the list | as designed |
+| «Επιστροφή για διόρθωση» / «Επανυποβολή» | **no stage change** (functions from 07a) | ✅ unaffected |
+| Back Office / admin / manager «Αλλαγή σταδίου από Back Office» | **any** other stage, with a written reason (≥ 10 characters), audited; a completed case is final; «Ολοκληρώθηκε» only from «Ενεργοποίηση» | ✅ the one path beyond the list (`set_case_stage`) |
 | Case → tab «Back Office» → buttons «Ενεργοποίηση» / «Ολοκλήρωση» | fixed in `fix/bo-stage-buttons-handover`: only the allowed next stage is attempted; otherwise a Greek message names the stage the move comes from and the next step. A database refusal is shown on screen | ✅ allowed (once that fix is live) |
 
-⚠️ **Deploy that fix before applying 07.** Before the fix, these two buttons jumped straight to the stage and ignored the error, so after 07 a click would silently do nothing.
+⚠️ **Deploy that fix before applying 07b.** Before the fix, these two buttons jumped straight to the stage and ignored the error, so after 07b a click would silently do nothing.
 
 Edge functions do not write `current_stage` (checked: none in `supabase/functions`). Creating a case (insert) is not affected: the trigger is UPDATE-only.
 

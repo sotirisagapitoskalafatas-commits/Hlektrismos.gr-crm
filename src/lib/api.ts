@@ -559,30 +559,16 @@ export async function fetchStageBlockers(caseId: string, stage: Stage): Promise<
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('case_document_blockers', { p_case: caseId, p_stage: stage });
   if (error || !Array.isArray(data)) return null;
-  return (data as { label: string; status: StageBlocker['status']; mode?: StageBlocker['mode'] }[]).map(b => ({ label: b.label, status: b.status, mode: b.mode }));
+  return (data as { label: string; status: StageBlocker['status'] }[]).map(b => ({ label: b.label, status: b.status }));
 }
 
-/* Document gate per stage (staged phase2/07): 'warn' (default) or 'block'. null = not available yet. */
-export type StageGate = { stage: Stage; min_status: 'received' | 'verified'; mode: 'warn' | 'block'; enabled: boolean };
+/* Document level per stage (staged phase2/07a): which documents a stage expects, for the warnings only — nothing blocks. null = not available yet. */
+export type StageGate = { stage: Stage; min_status: 'received' | 'verified'; enabled: boolean };
 export async function fetchStageGates(): Promise<StageGate[] | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('stage_document_gates').select('stage, min_status, mode, enabled').order('stage');
+  const { data, error } = await supabase.from('stage_document_gates').select('stage, min_status, enabled').order('stage');
   if (error) return null;
   return (data ?? []) as StageGate[];
-}
-export async function setStageGateMode(stage: Stage, mode: 'warn' | 'block'): Promise<string | null> {
-  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
-  const { error } = await supabase.rpc('set_stage_gate_mode', { p_stage: stage, p_mode: mode });
-  if (!error) return null;
-  if (/not allowed|42501/i.test(error.message)) return 'Μόνο ο διαχειριστής αλλάζει αυτή τη ρύθμιση.';
-  if (/Could not find the function|PGRST202/i.test(error.message)) return 'Η ρύθμιση δεν είναι ακόμη διαθέσιμη.';
-  return 'Η αλλαγή δεν αποθηκεύτηκε.';
-}
-
-export async function overrideStage(caseId: string, stage: Stage, reason: string): Promise<{ error: StageError | null }> {
-  if (!supabase) return { error: { kind: 'other', message: 'Database not configured' } };
-  const { error } = await supabase.rpc('change_case_stage_override', { p_case: caseId, p_stage: stage, p_reason: reason.trim() });
-  return { error: parseStageError(error) };
 }
 
 /** Set or clear (state null) a Back Office exception on a case (staged phase4/13). Returns a Greek error or null. */

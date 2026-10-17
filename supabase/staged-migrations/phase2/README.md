@@ -37,19 +37,25 @@
 
 ---
 
-# 07 — Server-enforced case workflow (NOT applied)
+# 07a / 07b — Case workflow (NOT applied)
 
-`07_case_return_and_document_gates.sql` — owner decisions A/B/C of the role addendum.
+The former single `07_case_return_and_document_gates.sql` is split in two independent files (owner decision of 17/10/2026). Either can be applied alone, in either order, and twice. The former file is kept only as a test fixture (`supabase/tests/fixtures/phase2_07_former.sql`) to prove the upgrade path.
 
-- **Document gates (trigger on `cases.current_stage`), per-stage setting `stage_document_gates.mode`:**
-  - **`warn` (default for every stage; meeting decision of 15/10/2026):** missing, rejected or unverified documents are listed in the case checklist and the stage dialog, but a stage change or a handover to Back Office is never refused. The dialog records the move in the case history together with the missing documents.
-  - **`block`:** a browser write is refused when required documents are missing/rejected (entering «Έλεγχος εγγράφων») or not verified (entering «Καταχώρηση παρόχου», «Ενεργοποίηση», «Ολοκληρώθηκε»). The error carries the list (`hint = document_blockers`, `detail` = JSON) and the app shows it. Admin/manager can override with a reason.
-  - **Switching modes:** an admin uses `set_stage_gate_mode(stage, mode)` (audited in `activity_log`), from *Διαχείριση → Έγγραφα*. Whether «Καταχώρηση Παρόχου» should block is left to the owner.
-  - Requirements and gate levels live in `document_requirements` / `stage_document_gates`, seeded from the app's indicative checklist. They **need business confirmation per provider/service before production**.
-- **Allowed transitions** (`case_stage_transitions`) = the app's matrix, enforced for browser writes.
-- **Override:** `change_case_stage_override` — admin/manager, reason ≥ 10 characters, transition must still be allowed; recorded on the timeline (with the blockers that were skipped) and in `activity_log`.
-- **Επιστροφή για διόρθωση:** `return_case_for_correction` — Back Office/admin/manager, only in Back Office stages, reason ≥ 10 + at least one item, to Inside or Field Sales. Same case and stage; responsibility moves to the team owner (managers notified when nobody is assigned); timeline + `app_notifications` + `activity_log`. **Επανυποβολή:** `resubmit_returned_case` by the receiving team/person or admin/manager → back to the Back Office owner, notified. Return columns are writable only through these functions.
+## `07a_document_checklist_and_return.sql`
+- **Document checklist — warnings only. There is no blocking mode and no override** (master prompt §7: missing documents never block; the «Μπλοκάρισμα» option was removed on the owner's approval). Missing, rejected or unverified documents are listed in the case checklist and the stage dialog; a stage change or a handover to Back Office is never refused. `case_document_blockers(case, stage)` stays as an informational function.
+  - Requirements and levels live in `document_requirements` / `stage_document_gates` (`document_check` = received; `submitted` / `activation` / `completed` = verified), seeded from the app's indicative checklist. They **need business confirmation per provider/service before production**.
+- **Επιστροφή για διόρθωση:** `return_case_for_correction` — Back Office/admin/manager, only in Back Office stages, reason ≥ 10 + at least one item, to Inside or Field Sales. Same case and stage; responsibility moves to the team owner (managers notified when nobody is assigned). `resubmit_returned_case` hands it back. Both are audited.
+- **If the former 07 was already applied on staging:** this file sets any gate left on `block` back to `warn` and drops `set_stage_gate_mode` and `change_case_stage_override`. The column `stage_document_gates.mode`, if present, stays (nothing reads it).
+- Rollback: `docs/ops/rollback_phase2_07a.sql` (data columns stay).
+
+## `07b_case_stage_guard_and_set_stage.sql`
+- **Allowed moves** (`case_stage_transitions`) = the app's matrix (`STAGE_TRANSITIONS`), enforced for **direct** writes by signed-in users (trigger on `cases.current_stage`). Sales roles work inside this list. The guard no longer looks at documents.
+- **`set_case_stage(case, stage, reason)` — «Αλλαγή σταδίου από Back Office»:** Back Office, admin and manager (the roles that hold `create_application` in the app; a test keeps the two lists equal) may move a case to **any other stage**, with a written reason (≥ 10 characters). Audited on the timeline (`stage_set`) and in `activity_log` with the actor.
+  - **Owner decisions in the function, each one line to change:** a completed case is final; a case is completed only from «Ενεργοποίηση».
+  - **Columns:** like the app's `changeStage` — completed → `status = 'completed'`, `activation_status = 'active'`; lost / cancelled → `status = 'lost'`; leaving lost / cancelled → `status = 'open'`.
 - Edge functions using the service role are not affected by the trigger (trusted server paths).
-- Local evidence: `node --test supabase/tests/case-workflow.test.mjs` — 8/8.
-- **Impact when applied:** cases currently moved forward without uploaded documents will be refused until the documents exist in the CRM or a manager overrides. Plan a short review of open cases first.
-- Rollback: drop triggers `cases_stage_guard`, `cases_return_guard` and the functions (incl. `set_stage_gate_mode`); the tables/columns can stay.
+- **Impact when applied:** direct stage writes outside the list are refused (the app already prevents them, PR #49). Nothing about documents changes.
+- Rollback: `docs/ops/rollback_phase2_07b.sql`, option A, B or C.
+
+## Local evidence (PGlite, not staging)
+`node --test supabase/tests/case-workflow.test.mjs supabase/tests/stage-jump.test.mjs supabase/tests/stage-set.test.mjs` — 9 + 7 + 8. Includes: a role × from × to matrix (605 combinations) against an independent statement of the rule, the same for direct writes, the SQL role list equal to the app's, seven apply orders, and the upgrade from the former 07.

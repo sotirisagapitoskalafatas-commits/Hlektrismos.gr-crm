@@ -26,7 +26,8 @@ These files sit outside `supabase/migrations/`, so the GitHub integration never 
 | 6 | `phase1/04_cron_secret_and_pause.sql` | Tariff cron authenticates with a dedicated secret. Unschedules the two outreach schedulers | **No**: replaces cron jobs | Owner pre-steps: `CRON_SECRET` + Vault entries (in the file) | Chatbot prices could go stale if the tariff sync fails; the form is unaffected | Security / operations |
 | 7 | `phase4/15_convert_lead_match_phone_only.sql` *(new)* | Lead → Case conversion reuses a customer **only by phone** (last 10 digits). Never by email, never the placeholder | Function replaced (same signature) | none | No: affects office conversion only | **Data correctness: high** (D1) |
 | 8 | `phase2/06_trash_leads_customers.sql` | Κάδος for leads and customers; admin-only permanent delete | Mostly additive (columns, functions); adds a **restrictive** policy that hides trashed rows | after 05 (same review) | No (definer RPC and service role are unaffected) | Normal |
-| 9 | `phase2/07_case_return_and_document_gates.sql` | Allowed stage transitions (trigger), per-stage document gates in «warn», return for correction | **No**: new trigger on `cases.current_stage` | **PR #49 must be live first.** Decide the role model; review open cases | No (the trigger is UPDATE-only and the service role is exempt) | Normal, behaviour change |
+| 9 | `phase2/07a_document_checklist_and_return.sql` | Document checklist that only **warns** (never blocks) + «Επιστροφή για διόρθωση». Owner decision 17/10: the «Μπλοκάρισμα» option and the override are gone | Additive (tables, columns, functions). Drops only what the *former* single 07 created, if it was ever applied on staging | Decide the role model (who may return a case) | No | Normal |
+| 9b | `phase2/07b_case_stage_guard_and_set_stage.sql` | Allowed stage moves for direct writes (trigger) + **«Αλλαγή σταδίου από Back Office»**: Back Office/admin/manager set any stage, with a written reason, audited | **No**: new trigger on `cases.current_stage` | **PR #49 must be live first** (it is). The app control for set_case_stage degrades to a neutral Greek sentence until this is applied | No (the trigger is UPDATE-only and the service role is not affected) | Normal |
 | 10 | `phase4/10_field_checkin_manual_flag.sql` | Check-in always accepted, with a review flag (no 150 m rejection) | Function replaced | none | No | Normal (field complaint) |
 | 11 | `phase4/11_customer_names.sql` | `customers.first_name / last_name` | Yes | none | No | Low |
 | 12 | `phase4/12_default_backoffice_assignee.sql` | Default Back Office assignee setting + routing | Yes | role model (who counts as "Back Office") | No | Normal |
@@ -48,7 +49,8 @@ Item 8 (06) can move anywhere after 05. Items 10–14 are independent of each ot
 | phase1/02, 04 | Outreach is off by switches. The tariff cron uses the old authentication |
 | phase4/15 | People without email can be joined to one customer on conversion (D1) |
 | phase2/06 | «Διαγραφή» shows «ο κάδος ενεργοποιείται μετά…»; nothing is trashed |
-| phase2/07 | Stage moves are checked only in the app. Document gates show warnings. Return for correction is unavailable |
+| phase2/07a | Document gaps are shown as warnings (never block). Return for correction is unavailable |
+| phase2/07b | Stage moves are checked only in the app. Back Office cannot jump to another stage: «Αλλαγή σταδίου από Back Office» is unavailable (the app shows a neutral sentence) |
 | phase4/10 | The server refuses check-ins more than 150 m away; the app offers «Καταγραφή χωρίς GPS» |
 | phase4/11 | One «Ονοματεπώνυμο» field (the app checks once per session) |
 | phase4/12 | Leads with documents stay with their creator, who is told routing is not active |
@@ -69,14 +71,15 @@ Item 8 (06) can move anywhere after 05. Items 10–14 are independent of each ot
 | phase1/04 | Re-create the jobs from `20260819000009_pg_cron_autonomous.sql` |
 | phase4/15 | [`rollback_phase4_15_convert_lead.sql`](rollback_phase4_15_convert_lead.sql): the original function verbatim (tested) |
 | phase2/06 | Drop the two restrictive policies, triggers and functions; the columns can stay |
-| phase2/07 | [`rollback_phase2_07_transitions.sql`](rollback_phase2_07_transitions.sql), option A or B (tested) |
+| phase2/07a | [`rollback_phase2_07a.sql`](rollback_phase2_07a.sql) (tested; data columns stay) |
+| phase2/07b | [`rollback_phase2_07b.sql`](rollback_phase2_07b.sql), option A, B or C (tested) |
 | phase4/10 | [`rollback_phase4_10_field_checkin.sql`](rollback_phase4_10_field_checkin.sql) (tested) |
 | phase4/11–14 | Comment at the end of each file; the columns can stay |
 | phase3/08 | Drop the new tables, functions and trigger; redeploy the previous `scrape-b2b` |
 | phase3/09 | At the end of the file. It drops the recorded objections, consents and screenings, so **export them first** |
 
-## Decide before applying 05 and 07
-The client asks for **two** roles: Admin/Back Office, and Sales agent. Both 05 (the staff administration matrix) and 07 (who may return a case, and to which team) are written for the current **five**. See `docs/product/ROLE_MODEL.md` for the two paths and what each means for these files.
+## Decide before applying 05 and 07a
+The client asks for **two** roles: Admin/Back Office, and Sales agent. Both 05 (the staff administration matrix) and 07a (who may return a case, and to which team) are written for the current **five**. See `docs/product/ROLE_MODEL.md` for the two paths and what each means for these files.
 
 ## Local evidence (PGlite, not staging)
 `npm test` runs every file under `supabase/tests/`. Relevant here:

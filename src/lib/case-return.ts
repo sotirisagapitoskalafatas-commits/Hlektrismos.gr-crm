@@ -1,5 +1,5 @@
 /* Case workflow rules on the client (pure, unit-tested). The database is the authority
-   (staged migration phase2/07); these only decide what to OFFER and how to explain a refusal. */
+   (staged migrations phase2/07a and 07b); these only decide what to OFFER and how to explain a refusal. */
 
 import type { Role } from './roles';
 
@@ -20,29 +20,20 @@ export const canResubmit = (role: Role | null | undefined, uid: string | null | 
 export const defaultReturnTeam = (items: string[]): ReturnTeam => (items.some(i => /υπογ/i.test(i)) ? 'field_sales' : 'inside_sales');
 
 export type BlockerStatus = 'missing' | 'rejected' | 'unverified';
-/** mode: 'warn' (default — shown, never blocks) or 'block' (the database refuses the move). Absent = an older server: treat as block. */
-export interface StageBlocker { label: string; status: BlockerStatus; mode?: 'warn' | 'block' }
-export type StageError = { kind: 'documents'; blockers: StageBlocker[] } | { kind: 'transition' } | { kind: 'other'; message: string };
+/** What is missing for a stage. Information only: documents never block a stage change or a handover (07a). */
+export interface StageBlocker { label: string; status: BlockerStatus }
+export type StageError = { kind: 'transition' } | { kind: 'other'; message: string };
 
 export const BLOCKER_TEXT: Record<BlockerStatus, string> = { missing: 'λείπει', rejected: 'απορρίφθηκε', unverified: 'δεν έχει ελεγχθεί' };
 
-/** Reads the database refusal raised by cases_stage_guard (hint + JSON detail). */
+/** Reads the database refusal raised by cases_stage_guard (hint 'transition'). */
 export function parseStageError(err: { message?: string; details?: string | null; hint?: string | null } | null | undefined): StageError | null {
   if (!err) return null;
-  if (err.hint === 'document_blockers' || /stage_blocked/.test(err.message ?? '')) {
-    try {
-      const list = JSON.parse(err.details ?? '[]') as { label?: string; status?: string }[];
-      return { kind: 'documents', blockers: list.map(b => ({ label: String(b.label ?? ''), status: (['missing', 'rejected', 'unverified'].includes(String(b.status)) ? b.status : 'missing') as BlockerStatus })) };
-    } catch { return { kind: 'documents', blockers: [] }; }
-  }
   if (err.hint === 'transition' || /stage_transition_not_allowed/.test(err.message ?? '')) return { kind: 'transition' };
   return { kind: 'other', message: err.message ?? '' };
 }
 
 export function stageErrorText(e: StageError): string {
-  if (e.kind === 'documents') return e.blockers.length
-    ? `Δεν επιτρέπεται η μετάβαση: ${e.blockers.map(b => `${b.label} (${BLOCKER_TEXT[b.status]})`).join(' · ')}.`
-    : 'Δεν επιτρέπεται η μετάβαση: λείπουν απαιτούμενα έγγραφα.';
   if (e.kind === 'transition') return 'Η μετάβαση σε αυτό το στάδιο δεν επιτρέπεται από το τρέχον στάδιο.';
   if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(e.message)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
   if (/not allowed|42501|permission/i.test(e.message)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';

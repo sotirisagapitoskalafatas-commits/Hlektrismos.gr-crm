@@ -1,5 +1,5 @@
 // LOCAL verification only (PGlite): the Back Office «Ενεργοποίηση» / «Ολοκλήρωση» buttons (src/lib/stage-jump.ts) against the
-// transition guard of supabase/staged-migrations/phase2/07. NOT staging or production verification.
+// transition guard of supabase/staged-migrations/phase2/07b (07b alone: no other staged file is loaded). NOT staging or production verification.
 import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -70,7 +70,7 @@ before(async () => {
     grant select, insert, update, delete on public.cases, public.case_documents, public.timeline_events, public.app_notifications, public.activity_log to authenticated;
     insert into public.profiles values ('${ADMIN}','Admin','admin',true),('${BO}','BO','back_office',true);
   `);
-  await db.exec(read('../staged-migrations/phase2/07_case_return_and_document_gates.sql'));
+  await db.exec(read('../staged-migrations/phase2/07b_case_stage_guard_and_set_stage.sql'));
 });
 
 test('the app list of allowed moves (STAGE_TRANSITIONS) is exactly the database list (case_stage_transitions)', async () => {
@@ -80,7 +80,7 @@ test('the app list of allowed moves (STAGE_TRANSITIONS) is exactly the database 
   assert.deepEqual(inApp, inDb);
 });
 
-test('every stage × both buttons: the app writes only when the 07 guard accepts the move, otherwise it shows a Greek message', async () => {
+test('every stage × both buttons: the app writes only when the 07b guard accepts the move, otherwise it shows a Greek message', async () => {
   for (const { id: stage } of J.STAGES) {
     for (const target of ['activation', 'completed']) {
       if (stage === target) continue; // the button is not shown on its own stage
@@ -123,14 +123,22 @@ test('impossible jump: nothing is written and the message says where the move co
   assert.deepEqual(await click(id, 'activation'), { wrote: true, ok: true, message: null });
 });
 
-test('a database refusal of an allowed move (gate set to «block») is shown, not swallowed', async () => {
-  await as(ADMIN);
-  assert.equal((await run("select public.set_stage_gate_mode('activation', 'block')")).ok, true);
+test('a database refusal of a move the app believed allowed is shown, not swallowed (e.g. a list changed on the server)', async () => {
+  // The only refusal left for a direct write is the allowed-moves list. Simulate a server list that no longer has this move.
+  await su();
+  await db.exec("delete from public.case_stage_transitions where from_stage = 'submitted' and to_stage = 'activation'");
   const id = await newCase('submitted');
   const r = await click(id, 'activation');
-  assert.equal(r.wrote, true); assert.equal(r.ok, false);
-  assert.match(r.message, /^Δεν επιτρέπεται η μετάβαση: Ταυτότητα — εμπρός όψη \(λείπει\)/);
+  assert.equal(r.wrote, true, 'the app list still allows it, so the write is attempted');
+  assert.equal(r.ok, false);
+  assert.equal(r.message, 'Η μετάβαση σε αυτό το στάδιο δεν επιτρέπεται από το τρέχον στάδιο.');
   assert.equal(await stageOf(id), 'submitted');
-  await as(ADMIN);
-  await run("select public.set_stage_gate_mode('activation', 'warn')");
+  await su();
+  await db.exec("insert into public.case_stage_transitions values ('submitted', 'activation') on conflict do nothing");
+});
+
+test('documents are not part of the guard: the same move with no documents at all goes through', async () => {
+  const id = await newCase('submitted');
+  assert.equal((await press(id, 'activation')).ok, true);
+  assert.equal(await stageOf(id), 'activation');
 });

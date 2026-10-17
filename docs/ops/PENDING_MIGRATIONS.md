@@ -28,6 +28,7 @@ These files sit outside `supabase/migrations/`, so the GitHub integration never 
 | 8 | `phase2/06_trash_leads_customers.sql` | Κάδος for leads and customers; admin-only permanent delete | Mostly additive (columns, functions); adds a **restrictive** policy that hides trashed rows | after 05 (same review) | No (definer RPC and service role are unaffected) | Normal |
 | 9 | `phase2/07a_document_checklist_and_return.sql` | Document checklist that only **warns** (never blocks) + «Επιστροφή για διόρθωση». Owner decision 17/10: the «Μπλοκάρισμα» option and the override are gone | Additive (tables, columns, functions). Drops only what the *former* single 07 created, if it was ever applied on staging | Decide the role model (who may return a case) | No | Normal |
 | 9b | `phase2/07b_case_stage_guard_and_set_stage.sql` | Allowed stage moves for direct writes (trigger) + **«Αλλαγή σταδίου από Back Office»**: Back Office/admin/manager set any stage, with a written reason, audited | **No**: new trigger on `cases.current_stage` | **PR #49 must be live first** (it is). The app control for set_case_stage degrades to a neutral Greek sentence until this is applied | No (the trigger is UPDATE-only and the service role is not affected) | Normal |
+| 9c | `phase2/07c_reopen_completed_case.sql` *(new)* | **«Επαναφορά ολοκληρωμένου case»**: an admin reopens a completed case to a working stage, with a written reason, audited | Yes: one function, no table, column or trigger | none (independent of 07a and 07b) | No (nothing changes until an admin uses it) | Low |
 | 10 | `phase4/10_field_checkin_manual_flag.sql` | Check-in always accepted, with a review flag (no 150 m rejection) | Function replaced | none | No | Normal (field complaint) |
 | 11 | `phase4/11_customer_names.sql` | `customers.first_name / last_name` | Yes | none | No | Low |
 | 12 | `phase4/12_default_backoffice_assignee.sql` | Default Back Office assignee setting + routing | Yes | role model (who counts as "Back Office") | No | Normal |
@@ -51,6 +52,7 @@ Item 8 (06) can move anywhere after 05. Items 10–14 are independent of each ot
 | phase2/06 | «Διαγραφή» shows «ο κάδος ενεργοποιείται μετά…»; nothing is trashed |
 | phase2/07a | Document gaps are shown as warnings (never block). Return for correction is unavailable |
 | phase2/07b | Stage moves are checked only in the app. Back Office cannot jump to another stage: «Αλλαγή σταδίου από Back Office» is unavailable (the app shows a neutral sentence) |
+| phase2/07c | An admin cannot reopen a completed case; the control shows «Η λειτουργία δεν είναι ακόμη διαθέσιμη.» |
 | phase4/10 | The server refuses check-ins more than 150 m away; the app offers «Καταγραφή χωρίς GPS» |
 | phase4/11 | One «Ονοματεπώνυμο» field (the app checks once per session) |
 | phase4/12 | Leads with documents stay with their creator, who is told routing is not active |
@@ -73,6 +75,7 @@ Item 8 (06) can move anywhere after 05. Items 10–14 are independent of each ot
 | phase2/06 | Drop the two restrictive policies, triggers and functions; the columns can stay |
 | phase2/07a | [`rollback_phase2_07a.sql`](rollback_phase2_07a.sql) (tested; data columns stay) |
 | phase2/07b | [`rollback_phase2_07b.sql`](rollback_phase2_07b.sql), option A, B or C (tested) |
+| phase2/07c | [`rollback_phase2_07c.sql`](rollback_phase2_07c.sql) (drops the function; reopened cases stay reopened, listed from `activity_log`) |
 | phase4/10 | [`rollback_phase4_10_field_checkin.sql`](rollback_phase4_10_field_checkin.sql) (tested) |
 | phase4/11–14 | Comment at the end of each file; the columns can stay |
 | phase3/08 | Drop the new tables, functions and trigger; redeploy the previous `scrape-b2b` |

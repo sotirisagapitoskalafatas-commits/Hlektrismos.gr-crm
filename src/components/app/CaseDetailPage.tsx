@@ -7,8 +7,9 @@ import { buildChecklist, docLabel } from '@/lib/documents';
 import { CaseExceptionCard, CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
 import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
-import { checkJump } from '@/lib/stage-jump';
-import { stageText } from '@/lib/case-flow';
+import { STAGE_SET_MIN_REASON, canUseStageSet, checkJump, stageSetTargets } from '@/lib/stage-jump';
+import { stageText, visitedStages } from '@/lib/case-flow';
+import { setCaseStage } from '@/lib/api';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import { canOpenFolder } from '@/lib/folder';
 import { casePatch, contactFormFrom, contactNameOk, contactSaveError, customerPatch } from '@/lib/contact-save';
@@ -470,6 +471,52 @@ export function SignaturesTab({ caseId }: { caseId: string }) {
 }
 
 /* ================= Back Office ================= */
+/* «Αλλαγή σταδίου από Back Office» (staged phase2/07b): the case continues from where it really is. Any other stage, with a
+   written reason; recorded with the user. It does not touch documents and does not pretend the skipped stages were done. */
+function StageSetControl({ c, reload }: { c: Case; reload: () => void }) {
+  const { role } = useAuth();
+  const { toast: notify } = useToast();
+  const targets = useMemo(() => stageSetTargets(role, c.current_stage), [role, c.current_stage]);
+  const [target, setTarget] = useState<Stage | ''>('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { setTarget(''); setReason(''); setMsg(null); }, [c.id, c.current_stage]);
+  if (!canUseStageSet(role)) return null;
+  const submit = async () => {
+    if (!target || busy) return;
+    setBusy(true); setMsg(null);
+    const err = await setCaseStage(c.id, target, reason);
+    setBusy(false);
+    if (err) { setMsg(err); notify(err, 'bad'); return; }
+    notify(`Στάδιο: ${stageText(target)}`, 'ok');
+    reload();
+  };
+  return (
+    <div className="p-3 rounded-xl bg-paper border border-line" data-stage-set>
+      <div className="text-[13px] font-medium text-ink">Αλλαγή σταδίου (Back Office)</div>
+      <p className="text-xs text-ink/55 mt-1 mb-2">
+        Για case που πρέπει να συνεχίσει από άλλο στάδιο, π.χ. ήρθε με πλήρη φάκελο ή γυρίζει πίσω για διόρθωση. Καταγράφεται με την αιτιολογία και τον χρήστη.
+        Δεν αλλάζει τα έγγραφα και τα στάδια που παραλείπονται δεν θεωρούνται ολοκληρωμένα.
+      </p>
+      {targets.length === 0 ? (
+        <p className="text-xs text-ink/55 m-0" data-stage-set-final>Το case έχει ολοκληρωθεί· δεν αλλάζει στάδιο.</p>
+      ) : (
+        <div className="space-y-2">
+          <select className="field !py-1.5 text-[13px]" value={target} onChange={e => setTarget(e.target.value as Stage | '')} aria-label="Νέο στάδιο" id="stage-set-target">
+            <option value="">Επιλέξτε στάδιο…</option>
+            {targets.map(s => <option key={s} value={s}>{stageText(s)}</option>)}
+          </select>
+          <textarea className="field text-[13px]" rows={2} id="stage-set-reason" value={reason} onChange={e => setReason(e.target.value)} aria-label="Αιτιολογία"
+            placeholder={`Γιατί συνεχίζει από αυτό το στάδιο; (τουλάχιστον ${STAGE_SET_MIN_REASON} χαρακτήρες — καταγράφεται)`} />
+          {msg && <p role="alert" data-stage-set-error className="text-[13px] text-bad-600 m-0">{msg}</p>}
+          <Btn variant="brand" disabled={busy || !target || reason.trim().length < STAGE_SET_MIN_REASON} onClick={() => void submit()}>{busy ? '…' : 'Αλλαγή σταδίου'}</Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
   const { role } = useAuth();
   const [docs, setDocs] = useState<CaseDocument[]>([]);
@@ -530,6 +577,7 @@ export function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
       <CardHeader title="Διεκπεραίωση" />
       {can(role, 'create_application') || can(role, 'submit_provider') || can(role, 'change_stage') ? (
         <div className="space-y-4">
+          <StageSetControl c={c} reload={reload} />
           <div className="p-3 rounded-xl bg-paper border border-line">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div>
@@ -662,6 +710,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   };
 
   const [upcomingVersion, setUpcomingVersion] = useState(0);
+  const [stageHistory, setStageHistory] = useState<TimelineEvent[] | null>(null);
   const reload = useCallback(async () => {
     const data = await fetchCase(caseId);
     setUpcomingVersion(v => v + 1);
@@ -669,6 +718,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       setC(data);
       setLead(data.lead_id ? await fetchLead(data.lead_id) : null);
       setDocs(await fetchDocuments(caseId));
+      setStageHistory(await fetchTimeline(caseId));
     }
   }, [caseId]);
 
@@ -720,7 +770,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
         </div>
       </div>
 
-      <CaseProgress c={c} allowedNext={allowedNext} canChange={canChange} onPick={setStagePending} />
+      <CaseProgress c={c} allowedNext={allowedNext} canChange={canChange} onPick={setStagePending} visited={stageHistory ? visitedStages(stageHistory, c.current_stage) : null} />
 
       {/* Next step + customer */}
       <div className="grid lg:grid-cols-3 gap-4">

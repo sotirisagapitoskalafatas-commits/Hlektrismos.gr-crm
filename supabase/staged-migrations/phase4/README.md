@@ -57,3 +57,15 @@
 - Count (read-only) and manual review: `docs/ops/D1_PLACEHOLDER_EMAIL.md`. Rollback: `docs/ops/rollback_phase4_15_convert_lead.sql`.
 - Local evidence: `node --test supabase/tests/convert-lead-d1.test.mjs` — 7/7. Independent of the other files; full order in `docs/ops/PENDING_MIGRATIONS.md`.
 
+## 16 — Copy the legacy leads into the CRM (one-time data script, NOT applied)
+`16_import_legacy_leads.sql` copies `hlektrismos_leads` (130 rows on live, newest 24/08/2026) into `public.leads`, which is the only table the CRM lists. Owner request 18/10/2026.
+- **Dry run first:** `docs/ops/LEGACY_LEADS_IMPORT_DRYRUN.sql` (read-only, counts only): how many would be copied, skipped as duplicates, skipped as unmappable, plus a check that the old-table columns exist.
+- **Copy:** nothing is deleted or changed in the old table. Every copied row has `source = 'import'`, `source_label = 'Παλιά βάση'` and the tags `import`, `legacy_import:<old id>` (the marker that makes a second run copy nothing), and `legacy_source:<old source>`. The original date is kept.
+- **Skipped:** already imported · soft-deleted · no name · no phone and no e-mail (the placeholder e-mail counts as empty) · status that cannot be mapped · same phone (last 10 digits) or e-mail as a lead the CRM already has · repeated inside the old table (the oldest is copied).
+- **Statuses:** mapped to the values `leads_status_check` allows. Old "beyond lead" statuses (converted, customer, won, active, …) become **qualified** with a `legacy_status:<old>` tag; they are never marked «converted» because no case exists for them. **Owner decision**, one CASE in the file.
+- **Consent** is copied as recorded (`gdpr_consent`, `consent_version 'legacy'`, `consent_source 'legacy_import'`). Rows without recorded consent are copied but visibly so; do not contact them until the contact-eligibility rules (phase3/09) are applied.
+- **Not copied:** `government_id`, bill files, scores, assignments. Imported leads are unassigned.
+- One statement (atomic); one `activity_log` entry with the counts only.
+- Local evidence: `node --test supabase/tests/legacy-leads-import.test.mjs`, 5/5, against the real `leads` definition and constraints.
+- Rollback: `docs/ops/rollback_phase4_16_legacy_leads_import.sql` (deletes only imported leads without a case or conversion).
+

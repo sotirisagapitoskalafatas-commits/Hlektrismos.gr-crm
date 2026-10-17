@@ -120,6 +120,7 @@ const PREVIEW_EXPIRES = '2026-10-15T21:00:00.000Z';
 // ---- Contact eligibility (mirrors staged-migrations/phase3/09; synthetic) ----
 const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
+let contactOff = false; // GET /__contact?state=off → the consent functions are missing (phase3/09 not applied)
 let getFail = null; // GET /__getfail?table=activity_log → the next GET of that table fails once (read-error test)
 let patchFail = null; // GET /__patchfail?table=customers → the next PATCH to that table fails once (save-error test)
 let leadFail = null; // GET /__leadfail?code=42501 → the next POST to leads fails with that code (error-display test)
@@ -223,6 +224,7 @@ http.createServer((req, res) => {
     const send = (code, obj, extra = {}) => { res.writeHead(code, { ...cors, ...extra }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { /* ignore */ }
     if (url.pathname === '/__log') return send(200, log);
+    if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
     if (url.pathname === '/__patchfail') { patchFail = url.searchParams.get('table') || null; return send(200, { patchFail }); }
     if (url.pathname === '/__leadfail') { leadFail = url.searchParams.get('code') || null; return send(200, { leadFail }); } // next leads POST fails once
@@ -401,6 +403,7 @@ http.createServer((req, res) => {
       // ---- Contact eligibility ----
       if (['contact_facts', 'record_contact_objection', 'lift_contact_objection', 'record_contact_consent', 'withdraw_contact_consent', 'record_article11_screening'].includes(name)) {
         if (name !== 'contact_facts') log.push({ method: 'RPC', table: name, body: json });
+        if (contactOff) return send(404, { code: 'PGRST202', message: `Could not find the function public.${name} in the schema cache`, details: null, hint: null });
         if (!u) return deny(`${name}: not allowed`);
         const pk = cPhone(json.p_phone), ek = cEmail(json.p_email);
         const bad = (m) => send(400, { code: '22023', message: `${name}: ${m}` });

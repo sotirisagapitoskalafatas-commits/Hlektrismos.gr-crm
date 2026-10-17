@@ -1463,6 +1463,99 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await wipe();
 }
 
+/* ---- 9e. Παροχές: each connection is opened, edited and saved on its own; archive and restore (staged phase5/17) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const seedPoint = async (fields) => (await (await fetch(`${M}/rest/v1/customer_supply_points`, { method: 'POST', headers: H, body: JSON.stringify({ customer_id: ATHINA, ...fields }) })).json())[0];
+  const rows = async () => (await (await fetch(`${M}/rest/v1/customer_supply_points?customer_id=eq.${ATHINA}&order=created_at.asc`, { headers: H })).json());
+  const patches = async () => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'PATCH' && l.table === 'customer_supply_points');
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const inCard = (n, sel) => `[data-supply-card="${n}"] ${sel}`;
+  const clickSel = (page, sel) => page.evaluate((q) => { const el = document.querySelector(q); el && el.click(); return !!el; }, sel);
+  const wipe = async () => { await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H }); };
+  await fetch(`${M}/__supply?state=on`);
+  await wipe();
+  const A = await seedPoint({ usage: 'residential', property_address: 'Οδός Α 1', supply_number: '12345678901', tariff_category_code: 'Γ1', tariff_name: 'Πράσινο' });
+  const B = await seedPoint({ usage: 'commercial', property_address: 'Οδός Β 2', supply_number: '22222222222', tariff_category_code: 'Γ21', tariff_name: 'Επαγγελματικό' });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await click(page, 'Πελάτες', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Αθηνά Κωνσταντίνου')); el && el.click(); });
+    await sleep(1800);
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(600);
+    // open BOTH editors
+    await clickSel(page, inCard(1, '[data-sp-edit]')); await clickSel(page, inCard(2, '[data-sp-edit]')); await sleep(300);
+    check('Επεξεργασία: each card opens its own editor; both can be open at once', await page.evaluate(() => document.querySelectorAll('[data-supply-editor]').length) === 2);
+    // the category list follows the usage: commercial offers Γ21, Γ22, Γ23 (not Γ1, Γ1Ν); residential the reverse
+    const catsB = await page.evaluate((q) => [...document.querySelectorAll(q + ' option')].map((o) => o.textContent.trim()), inCard(2, '[data-sp-field="category"]'));
+    const catsA = await page.evaluate((q) => [...document.querySelectorAll(q + ' option')].map((o) => o.textContent.trim()), inCard(1, '[data-sp-field="category"]'));
+    check('Επεξεργασία: the tariff category list is the configurable one, filtered by usage', JSON.stringify(catsB) === JSON.stringify(['—', 'Γ21', 'Γ22', 'Γ23']) && JSON.stringify(catsA) === JSON.stringify(['—', 'Γ1', 'Γ1Ν']), JSON.stringify([catsA, catsB]));
+    // an invalid number: the error shows under the field and only this editor's save is blocked
+    await setVal(page, inCard(2, '[data-sp-field="number"]'), '123');
+    await sleep(200);
+    const st1 = await page.evaluate(() => ({ err: document.querySelector('[data-supply-card="2"] [data-sp-error="number"]')?.textContent ?? '', saveB: document.querySelector('[data-supply-card="2"] [data-sp-save]')?.disabled, saveA: document.querySelector('[data-supply-card="1"] [data-sp-save]')?.disabled }));
+    check('Επεξεργασία: a given number that is not 11 digits shows the message and blocks only that connection\'s save', st1.err.includes('11 ψηφία') && st1.saveB === true && st1.saveA === false, JSON.stringify(st1));
+    // type something in A (not saved), then fully edit and save B
+    await setVal(page, inCard(1, '[data-sp-field="address"]'), 'ΜΗ ΑΠΟΘΗΚΕΥΜΕΝΗ ΔΙΕΥΘΥΝΣΗ Α');
+    await setVal(page, inCard(2, '[data-sp-field="number"]'), '98765432109');
+    await setVal(page, inCard(2, '[data-sp-field="address"]'), 'Νέα Οδός Β 22');
+    await setVal(page, inCard(2, '[data-sp-field="meter"]'), 'ΜΤ-2002');
+    await setVal(page, inCard(2, '[data-sp-field="meter_type"]'), 'three_phase');
+    await setVal(page, inCard(2, '[data-sp-field="category"]'), 'Γ22');
+    await setVal(page, inCard(2, '[data-sp-field="tariff"]'), 'Business Pro');
+    await setVal(page, inCard(2, '[data-sp-field="applied"]'), '2026-10-15');
+    await setVal(page, inCard(2, '[data-sp-field="months"]'), '36');
+    await sleep(200);
+    await clickSel(page, inCard(2, '[data-sp-save]')); await sleep(1800);
+    const p = (await patches()).pop();
+    check('Αποθήκευση: one PATCH addressed by THAT connection\'s id, with no customer in the body', p && p.query.includes(`id=eq.${B.id}`) && !('customer_id' in p.body) && p.body.supply_number === '98765432109' && p.body.tariff_category_code === 'Γ22', JSON.stringify(p));
+    const r = await rows();
+    const a1 = r.find((x) => x.id === A.id), b1 = r.find((x) => x.id === B.id);
+    check('Αποθήκευση: B has the new values, with the category code and the tariff name kept in separate fields', b1.property_address === 'Νέα Οδός Β 22' && b1.meter_identifier === 'ΜΤ-2002' && b1.meter_type === 'three_phase' && b1.tariff_category_code === 'Γ22' && b1.tariff_name === 'Business Pro' && b1.application_date === '2026-10-15' && b1.contract_months === 36 && b1.supply_number_ok === true, JSON.stringify(b1));
+    check('Αποθήκευση: A is untouched in the database', a1.property_address === 'Οδός Α 1' && a1.supply_number === '12345678901' && a1.tariff_category_code === 'Γ1' && a1.updated_at === A.updated_at, JSON.stringify(a1));
+    const ui = await page.evaluate(() => ({ editorB: !!document.querySelector('[data-supply-card="2"] [data-supply-editor]'), editorA: !!document.querySelector('[data-supply-card="1"] [data-supply-editor]'), typedA: document.querySelector('[data-supply-card="1"] [data-sp-field="address"]')?.value ?? null,
+      shownB: document.querySelector('[data-supply-card="2"] [data-supply-field="category"]')?.textContent, shownTariff: document.querySelector('[data-supply-card="2"] [data-supply-field="tariff"]')?.textContent }));
+    check('Αποθήκευση: B closes and shows the saved values; A\'s open editor keeps what was typed (nothing was overwritten)', !ui.editorB && ui.editorA && ui.typedA === 'ΜΗ ΑΠΟΘΗΚΕΥΜΕΝΗ ΔΙΕΥΘΥΝΣΗ Α' && ui.shownB === 'Γ22' && ui.shownTariff === 'Business Pro', JSON.stringify(ui));
+    // A: change the usage to commercial → the list follows; clear the number (optional); save
+    await setVal(page, inCard(1, '[data-sp-field="usage"]'), 'commercial'); await sleep(200);
+    const catsA2 = await page.evaluate((q) => [...document.querySelectorAll(q + ' option')].map((o) => o.textContent.trim()), inCard(1, '[data-sp-field="category"]'));
+    check('Επεξεργασία: changing the usage changes the offered categories, and a code that is no longer in the list is kept and marked', JSON.stringify(catsA2) === JSON.stringify(['—', 'Γ21', 'Γ22', 'Γ23', 'Γ1 (εκτός λίστας)']), JSON.stringify(catsA2));
+    await setVal(page, inCard(1, '[data-sp-field="usage"]'), 'residential');
+    await setVal(page, inCard(1, '[data-sp-field="number"]'), '');
+    await sleep(200);
+    await clickSel(page, inCard(1, '[data-sp-save]')); await sleep(1800);
+    const pa = (await patches()).pop();
+    const a2 = (await rows()).find((x) => x.id === A.id), b2 = (await rows()).find((x) => x.id === B.id);
+    check('Αποθήκευση: A saves with an EMPTY supply number (nothing is mandatory) and only A changes', pa.query.includes(`id=eq.${A.id}`) && a2.supply_number === null && a2.property_address === 'ΜΗ ΑΠΟΘΗΚΕΥΜΕΝΗ ΔΙΕΥΘΥΝΣΗ Α' && JSON.stringify(b2) === JSON.stringify(b1), JSON.stringify([pa.body.supply_number, a2.supply_number]));
+    // cancel leaves the stored values alone
+    await clickSel(page, inCard(2, '[data-sp-edit]')); await sleep(200);
+    await setVal(page, inCard(2, '[data-sp-field="address"]'), 'ΔΕΝ ΘΑ ΑΠΟΘΗΚΕΥΤΕΙ');
+    await clickSel(page, inCard(2, '[data-sp-cancel]')); await sleep(300);
+    check('Άκυρο: closes the editor and changes nothing', (await rows()).find((x) => x.id === B.id).property_address === 'Νέα Οδός Β 22' && !(await page.evaluate(() => document.body.innerText.includes('ΔΕΝ ΘΑ ΑΠΟΘΗΚΕΥΤΕΙ'))));
+    // archive B (two steps), then restore
+    await clickSel(page, inCard(2, '[data-sp-archive]')); await sleep(200);
+    const asked = await page.evaluate(() => !!document.querySelector('[data-sp-archive-box]'));
+    await clickSel(page, inCard(2, '[data-sp-archive-confirm]')); await sleep(1800);
+    const afterArchive = await page.evaluate(() => ({ cards: document.querySelectorAll('[data-supply-card]:not([data-supply-card="archived"])').length, toggle: document.querySelector('[data-supply-archived-toggle]')?.textContent?.trim() ?? '',
+      tab: [...document.querySelectorAll('main [role="tab"]')].find((b) => b.childNodes[0]?.textContent?.trim() === 'Παροχές')?.querySelector('span')?.textContent }));
+    check('Αρχειοθέτηση: asks first; the connection leaves the list (not deleted), the count drops, and it stays in the archive', asked && afterArchive.cards === 1 && afterArchive.toggle.includes('(1)') && afterArchive.tab === '1' && (await rows()).length === 2 && !!(await rows()).find((x) => x.id === B.id).archived_at, JSON.stringify(afterArchive));
+    await clickSel(page, '[data-supply-archived-toggle]'); await sleep(300);
+    const archTitle = await page.evaluate(() => document.querySelector('[data-supply-card="archived"] [data-supply-title]')?.textContent ?? '');
+    await clickSel(page, '[data-supply-card="archived"] [data-sp-restore]'); await sleep(1800);
+    const back = await page.evaluate(() => [...document.querySelectorAll('[data-supply-card] [data-supply-title]')].map((t) => t.textContent));
+    check('Επαναφορά: an archived connection is listed as «Αρχειοθετημένη — Επαγγελματικό» and comes back with all its data', archTitle === 'Αρχειοθετημένη — Επαγγελματικό' && JSON.stringify(back) === JSON.stringify(['Παροχή 1 — Οικιακό', 'Παροχή 2 — Επαγγελματικό']) && (await rows()).find((x) => x.id === B.id).tariff_name === 'Business Pro', JSON.stringify(back));
+    await browser.close();
+  }
+  // the connection\'s customer can never be part of an edit: the mock (like the database) refuses it
+  const bad = await fetch(`${M}/rest/v1/customer_supply_points?id=eq.${A.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ customer_id: '20000000-0000-4000-8000-000000000002' }) });
+  check('A connection cannot be moved to another customer (refused)', bad.status === 400 && (await rows()).find((x) => x.id === A.id).customer_id === ATHINA);
+  await wipe();
+}
+
 /* ---- 9b. A converted lead opens the customer folder: «Μετατράπηκε → Φάκελος», one-line notice (Part B 4) ---- */
 {
   const { browser, page } = await launch(1440, 900);

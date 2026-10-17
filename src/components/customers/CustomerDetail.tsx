@@ -21,8 +21,8 @@ import { caseCountText } from '@/lib/status-text';
 import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
-import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
-import type { SupplyPoint } from '@/lib/supply-points';
+import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
 import { caseNextStep, customerSummary, journeySteps, stageText } from '@/lib/case-flow';
@@ -51,6 +51,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [histTeam, setHistTeam] = useState('all');
   // undefined = loading; null = the staged SQL (phase5/17) is not applied yet
   const [supplyPoints, setSupplyPoints] = useState<SupplyPoint[] | null | undefined>(undefined);
+  const [tariffs, setTariffs] = useState<TariffCategory[] | null>(null);
   const [syncWarn, setSyncWarn] = useState<string | null>(null);
   const staff = useStaff();
   const [editing, setEditing] = useState(false);
@@ -63,9 +64,10 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const canEdit = can(role, 'edit_case');
 
   const load = useCallback(async () => {
-    const [c, all, sp] = await Promise.all([fetchCustomer(customerId), fetchCases({ includeDone: true }), fetchSupplyPoints(customerId)]);
+    const [c, all, sp, tc] = await Promise.all([fetchCustomer(customerId), fetchCases({ includeDone: true }), fetchSupplyPoints(customerId), fetchTariffCategories()]);
     setCust(c);
     setSupplyPoints(sp);
+    setTariffs(tc);
     const mine = all.filter(k => k.customer_id === customerId).sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     setCases(mine);
     const [d, t] = await Promise.all([
@@ -312,7 +314,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
         </div>
       )}
 
-      {tab === 'supply' && <SupplyPointsTab customerId={cust.id} points={supplyPoints} canEdit={canEdit && !cust.deleted_at} reload={() => void load()} />}
+      {tab === 'supply' && <SupplyPointsTab customerId={cust.id} points={supplyPoints} tariffs={tariffs} canEdit={!cust.deleted_at} reload={() => void load()} />}
 
       {tab === 'cases' && (
         <div className="atx-panel">

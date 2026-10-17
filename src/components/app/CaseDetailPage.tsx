@@ -9,6 +9,7 @@ import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
 import { checkJump } from '@/lib/stage-jump';
 import { stageText } from '@/lib/case-flow';
+import ContactEligibility from '@/components/contact/ContactEligibility';
 import { canOpenFolder } from '@/lib/folder';
 import { casePatch, contactFormFrom, contactNameOk, contactSaveError, customerPatch } from '@/lib/contact-save';
 import type { ContactForm } from '@/lib/contact-save';
@@ -819,6 +820,8 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
             </div>
           )}
         </Card>
+
+        {c.customer_id && <ContactEligibility subject={{ phone: c.customer?.phone ?? null, email: c.customer?.email ?? null, customerId: c.customer_id }} />}
 
       </div>
 

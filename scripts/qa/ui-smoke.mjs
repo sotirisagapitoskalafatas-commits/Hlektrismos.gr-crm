@@ -1271,6 +1271,42 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await browser.close();
 }
 
+/* ---- 10c. Consent block on the case (Part B 5): «μπορώ να καλέσω;» where most calls start; hidden for non-admins until phase3/09 is applied ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const openCase6 = async (page) => {
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === 'CS-2026-006' && e.offsetParent); el && el.click(); });
+    await sleep(2000);
+  };
+  const block = (page) => page.evaluate(() => { const b = document.querySelector('[data-contact-eligibility]'); return b ? { text: b.innerText, call: b.querySelector('[data-channel="call"]')?.getAttribute('data-allowed') ?? null } : null; });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCase6(page);
+    const b = await block(page);
+    check('Case: «Επικοινωνία & συγκαταθέσεις» is on the case, with the same per-channel answer as on the lead and customer', !!b && b.text.includes('Επικοινωνία & συγκαταθέσεις') && b.call === 'no', JSON.stringify(b?.call));
+    await browser.close();
+  }
+  await fetch(`${M}/__contact?state=off`);
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCase6(page);
+    check('Case: while phase3/09 is not applied, non-admins do not see the block at all (no developer wording)', (await block(page)) === null);
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await openCase6(page);
+    const b = await block(page);
+    check('Case: while phase3/09 is not applied, an admin sees the block with the plain-Greek unavailable note', !!b && b.text.includes('Ο έλεγχος συγκαταθέσεων δεν είναι ακόμη διαθέσιμος'), b?.text.slice(0, 60));
+    await browser.close();
+  }
+  await fetch(`${M}/__contact?state=on`);
+}
+
 /* ---- 11. Field day: order, arrival prompt, check-in without GPS (accepted + flagged), outcome-gated check-out ---- */
 {
   {

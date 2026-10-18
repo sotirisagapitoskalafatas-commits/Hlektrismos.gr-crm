@@ -9,6 +9,7 @@ from (values
   ('phase1/03_drop_exec_sql',                  not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'exec_sql'), 'no public.exec_sql (true also if it never existed)'),
   ('phase1/16_storage_docs_lockdown',          exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'website uploads contact forms')
                                                and not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'hlektrismos_docs_anon_select'), 'storage policies'),
+  ('phase1/17_anon_restrictive_lockdown',     exists (select 1 from pg_policies where schemaname = 'public' and policyname = 'anon never (restrictive)'), 'restrictive policy «anon never (restrictive)»'),
   ('phase2/05_staff_admin_and_role_preview',   exists (select 1 from pg_trigger where tgname = 'profiles_guard_privileged'), 'trigger profiles_guard_privileged'),
   ('phase2/06_trash_leads_customers',          exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'leads' and column_name = 'deleted_at'), 'column leads.deleted_at'),
   ('phase2/07a_document_checklist_and_return', to_regprocedure('public.return_case_for_correction(uuid,text,jsonb,text)') is not null, 'function return_case_for_correction'),

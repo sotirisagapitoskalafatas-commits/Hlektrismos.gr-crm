@@ -12,7 +12,7 @@ select c.col as legacy_column,
  order by 2 desc, 1;
 
 -- ───────────── 2) What the import would do ─────────────
--- >>> CLASSIFY (identical in the dry-run file; a test compares the two)
+-- >>> CLASSIFY (identical in the import file; a test compares the two)
 with src as (
   select h.id, h.created_at,
          nullif(btrim(coalesce(h.first_name, '')), '') as first_name,
@@ -57,7 +57,7 @@ with src as (
                            and right(regexp_replace(l.phone, '\D', '', 'g'), 10) = m.phone_key)
                           or (m.email is not null and lower(btrim(coalesce(l.email, ''))) = m.email)))
           or exists (select 1 from mapped e
-                      where e.id <> m.id and (e.created_at, e.id) < (m.created_at, m.id)
+                      where e.id <> m.id and e.deleted_at is null and (e.created_at, e.id) < (m.created_at, m.id)
                         and ((m.phone_key is not null and e.phone_key = m.phone_key) or (m.email is not null and e.email = m.email)))) as possible_duplicate
     from mapped m
 )
@@ -65,15 +65,15 @@ with src as (
 select r.item, r.n from (
     select 1 as ord, 'MODE: READ-ONLY dry run — nothing is written' as item, 0::bigint as n
     union all select 2, 'legacy rows in total', count(*) from classified
-    union all select 3, 'already imported by an earlier run (skipped)', count(*) filter (where already_imported) from classified
-    union all select 4, 'TO COPY in this run', count(*) filter (where not already_imported) from classified
-    union all select 5, 'of those: without recorded consent → «not for marketing»', count(*) filter (where not consent and not is_deleted and not already_imported) from classified
-    union all select 6, 'of those: soft-deleted in the old table → «unqualified», not for marketing', count(*) filter (where is_deleted and not already_imported) from classified
-    union all select 7, 'of those: possible duplicates (tagged, not merged)', count(*) filter (where possible_duplicate and not already_imported) from classified
-    union all select 8, 'of those: no name (named «Χωρίς όνομα»)', count(*) filter (where no_name and not already_imported) from classified
-    union all select 9, 'of those: no phone and no e-mail', count(*) filter (where no_contact and not already_imported) from classified
-    union all select 10, 'statuses: mapped directly', count(*) filter (where status_kind = 'direct' and not already_imported) from classified
-    union all select 11, 'statuses: «beyond lead» → qualified', count(*) filter (where status_kind = 'beyond_lead' and not already_imported) from classified
-    union all select 12, 'statuses: unknown or empty → new', count(*) filter (where status_kind = 'unknown' and not already_imported) from classified
+    union all select 3, 'already imported by an earlier run (skipped)', count(*) filter (where already_imported and not is_deleted) from classified
+    union all select 4, 'skipped_deleted: soft-deleted in the old table (they stay there)', count(*) filter (where is_deleted) from classified
+    union all select 5, 'TO COPY in this run', count(*) filter (where not already_imported and not is_deleted) from classified
+    union all select 6, 'of those: without recorded consent → «not for marketing»', count(*) filter (where not consent and not already_imported and not is_deleted) from classified
+    union all select 7, 'of those: possible duplicates (tagged, not merged)', count(*) filter (where possible_duplicate and not already_imported and not is_deleted) from classified
+    union all select 8, 'of those: no name (named «Χωρίς όνομα»)', count(*) filter (where no_name and not already_imported and not is_deleted) from classified
+    union all select 9, 'of those: no phone and no e-mail', count(*) filter (where no_contact and not already_imported and not is_deleted) from classified
+    union all select 10, 'statuses: mapped directly', count(*) filter (where status_kind = 'direct' and not already_imported and not is_deleted) from classified
+    union all select 11, 'statuses: «beyond lead» → qualified', count(*) filter (where status_kind = 'beyond_lead' and not already_imported and not is_deleted) from classified
+    union all select 12, 'statuses: unknown or empty → new', count(*) filter (where status_kind = 'unknown' and not already_imported and not is_deleted) from classified
     union all select 13, 'distinct old statuses in use', count(distinct old_status) from classified
   ) r order by r.ord;

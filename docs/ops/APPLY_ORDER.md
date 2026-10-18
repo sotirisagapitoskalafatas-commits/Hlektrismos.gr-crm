@@ -1,6 +1,6 @@
 # Apply order — every staged SQL file not yet on live
 
-**One list, in the exact order to run them.** 21 files, security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
+**One list, in the exact order to run them.** 22 files (21 numbered steps and step 2b, added by the security audit), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
 ## Before step 1
@@ -36,6 +36,15 @@ select exists (select 1 from pg_policies where schemaname='storage' and tablenam
 - **Check:**
 ```sql
 select exists (select 1 from pg_policies where schemaname='public' and tablename='crm_integrations' and policyname='admin manage crm_integrations') as applied;
+```
+
+## 2b. `phase1/17_anon_restrictive_lockdown.sql` — security (new, from the security audit F-02, F-06)
+- **Depends on:** step 2 (it closes what phase1/01 leaves open for the anonymous role).
+- **Unlocks on screen:** nothing visible. **Additive:** no policy dropped, no grant revoked — it adds a RESTRICTIVE «anon: never» policy to 12 legacy tables that still carry `using (true)` policies for the role `public` (commissions, agent attribution, customer document records, sales agents, staff directory, tasks, integrations, e-mails, legacy supply points/meters), and pins the `search_path` of `create_crm_user()`. The website form is not affected (`hlektrismos_leads` is not touched).
+- **Rollback:** [`rollback_phase1_17_anon_restrictive_lockdown.sql`](rollback_phase1_17_anon_restrictive_lockdown.sql) (drops only its own policies).
+- **Check** (at least one table had the policy added; a database that lacks some legacy tables gets fewer than 12):
+```sql
+select count(*) > 0 from pg_policies where schemaname='public' and policyname='anon never (restrictive)';
 ```
 
 ## 3. `phase2/05_staff_admin_and_role_preview.sql` — security

@@ -210,10 +210,12 @@ function DuplicateNotice({ point, canEdit, canReview, onChanged }: { point: Supp
       <ul className="m-0 mt-1 p-0 list-none space-y-0.5">
         {dups.map(d => (
           <li key={d.id} className="flex items-center gap-2 flex-wrap" data-supply-dup-item={d.id}>
-            <span>{d.customer_name || 'Πελάτης'} · {USAGE_LABEL[d.usage]}{d.property_address ? ` · ${d.property_address}` : ''}{d.needs_review ? ' · προς έλεγχο' : ''}</span>
-            {d.customer_id !== point.customer_id
-              ? <button className="atx-link !p-0 text-[12.5px]" onClick={() => go('customers', { customer: d.customer_id })} data-sp-dup-open>Άνοιγμα πελάτη</button>
-              : <span className="text-[var(--atx-muted)]">ίδιος πελάτης</span>}
+            <span>{d.customer_id ? (d.customer_name || 'Πελάτης') : `Lead: ${d.lead_name || '—'}`} · {USAGE_LABEL[d.usage]}{d.property_address ? ` · ${d.property_address}` : ''}{d.needs_review ? ' · προς έλεγχο' : ''}</span>
+            {(d.customer_id ? d.customer_id === point.customer_id : d.lead_id === point.lead_id)
+              ? <span className="text-[var(--atx-muted)]">{d.customer_id ? 'ίδιος πελάτης' : 'ίδιο lead'}</span>
+              : d.customer_id
+                ? <button className="atx-link !p-0 text-[12.5px]" onClick={() => go('customers', { customer: d.customer_id as string })} data-sp-dup-open>Άνοιγμα πελάτη</button>
+                : d.lead_id ? <button className="atx-link !p-0 text-[12.5px]" onClick={() => go('leads', { lead: d.lead_id as string })} data-sp-dup-open-lead>Άνοιγμα lead</button> : null}
           </li>
         ))}
       </ul>

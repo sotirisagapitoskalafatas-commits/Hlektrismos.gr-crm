@@ -23,3 +23,11 @@ test('filed website files point at the website bucket and are no longer pending'
   assert.equal(L.fileSizeText(2048), '2 KB');
   assert.equal(L.fileSizeText(3 * 1024 * 1024), '3.0 MB');
 });
+
+test('a file may carry the electricity connection it belongs to (staged phase5/18); entries without a tag are unchanged', () => {
+  const raw = [{ path: 'leads/a/bill.pdf', name: 'bill.pdf', type: 'application/pdf', size: 10, supply_point_id: 'sp-1' }, { path: 'leads/a/id.pdf', name: 'id.pdf' }, { path: 'leads/a/x.pdf', name: 'x.pdf', supply_point_id: 5 }];
+  const f = L.leadFiles(raw);
+  assert.equal(f[0].supply_point_id, 'sp-1');
+  assert.ok(!('supply_point_id' in f[1]), 'untagged stays exactly as before');
+  assert.ok(!('supply_point_id' in f[2]), 'a non-string tag is ignored');
+});

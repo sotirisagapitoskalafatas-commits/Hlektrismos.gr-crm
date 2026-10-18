@@ -9,6 +9,8 @@ export type UploadedFile = {
   type: string;
   size: number;
   url?: string;
+  /** The electricity connection this file belongs to (staged phase5/18), set by the lead form. */
+  supply_point_id?: string;
 };
 
 /**

@@ -3,7 +3,8 @@
    A case document that points to one of these files keeps the bucket in its reference (`hlektrismos_docs/<path>`),
    so filing it under a document type needs no copy or re-upload. Pure helpers, unit-tested. */
 
-export interface LeadFile { path: string; name: string; type: string; size: number }
+/** `supply_point_id`: the electricity connection this file belongs to (bill, meter photo …), when the lead has connections (staged phase5/18). */
+export interface LeadFile { path: string; name: string; type: string; size: number; supply_point_id?: string }
 
 export const LEAD_FILES_BUCKET = 'hlektrismos_docs';
 const PREFIX = `${LEAD_FILES_BUCKET}/`;
@@ -18,7 +19,8 @@ export function leadFiles(raw: unknown): LeadFile[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((f): f is Record<string, unknown> => !!f && typeof f === 'object' && typeof (f as { path?: unknown }).path === 'string')
-    .map(f => ({ path: String(f.path), name: String(f.name ?? String(f.path).split('/').pop()), type: String(f.type ?? ''), size: Number(f.size) || 0 }));
+    .map(f => ({ path: String(f.path), name: String(f.name ?? String(f.path).split('/').pop()), type: String(f.type ?? ''), size: Number(f.size) || 0,
+      ...(typeof f.supply_point_id === 'string' && f.supply_point_id ? { supply_point_id: f.supply_point_id } : {}) }));
 }
 
 /** Website files not yet filed as a case document. */

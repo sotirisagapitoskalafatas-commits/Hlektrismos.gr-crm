@@ -1989,7 +1989,7 @@ export async function archiveSupplyPoint(id: string, archived: boolean): Promise
   return supplyErrorText(error);
 }
 
-export type SupplyDuplicate = { id: string; customer_id: string; customer_name: string; usage: SupplyPoint['usage']; property_address: string; needs_review: boolean };
+export type SupplyDuplicate = { id: string; customer_id: string | null; customer_name: string | null; lead_id?: string | null; lead_name?: string | null; usage: SupplyPoint['usage']; property_address: string; needs_review: boolean };
 /** Other active connections with the same number, on any customer. A signal only. null = not installed yet. */
 export async function findSupplyDuplicates(number: string, excludeId?: string | null): Promise<SupplyDuplicate[] | null> {
   if (!supabase) return null;
@@ -2037,4 +2037,30 @@ export async function linkDocumentToSupplyPoint(documentId: string, supplyPointI
   if (!error) return null;
   logError('linkDocumentToSupplyPoint', error);
   return supplyErrorText(error);
+}
+
+/* ---- Παροχές on a LEAD (staged phase5/18): the same rows, owned by the lead until it is converted ---- */
+export async function fetchLeadSupplyPoints(leadId: string): Promise<SupplyPoint[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('customer_supply_points').select('*').eq('lead_id', leadId).order('created_at', { ascending: true }).order('id');
+  if (error) { if (!isNotInstalled(error)) logError('fetchLeadSupplyPoints', error); return null; }
+  return (data ?? []) as SupplyPoint[];
+}
+
+/** Are connections on leads available (phase5/17 AND 18 applied)? Asked once per session when «yes», every two minutes when «no». */
+let leadSupplyProbe: { at: number; ok: boolean } | null = null;
+export async function leadSupplyAvailable(): Promise<boolean> {
+  if (!supabase) return false;
+  if (leadSupplyProbe && (leadSupplyProbe.ok || Date.now() - leadSupplyProbe.at < 120_000)) return leadSupplyProbe.ok;
+  const { error } = await supabase.from('customer_supply_points').select('id, lead_id').limit(1);
+  leadSupplyProbe = { at: Date.now(), ok: !(error && isNotInstalled(error)) };
+  return leadSupplyProbe.ok;
+}
+
+/** Creates ONE connection on a lead. Nothing else is touched; nothing is required. */
+export async function createLeadSupplyPoint(leadId: string, draft: SupplyPointDraft): Promise<SupplyWrite> {
+  if (!supabase) return { point: null, error: 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.' };
+  const { data, error } = await supabase.from('customer_supply_points').insert({ lead_id: leadId, ...draftToRow(draft) }).select('*').single();
+  if (error) { logError('createLeadSupplyPoint', error); return { point: null, error: supplyErrorText(error) }; }
+  return { point: data as SupplyPoint, error: null };
 }

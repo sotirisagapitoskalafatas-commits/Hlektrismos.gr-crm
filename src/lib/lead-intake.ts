@@ -36,15 +36,16 @@ export async function routeLeadToBackoffice(leadId: string): Promise<{ assignee:
   return { assignee: (data ?? null) as Assignee | null, error: null };
 }
 
-/** Upload files for an existing lead and append them to leads.attached_files. Returns what was saved and what failed. */
-export async function attachLeadFiles(lead: Pick<Lead, 'id' | 'attached_files'>, files: File[]): Promise<{ saved: UploadedFile[]; failed: string[] }> {
+/** Upload files for an existing lead and append them to leads.attached_files. Returns what was saved and what failed.
+ *  `tags[i]` (optional) is the id of the electricity connection file i belongs to; a file without a tag stays untagged. */
+export async function attachLeadFiles(lead: Pick<Lead, 'id' | 'attached_files'>, files: File[], tags: (string | null | undefined)[] = []): Promise<{ saved: UploadedFile[]; failed: string[] }> {
   const saved: UploadedFile[] = [];
   const failed: string[] = [];
-  for (const f of files) {
+  for (const [i, f] of files.entries()) {
     try {
       const ready = await prepareForUpload(f);
       const { data, error } = await uploadDocument(ready, lead.id);
-      if (data) saved.push(data); else failed.push(`«${f.name}»${error ? ` (${error})` : ''}`);
+      if (data) saved.push(tags[i] ? { ...data, supply_point_id: tags[i] as string } : data); else failed.push(`«${f.name}»${error ? ` (${error})` : ''}`);
     } catch { failed.push(`«${f.name}»`); }
   }
   if (saved.length) {

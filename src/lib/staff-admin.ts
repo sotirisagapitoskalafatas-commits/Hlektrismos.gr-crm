@@ -43,7 +43,7 @@ const friendly = (msg: string | undefined, fallback: string) => {
   const m = msg ?? '';
   if (/last active administrator/i.test(m)) return 'Ο τελευταίος ενεργός διαχειριστής δεν μπορεί να αλλάξει ρόλο ή να απενεργοποιηθεί.';
   if (/own role|own status/i.test(m)) return 'Δεν μπορείτε να αλλάξετε τον δικό σας ρόλο ή την κατάστασή σας.';
-  if (/not allowed/i.test(m) || /permission|42501/i.test(m)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
+  if (/not allowed/i.test(m) || /permission|42501/i.test(m)) return 'Η δημιουργία και η διαχείριση λογαριασμών γίνεται μόνο από διαχειριστή.';
   if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
   if (/Could not find the function|PGRST202/i.test(m)) return 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
   return fallback;
@@ -78,6 +78,11 @@ async function invoke(body: Record<string, unknown>): Promise<{ data: Record<str
 
 export async function createStaff(input: { email: string; full_name: string; phone: string; role: Role; mode: 'invite' | 'password'; password?: string }) {
   return invoke({ action: 'create', ...input });
+}
+
+/** Sends the user a password-reset e-mail (the user chooses the new password; the administrator never sees it). Admin only, audited. */
+export async function resetStaffPassword(id: string) {
+  return invoke({ action: 'reset', user_id: id });
 }
 
 export async function deleteStaff(id: string) {

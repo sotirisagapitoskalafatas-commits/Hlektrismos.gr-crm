@@ -1,4 +1,5 @@
-// Staff accounts: create (invite or temporary password) and permanent delete, via the Supabase Auth Admin API.
+// Staff accounts: create (invite or temporary password), password reset e-mail and permanent delete, via the Supabase Auth Admin API.
+// ADMIN-ONLY (master prompt §2.4): managers and back office can see the team but cannot create, change, reset or delete accounts.
 // Edits, role changes and (de)activation go through the audited SQL functions staff_update / staff_set_active
 // (staged migration phase2/05), so the same matrix is enforced by the database for every path.
 //
@@ -7,7 +8,7 @@
 // written to public.staff_admin_audit. Requires verify_jwt (default). Never returns secrets or tokens.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { canManage, decideDelete, validateCreate } from "../_shared/staff-admin.ts";
+import { canManage, decideDelete, decideReset, validateCreate } from "../_shared/staff-admin.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -91,6 +92,26 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Η διαγραφή του λογαριασμού απέτυχε· το προφίλ επαναφέρθηκε.", 500);
     }
     await audit({ action: "delete", target_id: targetId, target_email: email, before: { full_name: target.full_name, role: target.role } });
+    return jsonResponse({ ok: true });
+  }
+
+  if (body.action === "reset") {
+    const targetId = String(body.user_id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(targetId)) return errorResponse("Μη έγκυρος χρήστης.", 400);
+    const { data: target } = await admin.from("profiles").select("id, role").eq("id", targetId).maybeSingle();
+    if (!target) return errorResponse("Ο χρήστης δεν βρέθηκε.", 404);
+    const { data: authUser } = await admin.auth.admin.getUserById(targetId);
+    const email = authUser?.user?.email ?? null;
+    const decision = decideReset({ actorRole, actorActive, targetRole: target.role, targetEmail: email });
+    if (!decision.ok) {
+      if (decision.status === 403) await audit({ action: "denied", target_id: targetId, target_email: email, note: "reset" });
+      return errorResponse(decision.error, decision.status);
+    }
+    // The user receives the recovery e-mail and chooses the password themselves. No link, token or password is ever returned here.
+    const site = Deno.env.get("SITE_URL") ?? "https://hlektrismos.gr";
+    const { error: resetErr } = await admin.auth.resetPasswordForEmail(email!, { redirectTo: `${site}/#/app` });
+    if (resetErr) return errorResponse("Η αποστολή email επαναφοράς απέτυχε. Ελέγξτε τη ρύθμιση email/Auth.", 502);
+    await audit({ action: "password_reset", target_id: targetId, target_email: email, note: "recovery e-mail sent" });
     return jsonResponse({ ok: true });
   }
 

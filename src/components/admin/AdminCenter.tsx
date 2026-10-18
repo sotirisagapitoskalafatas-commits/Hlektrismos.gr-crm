@@ -129,7 +129,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
 
 const ACTION_TEXT: Record<string, string> = {
   create: 'Δημιουργία χρήστη', update: 'Επεξεργασία στοιχείων', role_change: 'Αλλαγή ρόλου', deactivate: 'Απενεργοποίηση', reactivate: 'Ενεργοποίηση',
-  delete: 'Οριστική διαγραφή', denied: 'Άρνηση (χωρίς δικαίωμα)', role_preview_start: 'Έναρξη επίδειξης ρόλου', role_preview_end: 'Λήξη επίδειξης ρόλου',
+  delete: 'Οριστική διαγραφή', password_reset: 'Επαναφορά κωδικού (email)', denied: 'Άρνηση (χωρίς δικαίωμα)', role_preview_start: 'Έναρξη επίδειξης ρόλου', role_preview_end: 'Λήξη επίδειξης ρόλου',
 };
 
 function AuditTab() {

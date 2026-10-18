@@ -11,7 +11,7 @@ import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
 import {
-  ROLE_DESCRIPTION, canManage, createStaff, deleteStaff, generatePassword, listStaff, manageableRoles, setStaffActive,
+  ROLE_DESCRIPTION, canManage, createStaff, deleteStaff, generatePassword, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
   staffReferenceCount, updateStaff,
 } from '@/lib/staff-admin';
 import type { StaffMember, StaffSource } from '@/lib/staff-admin';
@@ -21,6 +21,7 @@ type Dialog =
   | { kind: 'create' }
   | { kind: 'edit'; s: StaffMember; refs: number | null }
   | { kind: 'status'; s: StaffMember }
+  | { kind: 'reset'; s: StaffMember }
   | { kind: 'delete'; s: StaffMember; refs: number | null }
   | null;
 
@@ -77,6 +78,9 @@ export default function StaffAdmin() {
         </div>
       )}
       {error && <div className="atx-notice" role="alert">{error}</div>}
+      {source === 'server' && allowedRoles.length === 0 && (
+        <div className="atx-notice" role="status" data-testid="admin-only-note">Η δημιουργία και η διαχείριση λογαριασμών (νέοι χρήστες, ρόλοι, επαναφορά κωδικού, απενεργοποίηση) γίνεται μόνο από διαχειριστή. Εδώ βλέπετε την ομάδα.</div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="atx-search">
@@ -127,6 +131,7 @@ export default function StaffAdmin() {
                       {s.can_manage && (
                         <span className="inline-flex gap-1">
                           <button className="atx-icon-btn" title="Επεξεργασία" aria-label={`Επεξεργασία ${s.full_name}`} onClick={() => void open('edit', s)}><Pencil size={15} /></button>
+                          <button className="atx-icon-btn" title="Επαναφορά κωδικού" aria-label={`Επαναφορά κωδικού ${s.full_name}`} onClick={() => setDialog({ kind: 'reset', s })}><KeyRound size={15} /></button>
                           <button className="atx-icon-btn" title={s.is_active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'} aria-label={`${s.is_active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'} ${s.full_name}`} onClick={() => setDialog({ kind: 'status', s })}>
                             {s.is_active ? <UserX size={15} /> : <UserCheck size={15} />}
                           </button>
@@ -142,8 +147,8 @@ export default function StaffAdmin() {
         )}
       </div>
       <p className="text-[12px] text-[var(--atx-faint)]">
-        Δικαιώματα διαχείρισης: Διαχειριστής → όλοι οι ρόλοι · Διευθυντής → Inside Sales, Field Sales, Back Office · Back Office → Back Office.
-        Κανείς δεν αλλάζει τον δικό του ρόλο· ο τελευταίος ενεργός διαχειριστής προστατεύεται. Ελέγχεται από τον server.
+        Μόνο οι διαχειριστές δημιουργούν χρήστες, ορίζουν ρόλο, επαναφέρουν κωδικούς και απενεργοποιούν λογαριασμούς. Δεν υπάρχει δημόσια εγγραφή.
+        Κάθε άτομο έχει δικό του λογαριασμό (και στο Back Office)· δεν μοιραζόμαστε κωδικούς. Κανείς δεν αλλάζει τον δικό του ρόλο· ο τελευταίος ενεργός διαχειριστής προστατεύεται. Ελέγχεται από τον server και καταγράφεται στο Audit Log.
       </p>
 
       {dialog?.kind === 'create' && (
@@ -171,6 +176,9 @@ export default function StaffAdmin() {
           toast(ok ? (dialog.s.is_active ? 'Ο χρήστης απενεργοποιήθηκε.' : 'Ο χρήστης ενεργοποιήθηκε.') : 'Η αλλαγή δεν επιβεβαιώθηκε.', ok ? 'ok' : 'bad');
           if (ok) setDialog(null);
         }} />
+      )}
+      {dialog?.kind === 'reset' && (
+        <ResetDialog s={dialog.s} onClose={() => setDialog(null)} onDone={() => { toast(`Στάλθηκε email επαναφοράς κωδικού στο ${dialog.s.email}.`, 'ok'); setDialog(null); }} />
       )}
       {dialog?.kind === 'delete' && (
         <DeleteDialog s={dialog.s} refs={dialog.refs} onClose={() => setDialog(null)}
@@ -319,6 +327,32 @@ function StatusDialog({ s, onClose, onDone }: { s: StaffMember; onClose: () => v
         <div className="flex justify-end gap-2">
           <Btn variant="outline" disabled={busy} onClick={onClose}>Άκυρο</Btn>
           <Btn variant={deactivate ? 'danger' : 'primary'} disabled={busy} onClick={() => void submit()}>{busy ? <Spinner /> : null} {deactivate ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ResetDialog({ s, onClose, onDone }: { s: StaffMember; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    const r = await resetStaffPassword(s.id);
+    setBusy(false);
+    if (r.error) { setErr(r.error); return; }
+    onDone();
+  };
+  return (
+    <Modal open onClose={() => !busy && onClose()} title={`Επαναφορά κωδικού: ${s.full_name}`} micro="Χρήστες & Ρόλοι">
+      <div className="space-y-3">
+        <p className="text-[14px] text-ink/75">
+          Ο χρήστης θα λάβει email{s.email ? ` στο ${s.email}` : ''} για να ορίσει νέο κωδικό. Δεν βλέπετε ούτε στέλνετε εσείς κωδικό. Η ενέργεια καταγράφεται στο Audit Log.
+        </p>
+        {err && <div className="atx-notice" role="alert">{err}</div>}
+        <div className="flex justify-end gap-2">
+          <Btn variant="outline" disabled={busy} onClick={onClose}>Άκυρο</Btn>
+          <Btn disabled={busy || !s.email} onClick={() => void submit()}>{busy ? <Spinner /> : <Mail className="w-3.5 h-3.5" />} Αποστολή email</Btn>
         </div>
       </div>
     </Modal>

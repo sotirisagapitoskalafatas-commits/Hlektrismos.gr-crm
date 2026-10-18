@@ -4,7 +4,10 @@ import { useNav } from '@/lib/nav';
 import LeadDetail from '@/components/leads/LeadDetail';
 import { TrashButton } from '@/components/trash/TrashControls';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
-import { Lead, convertLeadToCase, createLead, fetchLeads, getPosition, updateLeadChecked, updateLeadStage } from '@/lib/api';
+import { Lead, convertLeadToCase, createLead, createLeadSupplyPoint, fetchLeads, fetchTariffCategories, getPosition, leadSupplyAvailable, updateLeadChecked, updateLeadStage } from '@/lib/api';
+import LeadSupplySection from '@/components/leads/LeadSupplySection';
+import { leadSupplyBlocking } from '@/lib/supply-points';
+import type { SupplyPointDraft, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
 import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
 import { classifyUpload, MAX_FORM_FILES, PUBLIC_FORM_ACCEPT } from '@/lib/upload-files';
@@ -13,7 +16,7 @@ import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Users } from 'lucide-react';
 
 const EMPTY_FORM = {
-  full_name: '', phone: '', email: '', service_category: 'energy', source: 'inside_sales',
+  full_name: '', phone: '', email: '', address: '', service_category: 'energy', source: 'inside_sales',
   property_type: '', campaign_name: '', comments: '', lead_type: 'B2C', provider: '', program: '', partner: '',
 };
 
@@ -40,6 +43,20 @@ export default function LeadsPage() {
   // «Γρήγορο lead» (name only) or «Lead με έγγραφα» (details + files → default Back Office assignee).
   const [mode, setMode] = useState<'quick' | 'docs'>('quick');
   const [files, setFiles] = useState<File[]>([]);
+  // «Παροχές ρεύματος» (staged phase5/17 + 18): optional; collapsed in «Γρήγορο lead», open in «Lead με έγγραφα»
+  const [supplyDrafts, setSupplyDrafts] = useState<SupplyPointDraft[]>([]);
+  const [supplyOpen, setSupplyOpen] = useState(false);
+  const [supplyAvail, setSupplyAvail] = useState<boolean | null>(null);
+  const [tariffs, setTariffs] = useState<TariffCategory[] | null>(null);
+  useEffect(() => {
+    if (!modal) return;
+    let alive = true;
+    void leadSupplyAvailable().then(ok => { if (alive) setSupplyAvail(ok); });
+    void fetchTariffCategories().then(t => { if (alive) setTariffs(t); });
+    return () => { alive = false; };
+  }, [modal]);
+  const switchMode = (m: 'quick' | 'docs') => { setMode(m); setSupplyOpen(m === 'docs'); };
+  const closeCreate = () => { setModal(false); setCreateErr(''); setSupplyDrafts([]); setSupplyOpen(false); setMode('quick'); };
   const [editErr, setEditErr] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -125,6 +142,7 @@ export default function LeadsPage() {
       email: form.email.trim() || null,
       service_category: form.service_category,
       source: form.source,
+      address: form.address.trim() || null,
       property_type: form.property_type.trim() || null,
       campaign_name: form.campaign_name.trim() || null,
       comments: form.comments.trim() || null,
@@ -147,9 +165,19 @@ export default function LeadsPage() {
         else { tone = 'warn'; extra += ' Δεν έχει οριστεί υπεύθυνος Back Office — ορίστε τον στη Διαχείριση → Cases & Ροή.'; }
       }
     }
+    // The connections come after the lead exists; a failed one never removes the lead and is reported by name.
+    if (supplyAvail && supplyDrafts.length) {
+      const failedSupply: string[] = [];
+      for (const [i, d] of supplyDrafts.entries()) {
+        const r = await createLeadSupplyPoint(lead.id, d);
+        if (r.error) failedSupply.push(`παροχή ${i + 1} (${r.error})`);
+      }
+      if (failedSupply.length) { tone = 'warn'; extra += ` Δεν αποθηκεύτηκε: ${failedSupply.join(', ')} — προσθέστε την από το lead.`; }
+    }
     setCreating(false);
     setFiles([]);
     setModal(false);
+    setSupplyDrafts([]); setSupplyOpen(false); setMode('quick');
     setForm(EMPTY_FORM);
     setErr('');
     await load();
@@ -316,11 +344,11 @@ export default function LeadsPage() {
         </div>
       </Modal>
 
-      <Modal open={modal} onClose={() => { if (!creating) { setModal(false); setCreateErr(''); } }} title="Νέο Lead" micro="Χειροκίνητη εισαγωγή">
+      <Modal open={modal} onClose={() => { if (!creating) closeCreate(); }} title="Νέο Lead" micro="Χειροκίνητη εισαγωγή">
         <div className="space-y-4">
           <div role="radiogroup" aria-label="Τύπος καταχώρησης" className="flex gap-2 flex-wrap -mt-1">
             {([['quick', 'Γρήγορο lead'], ['docs', 'Lead με έγγραφα']] as const).map(([m, l]) => (
-              <button key={m} type="button" role="radio" aria-checked={mode === m} className={`atx-chip ${mode === m ? 'is-on' : ''}`} onClick={() => setMode(m)}>{l}</button>
+              <button key={m} type="button" role="radio" aria-checked={mode === m} className={`atx-chip ${mode === m ? 'is-on' : ''}`} onClick={() => switchMode(m)}>{l}</button>
             ))}
           </div>
           <p className="text-[12.5px] text-ink/55">{mode === 'quick'
@@ -337,6 +365,9 @@ export default function LeadsPage() {
               <input type="email" className="field" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.gr" />
             </Field>
           </div>
+          <Field label="Διεύθυνση κατοικίας (προαιρετικό)">
+            <input className="field" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Η διεύθυνση του πελάτη — όχι της παροχής" data-lead-address />
+          </Field>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Υπηρεσία">
               <select className="field" value={form.service_category} onChange={e => setForm(f => ({ ...f, service_category: e.target.value }))}>
@@ -352,6 +383,7 @@ export default function LeadsPage() {
           <Field label={form.source === 'partner' ? 'Συνεργάτης' : 'Συνεργάτης (αν υπάρχει)'}>
             <input className="field" value={form.partner} onChange={e => setForm(f => ({ ...f, partner: e.target.value }))} placeholder="Όνομα συνεργάτη που έφερε τον πελάτη" />
           </Field>
+          <LeadSupplySection drafts={supplyDrafts} setDrafts={setSupplyDrafts} tariffs={tariffs} available={supplyAvail} open={supplyOpen} setOpen={setSupplyOpen} disabled={creating} />
           {mode === 'docs' && (<>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Τύπος πελάτη">
@@ -406,8 +438,8 @@ export default function LeadsPage() {
         </div>
         {createErr && <div className="atx-notice mt-4" role="alert" data-lead-error>{createErr}</div>}
         <div className="flex justify-end gap-2 mt-5">
-          <Btn variant="ghost" disabled={creating} onClick={() => { setModal(false); setCreateErr(''); }}>Ακύρωση</Btn>
-          <Btn onClick={submitLead} disabled={creating || !form.full_name.trim()}>{creating ? <Spinner /> : <Plus className="w-3.5 h-3.5" />} Δημιουργία</Btn>
+          <Btn variant="ghost" disabled={creating} onClick={closeCreate}>Ακύρωση</Btn>
+          <Btn onClick={submitLead} disabled={creating || !form.full_name.trim() || (!!supplyAvail && leadSupplyBlocking(supplyDrafts))}>{creating ? <Spinner /> : <Plus className="w-3.5 h-3.5" />} Δημιουργία</Btn>
         </div>
       </Modal>
     </div>

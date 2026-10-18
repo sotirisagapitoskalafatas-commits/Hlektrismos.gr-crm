@@ -962,7 +962,7 @@ if (!PREVIEW_LIVE) {
     await sleep(300);
     const set = (idx, v) => page.evaluate((i, val) => { const el = [...document.querySelectorAll('.fixed.inset-0.z-50 input.field:not([type="file"])')][i]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, idx, v);
     await set(0, 'Φούρνος Δοκιμή');
-    await set(3, 'Γιώργος Συνεργάτης'); // name, phone, email, partner
+    await set(4, 'Γιώργος Συνεργάτης'); // name, phone, email, home address, partner
     const input = await page.$('[data-lead-files]');
     await input.uploadFile('C:/Users/kalaf/hlek/docs/product/screenshots/after/inside_sales-home-1440.jpg');
     await sleep(400);
@@ -1010,6 +1010,109 @@ if (!PREVIEW_LIVE) {
   await sleep(1500);
   const post = (await (await fetch('http://127.0.0.1:54399/__log')).json()).filter((l) => l.method === 'POST' && l.table === 'follow_ups').pop();
   check('Home: «+ Task» needs a description and a case, then saves a follow-up for me', disabled === true && post?.body?.reason === 'Κλήση για τα έγγραφα' && !!post.body.case_id && post.body.channel === 'other');
+  await browser.close();
+}
+
+/* ---- 2i. Lead form: optional «Παροχές ρεύματος» (staged phase5/17 + 18), «Διεύθυνση κατοικίας»; the form works as before without the SQL ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const MODAL = '.fixed.inset-0.z-50';
+  const get = async (q) => (await fetch(`${M}/rest/v1/${q}`, { headers: H })).json();
+  const logs = async () => (await (await fetch(`${M}/__log`)).json());
+  const supplyPosts = async () => (await logs()).filter((l) => l.method === 'POST' && l.table === 'customer_supply_points');
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const clickSel = (page, sel) => page.evaluate((q) => { const el = document.querySelector(q); el && el.click(); return !!el; }, sel);
+  const openNew = async (page) => { await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Νέο Lead')?.click()); await sleep(900); };
+  const nameInput = (page, v) => page.evaluate((val) => { const el = [...document.querySelectorAll('.fixed.inset-0.z-50 input.field')][0]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+  const mode = (page, label) => page.evaluate((l) => [...document.querySelectorAll('.fixed.inset-0.z-50 [role="radio"]')].find((b) => b.textContent.trim() === l)?.click(), label);
+  const create = (page) => page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.click());
+  const createDisabled = (page) => page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.disabled);
+  const dialogOpen = (page) => page.evaluate(() => [...document.querySelectorAll('h2')].some((h) => h.textContent.trim() === 'Νέο Lead'));
+  const waitClosed = async (page) => { for (let i = 0; i < 40 && (await dialogOpen(page)); i++) await sleep(200); await sleep(400); };
+  const item = (n, sel) => `${MODAL} [data-lead-supply-item="${n}"] ${sel}`;
+  const toggled = (page) => page.evaluate(() => document.querySelector('.fixed.inset-0.z-50 [data-lead-supply-toggle]')?.getAttribute('aria-expanded'));
+  await fetch(`${M}/__supply?state=on`); await fetch(`${M}/__leadsupply?state=on`); await fetch(`${M}/__supplyfail?state=off`);
+  await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H });
+  const { browser, page } = await launch(1440, 900);
+  await signInAs(page, 'inside_sales');
+  await click(page, 'Leads', '#shell-rail nav button'); await sleep(1200);
+  // 1) collapsed in «Γρήγορο lead», open in «Lead με έγγραφα», and it follows the mode
+  await openNew(page);
+  const q1 = await toggled(page);
+  const addressField = await page.evaluate(() => !!document.querySelector('.fixed.inset-0.z-50 [data-lead-address]'));
+  await mode(page, 'Lead με έγγραφα'); await sleep(300);
+  const q2 = await toggled(page);
+  await mode(page, 'Γρήγορο lead'); await sleep(300);
+  const q3 = await toggled(page);
+  check('Lead form: «Παροχές ρεύματος» is collapsed in «Γρήγορο lead», open in «Lead με έγγραφα», and follows the mode; «Διεύθυνση κατοικίας» is in both', q1 === 'false' && q2 === 'true' && q3 === 'false' && addressField, JSON.stringify([q1, q2, q3, addressField]));
+  // 2) quick lead with two connections and a home address
+  await nameInput(page, 'Λ. Δοκιμή Παροχών');
+  await setVal(page, `${MODAL} [data-lead-address]`, 'Οδός Κατοικίας 5, Αθήνα');
+  await clickSel(page, `${MODAL} [data-lead-supply-toggle]`); await sleep(300);
+  await clickSel(page, `${MODAL} [data-lead-supply-add]`); await sleep(300);
+  await setVal(page, item(1, '[data-sp-field="number"]'), '12345678901');
+  await setVal(page, item(1, '[data-sp-field="address"]'), 'Οδός Παροχής 1');
+  await setVal(page, item(1, '[data-sp-field="category"]'), 'Γ1');
+  await setVal(page, item(1, '[data-sp-field="tariff"]'), 'Πράσινο Οικιακό');
+  await clickSel(page, `${MODAL} [data-lead-supply-add]`); await sleep(300);
+  await setVal(page, item(2, '[data-sp-field="usage"]'), 'commercial');
+  await setVal(page, item(2, '[data-sp-field="number"]'), '123');
+  await setVal(page, item(2, '[data-sp-field="address"]'), 'Οδός Παροχής 2');
+  await setVal(page, item(2, '[data-sp-field="months"]'), '24');
+  await sleep(300);
+  const ui = await page.evaluate(() => ({ titles: [...document.querySelectorAll('.fixed.inset-0.z-50 [data-lead-supply-title]')].map((t) => t.textContent), warn: document.querySelector('.fixed.inset-0.z-50 [data-lead-supply-item="2"] [data-sp-error="number"]')?.textContent ?? '',
+    cats2: [...document.querySelectorAll('.fixed.inset-0.z-50 [data-lead-supply-item="2"] [data-sp-field="category"] option')].map((o) => o.textContent.trim()) }));
+  check('Lead form: each connection is a titled block with the same fields; the category list follows the usage (admin list)', JSON.stringify(ui.titles) === JSON.stringify(['Παροχή 1 — Οικιακό', 'Παροχή 2 — Επαγγελματικό']) && JSON.stringify(ui.cats2) === JSON.stringify(['—', 'Γ21', 'Γ22', 'Γ23']), JSON.stringify(ui));
+  check('Lead form: a supply number that is not 11 digits warns on that connection and does NOT block creating the lead', ui.warn.includes('11 ψηφία') && (await createDisabled(page)) === false, ui.warn);
+  await create(page); await waitClosed(page);
+  const lead = (await get('leads?client_name=eq.Λ. Δοκιμή Παροχών'))[0];
+  const lp = (await logs()).filter((l) => l.method === 'POST' && l.table === 'leads').pop()?.body;
+  const sp = await supplyPosts();
+  const mine = sp.slice(-2).map((x) => x.body);
+  check('Lead form: the lead is saved with the home address, and each connection is saved as ITS OWN row owned by the lead (no customer), with its own address',
+    !!lead && lp.address === 'Οδός Κατοικίας 5, Αθήνα' && mine.length === 2 && mine.every((b) => b.lead_id === lead.id && !('customer_id' in b)) && mine[0].property_address === 'Οδός Παροχής 1' && mine[1].property_address === 'Οδός Παροχής 2'
+    && mine[0].supply_number === '12345678901' && mine[0].tariff_category_code === 'Γ1' && mine[0].tariff_name === 'Πράσινο Οικιακό' && mine[1].usage === 'commercial' && mine[1].contract_months === 24, JSON.stringify({ lp: lp?.address, mine }));
+  check('Lead form: the lead address and the connection addresses are different fields (nothing copied between them)', lp.address !== mine[0].property_address && !JSON.stringify(lp).includes('Οδός Παροχής'));
+  // 3) a lead without connections: nothing extra is sent (name is the only requirement)
+  const before = (await supplyPosts()).length;
+  await openNew(page); await nameInput(page, 'Λ. Μόνο όνομα'); await create(page); await waitClosed(page);
+  check('Lead form: a name-only lead sends no connection at all', (await supplyPosts()).length === before && (await get('leads?client_name=eq.Λ. Μόνο όνομα')).length === 1);
+  // 4) the duplicate hint while typing (a connection of an existing customer has this number)
+  await fetch(`${M}/rest/v1/customer_supply_points`, { method: 'POST', headers: H, body: JSON.stringify({ customer_id: ATHINA, usage: 'residential', property_address: 'Υπάρχουσα', supply_number: '55555555555' }) });
+  await openNew(page); await nameInput(page, 'Λ. Διπλότυπο');
+  await clickSel(page, `${MODAL} [data-lead-supply-toggle]`); await sleep(300);
+  await clickSel(page, `${MODAL} [data-lead-supply-add]`); await sleep(300);
+  await setVal(page, item(1, '[data-sp-field="number"]'), '555 5555 5555'); await sleep(1000);
+  const hint = await page.evaluate(() => document.querySelector('.fixed.inset-0.z-50 [data-sp-dup-hint]')?.innerText ?? '');
+  check('Lead form: typing a number that already exists on a customer shows the hint under the field and does not block', hint.includes('υπάρχει ήδη') && hint.includes('Αθηνά Κωνσταντίνου') && (await createDisabled(page)) === false, hint);
+  // 5) invalid months is data, not a missing value: it blocks, with the message
+  await setVal(page, item(1, '[data-sp-field="months"]'), '0'); await sleep(300);
+  check('Lead form: an impossible contract duration disables «Δημιουργία» and says why on that connection', (await createDisabled(page)) === true && await page.evaluate(() => !!document.querySelector('.fixed.inset-0.z-50 [data-sp-error="months"]')));
+  await setVal(page, item(1, '[data-sp-field="months"]'), '');
+  // 6) a connection that fails to save never removes the lead, and is named
+  await fetch(`${M}/__supplyfail?state=on`);
+  await create(page); await waitClosed(page);
+  const body = await page.evaluate(() => document.body.innerText);
+  check('Lead form: if a connection cannot be saved the lead still exists and the message names the connection',
+    (await get('leads?client_name=eq.Λ. Διπλότυπο')).length === 1 && body.includes('Δεν αποθηκεύτηκε') && body.includes('παροχή 1'), body.slice(0, 120));
+  // 7) the SQL is not applied (phase5/17 absent, then only 18 absent): neutral sentence, the form works as today
+  for (const [label, off] of [['phase5/17 not applied', ['__supply?state=off']], ['phase5/18 not applied', ['__supply?state=on', '__leadsupply?state=off']]]) {
+    for (const u of off) await fetch(`${M}/${u}`);
+    const { browser: b2, page: p2 } = await launch(1440, 900);
+    await signInAs(p2, 'inside_sales');
+    await click(p2, 'Leads', '#shell-rail nav button'); await sleep(1200);
+    await openNew(p2); await clickSel(p2, `${MODAL} [data-lead-supply-toggle]`); await sleep(900);
+    const st = await p2.evaluate(() => ({ note: document.querySelector('.fixed.inset-0.z-50 [data-lead-supply-unavailable]')?.textContent ?? '', add: !!document.querySelector('.fixed.inset-0.z-50 [data-lead-supply-add]'), addr: !!document.querySelector('.fixed.inset-0.z-50 [data-lead-address]') }));
+    await nameInput(p2, `Λ. Χωρίς SQL ${label.slice(-14, -12)}`); const n0 = (await supplyPosts()).length; await create(p2); await waitClosed(p2);
+    const made = (await get('leads')).some((l) => (l.client_name ?? '').startsWith('Λ. Χωρίς SQL'));
+    check(`Lead form (${label}): the section is one neutral Greek sentence, no «Προσθήκη παροχής», and the lead is created as today`, st.note === 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.' && !st.add && st.addr && made && (await supplyPosts()).length === n0 && !/migration|phase|SQL|schema|PGRST|lead_id/i.test(st.note), JSON.stringify(st));
+    await b2.close();
+  }
+  await fetch(`${M}/__supply?state=on`); await fetch(`${M}/__leadsupply?state=on`);
+  await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H });
   await browser.close();
 }
 

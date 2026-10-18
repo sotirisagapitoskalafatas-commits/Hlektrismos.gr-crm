@@ -28,7 +28,7 @@ import { meetingPoint } from '@/lib/visit-location';
 import SignaturePad from './SignaturePad';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import {
-  ACTIVITY_META, CHANNELS, DOC_STATUSES, SERVICES, STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, } from '@/lib/roles';
+  ACTIVITY_META, CHANNELS, DOC_STATUSES, serviceLabel, STAGE_TRANSITIONS, TEAM_FILTERS, activityLabel, can, leadSourceInfo, } from '@/lib/roles';
 import type { ActivityType, Stage } from '@/lib/roles';
 import {
   Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, Lead, TimelineEvent,
@@ -784,7 +784,7 @@ function CustomerCasesPanel({ c }: { c: Case }) {
                 <li key={k.id} className="atx-row">
                   <span className="atx-icon" aria-hidden="true"><FileText size={16} /></span>
                   <span className="atx-row-main">
-                    <span className="atx-row-title">{SERVICES[k.service_type] ?? k.service_type} · {k.case_no}{here ? <span className="font-normal text-[var(--atx-muted)]"> · αυτή η υπόθεση</span> : null}</span>
+                    <span className="atx-row-title">{serviceLabel(k.service_type)} · {k.case_no}{here ? <span className="font-normal text-[var(--atx-muted)]"> · αυτή η υπόθεση</span> : null}</span>
                     <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}</span>
                   </span>
                   <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
@@ -897,7 +897,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
             {(c.priority === 'high' || c.priority === 'critical') && <span className="atx-tag t-danger">{c.priority === 'critical' ? 'Κρίσιμο' : 'Υψηλή προτεραιότητα'}</span>}
           </div>
           <p className="atx-sub" style={{ marginTop: 2 }}>
-            Case {c.case_no} · {SERVICES[c.service_type] ?? c.service_type}{c.property_type ? ` · ${c.property_type}` : ''}
+            Case {c.case_no} · {serviceLabel(c.service_type)}{c.property_type ? ` · ${c.property_type}` : ''}
             {c.source ? ` · ${leadSourceInfo(c.source).label}` : ''} · από {fmtDate(c.created_at)}
           </p>
         </div>

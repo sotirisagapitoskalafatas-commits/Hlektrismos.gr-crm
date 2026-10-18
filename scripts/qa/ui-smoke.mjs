@@ -1640,7 +1640,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   check('Website files: filed file no longer pending; bill item received', t1.includes('Προς καταχώρηση 1') && /Λογαριασμός ρεύματος[\s\S]{0,40}Παραλήφθηκε/.test(t1));
   await click(page, 'Leads', '#shell-rail nav button');
   await sleep(1200);
-  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /ΜΕΤ/.test(b.textContent))?.click()); // converted tab
+  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /^\S*\s*Μετατράπηκε\s*\d+$/.test(b.textContent.trim()))?.click()); // converted tab (the status chip, not the row button)
   await sleep(600);
   await page.evaluate(() => {
     const el = [...document.querySelectorAll('main *')].filter((e) => e.textContent.trim() === 'Δοκιμαστικό Lead 8' && e.offsetParent)[0];
@@ -2143,7 +2143,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'inside_sales');
   await click(page, 'Leads', '#shell-rail nav button'); await sleep(1200);
-  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /ΜΕΤ/.test(b.textContent))?.click()); // converted tab
+  await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /^\S*\s*Μετατράπηκε\s*\d+$/.test(b.textContent.trim()))?.click()); // converted tab (the status chip, not the row button)
   await sleep(600);
   const btns = await page.$$eval('main [data-lead-to-folder]', (b) => b.map((x) => x.textContent.trim()));
   check('Leads list: a converted row says «Μετατράπηκε → Φάκελος»', btns.length > 0 && btns.every((t) => t.includes('Μετατράπηκε → Φάκελος')), JSON.stringify(btns.slice(0, 2)));

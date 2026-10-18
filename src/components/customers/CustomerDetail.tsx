@@ -14,7 +14,7 @@ import type { FolderTab } from '@/lib/folder';
 import { useStaff } from '@/lib/useStaff';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { activityLabel, can, leadSourceInfo, SERVICES, STAGE_TRANSITIONS, TEAM_FILTERS } from '@/lib/roles';
+import { activityLabel, can, leadSourceInfo, serviceLabel, STAGE_TRANSITIONS, TEAM_FILTERS } from '@/lib/roles';
 import { leadStatusDisplay } from '@/lib/lead-status';
 import type { Stage } from '@/lib/roles';
 import { caseCountText } from '@/lib/status-text';
@@ -158,7 +158,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
       <li key={k.id} className="atx-row">
         <span className="atx-icon" aria-hidden="true"><Briefcase size={16} /></span>
         <button className="atx-row-main" aria-pressed={sel?.id === k.id} data-folder-case={k.case_no} onClick={() => setPicked(k.id)} title="Επιλογή case για τις καρτέλες του φακέλου">
-          <span className="atx-row-title">{SERVICES[k.service_type] ?? k.service_type} · {k.case_no}{sel?.id === k.id && cases.length > 1 ? <span className="font-normal text-[var(--atx-muted)]"> · επιλεγμένο</span> : null}</span>
+          <span className="atx-row-title">{serviceLabel(k.service_type)} · {k.case_no}{sel?.id === k.id && cases.length > 1 ? <span className="font-normal text-[var(--atx-muted)]"> · επιλεγμένο</span> : null}</span>
           <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}{supplyLabelFor(supplyPoints, k.supply_point_id) ? ` · ${supplyLabelFor(supplyPoints, k.supply_point_id)}` : ''}{k.next_action ? ` · ${k.next_action}` : ''}</span>
         </button>
         <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
@@ -184,8 +184,9 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
             <span data-folder-subtitle>{subtitle}</span>
           </p>
         </div>
-        {!cust.deleted_at && <TrashButton type="customer" id={cust.id} name={cust.full_name} onTrashed={() => { go('customers'); }} />}
         {canEdit && !editing && !cust.deleted_at && <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={openEdit}><Pencil size={14} /> Επεξεργασία</button>}
+        {/* the destructive action is last, small and quiet: it does not compete with the main actions */}
+        {!cust.deleted_at && <TrashButton compact type="customer" id={cust.id} name={cust.full_name} onTrashed={() => { go('customers'); }} />}
       </div>
       {notice !== null && <div className="atx-notice" data-folder-notice>{convertedNotice(notice)}</div>}
       {syncWarn && <div className="atx-notice" role="alert" data-sync-warning>{syncWarn}</div>}
@@ -238,7 +239,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
         <div className="flex items-center gap-2 flex-wrap text-[13px]" data-folder-scope>
           <span className="text-[var(--atx-muted)]">Case:</span>
           {cases.map(k => (
-            <button key={k.id} className="atx-chip" aria-pressed={sel.id === k.id} onClick={() => setPicked(k.id)}>{k.case_no} · {SERVICES[k.service_type] ?? k.service_type}</button>
+            <button key={k.id} className="atx-chip" aria-pressed={sel.id === k.id} onClick={() => setPicked(k.id)}>{k.case_no} · {serviceLabel(k.service_type)}</button>
           ))}
         </div>
       )}
@@ -268,7 +269,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
             {sel && (
               <div data-folder-progress={sel.case_no}>
                 <CaseProgress c={sel} allowedNext={[]} canChange={false} onPick={() => undefined} visited={visitedStages(events.filter(e => e.case_id === sel.id), sel.current_stage)} />
-                <p className="text-[12.5px] text-[var(--atx-muted)] mt-1.5 px-1">Case {sel.case_no} · {SERVICES[sel.service_type] ?? sel.service_type}. Η αλλαγή σταδίου γίνεται από το <button className="atx-link !p-0 text-[12.5px]" onClick={() => openCase(sel.id)}>case</button>.</p>
+                <p className="text-[12.5px] text-[var(--atx-muted)] mt-1.5 px-1">Case {sel.case_no} · {serviceLabel(sel.service_type)}. Η αλλαγή σταδίου γίνεται από το <button className="atx-link !p-0 text-[12.5px]" onClick={() => openCase(sel.id)}>case</button>.</p>
               </div>
             )}
             <div className="atx-panel">

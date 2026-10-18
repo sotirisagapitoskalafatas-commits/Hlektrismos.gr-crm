@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { SERVICES, can } from '@/lib/roles';
+import { serviceLabel, can } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import {
   Case, CaseDocument, CaseVisit, FollowUp, addActivity, addDocument,
@@ -465,7 +465,7 @@ export default function FieldModePage() {
             </div>
             <div className="text-[15px] font-semibold text-ink mt-1">{target.case?.customer?.full_name ?? '—'}</div>
             <div className="text-xs text-ink/45 mt-0.5">{selCaseTitle(target)}</div>
-            {c?.service_type && <div className="text-xs text-ink/50 mt-0.5">{SERVICES[c.service_type] ?? c.service_type}</div>}
+            {c?.service_type && <div className="text-xs text-ink/50 mt-0.5">{serviceLabel(c.service_type)}</div>}
             <div className="flex items-center gap-2 flex-wrap mt-2">
               {target.scheduled_at && <span className="pill bg-ink/10 text-ink/70">{fmtTime(target.scheduled_at)}</span>}
               {d != null && <span className="pill bg-brand-100 text-brand-600">~{durationMinutes(d)} λεπτά · {formatDistance(d)}</span>}
@@ -593,7 +593,7 @@ export default function FieldModePage() {
           </div>
           <div className="text-[15px] font-semibold text-ink mt-1">{selCase.title}</div>
           <div className="mt-2.5 space-y-2">
-            <InfoRow label="Υπηρεσία" value={SERVICES[selCase.service_type] ?? selCase.service_type} />
+            <InfoRow label="Υπηρεσία" value={serviceLabel(selCase.service_type)} />
             {selCase.priority && <InfoRow label="Προτεραιότητα" value={selCase.priority} />}
             <InfoRow label="Διεύθυνση" value={selCase.address || '—'} />
             {selCase.program && <InfoRow label="Πρόγραμμα" value={selCase.program} />}

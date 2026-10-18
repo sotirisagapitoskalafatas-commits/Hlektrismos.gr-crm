@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Clock, FileText, Mail, MapPin, Pencil, Phone, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { can, LEAD_STATUSES, leadSourceInfo, SERVICES } from '@/lib/roles';
+import { can, LEAD_STATUSES, leadSourceInfo, propertyLabel, serviceLabel } from '@/lib/roles';
 import { convertLeadToCase, fetchCase, fetchEntityActivity, fetchLead, fetchLeadSupplyPoints, fetchTariffCategories, getLeadFileUrl, logAudit, updateLeadStage } from '@/lib/api';
 import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
@@ -150,22 +150,25 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
             {tel && <a className="atx-link !p-0 inline-flex items-center gap-1" href={tel}><Phone size={13} aria-hidden="true" />{lead.phone}</a>}
             {lead.email && <a className="atx-link !p-0 inline-flex items-center gap-1 truncate" href={`mailto:${lead.email}`}><Mail size={13} aria-hidden="true" />{lead.email}</a>}
             <span data-folder-subtitle>
-              {SERVICES[lead.service_category ?? ''] ?? lead.service_category ?? 'Ενέργεια'}
+              {serviceLabel(lead.service_category)}
               {lead.assigned_to?.full_name ? ` · Υπεύθυνος: ${lead.assigned_to.full_name}` : ' · Χωρίς υπεύθυνο'}
             </span>
           </p>
         </div>
-        {!lead.deleted_at && <TrashButton type="lead" id={lead.id} name={name} onTrashed={() => { go('leads'); }} />}
+        <div className="flex gap-2 flex-wrap items-center">
         {isStaff && !converted && !lead.deleted_at && (
-          <div className="flex gap-2 flex-wrap">
+          <>
             <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" onClick={() => onEdit(lead)}><Pencil size={14} /> Επεξεργασία</button>
             <label className="sr-only" htmlFor="lead-status">Κατάσταση</label>
             <select id="lead-status" className="atx-chip" value={lead.status ?? 'new'} disabled={busy} onChange={e => void setStatus(e.target.value)}>
               {!st.known && lead.status && <option value={lead.status}>{lead.status}</option>}
               {LEAD_STATUSES.filter(s => s.id !== 'converted').map(s => <option key={s.id} value={s.id}>{leadStatusDisplay(s.id).label}{leadStatusDisplay(s.id).detail ? ` · ${leadStatusDisplay(s.id).detail}` : ''}</option>)}
             </select>
-          </div>
+          </>
         )}
+        {/* the destructive action is last, small and quiet: it does not compete with the main actions */}
+        {!lead.deleted_at && <TrashButton compact type="lead" id={lead.id} name={name} onTrashed={() => { go('leads'); }} />}
+        </div>
       </div>
 
       {lead.deleted_at && <InTrashBanner type="lead" id={lead.id} deletedAt={lead.deleted_at} onRestored={() => void load()} />}
@@ -249,8 +252,8 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
                   ['Τηλέφωνο', lead.phone],
                   ['Email', lead.email],
                   ['Διεύθυνση', lead.address],
-                  ['Ενδιαφέρον', SERVICES[lead.service_category ?? ''] ?? lead.service_category],
-                  ['Ακίνητο', lead.property_type],
+                  ['Ενδιαφέρον', serviceLabel(lead.service_category, '')],
+                  ['Ακίνητο', propertyLabel(lead.property_type)],
                   ['Εταιρεία', lead.company],
                   ['Συνεργάτης', lead.partner],
                   ['Πάροχος', [lead.provider, lead.program].filter(Boolean).join(' · ') || null],

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, LogIn, LogOut, MapPin, Navigation, Phone, RefreshCw, Route } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { SERVICES, can } from '@/lib/roles';
+import { serviceLabel, can } from '@/lib/roles';
 import {
   addActivity, createFollowUp, fetchArrivalRadius, fetchCases, fetchFollowUps, fetchTimeline, fetchVisits, fieldCheckin, fieldCheckout, updateVisitNotes,
 } from '@/lib/api';
@@ -438,7 +438,7 @@ export default function MyDayPage() {
                       <span className="atx-icon" aria-hidden="true"><MapPin size={16} /></span>
                       <button className="atx-row-main" onClick={() => openCase(c.id)}>
                         <span className="atx-row-title">{c.customer?.full_name ?? c.title}</span>
-                        <span className="atx-row-sub">{SERVICES[c.service_type] ?? c.service_type} · {stageText(c.current_stage)}{c.address ? ` · ${c.address}` : ''}</span>
+                        <span className="atx-row-sub">{serviceLabel(c.service_type)} · {stageText(c.current_stage)}{c.address ? ` · ${c.address}` : ''}</span>
                       </button>
                       <span className="atx-row-when">{km != null ? formatDistance(km) : ''}</span>
                     </li>

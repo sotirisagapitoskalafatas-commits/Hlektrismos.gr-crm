@@ -69,10 +69,10 @@ const DRY2 = DRY.slice(DRY.indexOf('-- ───────────── 2
 const asMap = (rows) => Object.fromEntries(rows.map((r) => [r.item, Number(r.n)]));
 const docsCounts = async () => { await db.exec('begin read only'); try { return asMap((await db.query(DRY2)).rows); } finally { await db.exec('rollback'); } };
 const EXPECT = {
-  'legacy rows in total': 14, 'already imported by an earlier run (skipped)': 0, 'TO COPY in this run': 14,
-  'of those: without recorded consent → «not for marketing»': 1, 'of those: soft-deleted in the old table → «unqualified», not for marketing': 1,
+  'legacy rows in total': 14, 'already imported by an earlier run (skipped)': 0, 'skipped_deleted: soft-deleted in the old table (they stay there)': 1, 'TO COPY in this run': 13,
+  'of those: without recorded consent → «not for marketing»': 1,
   'of those: possible duplicates (tagged, not merged)': 3, 'of those: no name (named «Χωρίς όνομα»)': 1, 'of those: no phone and no e-mail': 1,
-  'statuses: mapped directly': 12, 'statuses: «beyond lead» → qualified': 1, 'statuses: unknown or empty → new': 1, 'distinct old statuses in use': 5,
+  'statuses: mapped directly': 11, 'statuses: «beyond lead» → qualified': 1, 'statuses: unknown or empty → new': 1, 'distinct old statuses in use': 5,
 };
 const withoutMode = (m) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith('MODE')));
 
@@ -111,18 +111,19 @@ test('app users cannot run the function or read the plan view (owner only)', asy
   assert.match(r1 ?? '', /permission denied/); assert.match(r2 ?? '', /permission denied/);
 });
 
-test('the real import (false) copies ALL 14 rows, none skipped, marked, unassigned, statuses mapped, original status kept; the old table is untouched', async () => {
+test('the real import (false) copies the 13 rows that are not soft-deleted (the deleted one is skipped and stays in the old table), marked, unassigned, statuses mapped, original status kept', async () => {
   const oldBefore = await snapshot(db, 'hlektrismos_leads');
   const leadsBefore = (await db.query('select count(*)::int n from public.leads')).rows[0].n;
   const rows = (await db.query('select * from public.import_legacy_leads(false)')).rows;
   assert.ok(rows[0].item.startsWith('MODE: IMPORT'));
   assert.deepEqual(withoutMode(Object.fromEntries(Object.entries(asMap(rows)).filter(([k]) => k !== 'COPIED (written)'))), EXPECT, 'the counts are taken before the write');
-  assert.equal(asMap(rows)['COPIED (written)'], 14);
+  assert.equal(asMap(rows)['COPIED (written)'], 13);
   assert.equal(await snapshot(db, 'hlektrismos_leads'), oldBefore, 'the old table is not changed');
   const got = (await db.query("select * from public.leads where source = 'import'")).rows;
-  assert.equal((await db.query('select count(*)::int n from public.leads')).rows[0].n, leadsBefore + 14);
+  assert.equal((await db.query('select count(*)::int n from public.leads')).rows[0].n, leadsBefore + 13);
   const by = Object.fromEntries(got.map((r) => [r.tags.find((t) => t.startsWith('legacy_import:')).slice('legacy_import:'.length), r]));
-  assert.deepEqual(Object.keys(by).sort(), Object.values(ids).sort(), 'every old row, none skipped');
+  assert.deepEqual(Object.keys(by).sort(), Object.values(ids).filter((x) => x !== ids.deleted).sort(), 'every old row except the soft-deleted one');
+  assert.ok(!(ids.deleted in by), 'the soft-deleted row is NOT imported (it stays in the old table)');
   for (const r of got) {
     assert.equal(r.assigned_to_user_id, null); assert.equal(r.created_by_user_id, null); assert.equal(r.source_label, 'Παλιά βάση');
     assert.ok(r.tags.includes('import') && r.tags.some((t) => t.startsWith('legacy_status:'))); assert.match(r.notes, /Αρχική κατάσταση:/);
@@ -139,25 +140,23 @@ test('the real import (false) copies ALL 14 rows, none skipped, marked, unassign
   assert.equal(b.status, 'qualified'); assert.ok(b.tags.includes('legacy_status:converted')); assert.match(b.notes, /αντιστοιχίστηκε σε «qualified»/);
   assert.equal(b.gdpr_consent, false); assert.equal(b.consent_granted_at, null); assert.ok(b.tags.includes('not_for_marketing')); assert.match(b.notes, /ΟΧΙ για marketing/);
   assert.equal(by[ids.badStatus].status, 'new'); assert.ok(by[ids.badStatus].tags.includes('legacy_status:weird')); assert.match(by[ids.badStatus].notes, /άγνωστη/);
-  const d = by[ids.deleted];
-  assert.equal(d.status, 'unqualified'); assert.ok(d.tags.includes('legacy_deleted') && d.tags.includes('not_for_marketing')); assert.equal(d.gdpr_consent, false); assert.match(d.notes, /διαγραμμένο/);
   assert.equal(by[ids.noName].client_name, 'Χωρίς όνομα (παλιά βάση)'); assert.equal(by[ids.noName].first_name, '');
   assert.equal(by[ids.noContact].client_contact, ''); assert.equal(by[ids.noContact].phone, null); assert.equal(by[ids.noContact].email, null);
   for (const k of ['dupPhone', 'dupEmail', 'twinNew']) { assert.ok(by[ids[k]].tags.includes('possible_duplicate'), k); assert.match(by[ids[k]].notes, /Πιθανό διπλότυπο/); }
   for (const k of ['plain', 'twinOld', 'shortA', 'shortB']) assert.ok(!by[ids[k]].tags.includes('possible_duplicate'), k);
   const nfm = got.filter((r) => r.tags.includes('not_for_marketing')).map((r) => r.tags.find((t) => t.startsWith('legacy_import:')).slice('legacy_import:'.length)).sort();
-  assert.deepEqual(nfm, [ids.beyond, ids.deleted].sort(), 'only rows without consent (or deleted) are marked; consenting rows are open for normal contact');
+  assert.deepEqual(nfm, [ids.beyond], 'only rows without consent are marked; consenting rows are open for normal contact');
   const ex = (await db.query("select client_name, phone, email, source from public.leads where id = 'eeeeeeee-0000-4000-8000-000000000001'")).rows[0];
   assert.deepEqual(ex, { client_name: 'Υπάρχων', phone: '+30 697 111 1111', email: 'Exists@Example.com', source: 'website' });
 });
 
 test('one audit entry with the count only; the import is idempotent — a second real run copies nothing', async () => {
   const log = (await db.query("select details from public.activity_log where action = 'legacy_import'")).rows;
-  assert.equal(log.length, 1); assert.deepEqual(log[0].details, { copied: 14 }); assert.ok(!JSON.stringify(log).includes('@'));
+  assert.equal(log.length, 1); assert.deepEqual(log[0].details, { copied: 13 }); assert.ok(!JSON.stringify(log).includes('@'));
   const before = await snapshot(db, 'leads');
   const rows = asMap((await db.query('select * from public.import_legacy_leads(false)')).rows);
   assert.equal(await snapshot(db, 'leads'), before, 'nothing is copied twice');
-  assert.equal(rows['already imported by an earlier run (skipped)'], 14); assert.equal(rows['TO COPY in this run'], 0); assert.equal(rows['COPIED (written)'], 0);
+  assert.equal(rows['already imported by an earlier run (skipped)'], 13); assert.equal(rows['skipped_deleted: soft-deleted in the old table (they stay there)'], 1); assert.equal(rows['TO COPY in this run'], 0); assert.equal(rows['COPIED (written)'], 0);
   assert.equal((await docsCounts())['TO COPY in this run'], 0);
 });
 
@@ -167,7 +166,7 @@ test('rollback: removes the imported leads nobody built on (and the helper objec
   const keepCase = (await db.query("select id from public.leads where tags @> array['legacy_import:' || $1::text]", [ids.rejected])).rows[0].id;
   await db.query("update public.leads set converted_case_id = (select id from public.cases limit 1) where id = $1", [keepCase]);
   const review = (await db.query(ROLLBACK.slice(ROLLBACK.indexOf('select count(*)'), ROLLBACK.indexOf('-- 2) DELETE')))).rows[0];
-  assert.deepEqual({ ...review }, { imported_leads: 14, already_converted: 1, with_a_case: 1, assigned_since: 0 });
+  assert.deepEqual({ ...review }, { imported_leads: 13, already_converted: 1, with_a_case: 1, assigned_since: 0 });
   await db.exec(ROLLBACK.slice(ROLLBACK.indexOf('delete from')));
   assert.equal((await db.query("select count(*)::int n from public.leads where source = 'import'")).rows[0].n, 2, 'the converted lead and the one with a case stay');
   assert.equal((await db.query("select count(*)::int n from public.leads where id = 'eeeeeeee-0000-4000-8000-000000000001'")).rows[0].n, 1, 'the pre-existing lead stays');

@@ -4,6 +4,7 @@ import { useNav } from '@/lib/nav';
 import CaseDocuments from '@/components/documents/CaseDocuments';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { buildChecklist, docLabel } from '@/lib/documents';
+import CaseSupplyHint from '@/components/cases/CaseSupplyHint';
 import { CaseExceptionCard, CaseNextStepCard, CaseProgress, CaseUpcoming, HandoverDialog, StageChangeDialog } from '@/components/cases/CaseOverview';
 import { ReturnDialog, ReturnedBanner } from '@/components/cases/CaseReturn';
 import { canResubmit as canResubmitCase, canReturn as canReturnCase, stageErrorText } from '@/lib/case-return';
@@ -852,6 +853,8 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       </div>
 
       <CaseProgress c={c} allowedNext={allowedNext} canChange={canChange} onPick={setStagePending} visited={stageHistory ? visitedStages(stageHistory, c.current_stage) : null} />
+
+      <CaseSupplyHint c={c} onLinked={() => void reload()} />
 
       {/* Next step + customer */}
       <div className="grid lg:grid-cols-3 gap-4">

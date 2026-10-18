@@ -231,3 +231,8 @@ There is **no** configuration of folder tabs, sections or fields. **Everything b
 Approve, change or reject Part A. Part B (UI unification and wording bugs, with tests, no database change and no configuration feature) starts only after approval.
 
 D1 is a database fix and is **not** part of Part B: it needs a staged migration that you approve separately.
+
+---
+
+## Status 18/10/2026 — queue item 6
+The **Case** screen now uses the same folder layout and tabs as the Lead and the Customer (`folderTabs()` in `src/lib/folder.ts`, one list, one order): **Σύνοψη · Παροχές · Έγγραφα · Υποθέσεις · Ιστορικό**, then the case tabs Follow-ups · Επισκέψεις · Προσφορές · Υπογραφές · Back Office (Back Office only for the roles that have it). Only the badge (here the case stage) and the actions differ. The old «Cases» tab is now **«Υποθέσεις»** and «Έγγραφα» comes before it. Width is 1040 px everywhere. On the case, Σύνοψη holds what used to sit above the tabs (progress, next step, contact, consent); «Παροχές» and «Υποθέσεις» are the customer's connections and cases.

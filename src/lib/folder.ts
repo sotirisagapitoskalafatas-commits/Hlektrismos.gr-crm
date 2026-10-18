@@ -21,8 +21,8 @@ export type FolderTab = 'overview' | 'supply' | 'cases' | 'docs' | 'history' | '
 export const FOLDER_TABS: { id: FolderTab; label: string; needsCase: boolean; scoped: boolean }[] = [
   { id: 'overview', label: 'Σύνοψη', needsCase: false, scoped: false },
   { id: 'supply', label: 'Παροχές', needsCase: false, scoped: false },
-  { id: 'cases', label: 'Cases', needsCase: true, scoped: false },
   { id: 'docs', label: 'Έγγραφα', needsCase: false, scoped: true },
+  { id: 'cases', label: 'Υποθέσεις', needsCase: true, scoped: false },
   { id: 'history', label: 'Ιστορικό', needsCase: false, scoped: false },
   { id: 'followups', label: 'Follow-ups', needsCase: true, scoped: true },
   { id: 'visits', label: 'Επισκέψεις', needsCase: true, scoped: true },

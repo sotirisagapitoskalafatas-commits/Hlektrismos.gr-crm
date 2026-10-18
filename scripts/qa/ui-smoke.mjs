@@ -539,6 +539,7 @@ if (!PREVIEW_LIVE) {
     await sleep(1800);
     const call = (await rpcs()).pop();
     check('Stage set: goes through set_case_stage with the stage and the written reason', call?.body?.p_case === C3 && call.body.p_stage === 'submitted' && call.body.p_reason === 'Ήρθε από το Field με πλήρη φάκελο', JSON.stringify(call?.body));
+    await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(600); // the stepper lives in Σύνοψη, like in the other folders
     const steps = await page.evaluate(() => ({
       skipped: [...document.querySelectorAll('.atx-step.is-skipped .atx-step-label')].map((l) => l.textContent.replace(/Βήμα \d+: /, '').replace(' (παραλείφθηκε)', '').trim()),
       current: document.querySelector('.atx-step.is-current .atx-step-label')?.textContent.replace(/Βήμα \d+: /, '').trim(),
@@ -1553,8 +1554,8 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   check('Lead detail: opens from My Work with the recommended action', (await body()).includes('Προτεινόμενη ενέργεια') && (await body()).includes('Καταγραφή πρώτης επικοινωνίας'));
   {
     const f = await page.evaluate(() => ({ badge: document.querySelector('[data-folder-badge]')?.textContent ?? '', tabs: [...document.querySelectorAll('main [role="tab"]')].map((b) => b.childNodes[0]?.textContent?.trim()) }));
-    check('Lead folder: badge «Lead» and the same tabs as the customer folder (no Back Office for Inside Sales)', f.badge === 'Lead' && JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Παροχές', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f));
-    await click(page, 'Cases', '[role="tab"]'); await sleep(300);
+    check('Lead folder: badge «Lead» and the same tabs as the customer folder (no Back Office for Inside Sales)', f.badge === 'Lead' && JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Παροχές', 'Έγγραφα', 'Υποθέσεις', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f));
+    await click(page, 'Υποθέσεις', '[role="tab"]'); await sleep(300);
     const need1 = await page.evaluate(() => document.querySelector('[data-needs-case]')?.innerText ?? '');
     await click(page, 'Υπογραφές', '[role="tab"]'); await sleep(300);
     const need2 = await page.evaluate(() => document.querySelector('[data-needs-case]')?.innerText ?? '');
@@ -1687,9 +1688,9 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
       header: document.querySelector('main h1')?.parentElement?.parentElement?.innerText ?? '',
     }));
     check('Folder: one computed badge in the header', f.badge === 'Case σε εξέλιξη', f.badge);
-    check('Folder: tabs in the fixed order, «Παροχές» right after Σύνοψη (no Back Office for Inside Sales)', JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Παροχές', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f.tabs));
+    check('Folder: tabs in the fixed order, «Παροχές» right after Σύνοψη (no Back Office for Inside Sales)', JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Παροχές', 'Έγγραφα', 'Υποθέσεις', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f.tabs));
     check('Folder: header shows phone and «από …»; Σύνοψη shows the selected case stepper and the origin', /από \d/.test(f.header) && /CS-2026-00\d/.test(f.progress) && /Πηγή/.test(f.origin), JSON.stringify({ p: f.progress, o: f.origin.slice(0, 60) }));
-    await click(page, 'Cases', '[role="tab"]'); await sleep(300);
+    await click(page, 'Υποθέσεις', '[role="tab"]'); await sleep(300);
     const nos = await page.$$eval('main [data-folder-case]', (b) => b.map((x) => x.getAttribute('data-folder-case')));
     const other = nos.find((n) => n !== f.progress);
     await page.evaluate((n) => document.querySelector(`main [data-folder-case="${n}"]`)?.click(), other); await sleep(300);
@@ -1748,7 +1749,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await click(page, 'Σύνοψη', '[role="tab"]'); await sleep(400);
   const o = await page.evaluate(() => ({ lead: !!document.querySelector('[data-origin-lead]'), btn: !!document.querySelector('main [data-open-lead]'), text: document.querySelector('[data-origin-lead]')?.innerText ?? '' }));
   check('Folder: «Προέλευση» shows the lead read-only (source, dates) with no button back to a lead screen', o.lead && !o.btn && /Πηγή/.test(o.text) && /Μετατροπή/.test(o.text), o.text.slice(0, 80));
-  await click(page, 'Cases', '[role="tab"]'); await sleep(400);
+  await click(page, 'Υποθέσεις', '[role="tab"]'); await sleep(400);
   await page.evaluate(() => document.querySelector('[data-folder-case="CS-2026-001"]')?.closest('li')?.querySelector('button:last-child')?.click()); await sleep(1800);
   const toFolder = await page.evaluate(() => !!document.querySelector('[data-open-folder]'));
   await page.evaluate(() => document.querySelector('[data-open-folder]')?.click()); await sleep(1800);

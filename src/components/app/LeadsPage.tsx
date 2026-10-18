@@ -6,7 +6,7 @@ import { TrashButton } from '@/components/trash/TrashControls';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
 import { Lead, convertLeadToCase, createLead, createLeadSupplyPoint, fetchLeads, fetchTariffCategories, getPosition, leadSupplyAvailable, updateLeadChecked, updateLeadStage } from '@/lib/api';
 import LeadSupplySection from '@/components/leads/LeadSupplySection';
-import { leadSupplyBlocking } from '@/lib/supply-points';
+import { leadSupplyBlocking, supplyPointTitle } from '@/lib/supply-points';
 import type { SupplyPointDraft, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
 import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
@@ -43,6 +43,8 @@ export default function LeadsPage() {
   // «Γρήγορο lead» (name only) or «Lead με έγγραφα» (details + files → default Back Office assignee).
   const [mode, setMode] = useState<'quick' | 'docs'>('quick');
   const [files, setFiles] = useState<File[]>([]);
+  // for each file: the number (in the connections list below) of the connection it belongs to, or null
+  const [fileTags, setFileTags] = useState<(number | null)[]>([]);
   // «Παροχές ρεύματος» (staged phase5/17 + 18): optional; collapsed in «Γρήγορο lead», open in «Lead με έγγραφα»
   const [supplyDrafts, setSupplyDrafts] = useState<SupplyPointDraft[]>([]);
   const [supplyOpen, setSupplyOpen] = useState(false);
@@ -56,7 +58,9 @@ export default function LeadsPage() {
     return () => { alive = false; };
   }, [modal]);
   const switchMode = (m: 'quick' | 'docs') => { setMode(m); setSupplyOpen(m === 'docs'); };
-  const closeCreate = () => { setModal(false); setCreateErr(''); setSupplyDrafts([]); setSupplyOpen(false); setMode('quick'); };
+  const closeCreate = () => { setModal(false); setCreateErr(''); setSupplyDrafts([]); setSupplyOpen(false); setMode('quick'); setFiles([]); setFileTags([]); };
+  // removing connection i: files tagged to it become untagged, later tags shift down
+  const removeSupply = (i: number) => { setSupplyDrafts(supplyDrafts.filter((_, j) => j !== i)); setFileTags(fileTags.map(t => (t == null || t === i ? null : t > i ? t - 1 : t))); };
   const [editErr, setEditErr] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -152,11 +156,22 @@ export default function LeadsPage() {
       partner: form.partner.trim() || null,
     });
     if (error || !lead) { setCreating(false); setCreateErr(error ?? 'Η δημιουργία απέτυχε. Δοκιμάστε ξανά.'); return; }
-    // The lead exists now. Files go under leads/<id>/; a failed file never removes the lead.
+    // The lead exists now. Its connections come first (their ids are what documents are tagged with), then the files under
+    // leads/<id>/ and the routing. A failed connection or file never removes the lead and is reported by name.
     let extra = '';
     let tone: 'ok' | 'warn' = 'ok';
+    const supplyIds: (string | null)[] = [];
+    if (supplyAvail && supplyDrafts.length) {
+      const failedSupply: string[] = [];
+      for (const [i, d] of supplyDrafts.entries()) {
+        const r = await createLeadSupplyPoint(lead.id, d);
+        supplyIds.push(r.point?.id ?? null);
+        if (r.error) failedSupply.push(`παροχή ${i + 1} (${r.error})`);
+      }
+      if (failedSupply.length) { tone = 'warn'; extra += ` Δεν αποθηκεύτηκε: ${failedSupply.join(', ')} — προσθέστε την από το lead.`; }
+    }
     if (mode === 'docs' && files.length) {
-      const up = await attachLeadFiles(lead, files);
+      const up = await attachLeadFiles(lead, files, fileTags.map(t => (t == null ? null : supplyIds[t] ?? null)));
       if (up.failed.length) { tone = 'warn'; extra += ` Δεν ανέβηκαν: ${up.failed.join(', ')} — ανεβάστε τα ξανά από το case.`; }
       if (up.saved.length) {
         const r = await routeLeadToBackoffice(lead.id);
@@ -165,17 +180,8 @@ export default function LeadsPage() {
         else { tone = 'warn'; extra += ' Δεν έχει οριστεί υπεύθυνος Back Office — ορίστε τον στη Διαχείριση → Cases & Ροή.'; }
       }
     }
-    // The connections come after the lead exists; a failed one never removes the lead and is reported by name.
-    if (supplyAvail && supplyDrafts.length) {
-      const failedSupply: string[] = [];
-      for (const [i, d] of supplyDrafts.entries()) {
-        const r = await createLeadSupplyPoint(lead.id, d);
-        if (r.error) failedSupply.push(`παροχή ${i + 1} (${r.error})`);
-      }
-      if (failedSupply.length) { tone = 'warn'; extra += ` Δεν αποθηκεύτηκε: ${failedSupply.join(', ')} — προσθέστε την από το lead.`; }
-    }
     setCreating(false);
-    setFiles([]);
+    setFiles([]); setFileTags([]);
     setModal(false);
     setSupplyDrafts([]); setSupplyOpen(false); setMode('quick');
     setForm(EMPTY_FORM);
@@ -383,7 +389,7 @@ export default function LeadsPage() {
           <Field label={form.source === 'partner' ? 'Συνεργάτης' : 'Συνεργάτης (αν υπάρχει)'}>
             <input className="field" value={form.partner} onChange={e => setForm(f => ({ ...f, partner: e.target.value }))} placeholder="Όνομα συνεργάτη που έφερε τον πελάτη" />
           </Field>
-          <LeadSupplySection drafts={supplyDrafts} setDrafts={setSupplyDrafts} tariffs={tariffs} available={supplyAvail} open={supplyOpen} setOpen={setSupplyOpen} disabled={creating} />
+          <LeadSupplySection drafts={supplyDrafts} setDrafts={setSupplyDrafts} onRemove={removeSupply} tariffs={tariffs} available={supplyAvail} open={supplyOpen} setOpen={setSupplyOpen} disabled={creating} />
           {mode === 'docs' && (<>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Τύπος πελάτη">
@@ -419,7 +425,8 @@ export default function LeadsPage() {
                 const picked = Array.from(e.target.files ?? []);
                 const bad = picked.filter(f => !classifyUpload(f).ok).map(f => f.name);
                 const ok = picked.filter(f => classifyUpload(f).ok);
-                setFiles(cur => [...cur, ...ok].slice(0, MAX_FORM_FILES));
+                setFiles([...files, ...ok].slice(0, MAX_FORM_FILES));
+                setFileTags([...fileTags, ...ok.map(() => null)].slice(0, MAX_FORM_FILES));
                 setCreateErr(bad.length ? `Μη υποστηριζόμενα αρχεία: ${bad.join(', ')} (PDF ή φωτογραφία).` : '');
                 e.target.value = '';
               }} />
@@ -428,7 +435,14 @@ export default function LeadsPage() {
                 {files.map((f, i) => (
                   <li key={`${f.name}-${i}`} className="flex items-center gap-2">
                     <span className="flex-1 truncate">{f.name}</span>
-                    <button type="button" className="atx-link !p-0 text-[12.5px]" onClick={() => setFiles(cur => cur.filter((_, j) => j !== i))}>Αφαίρεση</button>
+                    {supplyAvail && supplyDrafts.length > 0 && (
+                      <select className="field !py-1 text-[12.5px] w-48" value={fileTags[i] == null ? '' : String(fileTags[i])} aria-label={`Παροχή για το αρχείο ${f.name}`} data-lead-file-tag
+                        onChange={e => setFileTags(fileTags.map((t, j) => (j === i ? (e.target.value === '' ? null : Number(e.target.value)) : t)))}>
+                        <option value="">Χωρίς παροχή</option>
+                        {supplyDrafts.map((d, n) => <option key={n} value={n}>{supplyPointTitle(n + 1, d.usage)}</option>)}
+                      </select>
+                    )}
+                    <button type="button" className="atx-link !p-0 text-[12.5px]" onClick={() => { setFiles(files.filter((_, j) => j !== i)); setFileTags(fileTags.filter((_, j) => j !== i)); }}>Αφαίρεση</button>
                   </li>
                 ))}
               </ul>

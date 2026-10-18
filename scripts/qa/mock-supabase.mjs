@@ -273,6 +273,27 @@ http.createServer((req, res) => {
       log.push({ method: 'RPC', table: 'convert_lead_to_case', body: json });
       const l = TABLES.leads.find((x) => x.id === json.p_lead_id);
       if (!l) return send(400, { message: 'lead not found' });
+      const mine = supplyOn && leadSupplyOn ? (TABLES.customer_supply_points ?? []).filter((p) => p.lead_id === l.id) : [];
+      if (mine.length) { // a lead WITH connections: a new case on the matched/new customer, then what the staged phase5/18 trigger does
+        const digits = (v) => String(v ?? '').replace(/\D/g, '');
+        const p10 = digits(l.phone).length >= 10 ? digits(l.phone).slice(-10) : null;
+        let cu = p10 ? customers.find((c) => digits(c.phone).length >= 10 && digits(c.phone).slice(-10) === p10) : null;
+        if (!cu) { cu = { id: crypto.randomUUID(), full_name: l.full_name ?? l.client_name, city: null, email: null, phone: l.phone ?? null, company: null, address: null, postal_code: null, lat: null, lng: null, notes: '', created_at: new Date().toISOString() }; customers.push(cu); }
+        const k = { ...caseRows[0], id: crypto.randomUUID(), case_no: `CS-2026-${String(100 + caseRows.length)}`, title: l.full_name ?? l.client_name, customer_id: cu.id, customer: cu, lead_id: l.id, current_stage: 'new', status: 'open', supply_point_id: null, created_at: new Date().toISOString() };
+        caseRows.push(k);
+        const all = TABLES.customer_supply_points;
+        const targets = [];
+        const remap = {};
+        for (const sp of mine) {
+          const dup = sp.archived_at || !sp.supply_number_key ? null : all.find((c) => c.customer_id === cu.id && !c.archived_at && c.supply_number_key === sp.supply_number_key);
+          if (dup) { Object.assign(sp, { needs_review: true, review_note: sp.review_note ?? 'Ο αριθμός υπάρχει ήδη στον πελάτη (ίδια παροχή;)' }); remap[sp.id] = dup.id; targets.push(dup.id); }
+          else { Object.assign(sp, { customer_id: cu.id, lead_id: null }); if (!sp.archived_at) targets.push(sp.id); }
+        }
+        if (Array.isArray(l.attached_files)) l.attached_files = l.attached_files.map((f) => (f.supply_point_id && remap[f.supply_point_id] ? { ...f, supply_point_id: remap[f.supply_point_id] } : f));
+        if (new Set(targets).size === 1) k.supply_point_id = targets[0];
+        l.status = 'converted'; l.converted_case_id = k.id; l.converted_at = new Date().toISOString();
+        return send(200, k.id);
+      }
       l.status = 'converted'; l.converted_case_id = caseRows[0].id; l.converted_at = new Date().toISOString();
       return send(200, caseRows[0].id);
     }

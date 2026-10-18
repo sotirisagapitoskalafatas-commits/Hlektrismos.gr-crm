@@ -2,13 +2,15 @@
    are independent: every card has its own editor and its own save, addressed by that connection's id, so saving one can
    never change another. Nothing is mandatory. Until the SQL is applied the tab is one neutral sentence — never an error. */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Zap } from 'lucide-react';
-import { archiveSupplyPoint, createSupplyPoint, linkCaseToSupplyPoint, linkDocumentToSupplyPoint, updateSupplyPoint } from '@/lib/api';
-import type { Case, CaseDocument } from '@/lib/api';
+import { archiveSupplyPoint, createSupplyPoint, findSupplyDuplicates, flagSupplyReview, linkCaseToSupplyPoint, linkDocumentToSupplyPoint, resolveSupplyReview, saveTariffCategory, updateSupplyPoint } from '@/lib/api';
+import type { Case, CaseDocument, SupplyDuplicate } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useNav } from '@/lib/nav';
 import { docLabel } from '@/lib/documents';
 import {
-  METER_TYPE_LABEL, USAGES, USAGE_LABEL, contractText, draftErrors, draftFromPoint, emptyDraft, supplyLabelFor, supplyNumberError, supplyPointTitle, tariffOptions,
+  METER_TYPE_LABEL, USAGES, USAGE_LABEL, contractText, draftErrors, draftFromPoint, emptyDraft, supplyLabelFor, supplyNumberError, supplyNumberOk, supplyPointTitle, tariffOptions,
 } from '@/lib/supply-points';
 import type { MeterType, SupplyPoint, SupplyPointDraft, SupplyUsage, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
@@ -96,6 +98,14 @@ function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: Suppl
   const [msg, setMsg] = useState<string | null>(null);
   const errors = draftErrors(d);
   const set = <K extends keyof SupplyPointDraft>(k: K, v: SupplyPointDraft[K]) => setD(x => ({ ...x, [k]: v }));
+  // the same number elsewhere is a hint, never a block: saving stays possible and nothing is ever moved or merged
+  const [hint, setHint] = useState<SupplyDuplicate[]>([]);
+  useEffect(() => {
+    let alive = true;
+    if (!d.supply_number.trim() || !supplyNumberOk(d.supply_number)) { setHint([]); return; }
+    const t = setTimeout(() => { void findSupplyDuplicates(d.supply_number, point.id).then(r => { if (alive) setHint(r ?? []); }); }, 400);
+    return () => { alive = false; clearTimeout(t); };
+  }, [d.supply_number, point.id]);
   const options = tariffs && tariffs.length > 0 ? tariffOptions(tariffs, d.usage, d.tariff_category_code || point.tariff_category_code) : null;
 
   const save = async () => {
@@ -123,6 +133,7 @@ function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: Suppl
         <label className={label}>Αριθμός Παροχής
           <input className="field mt-1" inputMode="numeric" value={d.supply_number} onChange={e => set('supply_number', e.target.value)} aria-invalid={!!errors.supply_number} data-sp-field="number" placeholder="11 ψηφία (προαιρετικό)" />
           {errors.supply_number && <span className="block text-[12.5px] font-normal mt-1" style={{ color: 'var(--atx-red)' }} role="alert" data-sp-error="number">{errors.supply_number}</span>}
+          {!errors.supply_number && hint.length > 0 && <span className="block text-[12.5px] font-normal mt-1" style={{ color: 'var(--atx-amber)' }} data-sp-dup-hint>Αυτός ο αριθμός υπάρχει ήδη σε άλλη παροχή ({hint.map(h => h.customer_name || 'πελάτης').join(', ')}). Μπορείτε να αποθηκεύσετε· δεν αλλάζει τίποτα στην άλλη παροχή.</span>}
         </label>
         <label className={label}>Μετρητής / Ρολόι ΔΕΗ (αριθμός)
           <input className="field mt-1" value={d.meter_identifier} onChange={e => set('meter_identifier', e.target.value)} data-sp-field="meter" />
@@ -170,8 +181,99 @@ function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: Suppl
   );
 }
 
+/* The same Αριθμός Παροχής on another connection: a signal for the office, never a block, a merge or a move. */
+function DuplicateNotice({ point, canEdit, canReview, onChanged }: { point: SupplyPoint; canEdit: boolean; canReview: boolean; onChanged: () => void }) {
+  const { go } = useNav();
+  const { toast } = useToast();
+  const [dups, setDups] = useState<SupplyDuplicate[]>([]);
+  const [busy, setBusy] = useState(false);
+  const relevant = !point.archived_at && point.supply_number_ok && !!point.supply_number_key;
+  useEffect(() => {
+    let alive = true;
+    if (!relevant) { setDups([]); return; }
+    void findSupplyDuplicates(point.supply_number ?? '', point.id).then(r => { if (alive) setDups(r ?? []); });
+    return () => { alive = false; };
+  }, [relevant, point.id, point.supply_number]);
+  if (!relevant || dups.length === 0) return null;
+  const act = async (op: Promise<string | null>, ok: string) => {
+    if (busy) return;
+    setBusy(true);
+    const err = await op;
+    setBusy(false);
+    if (err) { toast(err, 'bad'); return; }
+    toast(ok, 'ok');
+    onChanged();
+  };
+  return (
+    <div className="mt-3 p-3 rounded-xl border border-[var(--atx-line)] text-[13px]" style={{ background: 'rgba(255,170,0,.08)' }} data-supply-dup={point.id}>
+      <div className="font-medium">Ο ίδιος Αριθμός Παροχής υπάρχει και σε άλλη παροχή</div>
+      <ul className="m-0 mt-1 p-0 list-none space-y-0.5">
+        {dups.map(d => (
+          <li key={d.id} className="flex items-center gap-2 flex-wrap" data-supply-dup-item={d.id}>
+            <span>{d.customer_name || 'Πελάτης'} · {USAGE_LABEL[d.usage]}{d.property_address ? ` · ${d.property_address}` : ''}{d.needs_review ? ' · προς έλεγχο' : ''}</span>
+            {d.customer_id !== point.customer_id
+              ? <button className="atx-link !p-0 text-[12.5px]" onClick={() => go('customers', { customer: d.customer_id })} data-sp-dup-open>Άνοιγμα πελάτη</button>
+              : <span className="text-[var(--atx-muted)]">ίδιος πελάτης</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="m-0 mt-1 text-[12.5px] text-[var(--atx-muted)]">Τίποτα δεν συγχωνεύεται ούτε μετακινείται. Η σήμανση ειδοποιεί το γραφείο να ελέγξει αν είναι η ίδια παροχή.</p>
+      <div className="mt-2 flex gap-2 flex-wrap">
+        {canEdit && !point.needs_review && <button className="atx-btn atx-btn-quiet" disabled={busy} onClick={() => void act(flagSupplyReview(point.id), 'Η παροχή σημάνθηκε για έλεγχο.')} data-sp-flag>Σήμανση για έλεγχο</button>}
+        {canReview && point.needs_review && <button className="atx-btn atx-btn-quiet" disabled={busy} onClick={() => void act(resolveSupplyReview(point.id), 'Η παροχή σημάνθηκε ως ελεγμένη.')} data-sp-resolve>Ελέγχθηκε</button>}
+      </div>
+    </div>
+  );
+}
+
+/* The list of tariff categories (admins). A connection keeps the code it had, so none of this rewrites a connection. */
+function TariffListEditor({ tariffs, onChanged }: { tariffs: TariffCategory[]; onChanged: () => void }) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const [fresh, setFresh] = useState({ code: '', label: '', usage: 'commercial' as TariffCategory['usage'] });
+  const save = async (c: TariffCategory, ok = 'Αποθηκεύτηκε.') => {
+    if (busy || !c.code.trim()) return;
+    setBusy(true);
+    const err = await saveTariffCategory({ code: c.code, label: c.label.trim() || c.code.trim(), usage: c.usage, active: c.active, sort: Number.isFinite(c.sort) ? c.sort : 100 });
+    setBusy(false);
+    if (err) { toast(err, 'bad'); return; }
+    toast(ok, 'ok');
+    onChanged();
+  };
+  const [rows, setRows] = useState(tariffs);
+  useEffect(() => { setRows(tariffs); }, [tariffs]);
+  const patch = (code: string, p: Partial<TariffCategory>) => setRows(r => r.map(x => (x.code === code ? { ...x, ...p } : x)));
+  return (
+    <details className="atx-panel" style={{ padding: 16 }} data-tariff-admin>
+      <summary className="cursor-pointer text-[14px] font-semibold">Κατηγορίες τιμολογίου (διαχειριστής)</summary>
+      <p className="text-[12.5px] text-[var(--atx-muted)] mt-2 mb-3">Η λίστα που επιλέγεται σε κάθε παροχή. Η αλλαγή ή η απενεργοποίηση μιας κατηγορίας δεν αλλάζει τις υπάρχουσες παροχές: κάθε παροχή κρατά τον κωδικό που είχε.</p>
+      <div className="space-y-2">
+        {rows.map(c => (
+          <div key={c.code} className="flex items-center gap-2 flex-wrap" data-tariff-row={c.code}>
+            <span className="w-16 font-medium text-[13px]">{c.code}</span>
+            <input className="field !py-1.5 text-[13px] w-40" value={c.label} onChange={e => patch(c.code, { label: e.target.value })} aria-label={`Ετικέτα ${c.code}`} />
+            <select className="field !py-1.5 text-[13px] w-36" value={c.usage} onChange={e => patch(c.code, { usage: e.target.value as TariffCategory['usage'] })} aria-label={`Χρήση ${c.code}`}>
+              <option value="residential">Οικιακό</option><option value="commercial">Επαγγελματικό</option><option value="any">Όλα</option>
+            </select>
+            <label className="text-[13px] inline-flex items-center gap-1.5"><input type="checkbox" checked={c.active} onChange={e => patch(c.code, { active: e.target.checked })} data-tariff-active /> Ενεργή</label>
+            <button className="atx-btn atx-btn-quiet" disabled={busy} onClick={() => void save(c)} data-tariff-save>Αποθήκευση</button>
+          </div>
+        ))}
+        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[var(--atx-line)]" data-tariff-new>
+          <input className="field !py-1.5 text-[13px] w-16" value={fresh.code} onChange={e => setFresh(f => ({ ...f, code: e.target.value }))} placeholder="Κωδικός" aria-label="Νέος κωδικός" data-tariff-new-code />
+          <input className="field !py-1.5 text-[13px] w-40" value={fresh.label} onChange={e => setFresh(f => ({ ...f, label: e.target.value }))} placeholder="Ετικέτα" aria-label="Νέα ετικέτα" />
+          <select className="field !py-1.5 text-[13px] w-36" value={fresh.usage} onChange={e => setFresh(f => ({ ...f, usage: e.target.value as TariffCategory['usage'] }))} aria-label="Χρήση νέας κατηγορίας">
+            <option value="residential">Οικιακό</option><option value="commercial">Επαγγελματικό</option><option value="any">Όλα</option>
+          </select>
+          <button className="atx-btn atx-btn-primary" disabled={busy || !fresh.code.trim() || rows.some(r => r.code === fresh.code.trim())} onClick={() => { void save({ code: fresh.code.trim(), label: fresh.label, usage: fresh.usage, active: true, sort: 100 + rows.length }, 'Η κατηγορία προστέθηκε.').then(() => setFresh({ code: '', label: '', usage: 'commercial' })); }} data-tariff-add>Προσθήκη</button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /* One connection. `position` is its number among the active ones; an archived connection has none. */
-export function SupplyPointCard({ point, position, canEdit, tariffs, onChanged, links }: { point: SupplyPoint; position: number | null; canEdit: boolean; tariffs: TariffCategory[] | null; onChanged: () => void; links: Links }) {
+export function SupplyPointCard({ point, position, canEdit, canReview, tariffs, onChanged, links }: { point: SupplyPoint; position: number | null; canEdit: boolean; canReview: boolean; tariffs: TariffCategory[] | null; onChanged: () => void; links: Links }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -211,6 +313,7 @@ export function SupplyPointCard({ point, position, canEdit, tariffs, onChanged, 
         <dt className="text-[var(--atx-muted)]">Διάρκεια συμβολαίου</dt><dd className="m-0 font-medium" data-supply-field="contract">{dash(contractText(point.contract_months))}</dd>
         {point.notes && (<><dt className="text-[var(--atx-muted)]">Σημειώσεις</dt><dd className="m-0 font-medium whitespace-pre-line" data-supply-field="notes">{point.notes}</dd></>)}
       </dl>
+      {!archived && <DuplicateNotice point={point} canEdit={canEdit} canReview={canReview} onChanged={onChanged} />}
       {!archived && <SupplyLinks point={point} links={links} canEdit={canEdit} />}
       {editing && !archived && <SupplyPointEditor point={point} tariffs={tariffs} onSaved={() => { setEditing(false); onChanged(); }} onCancel={() => setEditing(false)} />}
       {canEdit && !archived && !confirming && !editing && <button className="atx-link mt-3 !p-0 text-[13px]" onClick={() => setConfirming(true)} data-sp-archive>Αρχειοθέτηση παροχής</button>}
@@ -238,6 +341,8 @@ export default function SupplyPointsTab({ customerId, points, tariffs, cases, do
   reload: () => void;
 }) {
   const { toast } = useToast();
+  const { role } = useAuth();
+  const canReview = role === 'admin' || role === 'manager' || role === 'back_office';
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -277,13 +382,14 @@ export default function SupplyPointsTab({ customerId, points, tariffs, cases, do
       </div>
       {active.length === 0 ? (
         <div className="atx-panel"><div className="atx-empty" data-supply-empty><strong>Καμία παροχή ακόμη</strong>Προσθέστε μια οικιακή ή επαγγελματική παροχή του πελάτη με το «Νέα παροχή».</div></div>
-      ) : active.map((p, i) => <SupplyPointCard key={p.id} point={p} position={i + 1} canEdit={canEdit} tariffs={tariffs} onChanged={reload} links={links} />)}
+      ) : active.map((p, i) => <SupplyPointCard key={p.id} point={p} position={i + 1} canEdit={canEdit} canReview={canReview} tariffs={tariffs} onChanged={reload} links={links} />)}
+      {role === 'admin' && tariffs && <TariffListEditor tariffs={tariffs} onChanged={reload} />}
       {archived.length > 0 && (
         <div data-supply-archived>
           <button className="atx-link !p-0 text-[13px]" aria-expanded={showArchived} onClick={() => setShowArchived(v => !v)} data-supply-archived-toggle>
             {showArchived ? 'Απόκρυψη' : 'Εμφάνιση'} αρχειοθετημένων παροχών ({archived.length})
           </button>
-          {showArchived && <div className="space-y-4 mt-3">{archived.map(p => <SupplyPointCard key={p.id} point={p} position={null} canEdit={canEdit} tariffs={tariffs} onChanged={reload} links={links} />)}</div>}
+          {showArchived && <div className="space-y-4 mt-3">{archived.map(p => <SupplyPointCard key={p.id} point={p} position={null} canEdit={canEdit} canReview={canReview} tariffs={tariffs} onChanged={reload} links={links} />)}</div>}
         </div>
       )}
     </div>

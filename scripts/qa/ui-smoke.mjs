@@ -1627,6 +1627,115 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   await fetch(`${M}/rest/v1/case_documents?id=in.(${[billHome.id, meterShop.id, e9.id].join(',')})`, { method: 'DELETE', headers: H });
 }
 
+/* ---- 9g. Παροχές: same supply number elsewhere = a signal, never a block; review flag; the admin's tariff list (staged phase5/17) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const DIMITRIS = '20000000-0000-4000-8000-000000000002';
+  const post = async (table, body) => (await (await fetch(`${M}/rest/v1/${table}`, { method: 'POST', headers: H, body: JSON.stringify(body) })).json())[0];
+  const get = async (q) => (await fetch(`${M}/rest/v1/${q}`, { headers: H })).json();
+  const rpcs = async (name) => (await (await fetch(`${M}/__log`)).json()).filter((l) => l.table === name);
+  const clickSel = (page, sel) => page.evaluate((q) => { const el = document.querySelector(q); el && el.click(); return !!el; }, sel);
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const wipe = async () => { await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H }); };
+  const openAthina = async (page) => {
+    await click(page, 'Πελάτες', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => { const el = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Αθηνά Κωνσταντίνου')); el && el.click(); });
+    await sleep(1800);
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(900);
+  };
+  await fetch(`${M}/__supply?state=on`);
+  await wipe();
+  const mine = await post('customer_supply_points', { customer_id: ATHINA, usage: 'residential', property_address: 'Οδός Α 1', supply_number: '12345678901' });
+  const theirs = await post('customer_supply_points', { customer_id: DIMITRIS, usage: 'commercial', property_address: 'Οδός Δ 4', supply_number: '123 4567 8901' });
+  const unique = await post('customer_supply_points', { customer_id: ATHINA, usage: 'commercial', property_address: 'Οδός Β 2', supply_number: '99999999999', tariff_category_code: 'Γ22' });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openAthina(page);
+    const st = await page.evaluate(() => ({
+      dup1: document.querySelector('[data-supply-card="1"] [data-supply-dup]')?.innerText ?? '', dup2: !!document.querySelector('[data-supply-card="2"] [data-supply-dup]'),
+      resolve: !!document.querySelector('[data-sp-resolve]'), flag: !!document.querySelector('[data-supply-card="1"] [data-sp-flag]'),
+    }));
+    check('Διπλότυπο: a number that exists on another customer\'s connection shows a notice naming that customer, on that card only — and says nothing is merged or moved',
+      st.dup1.includes('Δημήτρης Βλάχος') && st.dup1.includes('Επαγγελματικό') && /δεν συγχωνεύεται ούτε μετακινείται/.test(st.dup1) && !st.dup2, JSON.stringify(st));
+    check('Διπλότυπο: nothing is blocked — the connection is listed and editable; a sales user can flag but cannot close a review', st.flag && !st.resolve);
+    await clickSel(page, '[data-supply-card="1"] [data-sp-flag]'); await sleep(1800);
+    const flagged = { mine: (await get(`customer_supply_points?id=eq.${mine.id}`))[0], theirs: (await get(`customer_supply_points?id=eq.${theirs.id}`))[0] };
+    check('Σήμανση για έλεγχο: only the flag changes on THIS connection; the other customer\'s connection and both numbers and customers are untouched',
+      flagged.mine.needs_review === true && flagged.theirs.needs_review === false && flagged.mine.supply_number === '12345678901' && flagged.theirs.supply_number === '123 4567 8901' && flagged.mine.customer_id === ATHINA && flagged.theirs.customer_id === DIMITRIS, JSON.stringify([flagged.mine.needs_review, flagged.theirs.needs_review]));
+    check('Σήμανση για έλεγχο: the card shows «Προς έλεγχο» and the flag button is gone', await page.evaluate(() => !!document.querySelector('[data-supply-card="1"] [data-supply-review]') && !document.querySelector('[data-supply-card="1"] [data-sp-flag]')));
+    // open the other customer from the notice
+    await clickSel(page, '[data-supply-card="1"] [data-sp-dup-open]'); await sleep(1800);
+    check('Διπλότυπο: «Άνοιγμα πελάτη» opens the other customer\'s folder', (await page.evaluate(() => document.querySelector('main h1')?.textContent ?? '')).includes('Δημήτρης Βλάχος'));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'manager');
+    await openAthina(page);
+    await clickSel(page, '[data-supply-card="1"] [data-sp-resolve]'); await sleep(1800);
+    const r = (await get(`customer_supply_points?id=eq.${mine.id}`))[0];
+    check('Ελέγχθηκε: a reviewer (manager here; Back Office reaches the folder from a case) closes the review (flag off, review time set); numbers and customers still untouched', r.needs_review === false && !!r.reviewed_at && r.supply_number === '12345678901' && r.customer_id === ATHINA);
+    await browser.close();
+  }
+  {
+    // while editing: typing a number that exists elsewhere shows a hint, and saving is still possible
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openAthina(page);
+    await clickSel(page, '[data-supply-card="2"] [data-sp-edit]'); await sleep(300);
+    await setVal(page, '[data-supply-card="2"] [data-sp-field="number"]', '12345678901'); await sleep(900);
+    const hint = await page.evaluate(() => ({ text: document.querySelector('[data-supply-card="2"] [data-sp-dup-hint]')?.innerText ?? '', save: document.querySelector('[data-supply-card="2"] [data-sp-save]')?.disabled }));
+    check('Διπλότυπο: while typing, a number that exists elsewhere shows a hint under the field and does NOT disable «Αποθήκευση»', hint.text.includes('υπάρχει ήδη') && hint.text.includes('Δημήτρης Βλάχος') && hint.save === false, JSON.stringify(hint));
+    await clickSel(page, '[data-supply-card="2"] [data-sp-save]'); await sleep(1800);
+    const after = { u: (await get(`customer_supply_points?id=eq.${unique.id}`))[0], m: (await get(`customer_supply_points?id=eq.${mine.id}`))[0], t: (await get(`customer_supply_points?id=eq.${theirs.id}`))[0] };
+    check('Διπλότυπο: the save goes through; all three keep their own number and customer (nothing moved, merged or rejected)', after.u.supply_number === '12345678901' && after.m.supply_number === '12345678901' && after.t.supply_number === '123 4567 8901' && after.u.customer_id === ATHINA && after.t.customer_id === DIMITRIS);
+    const n = await page.evaluate(() => document.querySelectorAll('[data-supply-card="1"] [data-supply-dup-item], [data-supply-card="2"] [data-supply-dup-item]').length);
+    check('Διπλότυπο: both of Αθηνά\'s connections now list the other ones with the same number (including «ίδιος πελάτης»)', n >= 3, String(n));
+    await browser.close();
+  }
+  // the admin's tariff list
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openAthina(page);
+    check('Κατηγορίες τιμολογίου: a sales user does not see the list editor', await page.evaluate(() => !document.querySelector('[data-tariff-admin]')));
+    await browser.close();
+  }
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'admin');
+    await openAthina(page);
+    await clickSel(page, '[data-tariff-admin] summary'); await sleep(300);
+    const codes = await page.evaluate(() => [...document.querySelectorAll('[data-tariff-row]')].map((r) => r.getAttribute('data-tariff-row')));
+    check('Κατηγορίες τιμολογίου: the admin sees the configurable list (Γ1, Γ1Ν, Γ21, Γ22, Γ23)', JSON.stringify(codes) === JSON.stringify(['Γ1', 'Γ1Ν', 'Γ21', 'Γ22', 'Γ23']), JSON.stringify(codes));
+    await setVal(page, '[data-tariff-new-code]', 'Γ99'); await sleep(200);
+    await page.evaluate(() => { const row = document.querySelector('[data-tariff-new]'); const inputs = row.querySelectorAll('input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(inputs[1], 'Γ99 δοκιμή'); inputs[1].dispatchEvent(new Event('input', { bubbles: true })); });
+    await sleep(200);
+    await clickSel(page, '[data-tariff-add]'); await sleep(1500);
+    // archive Γ22 (the business connection uses it)
+    await page.evaluate(() => { const row = document.querySelector('[data-tariff-row="Γ22"]'); row.querySelector('[data-tariff-active]').click(); });
+    await sleep(200);
+    await page.evaluate(() => document.querySelector('[data-tariff-row="Γ22"] [data-tariff-save]').click()); await sleep(1500);
+    const list = await get('tariff_categories?order=sort.asc');
+    const g99 = list.find((x) => x.code === 'Γ99'), g22 = list.find((x) => x.code === 'Γ22');
+    check('Κατηγορίες τιμολογίου: the admin added Γ99 and archived Γ22 (the row stays, it is only inactive)', !!g99 && g99.active === true && g99.usage === 'commercial' && g22 && g22.active === false, JSON.stringify([g99?.code, g22?.active]));
+    const conn = (await get(`customer_supply_points?id=eq.${unique.id}`))[0];
+    check('Κατηγορίες τιμολογίου: the connection that used Γ22 still has Γ22 (the list change rewrote nothing)', conn.tariff_category_code === 'Γ22');
+    await clickSel(page, '[data-supply-card="2"] [data-sp-edit]'); await sleep(400);
+    const opts = await page.evaluate(() => [...document.querySelectorAll('[data-supply-card="2"] [data-sp-field="category"] option')].map((o) => o.textContent.trim()));
+    check('Κατηγορίες τιμολογίου: the editor offers the new Γ99, and shows the archived Γ22 of this connection as «εκτός λίστας» instead of losing it', opts.includes('Γ99 δοκιμή') && opts.includes('Γ22 (εκτός λίστας)') && !opts.includes('Γ1'), JSON.stringify(opts));
+    await browser.close();
+  }
+  // restore the shared mock
+  await wipe();
+  await fetch(`${M}/rest/v1/tariff_categories?code=eq.Γ99`, { method: 'DELETE', headers: H });
+  await fetch(`${M}/rest/v1/tariff_categories?code=eq.Γ22`, { method: 'PATCH', headers: H, body: JSON.stringify({ active: true }) });
+}
+
 /* ---- 9b. A converted lead opens the customer folder: «Μετατράπηκε → Φάκελος», one-line notice (Part B 4) ---- */
 {
   const { browser, page } = await launch(1440, 900);

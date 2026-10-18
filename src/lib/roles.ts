@@ -274,7 +274,7 @@ export const NAV_SECTIONS: NavSection[] = [
     children: [
       { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
       { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales', 'back_office'], maturity: 'beta', labs: true },
-      { key: 'providers', label: 'Πάροχοι & Προγράμματα', icon: Boxes, page: 'providers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
+      { key: 'providers', label: 'Πάροχοι', icon: Boxes, page: 'providers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
     ],
   },
   {
@@ -297,7 +297,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: 'analytics',
-    label: 'Insights',
+    label: 'Ανάλυση',
     icon: BarChart3,
     children: [
       { key: 'reports', label: 'Αναφορές', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
@@ -435,6 +435,25 @@ export const CHANNELS: Record<string, string> = {
 };
 
 export const SERVICE_TYPES = Object.keys(SERVICES);
+
+/** Greek text for a stored service value. The website form stores English words («electricity»); never show them raw. */
+const SERVICE_ALIASES: Record<string, string> = {
+  electricity: 'Ρεύμα', power: 'Ρεύμα', natural_gas: 'Αέριο', 'natural-gas': 'Αέριο', photovoltaic: 'Φωτοβολταϊκά', pv: 'Φωτοβολταϊκά',
+  mobility: 'Ηλεκτροκίνηση', ev_charging: 'Ηλεκτροκίνηση',
+};
+export function serviceLabel(v: string | null | undefined, empty = 'Ενέργεια'): string {
+  if (!v) return empty;
+  return SERVICES[v] ?? SERVICE_ALIASES[v.toLowerCase()] ?? v;
+}
+/** Greek text for a stored property type (the website form stores «apartment», «house», …). Free text already in Greek is kept. */
+const PROPERTY_LABELS: Record<string, string> = {
+  apartment: 'Διαμέρισμα', house: 'Μονοκατοικία', detached: 'Μονοκατοικία', maisonette: 'Μεζονέτα', studio: 'Γκαρσονιέρα',
+  business: 'Επαγγελματικός χώρος', commercial: 'Επαγγελματικός χώρος', shop: 'Κατάστημα', office: 'Γραφείο', farm: 'Αγροτικό', land: 'Οικόπεδο',
+};
+export function propertyLabel(v: string | null | undefined): string {
+  if (!v) return '';
+  return PROPERTY_LABELS[v.toLowerCase()] ?? v;
+}
 
 /* Re-exported icons used across the app */
 export {

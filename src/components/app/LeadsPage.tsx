@@ -3,7 +3,8 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import LeadDetail from '@/components/leads/LeadDetail';
 import { TrashButton } from '@/components/trash/TrashControls';
-import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo } from '@/lib/roles';
+import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo, propertyLabel, serviceLabel } from '@/lib/roles';
+import { leadStatusDisplay } from '@/lib/lead-status';
 import { Lead, convertLeadToCase, createLead, createLeadSupplyPoint, fetchLeads, fetchTariffCategories, getPosition, leadSupplyAvailable, updateLeadChecked, updateLeadStage } from '@/lib/api';
 import LeadSupplySection from '@/components/leads/LeadSupplySection';
 import { leadSupplyBlocking, supplyPointTitle } from '@/lib/supply-points';
@@ -218,7 +219,7 @@ export default function LeadsPage() {
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${tab === t.id ? 'bg-ink text-paper' : 'bg-white border border-line text-ink/55 hover:text-ink'}`}>
-              <span>{t.emoji}</span> {t.short}
+              <span aria-hidden="true">{t.emoji}</span> {t.id === 'all' ? t.label : leadStatusDisplay(t.id).label}{t.id !== 'all' && leadStatusDisplay(t.id).detail ? ` · ${leadStatusDisplay(t.id).detail}` : ''}
               <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${tab === t.id ? 'bg-paper/15' : 'bg-ink/5 text-ink/50'}`}>{count}</span>
             </button>
           );
@@ -226,7 +227,7 @@ export default function LeadsPage() {
       </div>
 
       <Card className="!p-0" pad={false}>
-        <CardHeader micro="Lead Pipeline" title={`${tab === 'all' ? 'Όλα τα leads' : leadStatusInfo(tab).label}`}
+        <CardHeader micro="Πορεία leads" title={`${tab === 'all' ? 'Όλα τα leads' : leadStatusInfo(tab).label}`}
           className="px-5 pt-5" action={<Pill tone="gray">{visible.length}</Pill>} />
         {loading && <div className="flex items-center justify-center py-16"><Spinner /></div>}
         {!loading && visible.length === 0 && (
@@ -256,7 +257,7 @@ export default function LeadsPage() {
                     <div className="text-xs text-ink/45 mt-0.5">
                       {l.phone || 'χωρίς τηλέφωνο'}
                       {(l.email ? ` · ${l.email}` : '')}
-                      {l.property_type ? ` · ${l.property_type}` : ''}
+                      {l.property_type ? ` · ${propertyLabel(l.property_type)}` : ''}
                     </div>
                     {(l.campaign_name || l.provider || l.company || l.assigned_to?.full_name || l.created_by?.full_name) && (
                       <div className="text-[11px] text-ink/35 mt-0.5 flex items-center gap-2 flex-wrap">
@@ -272,38 +273,41 @@ export default function LeadsPage() {
                       </div>
                     )}
                   </div>
-                  <Pill tone="gray">{SERVICES[l.service_category ?? ''] ?? l.service_category ?? 'Ενέργεια'}</Pill>
-                  <span className="text-xs text-ink/40">
-                    {l.converted_at
-                      ? `Μετατροπή ${new Date(l.converted_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' })}`
-                      : l.created_at ? new Date(l.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' }) : ''}
-                  </span>
-                  {isStaff && !converted && (
-                    <>
-                      <button onClick={() => openEdit(l)} title="Επεξεργασία Lead"
-                        className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <select className="field !w-auto !py-1.5 text-xs" value={l.status ?? 'new'}
-                        onChange={e => onStage(l, e.target.value)}>
-                        {LEAD_STATUSES.filter(s => s.id !== 'converted').map(s => (
-                          <option key={s.id} value={s.id}>{s.label}</option>
-                        ))}
-                      </select>
-                      <Btn variant="outline" onClick={() => onConvert(l)} disabled={busyId === l.id}>
-                        {busyId === l.id ? <Spinner /> : <ArrowRight className="w-3.5 h-3.5" />} Μετατροπή
-                      </Btn>
-                    </>
-                  )}
-                  {converted && l.converted_case_id && (
-                    <span data-lead-to-folder>
-                      <Btn variant="outline" onClick={() => go('leads', { lead: l.id })} title="Ανοίγει τον φάκελο του πελάτη">
-                        <ExternalLink className="w-3.5 h-3.5" /> Μετατράπηκε → Φάκελος
-                      </Btn>
+                  {/* On a phone the actions drop to their own line (min 44px targets) instead of squeezing the name */}
+                  <div className="flex items-center gap-2 flex-wrap max-sm:w-full max-sm:pt-1 max-sm:[&_button]:min-h-[40px] max-sm:[&_select]:min-h-[40px]" data-lead-actions>
+                    <Pill tone="gray">{serviceLabel(l.service_category)}</Pill>
+                    <span className="text-xs text-ink/40">
+                      {l.converted_at
+                        ? `Μετατροπή ${new Date(l.converted_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' })}`
+                        : l.created_at ? new Date(l.created_at).toLocaleDateString('el-GR', { day: '2-digit', month: 'short' }) : ''}
                     </span>
-                  )}
-                  <TrashButton compact type="lead" id={l.id} name={name}
-                    onTrashed={async () => { const list = await fetchLeads(); setItems(list); return !list.some(x => x.id === l.id); }} />
+                    {isStaff && !converted && (
+                      <>
+                        <button onClick={() => openEdit(l)} title="Επεξεργασία Lead"
+                          className="p-1.5 rounded-lg border border-line bg-white text-ink/60 hover:text-ink transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <select className="field !w-auto !py-1.5 text-xs" value={l.status ?? 'new'}
+                          onChange={e => onStage(l, e.target.value)}>
+                          {LEAD_STATUSES.filter(s => s.id !== 'converted').map(s => (
+                            <option key={s.id} value={s.id}>{s.label}</option>
+                          ))}
+                        </select>
+                        <Btn variant="outline" onClick={() => onConvert(l)} disabled={busyId === l.id}>
+                          {busyId === l.id ? <Spinner /> : <ArrowRight className="w-3.5 h-3.5" />} Μετατροπή
+                        </Btn>
+                      </>
+                    )}
+                    {converted && l.converted_case_id && (
+                      <span data-lead-to-folder>
+                        <Btn variant="outline" onClick={() => go('leads', { lead: l.id })} title="Ανοίγει τον φάκελο του πελάτη">
+                          <ExternalLink className="w-3.5 h-3.5" /> Μετατράπηκε → Φάκελος
+                        </Btn>
+                      </span>
+                    )}
+                    <TrashButton compact type="lead" id={l.id} name={name}
+                      onTrashed={async () => { const list = await fetchLeads(); setItems(list); return !list.some(x => x.id === l.id); }} />
+                  </div>
                 </div>
               );
             })}

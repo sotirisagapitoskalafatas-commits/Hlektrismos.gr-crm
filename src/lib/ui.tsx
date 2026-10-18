@@ -125,8 +125,8 @@ export function Modal({ open, onClose, title, micro, children, wide }: {
             {micro && <Micro className="mb-1">{micro}</Micro>}
             <h2 className="text-lg font-semibold text-ink tracking-tight">{title}</h2>
           </div>
-          <button onClick={onClose}
-            className="text-ink/40 hover:text-ink p-1 rounded-md hover:bg-ink/5">
+          <button onClick={onClose} aria-label="Κλείσιμο"
+            className="text-ink/40 hover:text-ink p-2.5 -m-2 sm:p-1 sm:m-0 rounded-md hover:bg-ink/5">
             <X className="w-4 h-4" />
           </button>
         </div>

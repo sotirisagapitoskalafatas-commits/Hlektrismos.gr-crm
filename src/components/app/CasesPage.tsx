@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { ACTIVE_STAGES, SERVICES, stageLabel } from '@/lib/roles';
+import { ACTIVE_STAGES, SERVICES, serviceLabel, stageLabel } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
 import { Case, createCase, fetchAllCaseStats, fetchCases } from '@/lib/api';
 import { Btn, Card, EmptyState, Field, Micro, Modal, Pill, Spinner, StagePill, fmtDate, fmtMoney } from '@/lib/ui';
@@ -221,7 +221,7 @@ export default function CasesPage() {
                 <span className="font-mono text-[11px] text-ink/35 w-20 shrink-0">{c.case_no}</span>
                 <span className="flex-1 min-w-[160px]">
                   <span className="block text-[13px] font-medium text-ink truncate">{c.customer?.full_name ?? c.title}</span>
-                  <span className="block text-xs text-ink/45 truncate">{SERVICES[c.service_type] ?? c.service_type} · {c.title}</span>
+                  <span className="block text-xs text-ink/45 truncate">{serviceLabel(c.service_type)} · {c.title}</span>
                 </span>
                 <span className="flex items-center gap-2 shrink-0 flex-wrap">
                   <StagePill stage={c.current_stage} />

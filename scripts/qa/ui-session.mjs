@@ -36,7 +36,7 @@ export async function launch(width = 1440, height = 900, dpr = 1) {
   sweepOldProfiles();
   // Isolated throwaway profile: never touches (or kills) the user's own Chrome.
   const userDataDir = mkdtempSync(join(tmpdir(), 'atlas-qa-'));
-  const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', userDataDir, args: ['--no-sandbox', '--no-first-run'] });
+  const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', protocolTimeout: 180000, userDataDir, args: ['--no-sandbox', '--no-first-run'] });
   browser.on('disconnected', () => { closedProfiles.add(userDataDir); sweepClosedProfiles(); });
   const page = await browser.newPage();
   await page.setViewport({ width, height, deviceScaleFactor: dpr, isMobile: width < 500, hasTouch: width < 500 });
@@ -53,7 +53,9 @@ export async function launch(width = 1440, height = 900, dpr = 1) {
 
 /** Seed a signed-in session for a role, then open the CRM shell. */
 export async function signInAs(page, role, hash = '#/app') {
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  // A tiny static file of the same origin hosts the localStorage seeding: loading the public landing page here (WebGL, heavy images)
+  // made the whole run slow and flaky on a busy machine, and the seeding does not need it.
+  await page.goto(BASE + 'app-icon.svg', { waitUntil: 'domcontentloaded', timeout: 30000 });
   const session = {
     access_token: `mock-${role}`, refresh_token: 'mock-refresh', token_type: 'bearer', expires_in: 86400,
     expires_at: Math.floor(Date.now() / 1000) + 86400,

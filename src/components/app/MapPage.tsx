@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNav } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
-import { ACTIVE_STAGES, BACK_OFFICE_STAGES, SERVICES, stageLabel } from '@/lib/roles';
+import { ACTIVE_STAGES, BACK_OFFICE_STAGES, serviceLabel, stageLabel } from '@/lib/roles';
 import { fieldAllowed, fieldDecision } from '@/lib/field-sales/policy';
 import { Case, CaseVisit, FollowUp, fetchAllCaseStats, fetchCases, fetchFollowUps, fetchLeads, fetchVisits, fetchFieldTargets, fieldCheckin, updateLeadLocation } from '@/lib/api';
 import { Btn, Card, Micro, Spinner, StagePill, fmtTime, isToday } from '@/lib/ui';
@@ -751,7 +751,7 @@ export default function MapPage() {
                     <>
                       <Micro tone="brand">{preview.c.case_no}</Micro>
                       <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.c.customer?.full_name ?? preview.c.title}</h3>
-                      <p className="text-xs text-ink/45 truncate">{SERVICES[preview.c.service_type] ?? preview.c.service_type}{preview.c.address ? ` · ${preview.c.address}` : ''}</p>
+                      <p className="text-xs text-ink/45 truncate">{serviceLabel(preview.c.service_type)}{preview.c.address ? ` · ${preview.c.address}` : ''}</p>
                       <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                         <StagePill stage={preview.c.current_stage} />
                         {myLoc && previewPos && <span className="text-[11px] text-ink/45">{formatDistance(distanceKm(myLoc, previewPos))} από εσάς</span>}

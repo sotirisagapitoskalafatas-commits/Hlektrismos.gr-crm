@@ -202,8 +202,8 @@ select exists (select 1 from information_schema.columns where table_schema='publ
 
 ## 21. `phase4/16_import_legacy_leads.sql` — PR #79 / v2, **last**
 - **Depends on:** nothing technical; best **after step 18** (so a contact with no permission record is already refused for promotional channels).
-- **Unlocks on screen:** the 130 old leads (`hlektrismos_leads`) appear in Leads: **all rows, unassigned, original status kept in a note, no marketing consent → «not for marketing»**.
-- **How:** run the read-only [`LEGACY_LEADS_IMPORT_DRYRUN.sql`](LEGACY_LEADS_IMPORT_DRYRUN.sql) first (counts only, nothing created) and look at the soft-deleted line; then run the file (it creates a view and a function and **copies nothing**); then `select * from public.import_legacy_leads();` (dry run by default) and only then `select * from public.import_legacy_leads(false);`.
+- **Unlocks on screen:** the old leads (`hlektrismos_leads`) appear in Leads: **every row except the soft-deleted ones (skipped, they stay in the old table), unassigned, original status kept in a note, no marketing consent → «not for marketing»**.
+- **How:** run the read-only [`LEGACY_LEADS_IMPORT_DRYRUN.sql`](LEGACY_LEADS_IMPORT_DRYRUN.sql) first (counts only, nothing created) and look at the `skipped_deleted` line; then run the file (it creates a view and a function and **copies nothing**); then `select * from public.import_legacy_leads();` (dry run by default) and only then `select * from public.import_legacy_leads(false);`.
 - **Rollback:** [`rollback_phase4_16_legacy_leads_import.sql`](rollback_phase4_16_legacy_leads_import.sql) (deletes only imported leads without a case or conversion, then the helper objects).
 - **Check:**
 ```sql

@@ -130,7 +130,7 @@ serve(async (req) => {
     const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const { data: lead } = await adminClient
       .from("leads")
-      .select("id, first_name, email, created_at")
+      .select("id, first_name, email, created_at, ack_sent_at")
       .eq("email", email)
       .eq("source", "website")
       .gte("created_at", cutoff)
@@ -143,6 +143,25 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: "no recent lead" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Security fix (docs/ops/SECURITY_AUDIT.md F-03): ONE confirmation per lead. The public anon key can call this function, so
+    // without this an attacker who submits the form with a victim's address could trigger unlimited e-mails from our domain
+    // within the 15-minute window. leads.ack_sent_at (already in the table) is claimed atomically BEFORE sending; a failed
+    // send releases the claim so a genuine retry still works.
+    if (lead.ack_sent_at) {
+      return new Response(JSON.stringify({ ok: true, skipped: "already confirmed" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: claimed } = await adminClient
+      .from("leads")
+      .update({ ack_sent_at: new Date().toISOString() })
+      .eq("id", lead.id)
+      .is("ack_sent_at", null)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) {
+      return new Response(JSON.stringify({ ok: true, skipped: "already confirmed" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const releaseClaim = async () => { await adminClient.from("leads").update({ ack_sent_at: null }).eq("id", lead.id); };
+
     const { data: setting } = await adminClient
       .from("crm_settings")
       .select("setting_value")
@@ -150,6 +169,7 @@ serve(async (req) => {
       .single();
 
     if (!setting?.setting_value?.smtp_host) {
+      await releaseClaim();
       return new Response(JSON.stringify({ ok: false, error: "SMTP not configured" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -235,13 +255,17 @@ serve(async (req) => {
       await client.mail(fromEmail);
       await client.rcpt(email);
       await client.data(headers, body);
+    } catch (sendErr) {
+      await releaseClaim();
+      throw sendErr;
     } finally {
       await client.quit();
     }
 
     return new Response(JSON.stringify({ ok: true, message: "Confirmation email sent" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
-    console.error("send-lead-confirmation error:", err);
-    return new Response(JSON.stringify({ ok: false, error: err.message || "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // No SMTP/internal detail to the caller (the function is reachable with the public anon key); the detail stays in the log.
+    console.error("send-lead-confirmation error:", err instanceof Error ? err.name : "error");
+    return new Response(JSON.stringify({ ok: false, error: "Η αποστολή δεν ολοκληρώθηκε." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

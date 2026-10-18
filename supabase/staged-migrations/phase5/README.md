@@ -13,3 +13,15 @@
 - Until applied the «Παροχές» tab shows «Η λειτουργία δεν είναι ακόμη διαθέσιμη.».
 - Local evidence: `node --test supabase/tests/supply-points.test.mjs` — 11/11 (independence, no moves, the 11-digit rule SQL = app, duplicates, RLS, tariff list, audit, links, legacy untouched + idempotent, rollback A and B).
 - Rollback: `docs/ops/rollback_phase5_17_supply_points.sql` (A keeps the data, B removes everything).
+
+## 18 — «Παροχές» on a lead (additive; needs 17)
+`18_lead_supply_points.sql` — owner request 18/10/2026: connections can be entered on a **lead**, not only on a customer.
+- **Same table:** `customer_supply_points.customer_id` becomes nullable and `lead_id` is added; **exactly one** is set (check constraint). Everything else is as in 17.
+- **Conversion:** when `leads.converted_case_id` goes from null to a case, a trigger **moves the lead's connections to the case's customer — the same rows, not copies** (ids, document tags and history stay). Because it is a trigger on the lead update, it works with the live `convert_lead_to_case()` and with the staged phase4/15 version; neither is replaced.
+  - If the customer **already has an active connection with the same supply number**: no copy. The lead's row stays on the lead, flagged «Προς έλεγχο», its document tags are re-pointed to the customer's connection, and the case is linked to that connection.
+  - The case is linked to a connection **only when exactly one** results; with several, which one the case is about is for the user to say (never guessed).
+- **Documents:** files uploaded with a lead live in `leads.attached_files` (jsonb); an entry may carry `supply_point_id`.
+- **Guard:** only the conversion can change a connection's owner; a signed-in user cannot (trigger). `supply_point_duplicates` also reports lead-owned connections.
+- Local evidence: `node --test supabase/tests/lead-supply-points.test.mjs` — 13/13 (one owner, staff only, owner guard, duplicates, conversion with the live AND the phase4/15 function, existing number on the customer, exactly-one linking, idempotent, rollback A and B).
+- Rollback: `docs/ops/rollback_phase5_18_lead_supply_points.sql` (A keeps the data).
+- Until applied the lead form works as today and the lead-side section shows «Η λειτουργία δεν είναι ακόμη διαθέσιμη.».

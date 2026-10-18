@@ -68,3 +68,11 @@ test('errors are neutral Greek, never migration or developer wording', () => {
   for (const e of [{ code: 'PGRST205', message: 'schema cache' }, { code: '42501', message: 'x' }, { message: 'boom' }, { code: '23514', message: 'x' }]) assert.ok(!/migration|phase\d|SQL|schema|PGRST|relation/i.test(t(e)));
   assert.equal(S.isNotInstalled({ code: 'PGRST205', message: '' }), true); assert.equal(S.isNotInstalled({ code: '23505', message: 'duplicate' }), false); assert.equal(S.isNotInstalled(null), false);
 });
+
+test('connection labels for case rows and pickers: numbered among the active ones, archived ones unnumbered, unknown empty', () => {
+  const pts = [{ id: 'a', usage: 'residential', archived_at: null }, { id: 'x', usage: 'commercial', archived_at: '2026-10-01T00:00:00Z' }, { id: 'b', usage: 'commercial', archived_at: null }];
+  assert.equal(S.supplyLabelFor(pts, 'a'), 'Παροχή 1 — Οικιακό');
+  assert.equal(S.supplyLabelFor(pts, 'b'), 'Παροχή 2 — Επαγγελματικό');
+  assert.equal(S.supplyLabelFor(pts, 'x'), 'Αρχειοθετημένη — Επαγγελματικό');
+  assert.equal(S.supplyLabelFor(pts, 'zzz'), ''); assert.equal(S.supplyLabelFor(pts, null), ''); assert.equal(S.supplyLabelFor(null, 'a'), '');
+});

@@ -52,6 +52,8 @@ export type Case = {
   exception_at?: string | null;
   return_from_stage?: string | null;
   customer_id: string | null;
+  /** The customer's electricity connection this case is about (staged phase5/17). */
+  supply_point_id?: string | null;
   source: string;
   service_type: string;
   property_type: string | null;
@@ -134,6 +136,8 @@ export type CaseDocument = {
   verified_by: string | null;
   verified_at: string | null;
   created_at: string;
+  /** The connection this document belongs to, e.g. its bill or meter photo (staged phase5/17). */
+  supply_point_id?: string | null;
 };
 
 export type CaseVisit = {
@@ -2016,5 +2020,21 @@ export async function saveTariffCategory(c: Pick<TariffCategory, 'code' | 'label
   const { error } = await supabase.from('tariff_categories').upsert({ ...c, code: c.code.trim(), updated_at: new Date().toISOString() }, { onConflict: 'code' });
   if (!error) return null;
   logError('saveTariffCategory', error);
+  return supplyErrorText(error);
+}
+
+/** Links one case (or one document) to a connection of the SAME customer, or unlinks it (null). Nothing else about it changes. */
+export async function linkCaseToSupplyPoint(caseId: string, supplyPointId: string | null): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.from('cases').update({ supply_point_id: supplyPointId }).eq('id', caseId);
+  if (!error) return null;
+  logError('linkCaseToSupplyPoint', error);
+  return supplyErrorText(error);
+}
+export async function linkDocumentToSupplyPoint(documentId: string, supplyPointId: string | null): Promise<string | null> {
+  if (!supabase) return 'Η σύνδεση με τη βάση δεν είναι διαθέσιμη.';
+  const { error } = await supabase.from('case_documents').update({ supply_point_id: supplyPointId }).eq('id', documentId);
+  if (!error) return null;
+  logError('linkDocumentToSupplyPoint', error);
   return supplyErrorText(error);
 }

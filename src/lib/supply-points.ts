@@ -155,3 +155,13 @@ export function supplyErrorText(error: { code?: string | null; message?: string 
   if (/23514|check constraint/i.test(m)) return 'Κάποιο στοιχείο της παροχής δεν είναι έγκυρο.';
   return 'Η παροχή δεν αποθηκεύτηκε. Δοκιμάστε ξανά.';
 }
+
+/** Name of a connection for lists elsewhere (case rows, document pickers): «Παροχή 2 — Επαγγελματικό», «Αρχειοθετημένη — Οικιακό», or '' when unknown. */
+export function supplyLabelFor(points: Pick<SupplyPoint, 'id' | 'usage' | 'archived_at'>[] | null | undefined, id: string | null | undefined): string {
+  if (!points || !id) return '';
+  const p = points.find(x => x.id === id);
+  if (!p) return '';
+  if (p.archived_at) return `Αρχειοθετημένη — ${USAGE_LABEL[p.usage]}`;
+  const position = points.filter(x => !x.archived_at).findIndex(x => x.id === id) + 1;
+  return supplyPointTitle(position, p.usage);
+}

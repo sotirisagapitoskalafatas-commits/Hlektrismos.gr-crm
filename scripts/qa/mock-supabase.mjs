@@ -355,6 +355,23 @@ http.createServer((req, res) => {
         TABLES.timeline_events.push({ id: crypto.randomUUID(), case_id: c.id, role: u.role, activity_type: 'stage_set', title: `Επαναφορά ολοκληρωμένου case από διαχειριστή: completed → ${json.p_stage}`, description: reason, user_id: u.id, occurred_at: new Date().toISOString(), location: null, metadata: { from: 'completed', to: json.p_stage, reopened: true }, user: null });
         return send(200, null);
       }
+      if (['supply_point_duplicates', 'flag_supply_point_review', 'resolve_supply_point_review'].includes(name)) { // phase5/17 functions
+        log.push({ method: 'RPC', table: name, body: json });
+        if (!supplyOn) return send(404, { code: 'PGRST202', message: `Could not find the function public.${name} in the schema cache`, details: null, hint: null });
+        const pts = TABLES.customer_supply_points ?? [];
+        if (name === 'supply_point_duplicates') {
+          const key = String(json.p_number ?? '').replace(/\D/g, '');
+          if (!key) return send(200, []);
+          return send(200, pts.filter((p) => !p.archived_at && p.supply_number_key === key && p.id !== json.p_exclude)
+            .map((p) => ({ id: p.id, customer_id: p.customer_id, customer_name: (TABLES.customers.find((c) => c.id === p.customer_id) ?? {}).full_name ?? '', usage: p.usage, property_address: p.property_address, needs_review: p.needs_review })));
+        }
+        const p = pts.find((x) => x.id === json.p_id);
+        if (!p) return send(400, { code: 'P0002', message: 'supply_point: not found' });
+        if (name === 'flag_supply_point_review') { Object.assign(p, { needs_review: true, review_note: json.p_note ?? null, reviewed_at: null }); return send(200, null); }
+        if (!['admin', 'manager', 'back_office'].includes(u?.role)) return deny('supply_point: not allowed');
+        Object.assign(p, { needs_review: false, reviewed_at: new Date().toISOString() });
+        return send(200, null);
+      }
       if (name === 'return_case_for_correction') {
         log.push({ method: 'RPC', table: name, body: json });
         if (!['back_office', 'admin', 'manager'].includes(u?.role)) return deny('return: not allowed');
@@ -617,6 +634,12 @@ http.createServer((req, res) => {
     if (!m) return send(404, {});
     const table = m[1];
     if (!supplyOn && (table === 'customer_supply_points' || table === 'tariff_categories')) return send(404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache`, details: null, hint: null });
+    if (table === 'tariff_categories' && req.method === 'POST') { // upsert by code (on_conflict=code), like the app's saveTariffCategory
+      log.push({ method: 'POST', table, body: json });
+      const list = (TABLES[table] ??= []);
+      const saved = (Array.isArray(json) ? json : [json]).map((r) => { const at = list.find((x) => x.code === r.code); if (at) { Object.assign(at, r); return at; } const row = { created_at: new Date().toISOString(), ...r }; list.push(row); return row; });
+      return send(201, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? saved[0] : saved);
+    }
     if (table === 'customer_supply_points' && (req.method === 'POST' || req.method === 'PATCH')) { // what the staged SQL does: generated flags, defaults, the customer never moves
       const key = (v) => { const d = String(v ?? '').replace(/\D/g, ''); return d === '' ? null : d; };
       const ok = (v) => { const t = String(v ?? '').replace(/^ +| +$/g, ''); return t === '' || (/^[0-9][0-9 -]*$/.test(t) && key(t).length === 11); };
@@ -646,6 +669,13 @@ http.createServer((req, res) => {
     log.push({ method: req.method, table, query: url.search, body: json });
     const tbl = (TABLES[table] ??= []);
     if (req.method === 'PATCH' && patchFail === table) { patchFail = null; const t = patchFailHint === 'transition'; patchFailHint = null; return send(400, t ? { code: 'P0001', message: 'stage_transition_not_allowed: activation -> completed', details: null, hint: 'transition' } : { code: '23514', message: 'mock: write refused', details: null, hint: null }); }
+    if (req.method === 'PATCH' && (table === 'cases' || table === 'case_documents') && json.supply_point_id) { // supply_point_link_guard: the connection must belong to the same customer
+      const sp = (TABLES.customer_supply_points ?? []).find((x) => x.id === json.supply_point_id);
+      for (const r of applyFilters(tbl, url.searchParams)) {
+        const customer = table === 'cases' ? r.customer_id : (TABLES.cases.find((k) => k.id === r.case_id) ?? {}).customer_id;
+        if (!sp || sp.customer_id !== customer) return send(400, { code: 'P0001', message: 'supply_point: the connection belongs to another customer', details: null, hint: null });
+      }
+    }
     if (req.method === 'PATCH') {
       const hit = applyFilters(tbl, url.searchParams);
       if (gatesOn && table === 'cases' && json.current_stage) {

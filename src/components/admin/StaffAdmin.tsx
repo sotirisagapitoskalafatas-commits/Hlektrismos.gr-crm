@@ -3,10 +3,10 @@
    the matrix allows and shows success only after re-reading the directory. Deletion is refused for anyone who
    appears in CRM history — deactivation keeps the history and blocks access. */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Mail, Plus, Search, ShieldAlert, UserCheck, UserX, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { ROLE_COLOR, roleLabel } from '@/lib/roles';
+import { ACCESS_GROUPS, ROLE_COLOR, accessGroupLabel, roleLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
@@ -89,7 +89,7 @@ export default function StaffAdmin() {
         </label>
         <select className="atx-chip" value={roleF} onChange={e => setRoleF(e.target.value as 'all' | Role)} aria-label="Ρόλος">
           <option value="all">Όλοι οι ρόλοι</option>
-          {(['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'] as Role[]).map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
+          {ACCESS_GROUPS.map(g => <optgroup key={g.id} label={g.label}>{g.roles.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}</optgroup>)}
         </select>
         <div className="atx-tabs" role="tablist" aria-label="Κατάσταση">
           {([['active', `Ενεργοί ${counts.active}`], ['inactive', `Ανενεργοί ${counts.inactive}`], ['all', 'Όλοι']] as const).map(([k, l]) => (
@@ -123,7 +123,10 @@ export default function StaffAdmin() {
                         </span>
                       </div>
                     </td>
-                    <td><span className="atx-role" style={{ background: rgbaOf(c, 0.12), color: c }}>{roleLabel(s.role)}</span></td>
+                    <td>
+                      <span className="atx-role" style={{ background: rgbaOf(c, 0.12), color: c }}>{roleLabel(s.role)}</span>
+                      <span className="block text-[11.5px] text-[var(--atx-faint)] mt-0.5" data-group>{accessGroupLabel(s.role)}</span>
+                    </td>
                     <td><span className={`atx-tag ${s.is_active ? 't-success' : ''}`}>{s.is_active ? 'Ενεργός' : 'Ανενεργός'}</span></td>
                     <td className="max-md:hidden text-[13px] text-[var(--atx-muted)]">{s.created_at ? fmtDate(s.created_at) : '—'}</td>
                     <td className="max-md:hidden text-[13px] text-[var(--atx-muted)]">{source === 'server' ? (s.last_sign_in_at ? fmtDate(s.last_sign_in_at) : 'Ποτέ') : '—'}</td>
@@ -197,13 +200,22 @@ export default function StaffAdmin() {
 function RolePicker({ roles, value, onChange, disabled }: { roles: Role[]; value: Role; onChange: (r: Role) => void; disabled?: boolean }) {
   return (
     <div className="grid sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Ρόλος">
-      {roles.map(r => (
-        <button key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled} onClick={() => onChange(r)}
-          className={`text-left rounded-xl border px-3 py-2.5 transition-colors disabled:opacity-60 ${value === r ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-100' : 'border-line hover:bg-ink/[0.03]'}`}>
-          <span className="block text-[14px] font-medium text-ink">{roleLabel(r)}</span>
-          <span className="block text-xs text-ink/50 leading-snug">{ROLE_DESCRIPTION[r]}</span>
-        </button>
-      ))}
+      {ACCESS_GROUPS.map(g => {
+        const inGroup = roles.filter(r => g.roles.includes(r));
+        if (!inGroup.length) return null;
+        return (
+          <Fragment key={g.id}>
+            <p className="sm:col-span-2 m-0 mt-1 text-[12px] font-semibold uppercase tracking-wide text-ink/50" data-role-group={g.id}>{g.label} <span className="font-normal normal-case tracking-normal">· {g.hint}</span></p>
+            {inGroup.map(r => (
+              <button key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled} onClick={() => onChange(r)}
+                className={`text-left rounded-xl border px-3 py-2.5 transition-colors disabled:opacity-60 ${value === r ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-100' : 'border-line hover:bg-ink/[0.03]'}`}>
+                <span className="block text-[14px] font-medium text-ink">{roleLabel(r)}</span>
+                <span className="block text-xs text-ink/50 leading-snug">{ROLE_DESCRIPTION[r]}</span>
+              </button>
+            ))}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

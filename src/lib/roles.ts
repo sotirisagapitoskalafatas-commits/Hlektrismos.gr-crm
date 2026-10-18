@@ -25,6 +25,19 @@ export function roleLabel(r: Role) {
   return ROLES.find(x => x.id === r)?.label ?? r;
 }
 
+/* ---------------- Two access groups (master prompt §2) ----------------
+   A MAPPING over the five database roles — the roles themselves are unchanged.
+   «Back Office / Admin»: admin, manager, back_office → see everything.
+   «Πωλητής»: inside_sales, field_sales → see only their own leads, cases and customers (enforced by the staged
+   SQL phase4/18; until it is applied the database still lets them read everything). */
+export type AccessGroup = 'office' | 'sales';
+export const ACCESS_GROUPS: { id: AccessGroup; label: string; hint: string; roles: Role[] }[] = [
+  { id: 'office', label: 'Back Office / Admin', hint: 'Βλέπουν όλα τα δεδομένα.', roles: ['admin', 'manager', 'back_office'] },
+  { id: 'sales', label: 'Πωλητής', hint: 'Βλέπουν μόνο τα δικά τους leads, cases και πελάτες.', roles: ['inside_sales', 'field_sales'] },
+];
+export const accessGroup = (r: Role): AccessGroup => (r === 'inside_sales' || r === 'field_sales' ? 'sales' : 'office');
+export const accessGroupLabel = (r: Role) => ACCESS_GROUPS.find(g => g.id === accessGroup(r))!.label;
+
 /* ---------------- Role colors (CRM Shell Redesign) ----------------
    Hue per role, used by the role simulator chips, avatar ring and
    notification accents. Design palette. */

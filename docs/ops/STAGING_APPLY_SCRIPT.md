@@ -1,6 +1,6 @@
 # Staging apply script (for OpenCode)
 
-The 22 staged SQL files of `docs/ops/APPLY_ORDER.md` (steps 1–21 and 2b) as exact `psql` commands, **one per step, each followed by its check query**, with a **STOP** between steps.
+The 25 staged SQL files of `docs/ops/APPLY_ORDER.md` (steps 1–22 and 2b, 2c, 3b) as exact `psql` commands, **one per step, each followed by its check query**, with a **STOP** between steps.
 
 > **STAGING ONLY.** Never run this against the live database. Never print or commit the connection string. Nothing here deploys an edge function: a step that needs a deploy says so, and you **report that it is pending**.
 
@@ -59,6 +59,18 @@ psql "$STAGING_DB_URL" -At -c "select count(*) > 0 from pg_policies where schema
 ```
 **STOP and report if this fails** (step 2b). Otherwise continue to step 3.
 
+## Step 2c — `phase4/19_staff_only_legacy_tables.sql`
+*deactivated accounts lose the legacy tables (security audit F-08)* · kind: ****additive** (RESTRICTIVE policies; nothing dropped)**
+
+```bash
+psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f supabase/staged-migrations/phase4/19_staff_only_legacy_tables.sql
+```
+Check (must print `t`):
+```bash
+psql "$STAGING_DB_URL" -At -c "select count(*) > 0 from pg_policies where schemaname='public' and policyname='staff only (restrictive)'"
+```
+**STOP and report if this fails** (step 2c). Otherwise continue to step 3.
+
 ## Step 3 — `phase2/05_staff_admin_and_role_preview.sql`
 *staff administration + self-promotion fix* · kind: **replaces policies (profiles update own, crm_settings)**
 
@@ -72,6 +84,18 @@ Check (must print `t`):
 psql "$STAGING_DB_URL" -At -c "select exists (select 1 from pg_trigger where tgname='profiles_guard_privileged')"
 ```
 **STOP and report if this fails** (step 3). Otherwise continue to step 4.
+
+## Step 3b — `phase4/17_admin_only_staff_provisioning.sql`
+*admin-only account provisioning (queue item 4, §2.4); **then deploy `admin-users` again and report it as pending*** · kind: ****additive** (one function body replaced)**
+
+```bash
+psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f supabase/staged-migrations/phase4/17_admin_only_staff_provisioning.sql
+```
+Check (must print `t`):
+```bash
+psql "$STAGING_DB_URL" -At -c "select position('a.role = ''manager''' in pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure)) = 0"
+```
+**STOP and report if this fails** (step 3b). Otherwise continue to step 4.
 
 ## Step 4 — `phase1/03_drop_exec_sql.sql`
 *drop exec_sql* · kind: **drops a function**
@@ -316,8 +340,20 @@ Paste both grids. Look at the `skipped_deleted` line (soft-deleted old rows are 
 **STOP and report.** Then the whole-database check and the report.
 
 
+## Step 22 — `phase4/18_sales_own_records_scope.sql`
+*sales agents see only their own records (queue item 5, audit F-04) — **run after steps 19 and 20*** · kind: ****additive** (RESTRICTIVE policies; nothing dropped)**
+
+```bash
+psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f supabase/staged-migrations/phase4/18_sales_own_records_scope.sql
+```
+Check (must print `t`):
+```bash
+psql "$STAGING_DB_URL" -At -c "select exists (select 1 from pg_policies where schemaname='public' and tablename='leads' and policyname='sales own records (restrictive)')"
+```
+**STOP and report if this fails** (step 22). Then run the whole-database check (rule 5) and write the report.
+
 ## Report back
-A table of 22 rows: step, file, result of the command, result of the check (`t` or the output), and for each step that needs a deploy or an owner pre-step: **pending**. Then the final `pending_migrations_check.sql` grid, and the two dry-run grids from step 21. Do not paste connection strings, keys, or personal data.
+A table of 25 rows: step, file, result of the command, result of the check (`t` or the output), and for each step that needs a deploy or an owner pre-step: **pending**. Then the final `pending_migrations_check.sql` grid, and the two dry-run grids from step 21. Do not paste connection strings, keys, or personal data.
 
 ## Rollback
 Each step's rollback file or instructions are in `docs/ops/APPLY_ORDER.md`. On staging, restoring the snapshot taken before step 1 is the quickest way back.

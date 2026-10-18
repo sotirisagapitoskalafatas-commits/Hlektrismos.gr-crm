@@ -114,6 +114,7 @@ const staffAudit = [];
 // Account provisioning is admin-only (staged phase4/17). Managers and back office may READ the team directory (DIRECTORY) but manage nobody.
 const MANAGE = { admin: ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'] };
 const DIRECTORY = { admin: true, manager: true, back_office: true };
+let salesScopeOn = true; // GET /__salesscope?state=on|off — staged phase4/18 (sales see only their own records) applied or not
 let signupDisabled = true; // GET /__signup?state=open → the identity provider still allows public sign-up
 const canManageMock = (actor, from, to = from) => !!actor && (MANAGE[actor.role] ?? []).includes(from) && (MANAGE[actor.role] ?? []).includes(to);
 const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.field_sales.id ? 5 : 0);
@@ -253,6 +254,7 @@ http.createServer((req, res) => {
     }
     if (url.pathname === '/__preview') { previewState = url.searchParams.get('state') ?? 'on'; return send(200, { previewState }); }
 
+    if (url.pathname === '/__salesscope') { salesScopeOn = url.searchParams.get('state') !== 'off'; return send(200, { salesScopeOn }); }
     if (url.pathname === '/__signup') { signupDisabled = url.searchParams.get('state') !== 'open'; return send(200, { signupDisabled }); }
     if (url.pathname === '/auth/v1/settings') return send(200, { external: { email: true }, disable_signup: signupDisabled, mailer_autoconfirm: false });
     if (url.pathname.startsWith('/auth/v1/')) {
@@ -610,6 +612,10 @@ http.createServer((req, res) => {
           out.push({ prospect: x.id, lead: lead.id, agent: a }); i++;
         }
         return send(200, out);
+      }
+      if (name === 'sales_scope_status') {
+        if (!salesScopeOn) return send(404, { code: 'PGRST202', message: 'Could not find the function public.sales_scope_status without parameters in the schema cache' });
+        return send(200, { enabled: true, tables: ['activity_log', 'case_documents', 'case_visits', 'cases', 'customer_supply_points', 'customers', 'follow_ups', 'leads', 'timeline_events'] });
       }
       if (name === 'staff_list') {
         if (!u || !DIRECTORY[u.role]) return deny('staff_list: not allowed');

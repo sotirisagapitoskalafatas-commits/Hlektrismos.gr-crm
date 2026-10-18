@@ -150,6 +150,15 @@ if (!PREVIEW_LIVE) {
   const tabs = await tabsOf(page);
   check('Admin Center (admin): 8 grouped tabs', ['Επισκόπηση', 'Χρήστες & Ρόλοι', 'Δικαιώματα', 'Cases & Ροή εργασίας', 'Έγγραφα', 'B2B Scraper', 'Ασφάλεια & Έλεγχοι', 'Audit Log'].every((t) => tabs.includes(t)), tabs.join(','));
   check('Admin Center: no unverified green claims', !(await page.evaluate(() => /Όλα τα tables προστατεύονται|Ιδιωτικό bucket μόνο για staff|Role-check policies/.test(document.body.innerText))));
+  await sleep(800);
+  check('Overview (admin): «Ορατότητα πωλητών» is active when the staged SQL is applied', await page.evaluate(() => /Μόνο τα δικά τους/.test(document.querySelector('[data-testid="sales-scope"]')?.textContent ?? '')));
+  await fetch('http://127.0.0.1:54399/__salesscope?state=off');
+  await click(page, 'Χρήστες & Ρόλοι', '[role="tab"]');
+  await sleep(500);
+  await click(page, 'Επισκόπηση', '[role="tab"]');
+  await sleep(1200);
+  check('Overview (admin): without the SQL the card says it is pending, what it waits for, and that sales still see everything', await page.evaluate(() => { const t = document.querySelector('[data-testid="sales-scope"]')?.textContent ?? ''; return /Εκκρεμεί/.test(t) && /phase4\/18/.test(t) && /βλέπουν όλα/.test(t); }));
+  await fetch('http://127.0.0.1:54399/__salesscope?state=on');
   await click(page, 'Ασφάλεια & Έλεγχοι', '[role="tab"]');
   await sleep(500);
   check('Security: unverified items are labelled «Δεν έχει επαληθευτεί ζωντανά»', await page.evaluate(() => document.querySelectorAll('[data-status="unverified"]').length >= 4 && document.body.innerText.includes('Δεν έχει επαληθευτεί ζωντανά')));
@@ -164,6 +173,7 @@ if (!PREVIEW_LIVE) {
   check('Security: the profile self-promotion finding is flagged', await page.evaluate(() => document.querySelector('[data-check="profiles-self-promotion"]')?.getAttribute('data-status') === 'action'));
   await click(page, 'Χρήστες & Ρόλοι', '[role="tab"]');
   await sleep(1200);
+  check('Users: roles are grouped «Back Office / Admin» and «Πωλητής»', await page.evaluate(() => { const g = [...document.querySelectorAll('[data-staff] [data-group]')].map((x) => x.textContent); return g.includes('Back Office / Admin') && g.includes('Πωλητής') && [...document.querySelectorAll('select[aria-label="Ρόλος"] optgroup')].map((o) => o.label).join('|') === 'Back Office / Admin|Πωλητής'; }));
   check('Users: directory with e-mail and status; no actions on your own row', await page.evaluate(() => !!document.querySelector('[data-staff="manager@example.invalid"]') && !document.querySelector('[data-staff="admin@example.invalid"] button[title="Διαγραφή"]')));
   // create (invite)
   await click(page, 'Νέος χρήστης');

@@ -119,3 +119,11 @@ test('rollback restores the phase2/05 matrix; re-applying 17 is idempotent', asy
   assert.equal(await can(ADMIN, 'manager', 'back_office'), true);
   assert.equal(await can(ADMIN2, null, null), false, 'unknown target role is refused (deny by default)');
 });
+
+test('the one-line check used in APPLY_ORDER / STAGING_APPLY_SCRIPT tells the two matrices apart', async () => {
+  const CHECK = "select position('a.role = ''manager''' in pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure)) = 0 as ok";
+  await su(); await rollback17();
+  assert.equal((await db.query(CHECK)).rows[0].ok, false, 'phase2/05 matrix: not admin-only');
+  await apply17();
+  assert.equal((await db.query(CHECK)).rows[0].ok, true, 'phase4/17 matrix: admin-only');
+});

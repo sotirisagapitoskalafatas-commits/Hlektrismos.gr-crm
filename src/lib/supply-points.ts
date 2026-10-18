@@ -167,3 +167,9 @@ export function supplyLabelFor(points: Pick<SupplyPoint, 'id' | 'usage' | 'archi
   const position = points.filter(x => !x.archived_at).findIndex(x => x.id === id) + 1;
   return supplyPointTitle(position, p.usage);
 }
+
+export const SUPPLY_UNAVAILABLE_TEXT = 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
+
+/** Problems with the connections typed on a lead that stop the lead being created: contract months and the date only — a supply number that is not 11 digits is a warning and never blocks. */
+export const leadSupplyBlocking = (drafts: SupplyPointDraft[]) =>
+  drafts.some(d => { const e = draftErrors(d); return !!(e.contract_months || e.application_date); });

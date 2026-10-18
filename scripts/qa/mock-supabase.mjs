@@ -122,6 +122,8 @@ const flaggedCheckins = [];
 let boAssignee = null; // staged phase4/12 default Back Office assignee (user id)
 let setStageOn = true; // GET /__setstage?state=on|off — phase2/07b set_case_stage applied or not (needs /__gates?state=on too)
 let reopenOn = true; // GET /__reopen?state=on|off — phase2/07c reopen_completed_case applied or not
+let leadSupplyOn = true; // GET /__leadsupply?state=on|off — phase5/18 (lead_id column) applied or not (needs supply on)
+let supplyFail = false; // GET /__supplyfail?state=on → the next write of a connection is refused once
 let supplyOn = true; // GET /__supply?state=on|off — phase5/17 customer_supply_points + tariff_categories applied or not
 let contactOff = false; // GET /__contact?state=off → the consent functions are missing (phase3/09 not applied)
 let getFail = null; // GET /__getfail?table=activity_log → the next GET of that table fails once (read-error test)
@@ -228,6 +230,8 @@ http.createServer((req, res) => {
     if (url.pathname === '/__log') return send(200, log);
     if (url.pathname === '/__setstage') { setStageOn = url.searchParams.get('state') !== 'off'; return send(200, { setStageOn }); }
     if (url.pathname === '/__reopen') { reopenOn = url.searchParams.get('state') !== 'off'; return send(200, { reopenOn }); }
+    if (url.pathname === '/__leadsupply') { leadSupplyOn = url.searchParams.get('state') !== 'off'; return send(200, { leadSupplyOn }); }
+    if (url.pathname === '/__supplyfail') { supplyFail = url.searchParams.get('state') === 'on'; return send(200, { supplyFail }); }
     if (url.pathname === '/__supply') { supplyOn = url.searchParams.get('state') !== 'off'; return send(200, { supplyOn }); }
     if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
@@ -363,7 +367,7 @@ http.createServer((req, res) => {
           const key = String(json.p_number ?? '').replace(/\D/g, '');
           if (!key) return send(200, []);
           return send(200, pts.filter((p) => !p.archived_at && p.supply_number_key === key && p.id !== json.p_exclude)
-            .map((p) => ({ id: p.id, customer_id: p.customer_id, customer_name: (TABLES.customers.find((c) => c.id === p.customer_id) ?? {}).full_name ?? '', usage: p.usage, property_address: p.property_address, needs_review: p.needs_review })));
+            .map((p) => ({ id: p.id, customer_id: p.customer_id ?? null, customer_name: p.customer_id ? (TABLES.customers.find((c) => c.id === p.customer_id) ?? {}).full_name ?? '' : null, lead_id: p.lead_id ?? null, lead_name: p.lead_id ? ((TABLES.leads.find((l) => l.id === p.lead_id) ?? {}).full_name ?? '') : null, usage: p.usage, property_address: p.property_address, needs_review: p.needs_review })));
         }
         const p = pts.find((x) => x.id === json.p_id);
         if (!p) return send(400, { code: 'P0002', message: 'supply_point: not found' });
@@ -639,6 +643,11 @@ http.createServer((req, res) => {
       const list = (TABLES[table] ??= []);
       const saved = (Array.isArray(json) ? json : [json]).map((r) => { const at = list.find((x) => x.code === r.code); if (at) { Object.assign(at, r); return at; } const row = { created_at: new Date().toISOString(), ...r }; list.push(row); return row; });
       return send(201, /vnd\.pgrst\.object/.test(req.headers.accept ?? '') ? saved[0] : saved);
+    }
+    if (table === 'customer_supply_points' && supplyOn) {
+      const touchesLead = (url.searchParams.get('select') ?? '').includes('lead_id') || url.searchParams.has('lead_id') || (Array.isArray(json) ? json : [json]).some((r) => r && typeof r === 'object' && 'lead_id' in r);
+      if (!leadSupplyOn && touchesLead) return send(400, { code: '42703', message: 'column customer_supply_points.lead_id does not exist', details: null, hint: null });
+      if (supplyFail && req.method === 'POST') { supplyFail = false; return send(400, { code: '23514', message: 'mock: check constraint', details: null, hint: null }); }
     }
     if (table === 'customer_supply_points' && (req.method === 'POST' || req.method === 'PATCH')) { // what the staged SQL does: generated flags, defaults, the customer never moves
       const key = (v) => { const d = String(v ?? '').replace(/\D/g, ''); return d === '' ? null : d; };

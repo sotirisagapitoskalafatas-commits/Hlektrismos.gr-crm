@@ -10,13 +10,11 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { docLabel } from '@/lib/documents';
 import {
-  METER_TYPE_LABEL, USAGES, USAGE_LABEL, contractText, draftErrors, draftFromPoint, emptyDraft, supplyLabelFor, supplyNumberError, supplyNumberOk, supplyPointTitle, tariffOptions,
+  METER_TYPE_LABEL, SUPPLY_UNAVAILABLE_TEXT, USAGES, USAGE_LABEL, contractText, draftErrors, draftFromPoint, emptyDraft, supplyLabelFor, supplyNumberError, supplyNumberOk, supplyPointTitle, tariffOptions,
 } from '@/lib/supply-points';
 import type { MeterType, SupplyPoint, SupplyPointDraft, SupplyUsage, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
 import { fmtDate } from '@/lib/ui';
-
-export const SUPPLY_UNAVAILABLE_TEXT = 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
 
 export type DocRow = CaseDocument & { case_no: string };
 type Links = { points: SupplyPoint[]; cases: Case[]; docs: DocRow[]; reload: () => void };
@@ -90,37 +88,28 @@ function SupplyLinks({ point, links, canEdit }: { point: SupplyPoint; links: Lin
 
 const dash = (v: string | null | undefined) => (v && v.trim() !== '' ? v : '—');
 
-/* The editor of ONE connection: its own draft, its own errors, its own save. */
-function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: SupplyPoint; tariffs: TariffCategory[] | null; onSaved: () => void; onCancel: () => void }) {
-  const { toast } = useToast();
-  const [d, setD] = useState<SupplyPointDraft>(() => draftFromPoint(point));
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const errors = draftErrors(d);
-  const set = <K extends keyof SupplyPointDraft>(k: K, v: SupplyPointDraft[K]) => setD(x => ({ ...x, [k]: v }));
-  // the same number elsewhere is a hint, never a block: saving stays possible and nothing is ever moved or merged
+/* The fields of ONE connection, shared by the card editor and the lead form. A given number that is not 11 digits shows
+   its message here (the caller decides what that blocks); the same number elsewhere is a hint, never a block. */
+export function SupplyFields({ d, set, errors, tariffs, ownId, keepCode }: {
+  d: SupplyPointDraft;
+  set: <K extends keyof SupplyPointDraft>(k: K, v: SupplyPointDraft[K]) => void;
+  errors: ReturnType<typeof draftErrors>;
+  tariffs: TariffCategory[] | null;
+  /** the connection being edited, so it does not report itself as a duplicate */
+  ownId?: string;
+  /** a code the connection already has, kept in the list even if it is no longer offered */
+  keepCode?: string | null;
+}) {
   const [hint, setHint] = useState<SupplyDuplicate[]>([]);
   useEffect(() => {
     let alive = true;
     if (!d.supply_number.trim() || !supplyNumberOk(d.supply_number)) { setHint([]); return; }
-    const t = setTimeout(() => { void findSupplyDuplicates(d.supply_number, point.id).then(r => { if (alive) setHint(r ?? []); }); }, 400);
+    const t = setTimeout(() => { void findSupplyDuplicates(d.supply_number, ownId ?? null).then(r => { if (alive) setHint(r ?? []); }); }, 400);
     return () => { alive = false; clearTimeout(t); };
-  }, [d.supply_number, point.id]);
-  const options = tariffs && tariffs.length > 0 ? tariffOptions(tariffs, d.usage, d.tariff_category_code || point.tariff_category_code) : null;
-
-  const save = async () => {
-    if (busy || Object.keys(errors).length > 0) return;
-    setBusy(true); setMsg(null);
-    const r = await updateSupplyPoint(point.id, d);
-    setBusy(false);
-    if (r.error) { setMsg(r.error); toast(r.error, 'bad'); return; }
-    toast('Η παροχή αποθηκεύτηκε.', 'ok');
-    onSaved();
-  };
-
+  }, [d.supply_number, ownId]);
+  const options = tariffs && tariffs.length > 0 ? tariffOptions(tariffs, d.usage, d.tariff_category_code || keepCode) : null;
   const label = 'text-[13px] font-medium';
   return (
-    <div className="mt-4 pt-4 border-t border-[var(--atx-line)]" data-supply-editor={point.id}>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className={label}>Χρήση
           <select className="field mt-1" value={d.usage} onChange={e => set('usage', e.target.value as SupplyUsage)} data-sp-field="usage">
@@ -133,7 +122,7 @@ function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: Suppl
         <label className={label}>Αριθμός Παροχής
           <input className="field mt-1" inputMode="numeric" value={d.supply_number} onChange={e => set('supply_number', e.target.value)} aria-invalid={!!errors.supply_number} data-sp-field="number" placeholder="11 ψηφία (προαιρετικό)" />
           {errors.supply_number && <span className="block text-[12.5px] font-normal mt-1" style={{ color: 'var(--atx-red)' }} role="alert" data-sp-error="number">{errors.supply_number}</span>}
-          {!errors.supply_number && hint.length > 0 && <span className="block text-[12.5px] font-normal mt-1" style={{ color: 'var(--atx-amber)' }} data-sp-dup-hint>Αυτός ο αριθμός υπάρχει ήδη σε άλλη παροχή ({hint.map(h => h.customer_name || 'πελάτης').join(', ')}). Μπορείτε να αποθηκεύσετε· δεν αλλάζει τίποτα στην άλλη παροχή.</span>}
+          {!errors.supply_number && hint.length > 0 && <span className="block text-[12.5px] font-normal mt-1" style={{ color: 'var(--atx-amber)' }} data-sp-dup-hint>Αυτός ο αριθμός υπάρχει ήδη σε άλλη παροχή ({hint.map(h => h.customer_id ? (h.customer_name || 'πελάτης') : `lead ${h.lead_name || ''}`.trim()).join(', ')}). Μπορείτε να αποθηκεύσετε· δεν αλλάζει τίποτα στην άλλη παροχή.</span>}
         </label>
         <label className={label}>Μετρητής / Ρολόι ΔΕΗ (αριθμός)
           <input className="field mt-1" value={d.meter_identifier} onChange={e => set('meter_identifier', e.target.value)} data-sp-field="meter" />
@@ -172,6 +161,30 @@ function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: Suppl
           <textarea className="field mt-1" rows={2} value={d.notes} onChange={e => set('notes', e.target.value)} data-sp-field="notes" />
         </label>
       </div>
+  );
+}
+
+/* The editor of ONE connection: its own draft, its own errors, its own save. */
+function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: SupplyPoint; tariffs: TariffCategory[] | null; onSaved: () => void; onCancel: () => void }) {
+  const { toast } = useToast();
+  const [d, setD] = useState<SupplyPointDraft>(() => draftFromPoint(point));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const errors = draftErrors(d);
+  const set = <K extends keyof SupplyPointDraft>(k: K, v: SupplyPointDraft[K]) => setD(x => ({ ...x, [k]: v }));
+  const save = async () => {
+    if (busy || Object.keys(errors).length > 0) return;
+    setBusy(true); setMsg(null);
+    const r = await updateSupplyPoint(point.id, d);
+    setBusy(false);
+    if (r.error) { setMsg(r.error); toast(r.error, 'bad'); return; }
+    toast('Η παροχή αποθηκεύτηκε.', 'ok');
+    onSaved();
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--atx-line)]" data-supply-editor={point.id}>
+      <SupplyFields d={d} set={set} errors={errors} tariffs={tariffs} ownId={point.id} keepCode={point.tariff_category_code} />
       {msg && <p role="alert" className="text-[13px] mt-3 mb-0" style={{ color: 'var(--atx-red)' }} data-sp-save-error>{msg}</p>}
       <div className="flex gap-2 mt-4">
         <button className="atx-btn atx-btn-primary" disabled={busy || Object.keys(errors).length > 0} onClick={() => void save()} data-sp-save>{busy ? '…' : 'Αποθήκευση'}</button>

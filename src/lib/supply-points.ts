@@ -13,7 +13,9 @@ export type TariffCategory = { code: string; label: string; usage: SupplyUsage |
 
 export type SupplyPoint = {
   id: string;
-  customer_id: string;
+  /** Exactly one of customer_id / lead_id is set (staged phase5/18): a connection on a lead moves to the customer when the lead is converted. */
+  customer_id: string | null;
+  lead_id?: string | null;
   usage: SupplyUsage;
   property_address: string;
   supply_number: string | null;

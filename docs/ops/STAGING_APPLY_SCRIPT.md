@@ -1,6 +1,6 @@
 # Staging apply script (for OpenCode)
 
-The 21 staged SQL files of `docs/ops/APPLY_ORDER.md` as exact `psql` commands, **one per step, each followed by its check query**, with a **STOP** between steps.
+The 22 staged SQL files of `docs/ops/APPLY_ORDER.md` (steps 1–21 and 2b) as exact `psql` commands, **one per step, each followed by its check query**, with a **STOP** between steps.
 
 > **STAGING ONLY.** Never run this against the live database. Never print or commit the connection string. Nothing here deploys an edge function: a step that needs a deploy says so, and you **report that it is pending**.
 
@@ -46,6 +46,18 @@ Check (must print `t`):
 psql "$STAGING_DB_URL" -At -c "select exists (select 1 from pg_policies where schemaname='public' and tablename='crm_integrations' and policyname='admin manage crm_integrations')"
 ```
 **STOP and report if this fails** (step 2). Otherwise continue to step 3.
+
+## Step 2b — `phase1/17_anon_restrictive_lockdown.sql`
+*anonymous lockdown for legacy tables (security audit F-02, F-06)* · kind: **additive** (RESTRICTIVE policies and a function setting; nothing dropped, nothing revoked)
+
+```bash
+psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f supabase/staged-migrations/phase1/17_anon_restrictive_lockdown.sql
+```
+Check (must print `t`):
+```bash
+psql "$STAGING_DB_URL" -At -c "select count(*) > 0 from pg_policies where schemaname='public' and policyname='anon never (restrictive)'"
+```
+**STOP and report if this fails** (step 2b). Otherwise continue to step 3.
 
 ## Step 3 — `phase2/05_staff_admin_and_role_preview.sql`
 *staff administration + self-promotion fix* · kind: **replaces policies (profiles update own, crm_settings)**
@@ -305,7 +317,7 @@ Paste both grids. Look at the `skipped_deleted` line (soft-deleted old rows are 
 
 
 ## Report back
-A table of 21 rows: step, file, result of the command, result of the check (`t` or the output), and for each step that needs a deploy or an owner pre-step: **pending**. Then the final `pending_migrations_check.sql` grid, and the two dry-run grids from step 21. Do not paste connection strings, keys, or personal data.
+A table of 22 rows: step, file, result of the command, result of the check (`t` or the output), and for each step that needs a deploy or an owner pre-step: **pending**. Then the final `pending_migrations_check.sql` grid, and the two dry-run grids from step 21. Do not paste connection strings, keys, or personal data.
 
 ## Rollback
 Each step's rollback file or instructions are in `docs/ops/APPLY_ORDER.md`. On staging, restoring the snapshot taken before step 1 is the quickest way back.

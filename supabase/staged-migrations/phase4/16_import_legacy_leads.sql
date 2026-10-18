@@ -1,27 +1,39 @@
--- STAGED — NOT APPLIED. One-time, idempotent copy of the legacy table public.hlektrismos_leads into public.leads,
--- so the sales team can see the lead history in the CRM. Run the dry-run FIRST: docs/ops/LEGACY_LEADS_IMPORT_DRYRUN.sql
--- (counts only, read-only). Staging first, then production only with the owner's approval and a backup.
+-- STAGED — NOT APPLIED. One-time, idempotent import of ALL rows of the legacy table public.hlektrismos_leads into public.leads, so the
+-- sales team can see the lead history in the CRM. Staging first, then production only with the owner's approval and a backup.
+-- Owner decisions of 18/10/2026: import all rows · rows without marketing consent are imported but marked «not for marketing» ·
+-- imported leads are unassigned · statuses are mapped to ours and the original status is kept in a note.
 --
---   * Nothing is deleted or changed in hlektrismos_leads.
---   * Every copied row is marked: source = 'import', source_label = 'Παλιά βάση', tags = {'import', 'legacy_import:<old id>', …}.
---     The tag 'legacy_import:<old id>' is what makes a second run copy nothing.
---   * Skipped (and counted by the dry-run): already imported · soft-deleted in the old table · no name · no phone and no
---     e-mail · a status that cannot be mapped · the same phone (last 10 digits) or e-mail already in public.leads ·
---     the same phone/e-mail twice inside the old table (the oldest row is the one copied).
---   * Status mapping (old → leads_status_check): new, lead → new · contacted, intro, follow_up → contacted ·
---     qualified → qualified · awaiting_offer, proposal → offer · lost, rejected → lost · the old "beyond lead" statuses
---     (converted, customer, won, active, accepted, awaiting_signature, docs_pending, sent_to_provider,
---     submitted_to_provider, deddie_meter_reading) → qualified, with the tag 'legacy_status:<old status>' so nothing is
---     lost. They are NOT marked «converted»: no case exists for them in the CRM. OWNER DECISION: the CASE below is the
---     one place to change it.
---   * Consent is copied as recorded (gdpr_consent = old consent; consent_version 'legacy'; consent_source
---     'legacy_import'). Rows without recorded consent are copied too but visibly (gdpr_consent = false): do not contact
---     them until the contact-eligibility rules (phase3/09) are applied and the owner decides.
+-- HOW TO RUN (SQL editor, as the project owner):
+--   1) create the objects:            run this whole file (it only creates a view and a function; nothing is copied).
+--   2) DRY RUN (default, no writes):  select * from public.import_legacy_leads();            -- counts only
+--   3) the real import:               select * from public.import_legacy_leads(false);       -- writes, returns the same counts
+--   A read-only dry run that needs NOTHING created first is docs/ops/LEGACY_LEADS_IMPORT_DRYRUN.sql (same classification).
+--   Neither anon nor authenticated users can run the function or read the view (grants revoked): only the owner can.
+--
+-- WHAT IT DOES
+--   * Nothing is deleted or changed in hlektrismos_leads. No row is skipped: every row is copied once. A second run copies nothing
+--     (the tag 'legacy_import:<old id>' marks a copied row).
+--   * Every copied row: source 'import', source_label 'Παλιά βάση', original date kept, UNASSIGNED, tags {'import', 'legacy_import:<id>',
+--     'legacy_status:<old status>', 'legacy_source:<old source>'} and a note that names the original status.
+--   * Rows WITHOUT recorded consent: gdpr_consent = false, tag 'not_for_marketing', and the note says so. They are for sales follow-up
+--     only: no campaigns, no bulk SMS/e-mail. (Once phase3/09 is applied, a contact with no permission record is already refused for
+--     promotional channels — fail closed; the tag and gdpr_consent = false make the same thing visible and searchable now.)
+--   * Statuses (old → leads_status_check): new, lead → new · contacted, intro, follow_up → contacted · qualified → qualified ·
+--     awaiting_offer, proposal → offer · lost, rejected → lost · the old "beyond lead" statuses (converted, customer, won, active, accepted,
+--     awaiting_signature, docs_pending, sent_to_provider, submitted_to_provider, deddie_meter_reading) → qualified (never «converted»: no
+--     case exists for them) · anything else or empty → new. The original status is always in the note and in the tag legacy_status:<old>.
+--   * Rows that were soft-deleted in the old table (deleted_at set) are imported too, as 'unqualified' with the tag 'legacy_deleted' and
+--     'not_for_marketing' and a note — so the history is visible but nobody is led to work them. (Decision 1 said all rows; if a deleted row
+--     was removed at the customer's request, tell Claude before running: the dry run counts them.)
+--   * Rows with no name get the name «Χωρίς όνομα (παλιά βάση)» (the column is required). Rows with no phone and no e-mail are copied as they are.
+--   * Possible duplicates (the same phone — last 10 digits — or e-mail as a lead the CRM already has, or as an OLDER row of the old table)
+--     are copied and tagged 'possible_duplicate' with a note; nothing is merged or hidden.
 --   * Not copied on purpose: government_id (sensitive, not needed to see a lead), bill file paths, scores, assignments.
---     Imported leads are unassigned.
---   * One statement = atomic: it all happens or nothing does. It also writes ONE activity_log entry with the counts only.
+--   * One activity_log entry with the counts only (no personal data).
 -- Rollback: docs/ops/rollback_phase4_16_legacy_leads_import.sql.
 
+-- The plan as a view (owner only): one row per old row with everything the import decides. Contains personal data: not readable by app users.
+create or replace view public.legacy_leads_import_plan as
 -- >>> CLASSIFY (identical in the dry-run file; a test compares the two)
 with src as (
   select h.id, h.created_at,
@@ -46,54 +58,97 @@ with src as (
            when old_status in ('lost', 'rejected') then 'lost'
            when old_status in ('converted', 'customer', 'won', 'active', 'accepted', 'awaiting_signature', 'docs_pending',
                                'sent_to_provider', 'submitted_to_provider', 'deddie_meter_reading') then 'qualified'
-         end as new_status,
-         old_status in ('converted', 'customer', 'won', 'active', 'accepted', 'awaiting_signature', 'docs_pending',
-                        'sent_to_provider', 'submitted_to_provider', 'deddie_meter_reading') as beyond_lead
+           else 'new'
+         end as mapped_status,
+         case
+           when old_status in ('new', 'lead', 'contacted', 'intro', 'follow_up', 'qualified', 'awaiting_offer', 'proposal', 'lost', 'rejected') then 'direct'
+           when old_status in ('converted', 'customer', 'won', 'active', 'accepted', 'awaiting_signature', 'docs_pending',
+                               'sent_to_provider', 'submitted_to_provider', 'deddie_meter_reading') then 'beyond_lead'
+           else 'unknown'
+         end as status_kind
     from src s
-), elig as (
-  select m.* from mapped m
-   where m.deleted_at is null and (m.first_name is not null or m.last_name is not null)
-     and (m.phone is not null or m.email is not null) and m.new_status is not null
 ), classified as (
   select m.*,
-         case
-           when exists (select 1 from public.leads l where l.tags @> array['legacy_import:' || m.id::text]) then 'already_imported'
-           when m.deleted_at is not null then 'soft_deleted'
-           when m.first_name is null and m.last_name is null then 'no_name'
-           when m.phone is null and m.email is null then 'no_contact'
-           when m.new_status is null then 'unmappable_status'
-           when exists (select 1 from public.leads l
-                         where not exists (select 1 from unnest(coalesce(l.tags, '{}'::text[])) t where t like 'legacy\_import:%')
-                           and ((m.phone_key is not null and length(regexp_replace(coalesce(l.phone, ''), '\D', '', 'g')) >= 10
-                                 and right(regexp_replace(l.phone, '\D', '', 'g'), 10) = m.phone_key)
-                                or (m.email is not null and lower(btrim(coalesce(l.email, ''))) = m.email))) then 'duplicate_existing'
-           when exists (select 1 from elig e
-                         where e.id <> m.id and (e.created_at, e.id) < (m.created_at, m.id)
-                           and ((m.phone_key is not null and e.phone_key = m.phone_key) or (m.email is not null and e.email = m.email))) then 'duplicate_in_legacy'
-           else 'copy'
-         end as verdict
+         (m.deleted_at is not null) as is_deleted,
+         (m.first_name is null and m.last_name is null) as no_name,
+         (m.phone is null and m.email is null) as no_contact,
+         exists (select 1 from public.leads l where l.tags @> array['legacy_import:' || m.id::text]) as already_imported,
+         (exists (select 1 from public.leads l
+                   where not exists (select 1 from unnest(coalesce(l.tags, '{}'::text[])) t where t like 'legacy\_import:%')
+                     and ((m.phone_key is not null and length(regexp_replace(coalesce(l.phone, ''), '\D', '', 'g')) >= 10
+                           and right(regexp_replace(l.phone, '\D', '', 'g'), 10) = m.phone_key)
+                          or (m.email is not null and lower(btrim(coalesce(l.email, ''))) = m.email)))
+          or exists (select 1 from mapped e
+                      where e.id <> m.id and (e.created_at, e.id) < (m.created_at, m.id)
+                        and ((m.phone_key is not null and e.phone_key = m.phone_key) or (m.email is not null and e.email = m.email)))) as possible_duplicate
     from mapped m
 )
 -- <<< CLASSIFY
-, ins as (
-  insert into public.leads (client_name, client_contact, first_name, last_name, full_name, email, phone, region, property_type, comments,
-                            service_category, provider, lead_type, status, source, source_label, tags, created_at, updated_at,
-                            gdpr_consent, consent_version, consent_granted_at, consent_source, notes)
-  select btrim(concat_ws(' ', c.first_name, c.last_name)),
-         coalesce(c.phone, c.email, ''),
-         coalesce(c.first_name, ''), coalesce(c.last_name, ''), btrim(concat_ws(' ', c.first_name, c.last_name)),
-         c.email, c.phone, c.region, c.property_type, c.comments,
-         coalesce(c.service_type, 'Ρεύμα'), c.provider, c.customer_type, c.new_status, 'import', 'Παλιά βάση',
-         array['import', 'legacy_import:' || c.id::text]
-           || case when c.beyond_lead then array['legacy_status:' || c.old_status] else '{}'::text[] end
-           || case when c.old_source is not null then array['legacy_source:' || c.old_source] else '{}'::text[] end,
-         c.created_at, now(),
-         c.consent, 'legacy', case when c.consent then c.created_at end, 'legacy_import',
-         'Εισαγωγή από την παλιά βάση (hlektrismos_leads)'
-    from classified c where c.verdict = 'copy'
-  returning 1
-)
-insert into public.activity_log (entity_type, entity_id, action, details)
-select 'lead_import', null, 'legacy_import',
-       jsonb_build_object('copied', (select count(*) from ins),
-                          'skipped', (select jsonb_object_agg(v, n) from (select verdict v, count(*) n from classified where verdict <> 'copy' group by 1) x));
+select * from classified;
+revoke all on public.legacy_leads_import_plan from public, anon, authenticated;
+
+-- DRY RUN by default (counts only, nothing written). p_dry_run => false: the same counts first, then the write, then «COPIED (written)».
+create or replace function public.import_legacy_leads(p_dry_run boolean default true)
+returns table (item text, n bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_copied bigint := 0;
+begin
+  -- the counts are taken BEFORE anything is written (a run that copies changes what «already imported» means)
+  return query
+  select r.item, r.n from (
+    select 1 as ord, case when coalesce(p_dry_run, true) then 'MODE: DRY RUN — nothing is written' else 'MODE: IMPORT — rows are written' end as item, 0::bigint as n
+    union all select 2, 'legacy rows in total', count(*) from public.legacy_leads_import_plan
+    union all select 3, 'already imported by an earlier run (skipped)', count(*) filter (where already_imported) from public.legacy_leads_import_plan
+    union all select 4, 'TO COPY in this run', count(*) filter (where not already_imported) from public.legacy_leads_import_plan
+    union all select 5, 'of those: without recorded consent → «not for marketing»', count(*) filter (where not consent and not is_deleted and not already_imported) from public.legacy_leads_import_plan
+    union all select 6, 'of those: soft-deleted in the old table → «unqualified», not for marketing', count(*) filter (where is_deleted and not already_imported) from public.legacy_leads_import_plan
+    union all select 7, 'of those: possible duplicates (tagged, not merged)', count(*) filter (where possible_duplicate and not already_imported) from public.legacy_leads_import_plan
+    union all select 8, 'of those: no name (named «Χωρίς όνομα»)', count(*) filter (where no_name and not already_imported) from public.legacy_leads_import_plan
+    union all select 9, 'of those: no phone and no e-mail', count(*) filter (where no_contact and not already_imported) from public.legacy_leads_import_plan
+    union all select 10, 'statuses: mapped directly', count(*) filter (where status_kind = 'direct' and not already_imported) from public.legacy_leads_import_plan
+    union all select 11, 'statuses: «beyond lead» → qualified', count(*) filter (where status_kind = 'beyond_lead' and not already_imported) from public.legacy_leads_import_plan
+    union all select 12, 'statuses: unknown or empty → new', count(*) filter (where status_kind = 'unknown' and not already_imported) from public.legacy_leads_import_plan
+    union all select 13, 'distinct old statuses in use', count(distinct old_status) from public.legacy_leads_import_plan
+  ) r order by r.ord;
+  if not coalesce(p_dry_run, true) then
+    with ins as (
+      insert into public.leads (client_name, client_contact, first_name, last_name, full_name, email, phone, region, property_type, comments,
+                                service_category, provider, lead_type, status, source, source_label, tags, created_at, updated_at,
+                                gdpr_consent, consent_version, consent_granted_at, consent_source, notes)
+      select case when p.no_name then 'Χωρίς όνομα (παλιά βάση)' else btrim(concat_ws(' ', p.first_name, p.last_name)) end,
+             coalesce(p.phone, p.email, ''),
+             coalesce(p.first_name, ''), coalesce(p.last_name, ''), case when p.no_name then 'Χωρίς όνομα (παλιά βάση)' else btrim(concat_ws(' ', p.first_name, p.last_name)) end,
+             p.email, p.phone, p.region, p.property_type, p.comments,
+             coalesce(p.service_type, 'Ρεύμα'), p.provider, p.customer_type,
+             case when p.is_deleted then 'unqualified' else p.mapped_status end,
+             'import', 'Παλιά βάση',
+             array['import', 'legacy_import:' || p.id::text, 'legacy_status:' || coalesce(nullif(p.old_status, ''), 'empty')]
+               || case when p.old_source is not null then array['legacy_source:' || p.old_source] else '{}'::text[] end
+               || case when not p.consent or p.is_deleted then array['not_for_marketing'] else '{}'::text[] end
+               || case when p.is_deleted then array['legacy_deleted'] else '{}'::text[] end
+               || case when p.possible_duplicate then array['possible_duplicate'] else '{}'::text[] end,
+             p.created_at, now(),
+             p.consent and not p.is_deleted, 'legacy', case when p.consent and not p.is_deleted then p.created_at end, 'legacy_import',
+             concat_ws(E'
+',
+               'Εισαγωγή από την παλιά βάση (hlektrismos_leads). Αρχική κατάσταση: ' || coalesce(nullif(p.old_status, ''), '(κενή)')
+                 || case p.status_kind when 'beyond_lead' then ' — αντιστοιχίστηκε σε «qualified» (δεν υπάρχει case στο CRM).' when 'unknown' then ' — άγνωστη, μπήκε ως «new».' else '.' end,
+               case when not p.consent then 'ΟΧΙ για marketing: δεν υπάρχει καταγεγραμμένη συγκατάθεση — μόνο follow-up πωλήσεων, όχι καμπάνιες ή μαζικά SMS/email.' end,
+               case when p.is_deleted then 'Ήταν διαγραμμένο στην παλιά βάση· εισήχθη ως «unqualified», όχι για marketing.' end,
+               case when p.possible_duplicate then 'Πιθανό διπλότυπο: ίδιο τηλέφωνο ή email με άλλο lead.' end)
+        from public.legacy_leads_import_plan p
+       where not p.already_imported
+      returning 1
+    )
+    select count(*) into v_copied from ins;
+    insert into public.activity_log (entity_type, entity_id, action, details)
+    values ('lead_import', null, 'legacy_import', jsonb_build_object('copied', v_copied));
+    return query select 'COPIED (written)'::text, v_copied;
+  end if;
+end;
+$$;
+revoke all on function public.import_legacy_leads(boolean) from public, anon, authenticated;

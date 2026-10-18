@@ -646,6 +646,13 @@ http.createServer((req, res) => {
     log.push({ method: req.method, table, query: url.search, body: json });
     const tbl = (TABLES[table] ??= []);
     if (req.method === 'PATCH' && patchFail === table) { patchFail = null; const t = patchFailHint === 'transition'; patchFailHint = null; return send(400, t ? { code: 'P0001', message: 'stage_transition_not_allowed: activation -> completed', details: null, hint: 'transition' } : { code: '23514', message: 'mock: write refused', details: null, hint: null }); }
+    if (req.method === 'PATCH' && (table === 'cases' || table === 'case_documents') && json.supply_point_id) { // supply_point_link_guard: the connection must belong to the same customer
+      const sp = (TABLES.customer_supply_points ?? []).find((x) => x.id === json.supply_point_id);
+      for (const r of applyFilters(tbl, url.searchParams)) {
+        const customer = table === 'cases' ? r.customer_id : (TABLES.cases.find((k) => k.id === r.case_id) ?? {}).customer_id;
+        if (!sp || sp.customer_id !== customer) return send(400, { code: 'P0001', message: 'supply_point: the connection belongs to another customer', details: null, hint: null });
+      }
+    }
     if (req.method === 'PATCH') {
       const hit = applyFilters(tbl, url.searchParams);
       if (gatesOn && table === 'cases' && json.current_stage) {

@@ -4,15 +4,87 @@
 
 import { useState } from 'react';
 import { Plus, Zap } from 'lucide-react';
-import { archiveSupplyPoint, createSupplyPoint, updateSupplyPoint } from '@/lib/api';
+import { archiveSupplyPoint, createSupplyPoint, linkCaseToSupplyPoint, linkDocumentToSupplyPoint, updateSupplyPoint } from '@/lib/api';
+import type { Case, CaseDocument } from '@/lib/api';
+import { docLabel } from '@/lib/documents';
 import {
-  METER_TYPE_LABEL, USAGES, USAGE_LABEL, contractText, draftErrors, draftFromPoint, emptyDraft, supplyNumberError, supplyPointTitle, tariffOptions,
+  METER_TYPE_LABEL, USAGES, USAGE_LABEL, contractText, draftErrors, draftFromPoint, emptyDraft, supplyLabelFor, supplyNumberError, supplyPointTitle, tariffOptions,
 } from '@/lib/supply-points';
 import type { MeterType, SupplyPoint, SupplyPointDraft, SupplyUsage, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
 import { fmtDate } from '@/lib/ui';
 
 export const SUPPLY_UNAVAILABLE_TEXT = 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
+
+export type DocRow = CaseDocument & { case_no: string };
+type Links = { points: SupplyPoint[]; cases: Case[]; docs: DocRow[]; reload: () => void };
+
+/* The cases and documents of THIS connection, and the picker to link one more. A case or a document points at one
+   connection (of the same customer — the database checks it); linking moves only that pointer. */
+function SupplyLinks({ point, links, canEdit }: { point: SupplyPoint; links: Links; canEdit: boolean }) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const mine = { cases: links.cases.filter(k => k.supply_point_id === point.id), docs: links.docs.filter(d => d.supply_point_id === point.id) };
+  const otherCases = links.cases.filter(k => k.supply_point_id !== point.id);
+  const otherDocs = links.docs.filter(d => d.supply_point_id !== point.id);
+  const where = (id: string | null | undefined) => { const l = supplyLabelFor(links.points, id); return l ? ` (σε ${l})` : ''; };
+
+  const run = async (op: Promise<string | null>, ok: string) => {
+    if (busy) return;
+    setBusy(true);
+    const err = await op;
+    setBusy(false);
+    if (err) { toast(err, 'bad'); return; }
+    toast(ok, 'ok');
+    links.reload();
+  };
+  const row = 'flex items-center gap-2 flex-wrap text-[13.5px]';
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--atx-line)] grid gap-4 sm:grid-cols-2" data-supply-links={point.id}>
+      <div data-supply-cases>
+        <h3 className="text-[13px] font-semibold m-0 mb-1.5">Cases της παροχής</h3>
+        {mine.cases.length === 0 ? <p className="m-0 text-[13px] text-[var(--atx-muted)]" data-supply-cases-empty>Κανένα case δεν συνδέεται με αυτή την παροχή.</p> : (
+          <ul className="m-0 p-0 list-none space-y-1">
+            {mine.cases.map(k => (
+              <li key={k.id} className={row} data-supply-linked-case={k.case_no}>
+                <span className="font-medium">{k.case_no}</span>
+                {canEdit && <button className="atx-link !p-0 text-[12.5px]" disabled={busy} onClick={() => void run(linkCaseToSupplyPoint(k.id, null), 'Η σύνδεση αφαιρέθηκε.')} data-sp-unlink-case>Αφαίρεση σύνδεσης</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canEdit && otherCases.length > 0 && (
+          <select className="field mt-2 !py-1.5 text-[13px]" value="" disabled={busy} aria-label="Σύνδεση case" data-sp-link-case
+            onChange={e => { if (e.target.value) void run(linkCaseToSupplyPoint(e.target.value, point.id), 'Το case συνδέθηκε.'); }}>
+            <option value="">Σύνδεση case…</option>
+            {otherCases.map(k => <option key={k.id} value={k.id}>{k.case_no}{where(k.supply_point_id)}</option>)}
+          </select>
+        )}
+      </div>
+      <div data-supply-docs>
+        <h3 className="text-[13px] font-semibold m-0 mb-1.5">Έγγραφα της παροχής</h3>
+        {mine.docs.length === 0 ? <p className="m-0 text-[13px] text-[var(--atx-muted)]" data-supply-docs-empty>Κανένα έγγραφο δεν συνδέεται με αυτή την παροχή.</p> : (
+          <ul className="m-0 p-0 list-none space-y-1">
+            {mine.docs.map(d => (
+              <li key={d.id} className={row} data-supply-linked-doc={d.id}>
+                <span className="font-medium">{docLabel(d.category)}</span>
+                <span className="text-[var(--atx-muted)]">{d.file_name || 'χωρίς αρχείο'} · {d.case_no}</span>
+                {canEdit && <button className="atx-link !p-0 text-[12.5px]" disabled={busy} onClick={() => void run(linkDocumentToSupplyPoint(d.id, null), 'Η σύνδεση αφαιρέθηκε.')} data-sp-unlink-doc>Αφαίρεση σύνδεσης</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canEdit && otherDocs.length > 0 && (
+          <select className="field mt-2 !py-1.5 text-[13px]" value="" disabled={busy} aria-label="Σύνδεση εγγράφου" data-sp-link-doc
+            onChange={e => { if (e.target.value) void run(linkDocumentToSupplyPoint(e.target.value, point.id), 'Το έγγραφο συνδέθηκε.'); }}>
+            <option value="">Σύνδεση εγγράφου…</option>
+            {otherDocs.map(d => <option key={d.id} value={d.id}>{docLabel(d.category)} · {d.file_name || 'χωρίς αρχείο'} · {d.case_no}{where(d.supply_point_id)}</option>)}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const dash = (v: string | null | undefined) => (v && v.trim() !== '' ? v : '—');
 
@@ -99,7 +171,7 @@ function SupplyPointEditor({ point, tariffs, onSaved, onCancel }: { point: Suppl
 }
 
 /* One connection. `position` is its number among the active ones; an archived connection has none. */
-export function SupplyPointCard({ point, position, canEdit, tariffs, onChanged }: { point: SupplyPoint; position: number | null; canEdit: boolean; tariffs: TariffCategory[] | null; onChanged: () => void }) {
+export function SupplyPointCard({ point, position, canEdit, tariffs, onChanged, links }: { point: SupplyPoint; position: number | null; canEdit: boolean; tariffs: TariffCategory[] | null; onChanged: () => void; links: Links }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -139,6 +211,7 @@ export function SupplyPointCard({ point, position, canEdit, tariffs, onChanged }
         <dt className="text-[var(--atx-muted)]">Διάρκεια συμβολαίου</dt><dd className="m-0 font-medium" data-supply-field="contract">{dash(contractText(point.contract_months))}</dd>
         {point.notes && (<><dt className="text-[var(--atx-muted)]">Σημειώσεις</dt><dd className="m-0 font-medium whitespace-pre-line" data-supply-field="notes">{point.notes}</dd></>)}
       </dl>
+      {!archived && <SupplyLinks point={point} links={links} canEdit={canEdit} />}
       {editing && !archived && <SupplyPointEditor point={point} tariffs={tariffs} onSaved={() => { setEditing(false); onChanged(); }} onCancel={() => setEditing(false)} />}
       {canEdit && !archived && !confirming && !editing && <button className="atx-link mt-3 !p-0 text-[13px]" onClick={() => setConfirming(true)} data-sp-archive>Αρχειοθέτηση παροχής</button>}
       {canEdit && confirming && (
@@ -152,8 +225,11 @@ export function SupplyPointCard({ point, position, canEdit, tariffs, onChanged }
   );
 }
 
-export default function SupplyPointsTab({ customerId, points, tariffs, canEdit, reload }: {
+export default function SupplyPointsTab({ customerId, points, tariffs, cases, docs, canEdit, reload }: {
   customerId: string;
+  /** this customer's cases and their documents, for the links on each card */
+  cases: Case[];
+  docs: DocRow[];
   /** undefined = still loading; null = the SQL is not applied yet */
   points: SupplyPoint[] | null | undefined;
   /** the configurable category list; null = unavailable (the field becomes plain text) */
@@ -173,6 +249,7 @@ export default function SupplyPointsTab({ customerId, points, tariffs, canEdit, 
 
   const active = points.filter(p => !p.archived_at);
   const archived = points.filter(p => !!p.archived_at);
+  const links: Links = { points, cases, docs, reload };
   const add = async (usage: SupplyUsage) => {
     if (busy) return;
     setBusy(true);
@@ -200,13 +277,13 @@ export default function SupplyPointsTab({ customerId, points, tariffs, canEdit, 
       </div>
       {active.length === 0 ? (
         <div className="atx-panel"><div className="atx-empty" data-supply-empty><strong>Καμία παροχή ακόμη</strong>Προσθέστε μια οικιακή ή επαγγελματική παροχή του πελάτη με το «Νέα παροχή».</div></div>
-      ) : active.map((p, i) => <SupplyPointCard key={p.id} point={p} position={i + 1} canEdit={canEdit} tariffs={tariffs} onChanged={reload} />)}
+      ) : active.map((p, i) => <SupplyPointCard key={p.id} point={p} position={i + 1} canEdit={canEdit} tariffs={tariffs} onChanged={reload} links={links} />)}
       {archived.length > 0 && (
         <div data-supply-archived>
           <button className="atx-link !p-0 text-[13px]" aria-expanded={showArchived} onClick={() => setShowArchived(v => !v)} data-supply-archived-toggle>
             {showArchived ? 'Απόκρυψη' : 'Εμφάνιση'} αρχειοθετημένων παροχών ({archived.length})
           </button>
-          {showArchived && <div className="space-y-4 mt-3">{archived.map(p => <SupplyPointCard key={p.id} point={p} position={null} canEdit={canEdit} tariffs={tariffs} onChanged={reload} />)}</div>}
+          {showArchived && <div className="space-y-4 mt-3">{archived.map(p => <SupplyPointCard key={p.id} point={p} position={null} canEdit={canEdit} tariffs={tariffs} onChanged={reload} links={links} />)}</div>}
         </div>
       )}
     </div>

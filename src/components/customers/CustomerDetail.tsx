@@ -22,6 +22,7 @@ import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
 import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import { supplyLabelFor } from '@/lib/supply-points';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
 import { buildChecklist, docLabel } from '@/lib/documents';
@@ -158,7 +159,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
         <span className="atx-icon" aria-hidden="true"><Briefcase size={16} /></span>
         <button className="atx-row-main" aria-pressed={sel?.id === k.id} data-folder-case={k.case_no} onClick={() => setPicked(k.id)} title="Επιλογή case για τις καρτέλες του φακέλου">
           <span className="atx-row-title">{SERVICES[k.service_type] ?? k.service_type} · {k.case_no}{sel?.id === k.id && cases.length > 1 ? <span className="font-normal text-[var(--atx-muted)]"> · επιλεγμένο</span> : null}</span>
-          <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}{k.next_action ? ` · ${k.next_action}` : ''}</span>
+          <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}{supplyLabelFor(supplyPoints, k.supply_point_id) ? ` · ${supplyLabelFor(supplyPoints, k.supply_point_id)}` : ''}{k.next_action ? ` · ${k.next_action}` : ''}</span>
         </button>
         <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
         <button className="atx-btn atx-btn-quiet" onClick={() => openCase(k.id)}>Άνοιγμα</button>
@@ -314,7 +315,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
         </div>
       )}
 
-      {tab === 'supply' && <SupplyPointsTab customerId={cust.id} points={supplyPoints} tariffs={tariffs} canEdit={!cust.deleted_at} reload={() => void load()} />}
+      {tab === 'supply' && <SupplyPointsTab customerId={cust.id} points={supplyPoints} tariffs={tariffs} cases={cases} docs={allDocs} canEdit={!cust.deleted_at} reload={() => void load()} />}
 
       {tab === 'cases' && (
         <div className="atx-panel">

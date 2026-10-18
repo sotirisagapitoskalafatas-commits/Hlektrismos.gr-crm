@@ -22,6 +22,7 @@ export const DOC_TYPES: DocType[] = [
   { key: 'lease', label: 'Μισθωτήριο', hint: 'Όταν ο πελάτης είναι ενοικιαστής — δηλωμένο στο TAXISnet', group: 'property' },
   { key: 'free_use', label: 'Δωρεάν παραχώρηση χρήσης', hint: 'Παραχωρητήριο ή υπεύθυνη δήλωση χρήσης ακινήτου', group: 'property' },
   { key: 'bill_electricity', label: 'Λογαριασμός ρεύματος', hint: 'Πρόσφατος, με τον αριθμό παροχής', group: 'supply' },
+  { key: 'meter_photo', label: 'Φωτογραφία μετρητή (ρολόι ΔΕΗ)', hint: 'Ευανάγνωστη, με τον αριθμό του μετρητή', group: 'supply' },
   { key: 'bill_gas', label: 'Λογαριασμός φυσικού αερίου', hint: 'Πρόσφατος, με τον αριθμό παροχής φυσικού αερίου', group: 'supply' },
   { key: 'kot_certificate', label: 'Βεβαίωση ΚΟΤ / ευάλωτου πελάτη', hint: 'Μόνο αν ο πελάτης είναι ενταγμένος σε ΚΟΤ', group: 'supply' },
   { key: 'business_registry', label: 'Βεβαίωση ΓΕΜΗ / καταστατικό', hint: 'Για νομικά πρόσωπα', group: 'business' },

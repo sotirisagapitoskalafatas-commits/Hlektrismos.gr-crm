@@ -326,9 +326,10 @@ export default function LeadsPage() {
               <input type="email" className="field" value={editForm.email ?? ''} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.gr" />
             </Field>
           </div>
-          <Field label="Διεύθυνση">
+          <Field label="Διεύθυνση κατοικίας">
             <input className="field" value={editForm.address ?? ''} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Οδός, αριθμός…" />
           </Field>
+          <p className="text-[12px] text-ink/55 -mt-2">Οι διευθύνσεις παροχών είναι στην καρτέλα Παροχές.</p>
           <Field label="Τοποθεσία (γεωγραφικές συντεταγμένες)">
             <div className="grid sm:grid-cols-2 gap-3">
               <input type="number" step="any" className="field" value={editForm.lat ?? ''} onChange={e => setEditForm(f => ({ ...f, lat: e.target.value }))} placeholder="lat" />

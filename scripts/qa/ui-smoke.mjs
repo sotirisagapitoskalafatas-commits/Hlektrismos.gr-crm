@@ -1329,6 +1329,62 @@ if (!PREVIEW_LIVE) {
   await fetch(`${M}/__dropleads?ids=${droppable.join(',')}`); // leave the shared mock as we found it (the conversions made cases and a customer)
 }
 
+/* ---- 2l. Case: «Επιλέξτε παροχή για αυτή την υπόθεση» when the customer has connections and the case is linked to none (staged phase5/17) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const post = async (table, body) => (await (await fetch(`${M}/rest/v1/${table}`, { method: 'POST', headers: H, body: JSON.stringify(body) })).json())[0];
+  const get = async (q) => (await fetch(`${M}/rest/v1/${q}`, { headers: H })).json();
+  const openCaseNo = async (page, no) => {
+    await click(page, 'Cases', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate((n) => { const el = [...document.querySelectorAll('main *')].find((e) => e.textContent.trim() === n && e.offsetParent); el && el.click(); }, no);
+    await sleep(1800);
+  };
+  const hint = (page) => page.evaluate(() => ({ text: document.querySelector('[data-case-supply-hint]')?.innerText ?? '', options: [...document.querySelectorAll('[data-case-supply-select] option')].map((o) => o.textContent.trim()) }));
+  await fetch(`${M}/__supply?state=on`);
+  await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H });
+  const cases = (await get(`cases?customer_id=eq.${ATHINA}&select=id,case_no`)).sort((a, b) => a.case_no.localeCompare(b.case_no));
+  const [c1, c2] = cases;
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCaseNo(page, c1.case_no);
+    check('Case: a customer with NO connection → no hint (nothing to choose)', (await hint(page)).text === '');
+    await browser.close();
+  }
+  const home = await post('customer_supply_points', { customer_id: ATHINA, usage: 'residential', property_address: 'Οδός Α 1', supply_number: '12345678901' });
+  const shop = await post('customer_supply_points', { customer_id: ATHINA, usage: 'commercial', property_address: 'Οδός Β 2', supply_number: '22222222222' });
+  await fetch(`${M}/rest/v1/cases?id=eq.${c2.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ supply_point_id: home.id }) });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openCaseNo(page, c1.case_no);
+    const h = await hint(page);
+    check('Case: the customer has two connections and the case is linked to none → «Επιλέξτε παροχή για αυτή την υπόθεση» with both to choose from',
+      h.text.includes('Επιλέξτε παροχή για αυτή την υπόθεση') && h.options.length === 3 && h.options[1].includes('Παροχή 1 — Οικιακό') && h.options[2].includes('Παροχή 2 — Επαγγελματικό'), JSON.stringify(h));
+    await page.evaluate((id) => { const s = document.querySelector('[data-case-supply-select]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, id); s.dispatchEvent(new Event('change', { bubbles: true })); }, shop.id);
+    await sleep(2000);
+    const patch = (await (await fetch(`${M}/__log`)).json()).filter((l) => l.method === 'PATCH' && l.table === 'cases').pop();
+    check('Case: choosing sends one update of this case only (its supply_point_id) and the hint goes away', patch.query.includes(`id=eq.${c1.id}`) && patch.body.supply_point_id === shop.id && (await get(`cases?id=eq.${c2.id}&select=supply_point_id`))[0].supply_point_id === home.id && (await hint(page)).text === '', JSON.stringify(patch.body));
+    await openCaseNo(page, c2.case_no);
+    check('Case: a case that is already linked shows no hint', (await hint(page)).text === '');
+    await browser.close();
+  }
+  await fetch(`${M}/__supply?state=off`);
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await fetch(`${M}/rest/v1/cases?id=eq.${c1.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ supply_point_id: null }) });
+    await openCaseNo(page, c1.case_no);
+    check('Case: while the SQL is not applied there is no hint and no error on the case page', (await hint(page)).text === '' && (await page.evaluate(() => document.querySelector('main h1, main h2') !== null)));
+    await browser.close();
+  }
+  await fetch(`${M}/__supply?state=on`);
+  await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H });
+  await fetch(`${M}/rest/v1/cases?id=in.(${c1.id},${c2.id})`, { method: 'PATCH', headers: H, body: JSON.stringify({ supply_point_id: null }) });
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);

@@ -153,6 +153,14 @@ if (!PREVIEW_LIVE) {
   await click(page, 'Ασφάλεια & Έλεγχοι', '[role="tab"]');
   await sleep(500);
   check('Security: unverified items are labelled «Δεν έχει επαληθευτεί ζωντανά»', await page.evaluate(() => document.querySelectorAll('[data-status="unverified"]').length >= 4 && document.body.innerText.includes('Δεν έχει επαληθευτεί ζωντανά')));
+  await click(page, 'Εκτέλεση ελέγχων');
+  await sleep(2500);
+  check('Security: public sign-up status is read from the identity provider (disabled → verified)', await page.evaluate(() => document.querySelector('[data-check="signup"]')?.getAttribute('data-status') === 'verified'));
+  await fetch('http://127.0.0.1:54399/__signup?state=open');
+  await click(page, 'Εκτέλεση ελέγχων');
+  await sleep(2500);
+  check('Security: public sign-up still enabled → «Χρειάζεται ενέργεια»', await page.evaluate(() => document.querySelector('[data-check="signup"]')?.getAttribute('data-status') === 'action'));
+  await fetch('http://127.0.0.1:54399/__signup?state=closed');
   check('Security: the profile self-promotion finding is flagged', await page.evaluate(() => document.querySelector('[data-check="profiles-self-promotion"]')?.getAttribute('data-status') === 'action'));
   await click(page, 'Χρήστες & Ρόλοι', '[role="tab"]');
   await sleep(1200);
@@ -173,6 +181,13 @@ if (!PREVIEW_LIVE) {
   const created = log.filter((l) => l.table === 'admin-users').pop();
   check('Users: create sends role + invite to the admin-users function (no password)', created?.body?.action === 'create' && created.body.role === 'field_sales' && created.body.mode === 'invite' && !created.body.password);
   check('Users: new account appears after re-reading the directory', await page.evaluate(() => !!document.querySelector('[data-staff="new.staff@example.invalid"]')));
+  // reset password: a recovery e-mail, no secret in the answer
+  await page.evaluate(() => document.querySelector('[data-staff="back_office@example.invalid"] button[title="Επαναφορά κωδικού"]')?.click());
+  await sleep(500);
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Αποστολή email')?.click());
+  await sleep(1200);
+  log = await (await fetch('http://127.0.0.1:54399/__log')).json();
+  check('Users: password reset goes through admin-users (action reset) and is confirmed in the UI', log.some((l) => l.table === 'admin-users' && l.body.action === 'reset') && await page.evaluate(() => document.body.innerText.includes('email επαναφοράς κωδικού')));
   // delete someone with CRM history → refused, deactivation offered
   await page.evaluate(() => document.querySelector('[data-staff="inside_sales@example.invalid"] button[title="Διαγραφή"]')?.click());
   await sleep(800);
@@ -196,7 +211,7 @@ if (!PREVIEW_LIVE) {
   check('Users: permanent delete needs the typed e-mail and removes the account', delBtnDisabled === true && !(await page.evaluate(() => !!document.querySelector('[data-staff="new.staff@example.invalid"]'))));
   await click(page, 'Audit Log', '[role="tab"]');
   await sleep(1000);
-  check('Audit Log: create / deactivate / delete are listed', await page.evaluate(() => ['Δημιουργία χρήστη', 'Απενεργοποίηση', 'Οριστική διαγραφή'].every((t) => document.body.innerText.includes(t))));
+  check('Audit Log: create / deactivate / delete are listed', await page.evaluate(() => ['Δημιουργία χρήστη', 'Επαναφορά κωδικού', 'Απενεργοποίηση', 'Οριστική διαγραφή'].every((t) => document.body.innerText.includes(t))));
   await browser.close();
 }
 {
@@ -206,11 +221,14 @@ if (!PREVIEW_LIVE) {
   await sleep(1200);
   await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim() === 'Χρήστες & Ρόλοι')?.click());
   await sleep(1000);
-  await click(page, 'Νέος χρήστης');
-  await sleep(500);
-  const opts = await page.evaluate(() => [...document.querySelectorAll('[role="radiogroup"][aria-label="Ρόλος"] [role="radio"]')].map((b) => b.textContent));
-  check('Manager: can create only Inside Sales / Field Sales / Back Office', opts.length === 3 && !opts.some((o) => /Διαχειριστής|Διευθυντής/.test(o)), opts.join('|'));
-  check('Manager: no actions on admin rows', await page.evaluate(() => !document.querySelector('[data-staff="admin@example.invalid"] button[title="Επεξεργασία"]')));
+  check('Manager: sees the team but has no «Νέος χρήστης» button (admin-only provisioning)', await page.evaluate(() => ![...document.querySelectorAll('button')].some((x) => x.textContent.trim().includes('Νέος χρήστης')) && !!document.querySelector('[data-staff="admin@example.invalid"]')));
+  check('Manager: the admin-only note is shown and no row has edit / reset / disable / delete actions', await page.evaluate(() => !!document.querySelector('[data-testid="admin-only-note"]') && !document.querySelector('[data-staff] button[title="Επεξεργασία"], [data-staff] button[title="Επαναφορά κωδικού"], [data-staff] button[title="Διαγραφή"]')));
+  const callFn = async (who, body) => (await fetch('http://127.0.0.1:54399/functions/v1/admin-users', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer mock-${who}` }, body: JSON.stringify(body) })).status;
+  const mgrFn = await callFn('manager', { action: 'create', email: 'x@example.invalid', full_name: 'Χ Χ', role: 'inside_sales', mode: 'invite' });
+  const mgrReset = await callFn('manager', { action: 'reset', user_id: '10000000-0000-4000-8000-000000000006' });
+  const salesFn = await callFn('inside_sales', { action: 'create', email: 'y@example.invalid', full_name: 'Ψ Ψ', role: 'inside_sales', mode: 'invite' });
+  const boFn = await callFn('back_office', { action: 'create', email: 'z@example.invalid', full_name: 'Ζ Ζ', role: 'back_office', mode: 'invite' });
+  check('admin-users refuses create / reset from manager, inside sales and back office (403)', mgrFn === 403 && mgrReset === 403 && salesFn === 403 && boFn === 403, [mgrFn, mgrReset, salesFn, boFn].join(','));
   await browser.close();
 }
 {
@@ -219,7 +237,8 @@ if (!PREVIEW_LIVE) {
   await click(page, 'Διαχείριση', '#shell-rail nav button');
   await sleep(1500);
   const roles = await page.evaluate(() => [...document.querySelectorAll('[data-staff] .atx-role')].map((x) => x.textContent));
-  check('Back Office: sees and manages Back Office colleagues only', roles.length >= 1 && roles.every((r) => r === 'Back Office') && (await page.evaluate(() => !document.body.innerText.includes('Ασφάλεια & Έλεγχοι'))), roles.join(','));
+  check('Back Office: sees Back Office colleagues only', roles.length >= 1 && roles.every((r) => r === 'Back Office') && (await page.evaluate(() => !document.body.innerText.includes('Ασφάλεια & Έλεγχοι'))), roles.join(','));
+  check('Back Office: no «Νέος χρήστης» and no row actions (accounts are created by an admin, one per person)', await page.evaluate(() => ![...document.querySelectorAll('button')].some((x) => x.textContent.trim().includes('Νέος χρήστης')) && !document.querySelector('[data-staff] .atx-icon-btn')));
   await browser.close();
 }
 {

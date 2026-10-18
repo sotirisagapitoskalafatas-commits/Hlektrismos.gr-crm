@@ -111,7 +111,10 @@ const staffRows = [
   { id: '10000000-0000-4000-8000-000000000007', full_name: 'Πρώην Συνεργάτης', email: 'former@example.invalid', phone: null, role: 'inside_sales', is_active: false, created_at: iso(-200 * D), last_sign_in_at: iso(-60 * D) },
 ];
 const staffAudit = [];
-const MANAGE = { admin: ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'], manager: ['inside_sales', 'field_sales', 'back_office'], back_office: ['back_office'] };
+// Account provisioning is admin-only (staged phase4/17). Managers and back office may READ the team directory (DIRECTORY) but manage nobody.
+const MANAGE = { admin: ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'] };
+const DIRECTORY = { admin: true, manager: true, back_office: true };
+let signupDisabled = true; // GET /__signup?state=open → the identity provider still allows public sign-up
 const canManageMock = (actor, from, to = from) => !!actor && (MANAGE[actor.role] ?? []).includes(from) && (MANAGE[actor.role] ?? []).includes(to);
 const staffRefs = (id) => (id === USERS.inside_sales.id ? 12 : id === USERS.field_sales.id ? 5 : 0);
 // Presentation preview: allowed for the mock admin unless MOCK_PREVIEW=expired.
@@ -250,6 +253,8 @@ http.createServer((req, res) => {
     }
     if (url.pathname === '/__preview') { previewState = url.searchParams.get('state') ?? 'on'; return send(200, { previewState }); }
 
+    if (url.pathname === '/__signup') { signupDisabled = url.searchParams.get('state') !== 'open'; return send(200, { signupDisabled }); }
+    if (url.pathname === '/auth/v1/settings') return send(200, { external: { email: true }, disable_signup: signupDisabled, mailer_autoconfirm: false });
     if (url.pathname.startsWith('/auth/v1/')) {
       const u = userForToken(req.headers.authorization);
       if (url.pathname.endsWith('/user')) {
@@ -607,12 +612,12 @@ http.createServer((req, res) => {
         return send(200, out);
       }
       if (name === 'staff_list') {
-        if (!u || !MANAGE[u.role]) return deny('staff_list: not allowed');
+        if (!u || !DIRECTORY[u.role]) return deny('staff_list: not allowed');
         const rows = staffRows.filter((r) => u.role !== 'back_office' || r.role === 'back_office')
           .map((r) => ({ ...r, can_manage: r.id !== u.id && canManageMock(u, r.role) }));
         return send(200, rows);
       }
-      if (name === 'staff_reference_count') return MANAGE[u?.role] ? send(200, staffRefs(json.p_id)) : deny('not allowed');
+      if (name === 'staff_reference_count') return DIRECTORY[u?.role] ? send(200, staffRefs(json.p_id)) : deny('not allowed');
       if (name === 'staff_update') {
         log.push({ method: 'RPC', table: 'staff_update', body: json });
         const t = staffRows.find((r) => r.id === json.p_id);
@@ -649,6 +654,13 @@ http.createServer((req, res) => {
           if (staffRefs(t.id) > 0) return send(409, { error: 'Ο χρήστης συνδέεται με εγγραφές του CRM.' });
           staffRows.splice(staffRows.indexOf(t), 1);
           staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: 'delete', target_id: t.id, target_email: t.email, before: { role: t.role }, after: null, note: null, created_at: new Date().toISOString() });
+          return send(200, { ok: true });
+        }
+        if (json.action === 'reset') { // admin only; sends a recovery e-mail, returns nothing secret
+          const t = staffRows.find((r) => r.id === json.user_id);
+          if (!t) return send(404, { error: 'Ο χρήστης δεν βρέθηκε.' });
+          if (!canManageMock(u, t.role)) { staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: 'denied', target_id: t.id, target_email: t.email, before: null, after: null, note: 'reset', created_at: new Date().toISOString() }); return send(403, { error: 'Μόνο οι διαχειριστές μπορούν να επαναφέρουν κωδικούς.' }); }
+          staffAudit.unshift({ id: `a${staffAudit.length + 1}`, actor_id: u.id, action: 'password_reset', target_id: t.id, target_email: t.email, before: null, after: null, note: 'recovery e-mail sent', created_at: new Date().toISOString() });
           return send(200, { ok: true });
         }
         return send(400, { error: 'Άγνωστη ενέργεια.' });

@@ -2,6 +2,9 @@
 
 import { anonymousClient } from './supabase';
 
+const AUTH_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
 export type Status = 'verified' | 'action' | 'unverified';
 export interface CheckResult { id: string; label: string; status: Status; detail: string }
 
@@ -11,6 +14,24 @@ const ANON_TABLES: [string, string][] = [
   ['follow_ups', 'Follow-ups'], ['profiles', 'Προφίλ προσωπικού'], ['activity_log', 'Ιστορικό ενεργειών'],
   ['crm_emails', 'Email πελατών'], ['crm_integrations', 'Ρυθμίσεις ενσωματώσεων'], ['crm_settings', 'Ρυθμίσεις CRM'],
 ];
+
+/** Are public sign-ups switched off at the identity provider? The Auth settings endpoint is public and read-only
+ *  (it is what the sign-in page of any Supabase project reads), so the browser can really check it: `disable_signup`
+ *  true → nobody can register by themselves; false → anyone with the public key could create an account (which stays
+ *  inactive and without CRM access because of the server backstop, but should still be switched off). */
+export async function checkPublicSignup(fetcher: typeof fetch = fetch): Promise<CheckResult> {
+  const id = 'signup', label = 'Δημόσια εγγραφή χρηστών (Auth)';
+  try {
+    const res = await fetcher(`${AUTH_URL}/auth/v1/settings`, { headers: { apikey: ANON_KEY } });
+    if (!res.ok) return { id, label, status: 'unverified', detail: `Ο έλεγχος δεν ολοκληρώθηκε (HTTP ${res.status}).` };
+    const j = await res.json() as { disable_signup?: unknown };
+    if (j.disable_signup === true) return { id, label, status: 'verified', detail: 'Η δημόσια εγγραφή είναι απενεργοποιημένη· λογαριασμούς δημιουργούν μόνο οι διαχειριστές.' };
+    if (j.disable_signup === false) return { id, label, status: 'action', detail: 'Η δημόσια εγγραφή είναι ΕΝΕΡΓΗ στο Auth. Απενεργοποιήστε την (Authentication → Sign In / Providers → «Allow new users to sign up»). Οι νέοι λογαριασμοί μένουν ανενεργοί, αλλά δεν πρέπει να δημιουργούνται.' };
+    return { id, label, status: 'unverified', detail: 'Το Auth δεν επέστρεψε τη ρύθμιση.' };
+  } catch {
+    return { id, label, status: 'unverified', detail: 'Ο έλεγχος δεν ολοκληρώθηκε (δίκτυο).' };
+  }
+}
 
 /** Run the anonymous-visitor checks. Exported for the overview card. */
 export async function runAnonChecks(): Promise<{ at: string; results: CheckResult[] }> {
@@ -33,6 +54,7 @@ export async function runAnonChecks(): Promise<{ at: string; results: CheckResul
   results.push(fErr || (files ?? []).length === 0
     ? { id: 'storage', label: 'Ανώνυμος επισκέπτης → αρχεία φόρμας (hlektrismos_docs)', status: 'verified', detail: 'Δεν επιστράφηκε λίστα αρχείων.' }
     : { id: 'storage', label: 'Ανώνυμος επισκέπτης → αρχεία φόρμας (hlektrismos_docs)', status: 'action', detail: 'Ο ανώνυμος επισκέπτης είδε λίστα αρχείων.' });
+  results.push(await checkPublicSignup());
   const out = { at: new Date().toISOString(), results };
   try { localStorage.setItem(STORE, JSON.stringify(out)); } catch { /* ignore */ }
   return out;
@@ -57,7 +79,6 @@ export const SOURCE_FINDINGS: CheckResult[] = [
 export const UNVERIFIED: CheckResult[] = [
   { id: 'rls-all', label: 'RLS σε όλους τους πίνακες για συνδεδεμένους χρήστες ανά ρόλο', status: 'unverified', detail: 'Απαιτεί έλεγχο με πραγματικούς λογαριασμούς ανά ρόλο στο staging.' },
   { id: 'mfa', label: 'MFA για διαχειριστές', status: 'unverified', detail: 'Δεν έχει ελεγχθεί η ρύθμιση του Supabase Auth.' },
-  { id: 'signup', label: 'Απενεργοποιημένες δημόσιες εγγραφές (Auth)', status: 'unverified', detail: 'Ρύθμιση του Supabase dashboard· ο server έχει backstop (νέοι λογαριασμοί ανενεργοί).' },
   { id: 'backups', label: 'Αντίγραφα ασφαλείας & δοκιμή επαναφοράς', status: 'unverified', detail: 'Δεν έχει γίνει δοκιμή επαναφοράς.' },
   { id: 'functions', label: 'Edge functions: εκδόσεις & μυστικά', status: 'unverified', detail: 'Δεν έχει συγκριθεί η αναπτυγμένη έκδοση με το repository.' },
 ];

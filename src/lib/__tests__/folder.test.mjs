@@ -19,7 +19,7 @@ test('badge: computed, one of four, never typed in', () => {
 });
 
 test('tabs: the same order everywhere; Back Office only for roles that have it', () => {
-  const order = ['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές', 'Back Office'];
+  const order = ['Σύνοψη', 'Έγγραφα', 'Υποθέσεις', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές', 'Back Office'];
   assert.deepEqual(F.folderTabs({ backOffice: true }).map((t) => t.label), order);
   assert.deepEqual(F.folderTabs({ backOffice: false }).map((t) => t.label), order.slice(0, -1));
   // the five case tabs plus documents are scoped to the selected case
@@ -28,7 +28,7 @@ test('tabs: the same order everywhere; Back Office only for roles that have it',
 });
 
 test('«Παροχές» is a customer tab right after Σύνοψη; an unconverted lead has no such tab; it needs no case', () => {
-  const withSupply = ['Σύνοψη', 'Παροχές', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές', 'Back Office'];
+  const withSupply = ['Σύνοψη', 'Παροχές', 'Έγγραφα', 'Υποθέσεις', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές', 'Back Office'];
   assert.deepEqual(F.folderTabs({ backOffice: true, supply: true }).map((t) => t.label), withSupply);
   assert.deepEqual(F.folderTabs({ backOffice: false, supply: true }).map((t) => t.label), withSupply.slice(0, -1));
   assert.ok(!F.folderTabs({ backOffice: true }).some((t) => t.id === 'supply'), 'the lead folder never gets it');
@@ -94,4 +94,14 @@ test('consent on the case (B1): the same component as on the lead and the custom
   assert.ok(/\{c\.customer_id && <ContactEligibility subject=\{\{ phone: c\.customer\?\.phone \?\? null, email: c\.customer\?\.email \?\? null, customerId: c\.customer_id \}\} \/>\}/.test(kase));
   // the component keeps the rule: hidden for non-admins while the check is unavailable
   assert.ok(/error === CONTACT_CHECK_UNAVAILABLE && role !== 'admin'\) return null/.test(read('../../components/contact/ContactEligibility.tsx')));
+});
+
+test('the case screen uses the same folder tabs as the lead and the customer (one list, one order)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  for (const f of ['../../components/app/CaseDetailPage.tsx', '../../components/customers/CustomerDetail.tsx', '../../components/leads/LeadDetail.tsx']) {
+    assert.match(read(f), /folderTabs\(/, `${f} builds its tabs from lib/folder.ts`);
+  }
+  assert.doesNotMatch(read('../../components/app/CaseDetailPage.tsx'), /id: 'timeline'/, 'no private tab list left on the case screen');
 });

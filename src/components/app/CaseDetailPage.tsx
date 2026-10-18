@@ -13,7 +13,11 @@ import { stageText, visitedStages } from '@/lib/case-flow';
 import { reopenAvailable, reopenCompletedCase, setCaseStage, stageSetAvailable } from '@/lib/api';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
-import { canOpenFolder } from '@/lib/folder';
+import { canOpenFolder, folderTabs } from '@/lib/folder';
+import type { FolderTab } from '@/lib/folder';
+import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
+import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
+import { journeySteps } from '@/lib/case-flow';
 import { casePatch, contactFormFrom, contactNameOk, contactSaveError, customerPatch } from '@/lib/contact-save';
 import type { ContactForm } from '@/lib/contact-save';
 import { APPLICATION_STATUS_TEXT, OFFER_STATUS_TEXT, SIGNATURE_STATUS_TEXT, statusText } from '@/lib/status-text';
@@ -30,7 +34,7 @@ import {
   Case, CaseDocument, CaseOffer, CaseSignature, CaseVisit, FollowUp, Lead, TimelineEvent,
   addActivity, captureSignature, changeStage, checkInVisit, checkOutVisit,
   completeFollowUp, createFollowUp, createOffer, createVisit, fetchCase, fetchDocuments,
-  fetchFollowUps, fetchLead, fetchOffers, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
+  fetchCases, fetchFollowUps, fetchLead, fetchOffers, fetchSupplyPoints, fetchTariffCategories, fetchSignatures, fetchTimeline, fetchVisits, getDocumentUrl,
   getPosition,
   markOfferSent, setDocumentStatus, setSignatureStatus, snoozeFollowUp, syncLeadsFromCustomer, updateCase, updateCustomer, customerNamesAvailable,
   uploadDocumentFile,
@@ -39,8 +43,8 @@ import {
   Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner, fmtDate, fmtDateTime, fmtMoney,
 } from '@/lib/ui';
 import {
-  ArrowLeft, CalendarClock, Camera, Check, CheckCircle2, ClipboardCheck,
-  Crosshair, FileText, FolderOpen, LogIn, LogOut, Mail, MapPin, MessageCircle, MessageSquare,
+  ArrowLeft, CalendarClock, Camera, Check, CheckCircle2,
+  Crosshair, FileText, LogIn, LogOut, Mail, MapPin, MessageCircle, MessageSquare,
   Pencil, PenLine, Phone, Plus, Send, StickyNote, X,
 } from 'lucide-react';
 import type { IconType } from '@/lib/ui';
@@ -736,6 +740,64 @@ export function BackOfficeTab({ c, reload }: { c: Case; reload: () => void }) {
   );
 }
 
+/* ================= Folder tabs that belong to the customer (the case page shows the same folder tabs) ================= */
+function CaseSupplyPanel({ c, lead, canEdit }: { c: Case; lead: Lead | null; canEdit: boolean }) {
+  const [data, setData] = useState<{ points: SupplyPoint[] | null; tariffs: TariffCategory[] | null; cases: Case[]; docs: (CaseDocument & { case_no: string })[] } | undefined>(undefined);
+  const load = useCallback(async () => {
+    if (!c.customer_id) return;
+    const [points, tariffs, all] = await Promise.all([fetchSupplyPoints(c.customer_id), fetchTariffCategories(), fetchCases({ includeDone: true })]);
+    const cases = all.filter(k => k.customer_id === c.customer_id);
+    const docs = (await Promise.all(cases.map(async k => (await fetchDocuments(k.id)).map(d => ({ ...d, case_no: k.case_no }))))).flat();
+    setData({ points, tariffs, cases, docs });
+  }, [c.customer_id]);
+  useEffect(() => { void load(); }, [load]);
+  return (
+    <SupplyPointsTab owner={{ customerId: c.customer_id! }} points={data === undefined ? undefined : data.points} tariffs={data?.tariffs ?? null}
+      cases={data?.cases ?? []} docs={data?.docs ?? []} leadFiles={lead ? toLeadFiles(lead.attached_files).filter(f => f.supply_point_id) : []}
+      canEdit={canEdit} reload={() => void load()} />
+  );
+}
+
+/** «Υποθέσεις»: every case of this customer, this one marked; the others open from here. */
+function CustomerCasesPanel({ c }: { c: Case }) {
+  const { openCase } = useNav();
+  const [cases, setCases] = useState<Case[] | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void fetchCases({ includeDone: true }).then(all => {
+      if (!alive) return;
+      setCases(c.customer_id ? all.filter(k => k.customer_id === c.customer_id).sort((x, y) => +new Date(y.created_at) - +new Date(x.created_at)) : [c]);
+    });
+    return () => { alive = false; };
+  }, [c]);
+  return (
+    <div className="atx-panel" data-folder-cases>
+      {cases === undefined ? <div className="atx-skeleton" aria-hidden="true" />
+        : cases === null || cases.length === 0 ? <div className="atx-empty"><strong>Καμία υπόθεση</strong></div>
+        : (
+          <ul className="m-0 p-0 list-none">
+            {cases.map(k => {
+              const { steps, outcome } = journeySteps(k.current_stage, []);
+              const n = steps.filter(x => x.state === 'done').length;
+              const here = k.id === c.id;
+              return (
+                <li key={k.id} className="atx-row">
+                  <span className="atx-icon" aria-hidden="true"><FileText size={16} /></span>
+                  <span className="atx-row-main">
+                    <span className="atx-row-title">{SERVICES[k.service_type] ?? k.service_type} · {k.case_no}{here ? <span className="font-normal text-[var(--atx-muted)]"> · αυτή η υπόθεση</span> : null}</span>
+                    <span className="atx-row-sub">{outcome ? `Έκλεισε: ${stageText(outcome)}` : `${stageText(k.current_stage)} · βήμα ${Math.min(n + 1, 9)} από 9`}</span>
+                  </span>
+                  <span className="atx-row-when">{k.value > 0 ? fmtMoney(k.value) : 'Χωρίς αξία'}</span>
+                  {!here && <button className="atx-btn atx-btn-quiet" onClick={() => openCase(k.id)}>Άνοιγμα</button>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+    </div>
+  );
+}
+
 /* ================= Main ================= */
 export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const { role, user } = useAuth();
@@ -743,7 +805,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const [c, setC] = useState<Case | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const websiteFiles = useMemo(() => toLeadFiles(lead?.attached_files), [lead]);
-  const [tab, setTab] = useState<'timeline' | 'followups' | 'docs' | 'visits' | 'offers' | 'signatures' | 'backoffice'>('timeline');
+  const [tab, setTab] = useState<FolderTab>('overview');
   const [stagePending, setStagePending] = useState<Stage | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
@@ -816,18 +878,11 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
   const isBO = can(role, 'create_application');
   const checklist = buildChecklist(c, docs);
 
-  const tabs: { id: typeof tab; label: string; icon: IconType }[] = [
-    { id: 'timeline', label: 'Ιστορικό', icon: CalendarClock },
-    { id: 'followups', label: 'Follow-ups', icon: CalendarClock },
-    { id: 'docs', label: 'Έγγραφα', icon: FolderOpen },
-    { id: 'visits', label: 'Επισκέψεις', icon: MapPin },
-    { id: 'offers', label: 'Προσφορές', icon: FileText },
-    { id: 'signatures', label: 'Υπογραφές', icon: PenLine },
-  ];
-  if (isBO) tabs.push({ id: 'backoffice', label: 'Back Office', icon: ClipboardCheck });
+  // Same tabs, same order and same labels as the customer and lead folders (lib/folder.ts). «Παροχές» belongs to the customer.
+  const tabs = folderTabs({ backOffice: isBO, supply: !!c.customer_id });
 
   return (
-    <div className="atx-page space-y-5" style={{ maxWidth: 1120 }}>
+    <div className="atx-page space-y-5" style={{ maxWidth: 1040 }} data-folder="case">
       <button className="atx-link inline-flex items-center gap-1" onClick={() => go('cases')}><ArrowLeft size={15} /> Επιστροφή στα cases</button>
 
       {/* Identity */}
@@ -838,7 +893,7 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
         <div className="flex-1 min-w-[220px]">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="atx-title" style={{ fontSize: 28 }}>{c.customer?.full_name ?? c.title}</h1>
-            <span className={`atx-tag ${['lost', 'cancelled'].includes(c.current_stage) ? 't-danger' : c.current_stage === 'completed' ? 't-success' : 't-info'}`}>{stageText(c.current_stage)}</span>
+            <span className={`atx-tag ${['lost', 'cancelled'].includes(c.current_stage) ? 't-danger' : c.current_stage === 'completed' ? 't-success' : 't-info'}`} data-folder-badge="case">{stageText(c.current_stage)}</span>
             {(c.priority === 'high' || c.priority === 'critical') && <span className="atx-tag t-danger">{c.priority === 'critical' ? 'Κρίσιμο' : 'Υψηλή προτεραιότητα'}</span>}
           </div>
           <p className="atx-sub" style={{ marginTop: 2 }}>
@@ -852,6 +907,17 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
         </div>
       </div>
 
+      {/* Tabs: same order and labels as the customer and lead folders */}
+      <div className="atx-pagetabs" role="tablist" aria-label="Ενότητες φακέλου">
+        {tabs.map(t => (
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className="atx-pagetab" onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <div className="space-y-5" data-case-overview>
       <CaseProgress c={c} allowedNext={allowedNext} canChange={canChange} onPick={setStagePending} visited={stageHistory ? visitedStages(stageHistory, c.current_stage) : null} />
 
       <CaseSupplyHint c={c} onLinked={() => void reload()} />
@@ -961,18 +1027,13 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
 
       </div>
 
-      {/* Tabs */}
-      <div className="atx-pagetabs" role="tablist" aria-label="Ενότητες case">
-        {tabs.map(t => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} className="atx-pagetab" onClick={() => setTab(t.id)}>
-            <t.icon className="w-4 h-4" aria-hidden="true" /> {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'timeline' && <TimelineTab caseId={c.id} load={reload} />}
-      {tab === 'followups' && <FollowUpsTab caseId={c.id} load={reload} />}
+        </div>
+      )}
+      {tab === 'supply' && c.customer_id && <CaseSupplyPanel c={c} lead={lead} canEdit={can(role, 'edit_case')} />}
       {tab === 'docs' && <CaseDocuments c={c} onChanged={reload} leadFiles={websiteFiles} />}
+      {tab === 'cases' && <CustomerCasesPanel c={c} />}
+      {tab === 'history' && <TimelineTab caseId={c.id} load={reload} />}
+      {tab === 'followups' && <FollowUpsTab caseId={c.id} load={reload} />}
       {tab === 'visits' && <VisitsTab c={c} />}
       {tab === 'offers' && <OffersTab caseId={c.id} />}
       {tab === 'signatures' && <SignaturesTab caseId={c.id} />}

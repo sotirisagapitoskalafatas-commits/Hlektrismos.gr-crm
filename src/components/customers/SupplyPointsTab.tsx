@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { Plus, Zap } from 'lucide-react';
-import { archiveSupplyPoint, createSupplyPoint, findSupplyDuplicates, flagSupplyReview, linkCaseToSupplyPoint, linkDocumentToSupplyPoint, resolveSupplyReview, saveTariffCategory, updateSupplyPoint } from '@/lib/api';
+import { archiveSupplyPoint, createLeadSupplyPoint, createSupplyPoint, findSupplyDuplicates, flagSupplyReview, linkCaseToSupplyPoint, linkDocumentToSupplyPoint, resolveSupplyReview, saveTariffCategory, updateSupplyPoint } from '@/lib/api';
 import type { Case, CaseDocument, SupplyDuplicate } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
@@ -288,7 +288,7 @@ function TariffListEditor({ tariffs, onChanged }: { tariffs: TariffCategory[]; o
 }
 
 /* One connection. `position` is its number among the active ones; an archived connection has none. */
-export function SupplyPointCard({ point, position, canEdit, canReview, tariffs, onChanged, links }: { point: SupplyPoint; position: number | null; canEdit: boolean; canReview: boolean; tariffs: TariffCategory[] | null; onChanged: () => void; links: Links }) {
+export function SupplyPointCard({ point, position, canEdit, canReview, tariffs, onChanged, links }: { point: SupplyPoint; position: number | null; canEdit: boolean; canReview: boolean; tariffs: TariffCategory[] | null; onChanged: () => void; links?: Links }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -329,7 +329,7 @@ export function SupplyPointCard({ point, position, canEdit, canReview, tariffs, 
         {point.notes && (<><dt className="text-[var(--atx-muted)]">Σημειώσεις</dt><dd className="m-0 font-medium whitespace-pre-line" data-supply-field="notes">{point.notes}</dd></>)}
       </dl>
       {!archived && <DuplicateNotice point={point} canEdit={canEdit} canReview={canReview} onChanged={onChanged} />}
-      {!archived && <SupplyLinks point={point} links={links} canEdit={canEdit} />}
+      {!archived && links && <SupplyLinks point={point} links={links} canEdit={canEdit} />}
       {editing && !archived && <SupplyPointEditor point={point} tariffs={tariffs} onSaved={() => { setEditing(false); onChanged(); }} onCancel={() => setEditing(false)} />}
       {canEdit && !archived && !confirming && !editing && <button className="atx-link mt-3 !p-0 text-[13px]" onClick={() => setConfirming(true)} data-sp-archive>Αρχειοθέτηση παροχής</button>}
       {canEdit && confirming && (
@@ -343,11 +343,12 @@ export function SupplyPointCard({ point, position, canEdit, canReview, tariffs, 
   );
 }
 
-export default function SupplyPointsTab({ customerId, points, tariffs, cases, docs, canEdit, reload }: {
-  customerId: string;
-  /** this customer's cases and their documents, for the links on each card */
-  cases: Case[];
-  docs: DocRow[];
+export default function SupplyPointsTab({ owner, points, tariffs, cases = [], docs = [], canEdit, reload }: {
+  /** a customer's folder, or a lead (connections on a lead move to the customer when it is converted) */
+  owner: { customerId: string } | { leadId: string };
+  /** this customer's cases and their documents, for the links on each card (not used on a lead: it has no case yet) */
+  cases?: Case[];
+  docs?: DocRow[];
   /** undefined = still loading; null = the SQL is not applied yet */
   points: SupplyPoint[] | null | undefined;
   /** the configurable category list; null = unavailable (the field becomes plain text) */
@@ -369,11 +370,12 @@ export default function SupplyPointsTab({ customerId, points, tariffs, cases, do
 
   const active = points.filter(p => !p.archived_at);
   const archived = points.filter(p => !!p.archived_at);
-  const links: Links = { points, cases, docs, reload };
+  // a lead has no case or case documents yet: the links section is only for a customer's connections
+  const links: Links | undefined = 'leadId' in owner ? undefined : { points, cases, docs, reload };
   const add = async (usage: SupplyUsage) => {
     if (busy) return;
     setBusy(true);
-    const r = await createSupplyPoint(customerId, emptyDraft(usage));
+    const r = 'leadId' in owner ? await createLeadSupplyPoint(owner.leadId, emptyDraft(usage)) : await createSupplyPoint(owner.customerId, emptyDraft(usage));
     setBusy(false);
     setChoosing(false);
     if (r.error) { toast(r.error, 'bad'); return; }

@@ -1,6 +1,6 @@
 # Apply order — every staged SQL file not yet on live
 
-**One list, in the exact order to run them.** 22 files (21 numbered steps and step 2b, added by the security audit), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
+**One list, in the exact order to run them.** 25 files (22 numbered steps, plus 2b, 2c and 3b added by the security audit and the account/visibility work), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
 ## Before step 1
@@ -15,7 +15,7 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 - **Step 3 (phase2/05):** deploy the edge function `admin-users` (`supabase functions deploy admin-users`; needs `SUPABASE_SERVICE_ROLE_KEY`, `SITE_URL`; invites need Auth e-mail/SMTP).
 - **Step 6 (phase1/04):** owner pre-steps in the file (`CRON_SECRET` and the Vault entries).
 - **Step 17 (phase3/08):** deploy the rewritten `scrape-b2b` **after** the SQL; check which version is live first (the GitHub integration redeploys listed functions on merge).
-- **Decide before steps 3 and 9:** the role model (`docs/product/ROLE_MODEL.md`); both are written for the current five roles. The master prompt v3 (PR #91) describes two roles; that is **not started** and needs your go-ahead.
+- **Roles:** the database keeps the five roles. The two application roles of the master prompt v3 (Back Office / Admin, Πωλήτης) are a **mapping** in the admin screens plus steps 3b and 22; the role model is `docs/product/ROLE_MODEL.md`.
 
 ---
 
@@ -47,6 +47,15 @@ select exists (select 1 from pg_policies where schemaname='public' and tablename
 select count(*) > 0 from pg_policies where schemaname='public' and policyname='anon never (restrictive)';
 ```
 
+## 2c. `phase4/19_staff_only_legacy_tables.sql` — security (new, from the security audit F-08)
+- **Depends on:** nothing (uses `is_staff()`). **Additive:** one RESTRICTIVE «staff only» policy per legacy table; nothing dropped or rewritten.
+- **Unlocks on screen:** nothing visible. A **deactivated** account (or any signed-in user without an active profile) can no longer read or write ~30 older tables (campaigns, calendar, chat, voice calls, lead notes, tasks …). Active staff see exactly what they saw before.
+- **Rollback:** [`rollback_phase4_19_staff_only_legacy_tables.sql`](rollback_phase4_19_staff_only_legacy_tables.sql).
+- **Check:**
+```sql
+select count(*) > 0 from pg_policies where schemaname='public' and policyname='staff only (restrictive)';
+```
+
 ## 3. `phase2/05_staff_admin_and_role_preview.sql` — security
 - **Depends on:** the role-model decision (see above); then deploy `admin-users`.
 - **Unlocks on screen:** no more self-promotion to admin; user management (Χρήστες & Ρόλοι) becomes editable; managers can no longer read credential rows in `crm_settings`.
@@ -54,6 +63,16 @@ select count(*) > 0 from pg_policies where schemaname='public' and policyname='a
 - **Check:**
 ```sql
 select exists (select 1 from pg_trigger where tgname='profiles_guard_privileged') as applied;
+```
+
+## 3b. `phase4/17_admin_only_staff_provisioning.sql` — security / roles (queue item 4, master prompt §2.4)
+- **Depends on:** step 3 (re-defines `staff_admin_can()` created there). **Additive:** one function body replaced; no drop, rename or data change.
+- **Unlocks on screen:** only administrators create users, change roles, disable accounts (Admin Center → Χρήστες & Ρόλοι). Managers and Back Office keep the read-only team list. Deploy the edge function `admin-users` again (new action `reset`: password-recovery e-mail).
+- **Rollback:** [`rollback_phase4_17_admin_only_staff_provisioning.sql`](rollback_phase4_17_admin_only_staff_provisioning.sql) (restores the step-3 matrix).
+- **If step 3 is ever re-applied, apply this step again afterwards.** Guide: [`ADMIN_PROVISIONING.md`](ADMIN_PROVISIONING.md).
+- **Check:**
+```sql
+select position('a.role = ''manager''' in pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure)) = 0;
 ```
 
 ## 4. `phase1/03_drop_exec_sql.sql` — security
@@ -223,3 +242,15 @@ select to_regprocedure('public.import_legacy_leads(boolean)') is not null as app
 
 ### Why this order
 Security first (1–6): they close live findings and nothing on screen depends on them. Then the data-correctness fix (7, D1) before more leads are converted. Then workflow features that are independent of each other (8–16). Compliance (17–18) before any outreach. The new supply points (19–20) need nothing above, but 20 needs 19; the legacy import (21) goes last so that everything it lands in (leads, consent rules, the new lead-side connections) already exists.
+
+## 22. `phase4/18_sales_own_records_scope.sql` — roles / visibility (queue item 5, security audit F-04), **after steps 19–20**
+- **Depends on:** the CRM tables (`leads`, `cases`, `customers`, …) and, to cover the connections too, steps 19–20 (`customer_supply_points`) — **a table that does not exist yet is skipped, so apply this after them (or run it again afterwards; it is idempotent)**.
+- **Additive:** RESTRICTIVE policies only (AND-ed with the existing ones); nothing dropped or rewritten. SECURITY DEFINER functions (conversion, routing, trash, import, duplicate signal) are unaffected.
+- **Unlocks on screen:** Inside Sales and Field Sales see **only their own** leads, cases, customers, follow-ups, documents, visits and connections (own = assigned to me / created by me / I am an owner of the case). Unassigned leads are visible to Back Office / Admin only. Back Office, Manager and Admin see everything. Admin Center → Επισκόπηση shows «Ορατότητα πωλητών: Μόνο τα δικά τους».
+- **Before you apply on live:** check with two real sales accounts on staging that the daily screens (Αρχική, Η εργασία μου, Leads, Cases, Πελάτες, Ημέρα μου) still show their work; `docs/ops/ADMIN_PROVISIONING.md` explains the accounts.
+- **Rollback:** [`rollback_phase4_18_sales_own_records_scope.sql`](rollback_phase4_18_sales_own_records_scope.sql).
+- **Check:**
+```sql
+select exists (select 1 from pg_policies where schemaname='public' and tablename='leads' and policyname='sales own records (restrictive)');
+```
+

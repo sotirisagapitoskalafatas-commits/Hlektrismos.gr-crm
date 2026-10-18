@@ -10,6 +10,7 @@ from (values
   ('phase1/16_storage_docs_lockdown',          exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'website uploads contact forms')
                                                and not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'hlektrismos_docs_anon_select'), 'storage policies'),
   ('phase1/17_anon_restrictive_lockdown',     exists (select 1 from pg_policies where schemaname = 'public' and policyname = 'anon never (restrictive)'), 'restrictive policy «anon never (restrictive)»'),
+  ('phase4/19_staff_only_legacy_tables',      exists (select 1 from pg_policies where schemaname = 'public' and policyname = 'staff only (restrictive)'), 'restrictive policy «staff only (restrictive)»'),
   ('phase2/05_staff_admin_and_role_preview',   exists (select 1 from pg_trigger where tgname = 'profiles_guard_privileged'), 'trigger profiles_guard_privileged'),
   ('phase2/06_trash_leads_customers',          exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'leads' and column_name = 'deleted_at'), 'column leads.deleted_at'),
   ('phase2/07a_document_checklist_and_return', to_regprocedure('public.return_case_for_correction(uuid,text,jsonb,text)') is not null, 'function return_case_for_correction'),
@@ -25,7 +26,9 @@ from (values
   ('phase4/12_default_backoffice_assignee',    exists (select 1 from pg_proc where proname = 'route_lead_to_backoffice'), 'function route_lead_to_backoffice'),
   ('phase4/13_case_exception_state',           exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'cases' and column_name = 'exception_state'), 'column cases.exception_state'),
   ('phase4/14_follow_up_kind',                 exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'follow_ups' and column_name = 'kind'), 'column follow_ups.kind'),
-  ('phase4/15_convert_lead_match_phone_only',  exists (select 1 from pg_proc where proname = 'customer_match_phone'), 'function customer_match_phone')
+  ('phase4/15_convert_lead_match_phone_only',  exists (select 1 from pg_proc where proname = 'customer_match_phone'), 'function customer_match_phone'),
+  ('phase4/17_admin_only_staff_provisioning',  exists (select 1 from pg_proc where proname = 'staff_admin_can') and position('a.role = ''manager''' in pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure)) = 0, 'staff_admin_can() is admin-only'),
+  ('phase4/18_sales_own_records_scope',        exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'leads' and policyname = 'sales own records (restrictive)'), 'restrictive policy «sales own records (restrictive)» on leads')
 ) as f(file, applied, marker)
 order by f.file;
 

@@ -16,6 +16,8 @@ import type { StaffAuditRow, StaffMember, StaffSource } from '@/lib/staff-admin'
 import StaffAdmin from './StaffAdmin';
 import AdminSecurity, { CheckList } from './AdminSecurity';
 import { SOURCE_FINDINGS, lastAnonChecks } from '@/lib/admin-checks';
+import { fetchSalesScope } from '@/lib/sales-scope';
+import type { SalesScope } from '@/lib/sales-scope';
 import { DocumentsTab, PermissionsTab, WorkflowTab } from './AdminReference';
 import ScraperSettingsCard from './ScraperSettings';
 import { TrashTab } from '@/components/trash/TrashControls';
@@ -79,8 +81,10 @@ export default function AdminCenter() {
 function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => void }) {
   const [staff, setStaff] = useState<{ rows: StaffMember[]; source: StaffSource } | null>(null);
   const [keySet, setKeySet] = useState<boolean | null | 'n/a'>(null);
+  const [scope, setScope] = useState<SalesScope | null | 'loading'>('loading');
   useEffect(() => {
     let alive = true;
+    if (role === 'admin' || role === 'manager') void fetchSalesScope().then(s => alive && setScope(s));
     void listStaff().then(r => alive && setStaff({ rows: r.rows, source: r.source }));
     if (role === 'admin' || role === 'manager') void fetchScraperSettings().then(s => alive && setKeySet(s ? s.keySet : 'n/a'));
     return () => { alive = false; };
@@ -102,6 +106,16 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
           <span className={`atx-ov-v ${staff?.source === 'server' ? '' : 'is-warn'}`}>{!staff ? '…' : staff.source === 'server' ? 'Ενεργή' : 'Εκκρεμεί'}</span>
           <span className="atx-ov-s">{staff?.source === 'server' ? 'Ο server απαντά στις ενέργειες διαχείρισης.' : pendingText(role, 'Εκκρεμεί η ενημέρωση της βάσης «Διαχείριση χρηστών» (phase2/05) και η function admin-users.', 'Η διαχείριση χρηστών ενεργοποιείται μετά την επόμενη ενημέρωση.')}</span>
         </button>
+        {(role === 'admin' || role === 'manager') && (
+          <button type="button" className="atx-ov" data-testid="sales-scope" onClick={() => onOpen('users')}>
+            <span className="atx-ov-k">Ορατότητα πωλητών</span>
+            <span className={`atx-ov-v ${scope === 'loading' ? '' : scope?.enabled ? 'is-ok' : 'is-warn'}`}>{scope === 'loading' ? '…' : scope === null ? 'Εκκρεμεί' : scope.enabled ? 'Μόνο τα δικά τους' : 'Βλέπουν όλα'}</span>
+            <span className="atx-ov-s">{scope === 'loading' ? ' ' : scope === null
+              ? pendingText(role, 'Εκκρεμεί η ενημέρωση βάσης «Ορατότητα πωλητών» (phase4/18): μέχρι τότε οι πωλητές βλέπουν όλα τα leads, cases και πελάτες.')
+              : scope.enabled ? 'Οι Inside και Field Sales βλέπουν μόνο τα δικά τους leads, cases και πελάτες· Back Office / Admin βλέπουν όλα.'
+                : 'Η ορατότητα δεν είναι ενεργή: οι πωλητές βλέπουν όλα τα δεδομένα.'}</span>
+          </button>
+        )}
         {role === 'admin' && (
           <button type="button" className="atx-ov" onClick={() => onOpen('security')}>
             <span className="atx-ov-k">Έλεγχοι ανώνυμης πρόσβασης</span>

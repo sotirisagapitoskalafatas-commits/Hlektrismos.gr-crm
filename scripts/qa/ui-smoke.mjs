@@ -1116,6 +1116,89 @@ if (!PREVIEW_LIVE) {
   await browser.close();
 }
 
+/* ---- 2j. Lead screen: «Παροχές» tab — the lead's connections can be added and edited there too (staged phase5/17 + 18) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const post = async (table, body) => (await (await fetch(`${M}/rest/v1/${table}`, { method: 'POST', headers: H, body: JSON.stringify(body) })).json())[0];
+  const get = async (q) => (await fetch(`${M}/rest/v1/${q}`, { headers: H })).json();
+  const logs = async () => (await (await fetch(`${M}/__log`)).json());
+  const clickSel = (page, sel) => page.evaluate((q) => { const el = document.querySelector(q); el && el.click(); return !!el; }, sel);
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const wipe = async () => { await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H }); };
+  const mkLead = (name) => post('leads', { client_name: name, client_contact: '', first_name: name.split(' ')[0], full_name: name, status: 'new', source: 'inside_sales' });
+  const openLead = async (page, name) => {
+    await click(page, 'Leads', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate((n) => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === n)?.click(), name);
+    await sleep(1600);
+  };
+  const cards = (page) => page.evaluate(() => [...document.querySelectorAll('[data-supply-card]')].map((c) => ({ title: c.querySelector('[data-supply-title]')?.textContent ?? '', address: c.querySelector('[data-supply-field="address"]')?.textContent ?? '', links: !!c.querySelector('[data-supply-links]'), dup: c.querySelector('[data-supply-dup]')?.innerText ?? '' })));
+  await fetch(`${M}/__supply?state=on`); await fetch(`${M}/__leadsupply?state=on`);
+  await wipe();
+  const lead = await mkLead('Μαρία Παροχοπούλου');
+  const other = await mkLead('Νίκος Άλλος');
+  const home = await post('customer_supply_points', { lead_id: lead.id, usage: 'residential', property_address: 'Οδός Α 1', supply_number: '12345678901' });
+  const shop = await post('customer_supply_points', { lead_id: lead.id, usage: 'commercial', property_address: 'Οδός Β 2', supply_number: '22222222222', tariff_category_code: 'Γ21' });
+  await post('customer_supply_points', { lead_id: other.id, usage: 'residential', property_address: 'Άλλου lead', supply_number: '12345678901' });
+  await post('customer_supply_points', { customer_id: ATHINA, usage: 'residential', property_address: 'Πελάτη', supply_number: '222 2222 2222' });
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openLead(page, 'Μαρία Παροχοπούλου');
+    const tabs = await page.evaluate(() => [...document.querySelectorAll('main [role="tab"]')].map((b) => ({ label: b.childNodes[0]?.textContent?.trim(), count: b.querySelector('span')?.textContent ?? null })));
+    check('Lead screen: «Παροχές» is right after Σύνοψη, with the number of connections, on the lead (badge «Lead» folder)', tabs[0].label === 'Σύνοψη' && tabs[1].label === 'Παροχές' && tabs[1].count === '2' && (await page.evaluate(() => document.querySelector('[data-folder-badge]')?.textContent)) === 'Lead', JSON.stringify(tabs.slice(0, 3)));
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(900);
+    let c = await cards(page);
+    check('Lead screen: the lead\'s connections are listed as «Παροχή 1 — Οικιακό», «Παροχή 2 — Επαγγελματικό», each with its own address; no case/document links (a lead has no case yet)',
+      c.length === 2 && c[0].title === 'Παροχή 1 — Οικιακό' && c[1].title === 'Παροχή 2 — Επαγγελματικό' && c[0].address.includes('Οδός Α 1') && c[1].address.includes('Οδός Β 2') && c.every((x) => !x.links), JSON.stringify(c.map((x) => [x.title, x.links])));
+    // the duplicate notice finds the other lead AND the customer
+    check('Lead screen: the duplicate notice names the other LEAD for card 1 and the CUSTOMER for card 2, never merging', c[0].dup.includes('Lead: Νίκος Άλλος') && c[1].dup.includes('Αθηνά Κωνσταντίνου') && /δεν συγχωνεύεται/.test(c[0].dup), JSON.stringify([c[0].dup.slice(0, 90), c[1].dup.slice(0, 90)]));
+    // add a connection: owned by the lead, nothing else required
+    await clickSel(page, '[data-supply-add]'); await sleep(300);
+    await clickSel(page, '[data-supply-new="commercial"]'); await sleep(1800);
+    c = await cards(page);
+    const posted = (await logs()).filter((l) => l.method === 'POST' && l.table === 'customer_supply_points').pop()?.body;
+    check('Lead screen: «+ Νέα παροχή» adds a connection OWNED BY THE LEAD (lead_id, no customer, nothing else required)', c.length === 3 && c[2].title === 'Παροχή 3 — Επαγγελματικό' && posted.lead_id === lead.id && !('customer_id' in posted) && posted.supply_number === null, JSON.stringify(posted));
+    // edit card 2 only
+    await clickSel(page, '[data-supply-card="2"] [data-sp-edit]'); await sleep(300);
+    await setVal(page, '[data-supply-card="2"] [data-sp-field="address"]', 'Νέα Οδός Β 22');
+    await setVal(page, '[data-supply-card="2"] [data-sp-field="tariff"]', 'Επαγγελματικό Κ');
+    await clickSel(page, '[data-supply-card="2"] [data-sp-save]'); await sleep(1800);
+    const pp = (await logs()).filter((l) => l.method === 'PATCH' && l.table === 'customer_supply_points').pop();
+    const r1 = (await get(`customer_supply_points?id=eq.${home.id}`))[0], r2 = (await get(`customer_supply_points?id=eq.${shop.id}`))[0];
+    check('Lead screen: saving one connection sends one update for that id, never the owner, and the other connection is untouched', pp.query.includes(`id=eq.${shop.id}`) && !('lead_id' in pp.body) && !('customer_id' in pp.body) && r2.property_address === 'Νέα Οδός Β 22' && r2.tariff_name === 'Επαγγελματικό Κ' && r1.property_address === 'Οδός Α 1' && r1.lead_id === lead.id, JSON.stringify(pp.body).slice(0, 120));
+    // the same 11-digit rule and the live hint while editing
+    await clickSel(page, '[data-supply-card="1"] [data-sp-edit]'); await sleep(300);
+    await setVal(page, '[data-supply-card="1"] [data-sp-field="number"]', '222 2222 2222'); await sleep(900);
+    const hint = await page.evaluate(() => document.querySelector('[data-supply-card="1"] [data-sp-dup-hint]')?.innerText ?? '');
+    check('Lead screen: the live duplicate hint works while editing a lead\'s connection', hint.includes('υπάρχει ήδη') && hint.includes('Αθηνά Κωνσταντίνου'), hint);
+    await clickSel(page, '[data-supply-card="1"] [data-sp-cancel]'); await sleep(300);
+    // flag for review, then archive and restore
+    await clickSel(page, '[data-supply-card="1"] [data-sp-flag]'); await sleep(1500);
+    check('Lead screen: «Σήμανση για έλεγχο» marks only that connection', (await get(`customer_supply_points?id=eq.${home.id}`))[0].needs_review === true && (await get(`customer_supply_points?id=eq.${shop.id}`))[0].needs_review === false);
+    await clickSel(page, '[data-supply-card="3"] [data-sp-archive]'); await sleep(200);
+    await clickSel(page, '[data-supply-card="3"] [data-sp-archive-confirm]'); await sleep(1500);
+    const afterArch = await page.evaluate(() => ({ n: document.querySelectorAll('[data-supply-card]:not([data-supply-card="archived"])').length, tab: [...document.querySelectorAll('main [role="tab"]')].find((b) => b.childNodes[0]?.textContent?.trim() === 'Παροχές')?.querySelector('span')?.textContent }));
+    check('Lead screen: archive keeps the row, the count follows (no delete)', afterArch.n === 2 && afterArch.tab === '2' && (await get(`customer_supply_points?lead_id=eq.${lead.id}`)).length === 3, JSON.stringify(afterArch));
+    await browser.close();
+  }
+  // the SQL is not applied: one neutral sentence, the lead screen otherwise works
+  for (const [label, offs] of [['phase5/17 not applied', ['__supply?state=off']], ['phase5/18 not applied', ['__supply?state=on', '__leadsupply?state=off']]]) {
+    for (const u of offs) await fetch(`${M}/${u}`);
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openLead(page, 'Μαρία Παροχοπούλου');
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(900);
+    const st = await page.evaluate(() => ({ note: document.querySelector('[data-supply-unavailable]')?.innerText ?? '', cards: document.querySelectorAll('[data-supply-card]').length, add: !!document.querySelector('[data-supply-add]'), name: document.querySelector('main h1')?.textContent ?? '' }));
+    check(`Lead screen (${label}): the tab is one neutral Greek sentence, no cards or buttons, and the lead screen still works`, st.note.includes('Η λειτουργία δεν είναι ακόμη διαθέσιμη.') && st.cards === 0 && !st.add && st.name.includes('Μαρία') && !/migration|phase|SQL|schema|PGRST|lead_id|relation/i.test(st.note), JSON.stringify(st));
+    await browser.close();
+  }
+  await fetch(`${M}/__supply?state=on`); await fetch(`${M}/__leadsupply?state=on`);
+  await wipe();
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);
@@ -1255,7 +1338,7 @@ for (const w of [1440, 1280, 1024, 820, 390]) {
   check('Lead detail: opens from My Work with the recommended action', (await body()).includes('Προτεινόμενη ενέργεια') && (await body()).includes('Καταγραφή πρώτης επικοινωνίας'));
   {
     const f = await page.evaluate(() => ({ badge: document.querySelector('[data-folder-badge]')?.textContent ?? '', tabs: [...document.querySelectorAll('main [role="tab"]')].map((b) => b.childNodes[0]?.textContent?.trim()) }));
-    check('Lead folder: badge «Lead» and the same tabs as the customer folder (no Back Office for Inside Sales)', f.badge === 'Lead' && JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f));
+    check('Lead folder: badge «Lead» and the same tabs as the customer folder (no Back Office for Inside Sales)', f.badge === 'Lead' && JSON.stringify(f.tabs) === JSON.stringify(['Σύνοψη', 'Παροχές', 'Cases', 'Έγγραφα', 'Ιστορικό', 'Follow-ups', 'Επισκέψεις', 'Προσφορές', 'Υπογραφές']), JSON.stringify(f));
     await click(page, 'Cases', '[role="tab"]'); await sleep(300);
     const need1 = await page.evaluate(() => document.querySelector('[data-needs-case]')?.innerText ?? '');
     await click(page, 'Υπογραφές', '[role="tab"]'); await sleep(300);

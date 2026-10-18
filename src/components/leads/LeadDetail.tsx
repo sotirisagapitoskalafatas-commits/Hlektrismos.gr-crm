@@ -7,7 +7,9 @@ import { ArrowLeft, Clock, FileText, Mail, MapPin, Pencil, Phone, Sparkles } fro
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { can, LEAD_STATUSES, leadSourceInfo, SERVICES } from '@/lib/roles';
-import { convertLeadToCase, fetchCase, fetchEntityActivity, fetchLead, getLeadFileUrl, logAudit, updateLeadStage } from '@/lib/api';
+import { convertLeadToCase, fetchCase, fetchEntityActivity, fetchLead, fetchLeadSupplyPoints, fetchTariffCategories, getLeadFileUrl, logAudit, updateLeadStage } from '@/lib/api';
+import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
+import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import { fileSizeText, leadFiles } from '@/lib/lead-files';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import ContactEligibility from '@/components/contact/ContactEligibility';
@@ -27,6 +29,9 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
   const { go, openCase } = useNav();
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | undefined>(undefined);
+  // «Παροχές» on the lead (staged phase5/17 + 18): undefined = loading, null = the SQL is not applied yet
+  const [supplyPoints, setSupplyPoints] = useState<SupplyPoint[] | null | undefined>(undefined);
+  const [tariffs, setTariffs] = useState<TariffCategory[] | null>(null);
   const [activity, setActivity] = useState<ActivityLogRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [now] = useState(() => Date.now());
@@ -37,9 +42,11 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
   const isStaff = can(role, 'create_case') || (role === 'back_office' && !!lead && lead.assigned_to_user_id === user?.id);
 
   const load = useCallback(async () => {
-    const [l, a] = await Promise.all([fetchLead(leadId), fetchEntityActivity('lead', leadId)]);
+    const [l, a, sp, tc] = await Promise.all([fetchLead(leadId), fetchEntityActivity('lead', leadId), fetchLeadSupplyPoints(leadId), fetchTariffCategories()]);
     setLead(l);
     setActivity(a);
+    setSupplyPoints(sp);
+    setTariffs(tc);
   }, [leadId]);
   useEffect(() => { void load(); }, [load, version]);
 
@@ -121,8 +128,8 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
   ].sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
   const converted = lead.status === 'converted';
-  const tabs = folderTabs({ backOffice: can(role, 'create_application') });
-  const counts: Partial<Record<FolderTab, number>> = { docs: files.length, history: history.length };
+  const tabs = folderTabs({ backOffice: can(role, 'create_application'), supply: true });
+  const counts: Partial<Record<FolderTab, number>> = { docs: files.length, history: history.length, ...(supplyPoints ? { supply: supplyPoints.filter(p => !p.archived_at).length } : {}) };
   const needsCase = tabs.find(t => t.id === tab)?.needsCase ?? false;
 
   return (
@@ -179,6 +186,8 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
       {needsCase && (
         <div className="atx-panel mt-4" data-needs-case><div className="atx-empty"><strong>{FOLDER_TABS.find(t => t.id === tab)?.label}</strong>{NEEDS_CASE_TEXT}</div></div>
       )}
+
+      {tab === 'supply' && <SupplyPointsTab owner={{ leadId: lead.id }} points={supplyPoints} tariffs={tariffs} canEdit={!lead.deleted_at} reload={() => void load()} />}
 
       {tab === 'docs' && (
         files.length > 0 ? (

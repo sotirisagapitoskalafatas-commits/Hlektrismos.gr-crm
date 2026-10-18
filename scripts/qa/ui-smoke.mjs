@@ -162,6 +162,8 @@ if (!PREVIEW_LIVE) {
   check('Security: public sign-up still enabled → «Χρειάζεται ενέργεια»', await page.evaluate(() => document.querySelector('[data-check="signup"]')?.getAttribute('data-status') === 'action'));
   await fetch('http://127.0.0.1:54399/__signup?state=closed');
   check('Security: the profile self-promotion finding is flagged', await page.evaluate(() => document.querySelector('[data-check="profiles-self-promotion"]')?.getAttribute('data-status') === 'action'));
+  await click(page, 'Χρήστες & Ρόλοι', '[role="tab"]');
+  await sleep(1200);
   check('Users: directory with e-mail and status; no actions on your own row', await page.evaluate(() => !!document.querySelector('[data-staff="manager@example.invalid"]') && !document.querySelector('[data-staff="admin@example.invalid"] button[title="Διαγραφή"]')));
   // create (invite)
   await click(page, 'Νέος χρήστης');

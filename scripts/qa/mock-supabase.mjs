@@ -232,6 +232,13 @@ http.createServer((req, res) => {
     if (url.pathname === '/__reopen') { reopenOn = url.searchParams.get('state') !== 'off'; return send(200, { reopenOn }); }
     if (url.pathname === '/__leadsupply') { leadSupplyOn = url.searchParams.get('state') !== 'off'; return send(200, { leadSupplyOn }); }
     if (url.pathname === '/__supplyfail') { supplyFail = url.searchParams.get('state') === 'on'; return send(200, { supplyFail }); }
+    if (url.pathname === '/__dropleads') { // test cleanup: remove the given leads, the cases made from them and the customers those conversions created (in place, the arrays are shared)
+      const ids = (url.searchParams.get('ids') || '').split(',').filter(Boolean);
+      for (let i = caseRows.length - 1; i >= 0; i--) if (ids.includes(caseRows[i].lead_id)) caseRows.splice(i, 1);
+      for (let i = customers.length - 1; i >= 0; i--) if (!/^20000000-0000-4000-8000-00000000000[1-6]$/.test(customers[i].id)) customers.splice(i, 1);
+      for (let i = TABLES.leads.length - 1; i >= 0; i--) if (ids.includes(TABLES.leads[i].id)) TABLES.leads.splice(i, 1);
+      return send(200, { ok: true });
+    }
     if (url.pathname === '/__supply') { supplyOn = url.searchParams.get('state') !== 'off'; return send(200, { supplyOn }); }
     if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }

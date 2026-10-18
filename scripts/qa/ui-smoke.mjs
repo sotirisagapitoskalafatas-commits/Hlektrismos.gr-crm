@@ -1231,6 +1231,7 @@ if (!PREVIEW_LIVE) {
   await wipe();
   // ---- A) the lead form: connections first, then the files tagged to them
   let leadA;
+  const droppable = [];
   {
     const { browser, page } = await launch(1440, 900);
     await signInAs(page, 'inside_sales');
@@ -1255,6 +1256,7 @@ if (!PREVIEW_LIVE) {
     await page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.click());
     await waitClosed(page);
     leadA = (await get('leads?client_name=eq.Κ. Με Έγγραφα Παροχών'))[0];
+    droppable.push(leadA.id);
     const conns = await get(`customer_supply_points?lead_id=eq.${leadA.id}&order=created_at.asc`);
     const files = (await get(`leads?id=eq.${leadA.id}`))[0].attached_files;
     check('Lead form: the connections are saved first, then each file carries the id of ITS connection (the third file is untagged)',
@@ -1300,6 +1302,7 @@ if (!PREVIEW_LIVE) {
   {
     const existing = await post('customer_supply_points', { customer_id: ATHINA, usage: 'residential', property_address: 'Υπάρχουσα του πελάτη', supply_number: '77777777777' });
     const lead = await post('leads', { client_name: 'Αθηνά Από Lead', client_contact: '6900000010', first_name: 'Αθηνά', full_name: 'Αθηνά Από Lead', phone: '6900000010', status: 'qualified', source: 'inside_sales', attached_files: [] });
+    droppable.push(lead.id);
     const dup = await post('customer_supply_points', { lead_id: lead.id, usage: 'residential', property_address: 'Από το lead', supply_number: '777 7777 7777' });
     const extra = await post('customer_supply_points', { lead_id: lead.id, usage: 'commercial', property_address: 'Δεύτερη', supply_number: '88888888888' });
     await fetch(`${M}/rest/v1/leads?id=eq.${lead.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ attached_files: [{ path: 'leads/x/bill.jpg', name: 'bill.jpg', type: 'image/jpeg', size: 1, supply_point_id: dup.id }] }) });
@@ -1323,6 +1326,7 @@ if (!PREVIEW_LIVE) {
     await browser.close();
   }
   await wipe();
+  await fetch(`${M}/__dropleads?ids=${droppable.join(',')}`); // leave the shared mock as we found it (the conversions made cases and a customer)
 }
 
 /* ---- 3. Home and My Work agree; actions really work ---- */

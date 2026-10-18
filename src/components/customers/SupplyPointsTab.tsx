@@ -5,7 +5,9 @@
 import { useEffect, useState } from 'react';
 import { Plus, Zap } from 'lucide-react';
 import { archiveSupplyPoint, createLeadSupplyPoint, createSupplyPoint, findSupplyDuplicates, flagSupplyReview, linkCaseToSupplyPoint, linkDocumentToSupplyPoint, resolveSupplyReview, saveTariffCategory, updateSupplyPoint } from '@/lib/api';
+import { getLeadFileUrl } from '@/lib/api';
 import type { Case, CaseDocument, SupplyDuplicate } from '@/lib/api';
+import type { LeadFile } from '@/lib/lead-files';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { docLabel } from '@/lib/documents';
@@ -17,14 +19,15 @@ import { useToast } from '@/lib/toast';
 import { fmtDate } from '@/lib/ui';
 
 export type DocRow = CaseDocument & { case_no: string };
-type Links = { points: SupplyPoint[]; cases: Case[]; docs: DocRow[]; reload: () => void };
+type Links = { points: SupplyPoint[]; cases: Case[]; docs: DocRow[]; leadFiles: LeadFile[]; reload: () => void };
 
 /* The cases and documents of THIS connection, and the picker to link one more. A case or a document points at one
    connection (of the same customer — the database checks it); linking moves only that pointer. */
 function SupplyLinks({ point, links, canEdit }: { point: SupplyPoint; links: Links; canEdit: boolean }) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
-  const mine = { cases: links.cases.filter(k => k.supply_point_id === point.id), docs: links.docs.filter(d => d.supply_point_id === point.id) };
+  const mine = { cases: links.cases.filter(k => k.supply_point_id === point.id), docs: links.docs.filter(d => d.supply_point_id === point.id), fromLead: links.leadFiles.filter(f => f.supply_point_id === point.id) };
+  const openLeadFile = async (path: string) => { const u = await getLeadFileUrl(path); if (u) window.open(u, '_blank', 'noopener'); else toast('Το αρχείο δεν είναι διαθέσιμο.', 'bad'); };
   const otherCases = links.cases.filter(k => k.supply_point_id !== point.id);
   const otherDocs = links.docs.filter(d => d.supply_point_id !== point.id);
   const where = (id: string | null | undefined) => { const l = supplyLabelFor(links.points, id); return l ? ` (σε ${l})` : ''; };
@@ -63,7 +66,8 @@ function SupplyLinks({ point, links, canEdit }: { point: SupplyPoint; links: Lin
       </div>
       <div data-supply-docs>
         <h3 className="text-[13px] font-semibold m-0 mb-1.5">Έγγραφα της παροχής</h3>
-        {mine.docs.length === 0 ? <p className="m-0 text-[13px] text-[var(--atx-muted)]" data-supply-docs-empty>Κανένα έγγραφο δεν συνδέεται με αυτή την παροχή.</p> : (
+        {mine.docs.length === 0 && mine.fromLead.length === 0 ? <p className="m-0 text-[13px] text-[var(--atx-muted)]" data-supply-docs-empty>Κανένα έγγραφο δεν συνδέεται με αυτή την παροχή.</p> : (
+          <>
           <ul className="m-0 p-0 list-none space-y-1">
             {mine.docs.map(d => (
               <li key={d.id} className={row} data-supply-linked-doc={d.id}>
@@ -72,7 +76,15 @@ function SupplyLinks({ point, links, canEdit }: { point: SupplyPoint; links: Lin
                 {canEdit && <button className="atx-link !p-0 text-[12.5px]" disabled={busy} onClick={() => void run(linkDocumentToSupplyPoint(d.id, null), 'Η σύνδεση αφαιρέθηκε.')} data-sp-unlink-doc>Αφαίρεση σύνδεσης</button>}
               </li>
             ))}
+            {mine.fromLead.map(f => (
+              <li key={f.path} className={row} data-supply-lead-file={f.path}>
+                <span className="font-medium">{f.name}</span>
+                <span className="text-[var(--atx-muted)]">από το lead</span>
+                <button className="atx-link !p-0 text-[12.5px]" onClick={() => void openLeadFile(f.path)} data-sp-open-lead-file>Άνοιγμα</button>
+              </li>
+            ))}
           </ul>
+          </>
         )}
         {canEdit && otherDocs.length > 0 && (
           <select className="field mt-2 !py-1.5 text-[13px]" value="" disabled={busy} aria-label="Σύνδεση εγγράφου" data-sp-link-doc
@@ -343,12 +355,14 @@ export function SupplyPointCard({ point, position, canEdit, canReview, tariffs, 
   );
 }
 
-export default function SupplyPointsTab({ owner, points, tariffs, cases = [], docs = [], canEdit, reload }: {
+export default function SupplyPointsTab({ owner, points, tariffs, cases = [], docs = [], leadFiles = [], canEdit, reload }: {
   /** a customer's folder, or a lead (connections on a lead move to the customer when it is converted) */
   owner: { customerId: string } | { leadId: string };
   /** this customer's cases and their documents, for the links on each card (not used on a lead: it has no case yet) */
   cases?: Case[];
   docs?: DocRow[];
+  /** files that came with the lead and are tagged to one of these connections */
+  leadFiles?: LeadFile[];
   /** undefined = still loading; null = the SQL is not applied yet */
   points: SupplyPoint[] | null | undefined;
   /** the configurable category list; null = unavailable (the field becomes plain text) */
@@ -371,7 +385,7 @@ export default function SupplyPointsTab({ owner, points, tariffs, cases = [], do
   const active = points.filter(p => !p.archived_at);
   const archived = points.filter(p => !!p.archived_at);
   // a lead has no case or case documents yet: the links section is only for a customer's connections
-  const links: Links | undefined = 'leadId' in owner ? undefined : { points, cases, docs, reload };
+  const links: Links | undefined = 'leadId' in owner ? undefined : { points, cases, docs, leadFiles, reload };
   const add = async (usage: SupplyUsage) => {
     if (busy) return;
     setBusy(true);

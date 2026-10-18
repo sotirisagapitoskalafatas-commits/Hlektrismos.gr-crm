@@ -7,9 +7,11 @@ import { SupplyFields } from '@/components/customers/SupplyPointsTab';
 import { SUPPLY_UNAVAILABLE_TEXT, draftErrors, emptyDraft, supplyPointTitle } from '@/lib/supply-points';
 import type { SupplyPointDraft, TariffCategory } from '@/lib/supply-points';
 
-export default function LeadSupplySection({ drafts, setDrafts, tariffs, available, open, setOpen, disabled }: {
+export default function LeadSupplySection({ drafts, setDrafts, onRemove, tariffs, available, open, setOpen, disabled }: {
   drafts: SupplyPointDraft[];
   setDrafts: (next: SupplyPointDraft[]) => void;
+  /** removes connection i (the parent also fixes the file tags that pointed at it) */
+  onRemove?: (i: number) => void;
   tariffs: TariffCategory[] | null;
   /** null = still asking, false = the SQL is not applied yet */
   available: boolean | null;
@@ -38,7 +40,7 @@ export default function LeadSupplySection({ drafts, setDrafts, tariffs, availabl
                   <div key={i} className="p-3 rounded-xl bg-paper border border-line" data-lead-supply-item={i + 1}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[13px] font-semibold flex-1" data-lead-supply-title>{supplyPointTitle(i + 1, d.usage)}</span>
-                      <button type="button" className="atx-link !p-0 text-[12.5px]" disabled={disabled} onClick={() => setDrafts(drafts.filter((_, j) => j !== i))} data-lead-supply-remove>Αφαίρεση</button>
+                      <button type="button" className="atx-link !p-0 text-[12.5px]" disabled={disabled} onClick={() => (onRemove ? onRemove(i) : setDrafts(drafts.filter((_, j) => j !== i)))} data-lead-supply-remove>Αφαίρεση</button>
                     </div>
                     <SupplyFields d={d} set={(k, v) => patch(i, { [k]: v } as Partial<SupplyPointDraft>)} errors={errors} tariffs={tariffs} />
                   </div>

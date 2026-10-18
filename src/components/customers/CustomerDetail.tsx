@@ -315,7 +315,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
         </div>
       )}
 
-      {tab === 'supply' && <SupplyPointsTab owner={{ customerId: cust.id }} points={supplyPoints} tariffs={tariffs} cases={cases} docs={allDocs} canEdit={!cust.deleted_at} reload={() => void load()} />}
+      {tab === 'supply' && <SupplyPointsTab owner={{ customerId: cust.id }} points={supplyPoints} tariffs={tariffs} cases={cases} docs={allDocs} leadFiles={Object.values(leads).flatMap(l => (l ? toLeadFiles(l.attached_files).filter(f => f.supply_point_id) : []))} canEdit={!cust.deleted_at} reload={() => void load()} />}
 
       {tab === 'cases' && (
         <div className="atx-panel">

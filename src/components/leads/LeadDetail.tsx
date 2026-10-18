@@ -11,6 +11,8 @@ import { convertLeadToCase, fetchCase, fetchEntityActivity, fetchLead, fetchLead
 import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import { fileSizeText, leadFiles } from '@/lib/lead-files';
+import { tagLeadFile } from '@/lib/lead-intake';
+import { supplyLabelFor } from '@/lib/supply-points';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import type { ActivityLogRow, Lead } from '@/lib/api';
@@ -202,8 +204,15 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
                   <span className="atx-icon" style={{ width: 30, height: 30 }} aria-hidden="true"><FileText size={14} /></span>
                   <span className="flex-1 min-w-0">
                     <span className="block font-medium truncate">{f.name}</span>
-                    <span className="block text-[12.5px] text-[var(--atx-muted)]">{fileSizeText(f.size) || '—'}</span>
+                    <span className="block text-[12.5px] text-[var(--atx-muted)]">{fileSizeText(f.size) || '—'}{f.supply_point_id && supplyLabelFor(supplyPoints, f.supply_point_id) ? ` · ${supplyLabelFor(supplyPoints, f.supply_point_id)}` : ''}</span>
                   </span>
+                  {supplyPoints && supplyPoints.some(p => !p.archived_at) && !lead.converted_case_id && (
+                    <select className="field !py-1 text-[12.5px] w-48" value={f.supply_point_id ?? ''} aria-label={`Παροχή για το αρχείο ${f.name}`} data-lead-file-tag={f.path}
+                      onChange={e => { void tagLeadFile(lead.id, f.path, e.target.value || null).then(err => { if (err) toast(err, 'bad'); else { toast('Η παροχή του αρχείου αποθηκεύτηκε.', 'ok'); void load(); } }); }}>
+                      <option value="">Χωρίς παροχή</option>
+                      {supplyPoints.filter(p => !p.archived_at).map(p => <option key={p.id} value={p.id}>{supplyLabelFor(supplyPoints, p.id)}</option>)}
+                    </select>
+                  )}
                   {fileUrls[f.path]
                     ? <a className="atx-btn atx-btn-quiet" href={fileUrls[f.path]} target="_blank" rel="noreferrer">Άνοιγμα</a>
                     : <span className="text-[12.5px] text-[var(--atx-faint)]">Μη διαθέσιμο</span>}

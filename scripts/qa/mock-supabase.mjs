@@ -232,6 +232,13 @@ http.createServer((req, res) => {
     if (url.pathname === '/__reopen') { reopenOn = url.searchParams.get('state') !== 'off'; return send(200, { reopenOn }); }
     if (url.pathname === '/__leadsupply') { leadSupplyOn = url.searchParams.get('state') !== 'off'; return send(200, { leadSupplyOn }); }
     if (url.pathname === '/__supplyfail') { supplyFail = url.searchParams.get('state') === 'on'; return send(200, { supplyFail }); }
+    if (url.pathname === '/__dropleads') { // test cleanup: remove the given leads, the cases made from them and the customers those conversions created (in place, the arrays are shared)
+      const ids = (url.searchParams.get('ids') || '').split(',').filter(Boolean);
+      for (let i = caseRows.length - 1; i >= 0; i--) if (ids.includes(caseRows[i].lead_id)) caseRows.splice(i, 1);
+      for (let i = customers.length - 1; i >= 0; i--) if (!/^20000000-0000-4000-8000-00000000000[1-6]$/.test(customers[i].id)) customers.splice(i, 1);
+      for (let i = TABLES.leads.length - 1; i >= 0; i--) if (ids.includes(TABLES.leads[i].id)) TABLES.leads.splice(i, 1);
+      return send(200, { ok: true });
+    }
     if (url.pathname === '/__supply') { supplyOn = url.searchParams.get('state') !== 'off'; return send(200, { supplyOn }); }
     if (url.pathname === '/__contact') { contactOff = url.searchParams.get('state') === 'off'; return send(200, { contactOff }); }
     if (url.pathname === '/__getfail') { getFail = url.searchParams.get('table') || null; return send(200, { getFail }); }
@@ -273,6 +280,27 @@ http.createServer((req, res) => {
       log.push({ method: 'RPC', table: 'convert_lead_to_case', body: json });
       const l = TABLES.leads.find((x) => x.id === json.p_lead_id);
       if (!l) return send(400, { message: 'lead not found' });
+      const mine = supplyOn && leadSupplyOn ? (TABLES.customer_supply_points ?? []).filter((p) => p.lead_id === l.id) : [];
+      if (mine.length) { // a lead WITH connections: a new case on the matched/new customer, then what the staged phase5/18 trigger does
+        const digits = (v) => String(v ?? '').replace(/\D/g, '');
+        const p10 = digits(l.phone).length >= 10 ? digits(l.phone).slice(-10) : null;
+        let cu = p10 ? customers.find((c) => digits(c.phone).length >= 10 && digits(c.phone).slice(-10) === p10) : null;
+        if (!cu) { cu = { id: crypto.randomUUID(), full_name: l.full_name ?? l.client_name, city: null, email: null, phone: l.phone ?? null, company: null, address: null, postal_code: null, lat: null, lng: null, notes: '', created_at: new Date().toISOString() }; customers.push(cu); }
+        const k = { ...caseRows[0], id: crypto.randomUUID(), case_no: `CS-2026-${String(100 + caseRows.length)}`, title: l.full_name ?? l.client_name, customer_id: cu.id, customer: cu, lead_id: l.id, current_stage: 'new', status: 'open', supply_point_id: null, created_at: new Date().toISOString() };
+        caseRows.push(k);
+        const all = TABLES.customer_supply_points;
+        const targets = [];
+        const remap = {};
+        for (const sp of mine) {
+          const dup = sp.archived_at || !sp.supply_number_key ? null : all.find((c) => c.customer_id === cu.id && !c.archived_at && c.supply_number_key === sp.supply_number_key);
+          if (dup) { Object.assign(sp, { needs_review: true, review_note: sp.review_note ?? 'Ο αριθμός υπάρχει ήδη στον πελάτη (ίδια παροχή;)' }); remap[sp.id] = dup.id; targets.push(dup.id); }
+          else { Object.assign(sp, { customer_id: cu.id, lead_id: null }); if (!sp.archived_at) targets.push(sp.id); }
+        }
+        if (Array.isArray(l.attached_files)) l.attached_files = l.attached_files.map((f) => (f.supply_point_id && remap[f.supply_point_id] ? { ...f, supply_point_id: remap[f.supply_point_id] } : f));
+        if (new Set(targets).size === 1) k.supply_point_id = targets[0];
+        l.status = 'converted'; l.converted_case_id = k.id; l.converted_at = new Date().toISOString();
+        return send(200, k.id);
+      }
       l.status = 'converted'; l.converted_case_id = caseRows[0].id; l.converted_at = new Date().toISOString();
       return send(200, caseRows[0].id);
     }

@@ -65,3 +65,18 @@ export async function fetchBackofficeLeads(userId: string | null): Promise<Lead[
   if (error) return [];
   return ((data ?? []) as Lead[]).filter(l => !l.deleted_at && leadFiles(l.attached_files).length > 0);
 }
+
+/** Tag (or untag, null) one file of a lead with the electricity connection it belongs to. Reads the current list first so a
+ *  concurrent change to another file is not overwritten; returns an error text or null. */
+export async function tagLeadFile(leadId: string, path: string, supplyPointId: string | null): Promise<string | null> {
+  const { data, error } = await supabase.from('leads').select('attached_files').eq('id', leadId).single();
+  if (error || !data) return 'Η αλλαγή δεν αποθηκεύτηκε. Δοκιμάστε ξανά.';
+  const list = Array.isArray(data.attached_files) ? (data.attached_files as Record<string, unknown>[]) : [];
+  const next = list.map(f => {
+    if (f?.path !== path) return f;
+    const { supply_point_id: _drop, ...rest } = f; void _drop;
+    return supplyPointId ? { ...rest, supply_point_id: supplyPointId } : rest;
+  });
+  const { error: e2 } = await supabase.from('leads').update({ attached_files: next }).eq('id', leadId);
+  return e2 ? 'Η αλλαγή δεν αποθηκεύτηκε. Δοκιμάστε ξανά.' : null;
+}

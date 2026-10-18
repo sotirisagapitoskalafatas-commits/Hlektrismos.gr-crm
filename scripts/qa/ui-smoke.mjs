@@ -1199,6 +1199,136 @@ if (!PREVIEW_LIVE) {
   await wipe();
 }
 
+/* ---- 2k. Lead connections: files tagged to a connection; conversion moves the connections to the customer (same records) (staged phase5/18) ---- */
+{
+  const M = 'http://127.0.0.1:54399';
+  const H = { Authorization: 'Bearer mock-admin', 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const ATHINA = '20000000-0000-4000-8000-000000000001';
+  const MODAL = '.fixed.inset-0.z-50';
+  const post = async (table, body) => (await (await fetch(`${M}/rest/v1/${table}`, { method: 'POST', headers: H, body: JSON.stringify(body) })).json())[0];
+  const get = async (q) => (await fetch(`${M}/rest/v1/${q}`, { headers: H })).json();
+  const logs = async () => (await (await fetch(`${M}/__log`)).json());
+  const clickSel = (page, sel) => page.evaluate((q) => { const el = document.querySelector(q); el && el.click(); return !!el; }, sel);
+  const setVal = (page, sel, v) => page.evaluate((q, val) => { const el = document.querySelector(q); const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); }, sel, v);
+  const wipe = async () => { await fetch(`${M}/rest/v1/customer_supply_points?id=not.is.null`, { method: 'DELETE', headers: H }); };
+  const nameInput = (page, v) => page.evaluate((val) => { const el = [...document.querySelectorAll('.fixed.inset-0.z-50 input.field')][0]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+  const dialogOpen = (page) => page.evaluate(() => [...document.querySelectorAll('h2')].some((h) => h.textContent.trim() === 'Νέο Lead'));
+  const waitClosed = async (page) => { for (let i = 0; i < 50 && (await dialogOpen(page)); i++) await sleep(200); await sleep(600); };
+  const item = (n, sel) => `${MODAL} [data-lead-supply-item="${n}"] ${sel}`;
+  const openLeadByName = async (page, name) => {
+    await click(page, 'Leads', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => /Όλα/.test(b.textContent) && b.textContent.length < 14)?.click()); await sleep(500);
+    await page.evaluate((n) => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === n)?.click(), name);
+    await sleep(1600);
+  };
+  const openCustomerFolder = async (page, name) => {
+    await click(page, 'Πελάτες', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate((n) => [...document.querySelectorAll('main button')].find((b) => b.textContent.includes(n))?.click(), name);
+    await sleep(1800);
+  };
+  await fetch(`${M}/__supply?state=on`); await fetch(`${M}/__leadsupply?state=on`); await fetch(`${M}/__supplyfail?state=off`);
+  await wipe();
+  // ---- A) the lead form: connections first, then the files tagged to them
+  let leadA;
+  const droppable = [];
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await click(page, 'Leads', '#shell-rail nav button'); await sleep(1200);
+    await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Νέο Lead')?.click()); await sleep(900);
+    await page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 [role="radio"]')].find((b) => b.textContent.trim() === 'Lead με έγγραφα')?.click()); await sleep(400);
+    await nameInput(page, 'Κ. Με Έγγραφα Παροχών');
+    await clickSel(page, `${MODAL} [data-lead-supply-add]`); await sleep(300);
+    await setVal(page, item(1, '[data-sp-field="number"]'), '12345678901');
+    await clickSel(page, `${MODAL} [data-lead-supply-add]`); await sleep(300);
+    await setVal(page, item(2, '[data-sp-field="usage"]'), 'commercial');
+    await setVal(page, item(2, '[data-sp-field="number"]'), '22222222222');
+    const input = await page.$('[data-lead-files]');
+    await input.uploadFile('C:/Users/kalaf/hlek/docs/product/screenshots/after/inside_sales-home-1440.jpg'); await sleep(400);
+    await input.uploadFile('C:/Users/kalaf/hlek/docs/product/screenshots/after/inside_sales-home-1440.jpg'); await sleep(400);
+    await input.uploadFile('C:/Users/kalaf/hlek/docs/product/screenshots/after/inside_sales-home-1440.jpg'); await sleep(400);
+    const tagSel = await page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 [data-lead-file-tag]')].map((s) => [...s.options].map((o) => o.textContent.trim())));
+    check('Lead form: every file can be tagged to one of the connections typed above (or none)', tagSel.length === 3 && JSON.stringify(tagSel[0]) === JSON.stringify(['Χωρίς παροχή', 'Παροχή 1 — Οικιακό', 'Παροχή 2 — Επαγγελματικό']), JSON.stringify(tagSel[0]));
+    await page.evaluate(() => { const sels = [...document.querySelectorAll('.fixed.inset-0.z-50 [data-lead-file-tag]')]; const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+      set.call(sels[0], '0'); sels[0].dispatchEvent(new Event('change', { bubbles: true })); set.call(sels[1], '1'); sels[1].dispatchEvent(new Event('change', { bubbles: true })); });
+    await sleep(300);
+    await page.evaluate(() => [...document.querySelectorAll('.fixed.inset-0.z-50 button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.click());
+    await waitClosed(page);
+    leadA = (await get('leads?client_name=eq.Κ. Με Έγγραφα Παροχών'))[0];
+    droppable.push(leadA.id);
+    const conns = await get(`customer_supply_points?lead_id=eq.${leadA.id}&order=created_at.asc`);
+    const files = (await get(`leads?id=eq.${leadA.id}`))[0].attached_files;
+    check('Lead form: the connections are saved first, then each file carries the id of ITS connection (the third file is untagged)',
+      conns.length === 2 && files.length === 3 && files[0].supply_point_id === conns[0].id && files[1].supply_point_id === conns[1].id && !('supply_point_id' in files[2]), JSON.stringify(files.map((f) => f.supply_point_id ?? null)));
+    await browser.close();
+  }
+  // ---- B) the lead screen shows the tag and can change it
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openLeadByName(page, 'Κ. Με Έγγραφα Παροχών');
+    await click(page, 'Έγγραφα', '[role="tab"]'); await sleep(800);
+    const conns = await get(`customer_supply_points?lead_id=eq.${leadA.id}&order=created_at.asc`);
+    const rows = await page.evaluate(() => [...document.querySelectorAll('main li')].filter((li) => li.querySelector('[data-lead-file-tag]')).map((li) => ({ sub: li.querySelectorAll('span.block')[1]?.innerText ?? '', val: li.querySelector('select').value })));
+    check('Lead screen → Έγγραφα: each file shows the connection it belongs to; untagged shows none', rows.length === 3 && rows[0].sub.includes('Παροχή 1 — Οικιακό') && rows[1].sub.includes('Παροχή 2 — Επαγγελματικό') && !rows[2].sub.includes('Παροχή') && rows[0].val === conns[0].id && rows[1].val === conns[1].id && rows[2].val === '', JSON.stringify(rows.map((r) => r.sub)));
+    await page.evaluate((id) => { const sel = [...document.querySelectorAll('main [data-lead-file-tag]')][2]; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, id); sel.dispatchEvent(new Event('change', { bubbles: true })); }, conns[1].id);
+    await sleep(1600);
+    const f2 = (await get(`leads?id=eq.${leadA.id}`))[0].attached_files;
+    check('Lead screen → Έγγραφα: tagging the third file changes only that file; the other tags stay', f2[2].supply_point_id === conns[1].id && f2[0].supply_point_id === conns[0].id && f2[1].supply_point_id === conns[1].id, JSON.stringify(f2.map((f) => f.supply_point_id ?? null)));
+    await browser.close();
+  }
+  // ---- C) conversion: the connections move to the customer (same rows), documents keep their tags, the case is not guessed
+  {
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await fetch(`${M}/rest/v1/leads?id=eq.${leadA.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ status: 'qualified', phone: '6911223344' }) });
+    const before = await get(`customer_supply_points?lead_id=eq.${leadA.id}&order=created_at.asc`);
+    await openLeadByName(page, 'Κ. Με Έγγραφα Παροχών');
+    await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Μετατροπή σε Case'))?.click());
+    await sleep(3000);
+    await openCustomerFolder(page, 'Κ. Με Έγγραφα Παροχών');
+    const owner = await get(`customer_supply_points?id=in.(${before.map((b) => b.id).join(',')})&order=created_at.asc`);
+    const cs = (await get(`cases?lead_id=eq.${leadA.id}`))[0];
+    check('Conversion: the SAME two connection rows now belong to the new customer (no copies, same ids, lead_id cleared)', owner.length === 2 && owner.every((o) => o.customer_id === cs.customer_id && !o.lead_id) && owner.map((o) => o.id).join() === before.map((b) => b.id).join(), JSON.stringify(owner.map((o) => [o.customer_id?.slice(0, 4), o.lead_id])));
+    check('Conversion: with two connections the case is NOT linked to either (never guessed)', !cs.supply_point_id);
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(1000);
+    const st = await page.evaluate(() => ({ titles: [...document.querySelectorAll('[data-supply-card] [data-supply-title]')].map((t) => t.textContent), leadFiles: [...document.querySelectorAll('[data-supply-lead-file]')].map((x) => x.closest('[data-supply-card]')?.getAttribute('data-supply-card')),
+      folder: document.querySelector('[data-folder-badge]')?.textContent ?? '' }));
+    check('Conversion: the customer folder opens, «Παροχές» lists both connections, and the files tagged at lead time (one on card 1, two on card 2) show on THEIR connection («από το lead»)', st.titles.length === 2 && st.leadFiles.join() === '1,2,2' && st.folder !== 'Lead', JSON.stringify(st));
+    await browser.close();
+  }
+  // ---- D) the customer already has that number: nothing is duplicated, the case links to the existing connection
+  {
+    const existing = await post('customer_supply_points', { customer_id: ATHINA, usage: 'residential', property_address: 'Υπάρχουσα του πελάτη', supply_number: '77777777777' });
+    const lead = await post('leads', { client_name: 'Αθηνά Από Lead', client_contact: '6900000010', first_name: 'Αθηνά', full_name: 'Αθηνά Από Lead', phone: '6900000010', status: 'qualified', source: 'inside_sales', attached_files: [] });
+    droppable.push(lead.id);
+    const dup = await post('customer_supply_points', { lead_id: lead.id, usage: 'residential', property_address: 'Από το lead', supply_number: '777 7777 7777' });
+    const extra = await post('customer_supply_points', { lead_id: lead.id, usage: 'commercial', property_address: 'Δεύτερη', supply_number: '88888888888' });
+    await fetch(`${M}/rest/v1/leads?id=eq.${lead.id}`, { method: 'PATCH', headers: H, body: JSON.stringify({ attached_files: [{ path: 'leads/x/bill.jpg', name: 'bill.jpg', type: 'image/jpeg', size: 1, supply_point_id: dup.id }] }) });
+    await fetch(`${M}/rest/v1/customer_supply_points?id=eq.${extra.id}`, { method: 'DELETE', headers: H }); // exactly one connection: the duplicate
+    const { browser, page } = await launch(1440, 900);
+    await signInAs(page, 'inside_sales');
+    await openLeadByName(page, 'Αθηνά Από Lead');
+    await page.evaluate(() => [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('Μετατροπή σε Case'))?.click());
+    await sleep(3000);
+    await openCustomerFolder(page, 'Αθηνά Κωνσταντίνου');
+    const cs = (await get(`cases?lead_id=eq.${lead.id}`))[0];
+    const theirs = await get(`customer_supply_points?customer_id=eq.${ATHINA}`);
+    const left = (await get(`customer_supply_points?id=eq.${dup.id}`))[0];
+    const tags = (await get(`leads?id=eq.${lead.id}`))[0].attached_files;
+    check('Conversion (number already on the customer): no copy — the customer still has exactly that one connection; the lead\'s row stays on the lead, flagged', cs.customer_id === ATHINA && theirs.filter((t) => t.supply_number_key === '77777777777').length === 1 && left.lead_id === lead.id && !left.customer_id && left.needs_review === true, JSON.stringify([theirs.length, left.needs_review]));
+    check('Conversion (number already on the customer): the case is linked to the customer\'s existing connection and the document tag points at it', cs.supply_point_id === existing.id && tags[0].supply_point_id === existing.id, JSON.stringify([cs.supply_point_id === existing.id, tags[0].supply_point_id === existing.id]));
+    await click(page, 'Παροχές', '[role="tab"]'); await sleep(1000);
+    const view = await page.evaluate(() => ({ cards: [...document.querySelectorAll('[data-supply-card]')].map((c) => ({ title: c.querySelector('[data-supply-title]')?.textContent, dup: c.querySelector('[data-supply-dup]')?.innerText ?? '', file: !!c.querySelector('[data-supply-lead-file]'), cases: [...c.querySelectorAll('[data-supply-linked-case]')].length })) }));
+    const target = view.cards.find((c) => c.file);
+    check('Conversion (number already on the customer): the existing connection shows the duplicate notice (the lead\'s row), its linked case and the lead\'s file', !!target && /Lead: Αθηνά Από Lead/.test(target.dup) && target.cases === 1, JSON.stringify(view.cards.map((c) => [c.title, c.cases, c.file])));
+    await browser.close();
+  }
+  await wipe();
+  await fetch(`${M}/__dropleads?ids=${droppable.join(',')}`); // leave the shared mock as we found it (the conversions made cases and a customer)
+}
+
 /* ---- 3. Home and My Work agree; actions really work ---- */
 {
   const { browser, page } = await launch(1440, 900);

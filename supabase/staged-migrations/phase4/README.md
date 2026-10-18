@@ -57,15 +57,14 @@
 - Count (read-only) and manual review: `docs/ops/D1_PLACEHOLDER_EMAIL.md`. Rollback: `docs/ops/rollback_phase4_15_convert_lead.sql`.
 - Local evidence: `node --test supabase/tests/convert-lead-d1.test.mjs` — 7/7. Independent of the other files; full order in `docs/ops/PENDING_MIGRATIONS.md`.
 
-## 16 — Copy the legacy leads into the CRM (one-time data script, NOT applied)
-`16_import_legacy_leads.sql` copies `hlektrismos_leads` (130 rows on live, newest 24/08/2026) into `public.leads`, which is the only table the CRM lists. Owner request 18/10/2026.
-- **Dry run first:** `docs/ops/LEGACY_LEADS_IMPORT_DRYRUN.sql` (read-only, counts only): how many would be copied, skipped as duplicates, skipped as unmappable, plus a check that the old-table columns exist.
-- **Copy:** nothing is deleted or changed in the old table. Every copied row has `source = 'import'`, `source_label = 'Παλιά βάση'` and the tags `import`, `legacy_import:<old id>` (the marker that makes a second run copy nothing), and `legacy_source:<old source>`. The original date is kept.
-- **Skipped:** already imported · soft-deleted · no name · no phone and no e-mail (the placeholder e-mail counts as empty) · status that cannot be mapped · same phone (last 10 digits) or e-mail as a lead the CRM already has · repeated inside the old table (the oldest is copied).
-- **Statuses:** mapped to the values `leads_status_check` allows. Old "beyond lead" statuses (converted, customer, won, active, …) become **qualified** with a `legacy_status:<old>` tag; they are never marked «converted» because no case exists for them. **Owner decision**, one CASE in the file.
-- **Consent** is copied as recorded (`gdpr_consent`, `consent_version 'legacy'`, `consent_source 'legacy_import'`). Rows without recorded consent are copied but visibly so; do not contact them until the contact-eligibility rules (phase3/09) are applied.
-- **Not copied:** `government_id`, bill files, scores, assignments. Imported leads are unassigned.
-- One statement (atomic); one `activity_log` entry with the counts only.
-- Local evidence: `node --test supabase/tests/legacy-leads-import.test.mjs`, 5/5, against the real `leads` definition and constraints.
-- Rollback: `docs/ops/rollback_phase4_16_legacy_leads_import.sql` (deletes only imported leads without a case or conversion).
-
+## 16 — Import the legacy leads into the CRM (one-time data script, NOT applied)
+`16_import_legacy_leads.sql` imports **all** rows of `hlektrismos_leads` (130 on live, newest 24/08/2026) into `public.leads`, which is the only table the CRM lists. Owner decisions of 18/10/2026: import all rows · no marketing consent → imported but «not for marketing» · unassigned · statuses mapped, original status kept in a note.
+- **How to run (SQL editor, as owner):** run the file once (creates a view and a function; **copies nothing**), then `select * from public.import_legacy_leads();` — a **dry run by default, counts only, no writes** — and only then `select * from public.import_legacy_leads(false);`. The read-only `docs/ops/LEGACY_LEADS_IMPORT_DRYRUN.sql` gives the same counts **before anything is created**. App users (anon, authenticated) cannot run the function or read the plan view.
+- **No row is skipped.** Each old row is copied once (tag `legacy_import:<old id>`); a second run copies nothing. Original date kept; `source 'import'`, label «Παλιά βάση»; **unassigned**.
+- **Not for marketing:** rows without recorded consent get `gdpr_consent = false`, the tag `not_for_marketing` and a note: sales follow-up only, no campaigns, no bulk SMS/e-mail. (With phase3/09 applied, a contact with no permission record is already refused for promotional channels — fail closed.)
+- **Statuses:** mapped to the values `leads_status_check` allows; the **original status is always kept** in the tag `legacy_status:<old>` and in the note. Old "beyond lead" statuses (converted, customer, won, active, …) → `qualified`, never «converted» (no case exists); unknown or empty → `new`.
+- **Soft-deleted old rows** (`deleted_at`) are imported too, as `unqualified` with the tags `legacy_deleted` + `not_for_marketing` and a note, so the history is visible but nobody is led to work them. The dry run counts them — **if any was deleted at a customer's request, tell Claude before running.**
+- **Possible duplicates** (same phone — last 10 digits — or e-mail as an existing lead or an older old row) are copied and tagged `possible_duplicate`; nothing is merged or hidden. No name → «Χωρίς όνομα (παλιά βάση)».
+- **Not copied:** `government_id`, bill files, scores, assignments. One `activity_log` entry with the count only.
+- Local evidence: `node --test supabase/tests/legacy-leads-import.test.mjs`, 6/6, against the real `leads` definition and constraints (dry run default writes nothing and equals the docs file; all 14 fixture rows copied; mapping; not-for-marketing; deleted; duplicates; idempotent; privileges; rollback).
+- Rollback: `docs/ops/rollback_phase4_16_legacy_leads_import.sql` (deletes only imported leads without a case or conversion, then drops the helper objects).

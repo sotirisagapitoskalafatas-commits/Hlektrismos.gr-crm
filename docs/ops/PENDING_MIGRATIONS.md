@@ -8,6 +8,8 @@
 
 The Admin centre findings match this: anonymous read of integration settings, self-promotion to admin, credentials readable in `crm_settings`, and anonymous listing of files.
 
+**The order to apply them in is [`APPLY_ORDER.md`](APPLY_ORDER.md)** (one list, with for each file: what it depends on, what it unlocks on screen, its rollback file and a one-line check query).
+
 **Check before you apply.** Run [`pending_migrations_check.sql`](pending_migrations_check.sql) on staging and production. It is read-only, catalog only, and shows which files are already applied. I have not run it on either.
 
 These files sit outside `supabase/migrations/`, so the GitHub integration never applies them. They are run by hand in the SQL editor, staging first. Production needs your approval and a backup or PITR checkpoint.

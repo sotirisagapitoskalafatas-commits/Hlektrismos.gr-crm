@@ -329,7 +329,7 @@ export default function LandingPage() {
                 {[
                   { num: '01', title: 'Μας λες τις ανάγκες σου', text: 'Συμπληρώνεις λίγα στοιχεία ή μιλάς μαζί μας.' },
                   { num: '02', title: 'Μελετάμε τις διαθέσιμες επιλογές', text: 'Εξετάζουμε τα προγράμματα και τους όρους.' },
-                  { num: '03', title: 'Σε καθοδηγούμε στη λύση', text: 'Εξηγούμε τα επόμενα βήματα με σαφήνεια.' },
+                  { num: '03', title: 'Σε καθοδηγούμε στην κατάλληλη λύση', text: 'Εξηγούμε τα επόμενα βήματα με σαφήνεια.' },
                 ].map((step) => <article key={step.num} data-motion-item style={{ position: 'relative', paddingTop: 8 }}>
                   <span style={{ display: 'grid', placeItems: 'center', width: 48, height: 48, borderRadius: '50%', border: '1px solid #74b4df', color: '#dcf4ff', background: 'rgba(84,160,213,.12)', fontWeight: 850, fontSize: 14 }}>{step.num}</span>
                   <h3 style={{ color: '#fff', fontWeight: 800, fontSize: 13.5, lineHeight: 1.4, marginTop: 16 }}>{step.title}</h3>
@@ -367,15 +367,15 @@ export default function LandingPage() {
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(232,243,252,.70) 0%,rgba(238,247,254,.58) 100%)' }} />
           <div className="l-split" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
             <div data-motion="left" style={{ background: 'rgba(255,255,255,.88)', border: '1px solid rgba(201,220,236,.9)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 22px 52px rgba(28,72,111,.10)' }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#5686ad' }}>Ζητήστε να σας καλέσουμε!</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#12395f' }}>Βρες την ενεργειακή λύση που σου ταιριάζει.</h2>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#5686ad' }}>ΕΠΙΚΟΙΝΩΝΗΣΤΕ ΜΑΖΙ ΜΑΣ</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#12395f' }}>Ας βρούμε μαζί τη λύση που σου ταιριάζει.</h2>
               <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#536b80', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου για να εξετάσετε τις διαθέσιμες επιλογές.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
                 <a href="tel:+302102255000" className="footer-link" style={{ fontWeight: 700, color: '#183f63' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
                 <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#183f63' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
                 <span style={{ color: '#536b80' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#657d91' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#657d91' }}><Lock size={12} /> Τα στοιχεία σου θα χρησιμοποιηθούν για να επικοινωνήσουμε μαζί σου.</span>
             </div>
 
             <div data-motion="right" style={{ background: 'rgba(255,255,255,.96)', border: '1px solid #d5e5f1', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', boxShadow: '0 22px 52px rgba(28,72,111,.10)' }}>

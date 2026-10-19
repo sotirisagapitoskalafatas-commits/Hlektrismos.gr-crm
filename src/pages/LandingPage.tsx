@@ -430,6 +430,12 @@ export default function LandingPage() {
                         {serviceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </label>
+                    <details className="landing-optional-fields" style={{ border: '1px solid #dce8f2', borderRadius: 12, padding: '12px 14px', background: '#fbfdff' }}>
+                      <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, color: '#315b7c', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', listStyle: 'none' }}>
+                        Σχόλια ή λογαριασμός ενέργειας (προαιρετικό)
+                        <ChevronDown size={15} aria-hidden="true"/>
+                      </summary>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Σχόλια (προαιρετικά)
                       <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
                     </label>
@@ -475,6 +481,8 @@ export default function LandingPage() {
                       )}
                       <span style={{ fontSize: 12, color: '#72899d' }}>Μπορείς να στείλεις όλες τις σελίδες: διάλεξε πολλά αρχεία ή φωτογραφίες μαζί, ή πρόσθεσε κι άλλα μετά (έως {MAX_FORM_FILES}, 25MB το καθένα). Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
                     </div>
+                      </div>
+                    </details>
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#657d91' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
                       <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#174a75' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>

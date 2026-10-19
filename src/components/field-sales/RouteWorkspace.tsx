@@ -39,8 +39,10 @@ function localDate(): string {
 }
 
 function fromSeed(stop: RouteStopInput): SavedRouteStopDraft {
-  const sourceType = stop.id.startsWith('visit-') ? 'visit' : stop.id.startsWith('case-') ? 'crm' : 'manual';
+  const isFollowUp = stop.id.includes('-followup-');
+  const sourceType = stop.id.startsWith('visit-') ? 'visit' : (stop.id.startsWith('case-') || stop.id.startsWith('lead-')) ? 'crm' : 'manual';
   const parts = stop.id.match(/(?:visit|case|lead)-([0-9a-f-]{36})/i);
+  const followUp = stop.id.match(/-followup-([0-9a-f-]{36})/i);
   return {
     source_type: sourceType,
     source_id: parts?.[1] ?? null,
@@ -48,9 +50,13 @@ function fromSeed(stop: RouteStopInput): SavedRouteStopDraft {
     subtitle: stop.subtitle ?? null,
     latitude: stop.lat,
     longitude: stop.lng,
+    category: isFollowUp ? 'follow_up' : sourceType === 'crm' ? 'case' : null,
     scheduled_at: stop.scheduledAt ?? null,
     stop_status: 'pending',
-    metadata: { seeded_from_today: true },
+    metadata: {
+      seeded_from_today: true,
+      ...(followUp?.[1] ? { follow_up_id: followUp[1] } : {}),
+    },
   };
 }
 
@@ -686,8 +692,16 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
             </div>
             <div className="flex flex-wrap gap-2">
               <Btn variant="outline" onClick={() => void nearestOrder()} disabled={stops.length < 2}><RefreshCw className="h-3.5 w-3.5" /> Σειρά κοντινότερης στάσης</Btn>
-              <Btn variant="ghost" onClick={() => setStops(current => [...current, ...seedStops.filter(seed => { const id = seed.id.match(/(?:visit|case|lead)-([0-9a-f-]{36})/i)?.[1]; return !id || !current.some(stop => stop.source_id === id); }).map(fromSeed)])} disabled={!seedStops.length}>
-                <Plus className="h-3.5 w-3.5" /> Εκκρεμείς επισκέψεις
+              <Btn variant="ghost" onClick={() => setStops(current => [...current, ...seedStops.filter(seed => {
+                const isFollowUp = seed.id.includes('-followup-');
+                const followUpId = seed.id.match(/-followup-([0-9a-f-]{36})/i)?.[1];
+                const sourceId = seed.id.match(/(?:visit|case|lead)-([0-9a-f-]{36})/i)?.[1];
+                if (isFollowUp && followUpId) return !current.some(stop => stop.metadata?.follow_up_id === followUpId);
+                if (seed.id.startsWith('visit-') && sourceId) return !current.some(stop => stop.source_type === 'visit' && stop.source_id === sourceId);
+                if (seed.id.startsWith('case-') && sourceId) return !current.some(stop => stop.source_id === sourceId && stop.category !== 'follow_up');
+                return !current.some(stop => stop.label === seed.label && stop.latitude === seed.lat && stop.longitude === seed.lng);
+              }).map(fromSeed)])} disabled={!seedStops.length}>
+                <Plus className="h-3.5 w-3.5" /> Προσθήκη εκκρεμούς εργασίας
               </Btn>
             </div>
           </div>

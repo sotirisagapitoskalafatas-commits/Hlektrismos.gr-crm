@@ -36,7 +36,7 @@ begin
 
       if t = 'profiles' then
         execute 'grant select on table public.profiles to authenticated';
-        execute 'grant update (full_name, phone, avatar_url, timezone, language, updated_at) on table public.profiles to authenticated';
+        execute 'grant update (full_name, phone, avatar_url, timezone, language, availability_status, updated_at) on table public.profiles to authenticated';
       elsif t = 'crm_users' then
         execute 'grant select on table public.crm_users to authenticated';
       elsif t = 'crm_integrations' then
@@ -431,10 +431,10 @@ begin
   end loop;
 
   if to_regprocedure('public.insert_website_lead(text,jsonb)') is not null then
-    grant execute on function public.insert_website_lead(text,jsonb) to anon, authenticated, service_role;
+    execute 'grant execute on function public.insert_website_lead(text,jsonb) to anon, authenticated, service_role';
   end if;
   if to_regprocedure('public.get_active_tariff_prices(text)') is not null then
-    grant execute on function public.get_active_tariff_prices(text) to anon, authenticated, service_role;
+    execute 'grant execute on function public.get_active_tariff_prices(text) to anon, authenticated, service_role';
   end if;
 end $$;
 

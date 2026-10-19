@@ -594,13 +594,49 @@ set search_path = pg_catalog, public, pg_temp
 as $
 begin
   if tg_op = 'INSERT' then
-    new.requested_at := coalesce(new.requested_at, now());
+    new.requested_by := auth.uid();
+    new.requested_at := now();
     new.updated_at := now();
+    new.status := 'pending';
+    new.reviewed_by := null;
+    new.reviewed_at := null;
+    new.created_lead_id := null;
   else
+    -- Request/candidate evidence is immutable after submission. Review edits cannot rewrite the submitted candidate.
+    new.requested_by := old.requested_by;
+    new.route_id := old.route_id;
+    new.route_stop_id := old.route_stop_id;
+    new.candidate_name := old.candidate_name;
+    new.candidate_address := old.candidate_address;
+    new.candidate_phone := old.candidate_phone;
+    new.candidate_category := old.candidate_category;
+    new.candidate_lat := old.candidate_lat;
+    new.candidate_lng := old.candidate_lng;
+    new.source_provider := old.source_provider;
+    new.source_url := old.source_url;
+    new.duplicate_signal := old.duplicate_signal;
+    new.requested_at := old.requested_at;
     new.updated_at := now();
+
     if new.status is distinct from old.status then
-      new.reviewed_by := auth.uid();
-      new.reviewed_at := now();
+      if not (
+        (old.status = 'pending' and new.status = 'approved')
+        or (old.status = 'approved' and new.status in ('pending','rejected','converted'))
+      ) then
+        raise exception 'field_sales_duplicate_reviews: invalid status transition' using errcode = '23514';
+      end if;
+      if new.status = 'pending' then
+        new.reviewed_by := null;
+        new.reviewed_at := null;
+        new.created_lead_id := null;
+      else
+        new.reviewed_by := auth.uid();
+        new.reviewed_at := now();
+      end if;
+    else
+      new.reviewed_by := old.reviewed_by;
+      new.reviewed_at := old.reviewed_at;
+      new.created_lead_id := old.created_lead_id;
     end if;
   end if;
   return new;

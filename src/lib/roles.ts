@@ -36,6 +36,12 @@ export const ACCESS_GROUPS: { id: AccessGroup; label: string; hint: string; role
   { id: 'sales', label: 'Πωλητής', hint: 'Βλέπουν μόνο τα δικά τους leads, cases και πελάτες.', roles: ['inside_sales', 'field_sales'] },
 ];
 export const accessGroup = (r: Role): AccessGroup => (r === 'inside_sales' || r === 'field_sales' ? 'sales' : 'office');
+export const ACCESS_GROUP_COLOR = {
+  office: '#475569',
+  sales: '#156db5',
+} as const;
+
+export const accessGroupColor = (r: Role): string => ACCESS_GROUP_COLOR[accessGroup(r)];
 export const accessGroupLabel = (r: Role) => ACCESS_GROUPS.find(g => g.id === accessGroup(r))!.label;
 
 /* ---------------- Role colors (CRM Shell Redesign) ----------------

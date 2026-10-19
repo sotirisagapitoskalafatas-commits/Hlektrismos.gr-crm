@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { ROLE_COLOR, ROLES, roleLabel } from '@/lib/roles';
+import { ROLE_COLOR, ROLES, accessGroupLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
@@ -73,7 +73,7 @@ export function PreviewBanner() {
       <Eye size={16} aria-hidden="true" className="shrink-0" />
       <span className="flex-1 min-w-0">
         <strong>ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ — DEMO.</strong> Δεν αλλάζει τα πραγματικά δικαιώματα του λογαριασμού.
-        <span className="atx-preview-roles"> Προβολή ως: <b>{roleLabel(preview.role)}</b> · Πραγματικός ρόλος: <b>{roleLabel(profile.role)}</b> · μόνο ανάγνωση</span>
+        <span className="atx-preview-roles"> Προβολή ως: <b>{accessGroupLabel(preview.role)}</b> · Πραγματικός ρόλος: <b>{accessGroupLabel(profile.role)}</b> · μόνο ανάγνωση</span>
       </span>
       <button type="button" className="atx-preview-exit" onClick={() => void endPreview()}>
         <LogOut size={14} aria-hidden="true" /> Επιστροφή στον πραγματικό ρόλο

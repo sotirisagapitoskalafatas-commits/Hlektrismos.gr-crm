@@ -502,12 +502,14 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
                   <div className="text-[10px] text-ink/35 mt-1">{stop.latitude.toFixed(5)}, {stop.longitude.toFixed(5)} · {stop.source_type === 'discovery' ? 'OpenStreetMap candidate' : stop.source_type.toUpperCase()}</div>
                   <label className="block mt-2 text-[10px] text-ink/45">Κατάσταση στάσης
                     <select className="field mt-1 !py-1 !text-xs" value={stop.stop_status ?? 'pending'} onChange={event => void changeStopStatus(index, event.target.value as 'pending' | 'arrived' | 'completed' | 'skipped')} disabled={saving || stop.stop_status === 'completed'} aria-label={`Κατάσταση στάσης ${index + 1}`}>
-                      <option value="pending">Εκκρεμεί</option>
+                      <option value="pending" disabled={stop.stop_status === 'arrived'}>Εκκρεμεί</option>
                       <option value="arrived">Άφιξη</option>
                       <option value="completed">Ολοκληρώθηκε</option>
-                      <option value="skipped">Παραλείφθηκε</option>
+                      <option value="skipped" disabled={stop.stop_status === 'arrived'}>Παραλείφθηκε</option>
                     </select>
                   </label>
+                  {stop.arrived_at && <p className="mt-1 text-[10px] text-cyan-700">Άφιξη: {new Date(stop.arrived_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>}
+                  {stop.completed_at && <p className="text-[10px] text-emerald-700">Ολοκλήρωση: {new Date(stop.completed_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>}
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   <button className="rounded-lg p-1.5 text-ink/45 hover:bg-ink/5 disabled:opacity-25" aria-label="Μετακίνηση στάσης επάνω" disabled={index === 0 || stop.stop_status === 'arrived' || stop.stop_status === 'completed'} onClick={() => void reorder(index, -1)}><ChevronUp className="h-4 w-4" /></button>

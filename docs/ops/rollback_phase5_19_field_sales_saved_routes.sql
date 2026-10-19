@@ -19,5 +19,10 @@ drop trigger if exists field_sales_protect_route_history on public.field_sales_r
 drop function if exists public.field_sales_protect_route_history();
 drop function if exists public.field_sales_route_owner_allowed(uuid);
 drop function if exists public.field_sales_replace_route_stops(uuid, jsonb);
+drop trigger if exists field_sales_duplicate_review_stamp on public.field_sales_duplicate_reviews;
+drop function if exists public.field_sales_duplicate_review_stamp();
+drop table if exists public.field_sales_duplicate_reviews;
+drop function if exists public.field_sales_candidate_duplicate_signal(text, text, text, double precision, double precision);
+
 drop table if exists public.field_sales_route_stops;
 drop table if exists public.field_sales_routes;

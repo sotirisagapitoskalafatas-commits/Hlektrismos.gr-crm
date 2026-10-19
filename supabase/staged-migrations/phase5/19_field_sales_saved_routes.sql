@@ -365,20 +365,62 @@ security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
 begin
-  if tg_op = 'UPDATE' then
-    if old.stop_status = 'completed' and new.stop_status <> 'completed' then
-      raise exception 'field_sales_route_stops: completed visit history cannot be reversed' using errcode = '23514';
+  if tg_op = 'INSERT' then
+    -- Clients cannot choose the recorded timestamps.
+    if new.stop_status = 'arrived' then
+      new.arrived_at := now();
+      new.completed_at := null;
+    elsif new.stop_status = 'completed' then
+      new.arrived_at := now();
+      new.completed_at := now();
+    else
+      new.arrived_at := null;
+      new.completed_at := null;
     end if;
-    if old.stop_status = 'arrived' and new.stop_status in ('pending','skipped') then
-      raise exception 'field_sales_route_stops: arrival history cannot be cleared' using errcode = '23514';
+    new.updated_at := now();
+    return new;
+  end if;
+
+  if old.stop_status = 'completed' and new.stop_status <> 'completed' then
+    raise exception 'field_sales_route_stops: completed visit history cannot be reversed' using errcode = '23514';
+  end if;
+  if old.stop_status = 'arrived' and new.stop_status in ('pending','skipped') then
+    raise exception 'field_sales_route_stops: arrival history cannot be cleared' using errcode = '23514';
+  end if;
+
+  if old.stop_status in ('arrived','completed') and (
+    new.route_id is distinct from old.route_id
+    or new.source_type is distinct from old.source_type
+    or new.source_id is distinct from old.source_id
+    or new.label is distinct from old.label
+    or new.subtitle is distinct from old.subtitle
+    or new.address is distinct from old.address
+    or new.latitude is distinct from old.latitude
+    or new.longitude is distinct from old.longitude
+    or new.category is distinct from old.category
+    or new.source_url is distinct from old.source_url
+    or new.scheduled_at is distinct from old.scheduled_at
+    or new.notes is distinct from old.notes
+    or new.metadata is distinct from old.metadata
+  ) then
+    raise exception 'field_sales_route_stops: recorded visit content is immutable' using errcode = '23514';
+  end if;
+
+  if new.stop_status is distinct from old.stop_status then
+    if new.stop_status = 'arrived' then
+      new.arrived_at := now();
+      new.completed_at := null;
+    elsif new.stop_status = 'completed' then
+      new.arrived_at := coalesce(old.arrived_at, now());
+      new.completed_at := now();
+    else
+      new.arrived_at := old.arrived_at;
+      new.completed_at := old.completed_at;
     end if;
-  end if;
-  if new.stop_status = 'arrived' and new.arrived_at is null then
-    new.arrived_at := now();
-  end if;
-  if new.stop_status = 'completed' then
-    if new.arrived_at is null then new.arrived_at := now(); end if;
-    if new.completed_at is null then new.completed_at := now(); end if;
+  else
+    -- Do not accept client-supplied or manually edited visit timestamps.
+    new.arrived_at := old.arrived_at;
+    new.completed_at := old.completed_at;
   end if;
   new.updated_at := now();
   return new;

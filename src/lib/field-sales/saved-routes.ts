@@ -36,6 +36,8 @@ export interface SavedRouteStop {
   category: string | null;
   source_url: string | null;
   stop_status: SavedRouteStopStatus;
+  arrived_at: string | null;
+  completed_at: string | null;
   scheduled_at: string | null;
   notes: string | null;
   metadata: Record<string, unknown>;
@@ -55,6 +57,8 @@ export interface SavedRouteStopDraft {
   category?: string | null;
   source_url?: string | null;
   stop_status?: SavedRouteStopStatus;
+  arrived_at?: string | null;
+  completed_at?: string | null;
   scheduled_at?: string | null;
   notes?: string | null;
   metadata?: Record<string, unknown>;
@@ -123,6 +127,7 @@ export async function saveSavedRoute(draft: SavedRouteDraft): Promise<{ row: Sav
 /** Replaces all stops in one database transaction using an invoker-secured RPC. */
 export async function replaceSavedRouteStops(routeId: string, stops: SavedRouteStopDraft[]): Promise<string | null> {
   const normalized = stops.map((stop, index) => ({
+    id: stop.id ?? null,
     sort_order: index,
     source_type: stop.source_type,
     source_id: stop.source_id ?? null,
@@ -152,6 +157,22 @@ export async function updateSavedRouteStatus(id: string, status: SavedRouteStatu
     updated_at: new Date().toISOString(),
   }).eq('id', id);
   return error ? friendlyError(error, 'Δεν ενημερώθηκε η κατάσταση της διαδρομής') : null;
+}
+
+export async function updateSavedRouteStopStatus(
+  id: string,
+  status: SavedRouteStopStatus,
+): Promise<{ row: SavedRouteStop | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('field_sales_route_stops')
+    .update({ stop_status: status, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*')
+    .single();
+  return {
+    row: (data as SavedRouteStop | null) ?? null,
+    error: error ? friendlyError(error, 'Δεν ενημερώθηκε η κατάσταση της στάσης') : null,
+  };
 }
 
 export async function deleteSavedRoute(id: string): Promise<string | null> {

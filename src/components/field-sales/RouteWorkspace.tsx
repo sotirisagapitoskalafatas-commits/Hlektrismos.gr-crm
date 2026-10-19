@@ -247,7 +247,7 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
     const next = stops.map((stop, i) => i === index ? { ...stop, stop_status: status } : stop);
     setStops(next);
     if (!selectedRouteId) {
-      toast('Η κατάσταση θα αποθηκευτεί μαζί με τη νέα διαδρομή.', 'info');
+      toast('Η κατάσταση θα αποθηκευτεί μαζί με τη νέα διαδρομή.', 'warn');
       return;
     }
     setSaving(true);

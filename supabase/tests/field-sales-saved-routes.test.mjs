@@ -68,7 +68,7 @@ before(async () => {
     create function public.is_staff() returns boolean language sql stable security definer set search_path=public
       as $$ select exists (select 1 from public.profiles p where p.id=auth.uid() and coalesce(p.is_active,true)) $$;
     create function public.is_role(r text) returns boolean language sql stable security definer set search_path=public
-      as $ select exists (select 1 from public.profiles p where p.id=auth.uid() and p.role=r and coalesce(p.is_active,true)) $;
+      as $$ select exists (select 1 from public.profiles p where p.id=auth.uid() and p.role=r and coalesce(p.is_active,true)) $$;
     create table public.customers (
       id uuid primary key default gen_random_uuid(),
       full_name text, phone text, address text, lat double precision, lng double precision

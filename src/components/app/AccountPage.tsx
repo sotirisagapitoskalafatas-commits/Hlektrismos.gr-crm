@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { ROLES, roleLabel } from '@/lib/roles';
+import { ROLES, accessGroupLabel } from '@/lib/roles';
 import { updateProfile } from '@/lib/api';
 import { Btn, Card, CardHeader, Field, Micro, Pill } from '@/lib/ui';
 import { Check, LogOut, Mail, Phone as PhoneIcon, ShieldCheck } from 'lucide-react';
@@ -48,8 +48,8 @@ export default function AccountPage() {
             <div className="text-xs text-ink/50 truncate">{user?.email ?? '—'}</div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
-            <Pill tone="blue">{realRole ? roleLabel(realRole) : '—'}</Pill>
-            {preview.role && <span className="micro text-warn-600">προεπισκόπηση: {roleLabel(preview.role)}</span>}
+            <Pill tone="blue">{realRole ? accessGroupLabel(realRole) : '—'}</Pill>
+            {preview.role && <span className="micro text-warn-600">προεπισκόπηση: {accessGroupLabel(preview.role)}</span>}
           </div>
         </div>
       </Card>

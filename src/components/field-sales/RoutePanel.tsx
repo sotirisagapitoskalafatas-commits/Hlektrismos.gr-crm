@@ -52,7 +52,7 @@ export default function RoutePanel({ stops, onPlan, onClose, travelMode = 'drivi
     setError(null);
     setPlan(null);
     const internal = ordered.map(toInternal);
-    planRoute(internal)
+    planRoute(internal, travelMode)
       .then(p => {
         if (!alive) return;
         setPlan(p);
@@ -64,7 +64,7 @@ export default function RoutePanel({ stops, onPlan, onClose, travelMode = 'drivi
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [ordered, onPlan]);
+  }, [ordered, onPlan, travelMode]);
 
   const navigateStops = ordered.length < 2
     ? null

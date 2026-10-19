@@ -11,6 +11,10 @@ drop policy if exists "field routes update own or office" on public.field_sales_
 drop policy if exists "field routes insert own or office" on public.field_sales_routes;
 drop policy if exists "field routes read own or office" on public.field_sales_routes;
 
+drop trigger if exists field_sales_protect_route_stop_history on public.field_sales_route_stops;
+drop function if exists public.field_sales_protect_route_stop_history();
+drop trigger if exists field_sales_track_route_stop_status on public.field_sales_route_stops;
+drop function if exists public.field_sales_track_route_stop_status();
 drop trigger if exists field_sales_protect_route_history on public.field_sales_routes;
 drop function if exists public.field_sales_protect_route_history();
 drop function if exists public.field_sales_route_owner_allowed(uuid);

@@ -634,7 +634,7 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       {(routeError || (routes.length === 0 && !loadingRoutes)) && (
         <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:mx-5" role="status">
           {routeError ?? 'Δεν υπάρχουν ακόμη αποθηκευμένες διαδρομές.'}
-          {routeError && /phase5\/19/i.test(routeError) && ' Μπορείτε ακόμη να δείτε την προεπισκόπηση, αλλά η αποθήκευση θα λειτουργήσει μετά την εγκεκριμένη migration.'}
+          {routeError && /phase5\/19/i.test(routeError) && ' Η προεπισκόπηση παραμένει διαθέσιμη, αλλά η αποθήκευση δεν είναι ακόμη ενεργή.'}
         </div>
       )}
 

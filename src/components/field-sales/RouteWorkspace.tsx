@@ -462,7 +462,7 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       status: 'new',
       property_type: 'Επιχείρηση',
       service_category: candidate.category ?? null,
-      lead_type: 'business',
+      lead_type: 'B2B',
       assigned_to_user_id: currentUserId,
       comments: 'Πηγή ανακάλυψης: ' + candidate.source + '. ' + candidate.sourceUrl,
     });

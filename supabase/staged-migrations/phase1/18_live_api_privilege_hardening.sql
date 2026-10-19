@@ -350,7 +350,47 @@ begin
   end loop;
 end $$;
 
--- 9. Pin a safe search_path on SECURITY DEFINER functions that still have the mutable default.
+-- 9. Remove default PUBLIC/anon EXECUTE from every SECURITY DEFINER function in the exposed public schema.
+-- Only the two documented public read/intake endpoints are restored for anon:
+--   insert_website_lead(text,jsonb) — validates source, age, and consent.
+--   get_active_tariff_prices(text) — public tariff/catalogue chatbot reads.
+-- Trigger functions are not user-callable RPCs; only service_role retains direct EXECUTE.
+-- A short service-only list prevents legacy account/role/scraper mutations from being called as authenticated.
+do $
+declare
+  f record;
+  service_only boolean;
+  trigger_only boolean;
+begin
+  for f in
+    select p.oid::regprocedure as signature, p.proname, p.prorettype
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prosecdef
+  loop
+    execute format('revoke execute on function %s from public, anon', f.signature);
+
+    trigger_only := f.prorettype = 'trigger'::regtype;
+    service_only := f.proname in (
+      'create_crm_user', 'staff_active_admin_count',
+      'crm_grant_role', 'crm_revoke_role', 'crm_set_primary_role',
+      'set_user_role', 'convert_lead_to_customer', 'upsert_scraped_b2b_leads'
+    ) or trigger_only;
+
+    if service_only then
+      execute format('revoke execute on function %s from authenticated', f.signature);
+      execute format('grant execute on function %s to service_role', f.signature);
+    else
+      execute format('grant execute on function %s to authenticated, service_role', f.signature);
+    end if;
+
+    if f.proname in ('insert_website_lead', 'get_active_tariff_prices') then
+      execute format('grant execute on function %s to anon', f.signature);
+    end if;
+  end loop;
+end $;
+
+-- 10. Pin a safe search_path on SECURITY DEFINER functions that still have the mutable default.
 -- This only sets function configuration; it does not change their body or return shape.
 do $$
 declare
@@ -372,7 +412,7 @@ begin
   end loop;
 end $$;
 
--- 10. Tariffs are public catalogue data. Use invoker permissions/RLS for this view rather than view-owner rights.
+-- 11. Tariffs are public catalogue data. Use invoker permissions/RLS for this view rather than view-owner rights.
 -- The underlying tariff tables explicitly allow public SELECT; that behaviour remains unchanged.
 do $$
 begin

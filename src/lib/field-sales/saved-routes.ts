@@ -80,7 +80,7 @@ export interface SavedRouteDraft {
 function friendlyError(error: { message?: string; code?: string } | null | undefined, action: string): string {
   const message = error?.message ?? '';
   if (/field_sales_routes|field_sales_route_stops|field_sales_replace_route_stops|field_sales_candidate_duplicate_signal|field_sales_duplicate_reviews|schema cache|PGRST20[245]/i.test(message) || error?.code === '42P01') {
-    return 'Οι διατηρημένες διαδρομές δεν είναι ακόμη διαθέσιμες στη βάση. Χρειάζεται η εγκεκριμένη migration phase5/19.';
+    return 'Η αποθήκευση διαδρομών δεν είναι διαθέσιμη ακόμη. Επικοινωνήστε με το Back Office.';
   }
   if (/row-level security|permission denied|42501/i.test(message) || error?.code === '42501') {
     return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια στη συγκεκριμένη διαδρομή.';

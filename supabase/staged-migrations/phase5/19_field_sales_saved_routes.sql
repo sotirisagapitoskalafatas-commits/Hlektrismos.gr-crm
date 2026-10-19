@@ -364,11 +364,13 @@ security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
 begin
-  if old.stop_status = 'completed' and new.stop_status <> 'completed' then
-    raise exception 'field_sales_route_stops: completed visit history cannot be reversed' using errcode = '23514';
-  end if;
-  if old.stop_status = 'arrived' and new.stop_status in ('pending','skipped') then
-    raise exception 'field_sales_route_stops: arrival history cannot be cleared' using errcode = '23514';
+  if tg_op = 'UPDATE' then
+    if old.stop_status = 'completed' and new.stop_status <> 'completed' then
+      raise exception 'field_sales_route_stops: completed visit history cannot be reversed' using errcode = '23514';
+    end if;
+    if old.stop_status = 'arrived' and new.stop_status in ('pending','skipped') then
+      raise exception 'field_sales_route_stops: arrival history cannot be cleared' using errcode = '23514';
+    end if;
   end if;
   if new.stop_status = 'arrived' and new.arrived_at is null then
     new.arrived_at := now();
@@ -384,7 +386,7 @@ $$;
 revoke all on function public.field_sales_track_route_stop_status() from public, anon, authenticated;
 grant execute on function public.field_sales_track_route_stop_status() to service_role;
 drop trigger if exists field_sales_track_route_stop_status on public.field_sales_route_stops;
-create trigger field_sales_track_route_stop_status before update of stop_status on public.field_sales_route_stops
+create trigger field_sales_track_route_stop_status before insert or update on public.field_sales_route_stops
   for each row execute function public.field_sales_track_route_stop_status();
 
 -- Do not allow direct deletion of a stop that has arrival/completion history.

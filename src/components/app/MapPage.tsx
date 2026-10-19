@@ -953,6 +953,11 @@ export default function MapPage() {
                         <MapPin className="w-3.5 h-3.5" /> Άνοιγμα Case
                       </Btn>
                     )}
+                    {preview.stop.source_type === 'crm' && preview.stop.category === 'lead' && (
+                      <Btn onClick={() => go('leads')}>
+                        <MapPin className="w-3.5 h-3.5" /> Άνοιγμα Leads
+                      </Btn>
+                    )}
                   </>
                 )}
                 {preview.kind === 'business' && (

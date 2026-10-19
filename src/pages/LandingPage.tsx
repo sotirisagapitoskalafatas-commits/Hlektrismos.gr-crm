@@ -49,285 +49,6 @@ type LeadForm = {
   adult: boolean;
 };
 
-/* ─── Cinematic tour (scroll-scrubbed 12-frame sequence) ────── */
-function CinematicTour() {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const frameRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
-  const captionRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const hintRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section) return;
-
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const N = FRAMES.length;
-    let cur = -1;
-    let target = 0;
-    let running = false;
-    let raf = 0;
-    const shown = new Set<number>();
-
-    frameRefs.current.forEach((f, i) => {
-      if (f) {
-        f.style.visibility = i === 0 ? 'visible' : 'hidden';
-        f.style.opacity = i === 0 ? '1' : '0';
-      }
-    });
-    shown.add(0);
-
-    /* Frames stay src-less until their turn comes up. All 12 cover the same
-       inset:0 spot, so loading="lazy" can't defer them — that pulled every
-       full-screen PNG on first paint and froze low-end phones. Only the
-       current + next frames get their src attached, as the scrubbed
-       position advances. */
-    const imgs = imgRefs.current;
-    const load = (i: number) => {
-      const im = imgs[i];
-      if (im && !im.dataset.loaded) { im.src = FRAMES[i]; im.dataset.loaded = '1'; }
-    };
-    load(0);
-    load(1);
-
-    const apply = (p: number) => {
-      const sp = p * (N - 1);
-      const base = Math.min(Math.floor(sp), N - 2);
-      const frac = sp - base;
-
-      for (const i of shown) {
-        if (i !== base && i !== base + 1) {
-          const f = frameRefs.current[i];
-          if (f) { f.style.visibility = 'hidden'; f.style.opacity = '0'; }
-          shown.delete(i);
-        }
-      }
-
-      const pairs: [number, number, number][] = [
-        [base, 1 - frac, 1 + 0.14 * frac],
-        [base + 1, frac, 1.14 - 0.14 * frac],
-      ];
-      for (const [i, op, sc] of pairs) {
-        if (i >= N) continue;
-        load(i);
-        load(i + 1);
-        const f = frameRefs.current[i];
-        if (!f) continue;
-        if (!shown.has(i)) { f.style.visibility = 'visible'; shown.add(i); }
-        f.style.opacity = op.toFixed(3);
-        f.style.transform = reduce ? 'scale(1.02)' : `scale(${sc.toFixed(4)})`;
-      }
-
-      const m = 0.028;
-      captionRefs.current.forEach((c) => {
-        if (!c) return;
-        const s = +(c.dataset.start ?? 0);
-        const e = +(c.dataset.end ?? 0);
-        let o = 0;
-        if (p >= s - m && p <= e + m) o = Math.max(0, Math.min((p - (s - m)) / m, ((e + m) - p) / m, 1));
-        c.style.opacity = o.toFixed(3);
-        c.style.visibility = o > 0 ? 'visible' : 'hidden';
-        c.style.pointerEvents = o > 0.5 ? 'auto' : 'none';
-      });
-
-      if (hintRef.current) hintRef.current.style.opacity = p > 0.04 ? '0' : '1';
-    };
-
-    const readTarget = () => {
-      const total = section.offsetHeight - window.innerHeight;
-      const scrolled = Math.min(Math.max(window.scrollY - section.offsetTop, 0), total);
-      return total > 0 ? scrolled / total : 0;
-    };
-
-    const ease = reduce ? 1 : 0.09;
-
-    const tick = () => {
-      target = readTarget();
-      if (cur < 0) cur = target;
-      cur += (target - cur) * ease;
-      if (Math.abs(target - cur) < 0.0004) {
-        cur = target; apply(cur); running = false; return;
-      }
-      apply(cur);
-      raf = requestAnimationFrame(tick);
-    };
-
-    const kick = () => { if (!running) { running = true; raf = requestAnimationFrame(tick); } };
-
-    apply(readTarget());
-    window.addEventListener('scroll', kick, { passive: true });
-    window.addEventListener('resize', kick);
-    kick();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', kick);
-      window.removeEventListener('resize', kick);
-    };
-  }, []);
-
-  const capStyle = (c: CaptionDef): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      position: 'absolute',
-      maxWidth: c.maxW ?? 560,
-      opacity: 0,
-      padding: 'clamp(24px,3vw,40px)',
-      borderRadius: 22,
-      background: 'rgba(16,32,51,0.52)',
-      border: '1px solid rgba(139,164,200,0.20)',
-      backdropFilter: 'blur(14px)',
-      WebkitBackdropFilter: 'blur(14px)',
-      boxShadow: '0 24px 60px rgba(2,6,12,0.45), inset 0 1px 0 rgba(255,255,255,0.09)',
-      color: '#F8FAFC',
-    };
-    if (c.pos === 'right') {
-      base.right = 'clamp(20px,5vw,70px)';
-      base.textAlign = 'right';
-    } else if (c.pos === 'center') {
-      base.left = '50%';
-      base.textAlign = 'center';
-    } else {
-      base.left = 'clamp(20px,5vw,70px)';
-    }
-    if (c.vPos === 'bottom') {
-      base.bottom = 'clamp(60px,12vh,120px)';
-    } else {
-      base.top = '50%';
-      base.transform = c.pos === 'center' ? 'translate(-50%,-50%)' : 'translateY(-50%)';
-    }
-    return base;
-  };
-
-  const seeSolutions = () => {
-    const s = sectionRef.current;
-    if (s) window.scrollTo({ top: s.offsetTop + s.offsetHeight - window.innerHeight + 2, behavior: 'smooth' });
-  };
-
-  return (
-    <section ref={sectionRef} data-cine-section style={{ position: 'relative', width: '100%', height: '1180vh' }}>
-      <div className="cine-sticky" style={{ background: '#102033' }}>
-        {FRAMES.map((src, i) => (
-          <div
-            key={i}
-            ref={(el) => { frameRefs.current[i] = el; }}
-            style={{ position: 'absolute', inset: 0, opacity: i === 0 ? 1 : 0, transform: 'scale(1.06)', willChange: 'transform,opacity' }}
-          >
-            {i === 0
-              ? <>
-                  <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" decoding="async" />
-                  <div className="hlk-hero-bolt" data-motion-scrub data-motion-y="-16" data-motion-rotate="5" data-motion-scale="1.015" style={{ position: 'absolute', zIndex: 1, pointerEvents: 'none', right: 'clamp(22px,16vw,290px)', top: '10%', width: 'clamp(190px,25vw,390px)', aspectRatio: '3 / 4', opacity: .94 }}>
-                    <svg viewBox="0 0 300 420" width="100%" height="100%" role="img" aria-label="Διακοσμητικός φωτεινός κεραυνός ενέργειας" style={{ overflow: 'visible', filter: 'drop-shadow(0 0 26px rgba(37,145,255,.52))' }}>
-                      <defs>
-                        <linearGradient id="hlk-bolt-gradient" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor="#d9fbff" />
-                          <stop offset="35%" stopColor="#59c9ff" />
-                          <stop offset="68%" stopColor="#1477ed" />
-                          <stop offset="100%" stopColor="#0b45b4" />
-                        </linearGradient>
-                        <linearGradient id="hlk-bolt-edge" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor="#ffffff" stopOpacity=".95" />
-                          <stop offset="100%" stopColor="#76dbff" stopOpacity=".25" />
-                        </linearGradient>
-                      </defs>
-                      <ellipse cx="150" cy="210" rx="108" ry="176" fill="none" stroke="#9fe7ff" strokeOpacity=".25" strokeWidth="1.4" transform="rotate(22 150 210)" />
-                      <ellipse cx="150" cy="210" rx="132" ry="148" fill="none" stroke="#5bbdff" strokeOpacity=".38" strokeWidth="1.2" transform="rotate(-28 150 210)" />
-                      <path d="M177 20 L80 211 Q75 222 89 220 L138 210 L101 379 L233 170 Q240 159 224 161 L169 171 Z" fill="url(#hlk-bolt-gradient)" stroke="url(#hlk-bolt-edge)" strokeWidth="4" strokeLinejoin="round" />
-                      <path d="M176 32 L105 195 L151 186 L126 333 L214 174 L159 184 Z" fill="#a5eeff" fillOpacity=".25" />
-                      <path d="M185 43 L121 188" stroke="#fff" strokeOpacity=".74" strokeWidth="5" strokeLinecap="round" />
-                      <path d="M60 118 C20 160 35 225 67 245" fill="none" stroke="#8ee5ff" strokeOpacity=".75" strokeWidth="2" strokeDasharray="4 9" />
-                      <path d="M231 94 C273 126 278 185 244 224" fill="none" stroke="#4bbcff" strokeOpacity=".85" strokeWidth="2" strokeDasharray="4 8" />
-                    </svg>
-                  </div>
-                </>
-              : <img ref={(el) => { imgRefs.current[i] = el; }} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            }
-          </div>
-        ))}
-
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(16,32,51,.74) 0%,rgba(16,32,51,.30) 42%,rgba(16,32,51,0) 68%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg,rgba(16,32,51,.60) 0%,rgba(16,32,51,0) 32%)', pointerEvents: 'none' }} />
-
-        {CAPTIONS.map((c, i) => (
-          <div
-            key={i}
-            ref={(el) => { captionRefs.current[i] = el; }}
-            data-start={c.start}
-            data-end={c.end}
-            className={c.pos === 'right' ? 'cap-box cap-right' : 'cap-box'}
-            style={capStyle(c)}
-          >
-            {c.hero && (
-              <span className="cap-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(59,130,246,.38)', background: 'rgba(59,130,246,.10)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
-                {c.eyebrow}
-              </span>
-            )}
-            {!c.hero && (
-              <span className="cap-eyebrow" style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
-                {c.eyebrow}
-              </span>
-            )}
-            <h2 className="cap-title" style={{ fontFamily: 'var(--font-cinematic)', fontWeight: c.hero ? 800 : 700, fontSize: c.hero ? 'clamp(38px,5.4vw,74px)' : 'clamp(28px,3.6vw,48px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC', textShadow: '0 4px 30px rgba(0,0,0,.55)' }}>
-              {c.hero ? (
-                c.title.includes(' ενέργειας')
-                  ? <>{c.title.split(' ενέργειας')[0]}{' '}<span style={{ color: '#3B82F6' }}>ενέργειας</span></>
-                  : c.title
-              ) : c.title}
-            </h2>
-            <p className="cap-body" style={{ fontSize: c.hero ? 'clamp(16px,1.5vw,20px)' : 17, lineHeight: 1.55, color: '#D7DDE5', marginTop: 14, maxWidth: c.hero ? 520 : undefined, textWrap: 'pretty' as const }}>
-              {c.text}
-            </p>
-            {c.hero && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 32 }}>
-                <button onClick={seeSolutions} className="cine-cta" style={{ fontFamily: 'var(--font-body)' }}>
-                  Δες τις Λύσεις <span className="arrow" style={{ fontSize: 18, lineHeight: 1 }}>→</span>
-                </button>
-                <a href="tel:+302102255000" className="cine-cta ghost">
-                  <Phone size={16} /> +30 210 22 55 000
-                </a>
-              </div>
-            )}
-          </div>
-        ))}
-
-        <div ref={hintRef} style={{ position: 'absolute', left: '50%', bottom: 34, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, opacity: 1, transition: 'opacity .4s' }}>
-          <span style={{ fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase' as const, color: '#9fb2bc' }}>Κύλιση</span>
-            <div style={{ width: 24, height: 38, border: '2px solid rgba(255,255,255,.4)', borderRadius: 14, display: 'flex', justifyContent: 'center', paddingTop: 7 }}>
-              <div style={{ width: 4, height: 8, borderRadius: 2, background: '#fff', animation: 'hlk-bob 1.5s ease-in-out infinite' }} />
-          </div>
-        </div>
-      </div>
-
-      {/* animated multi-layer wave divider → hands off to the Features band */}
-      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 'clamp(80px,9vw,130px)', overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
-        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 0.4, willChange: 'transform', animation: 'wv-right 19s linear infinite' }}>
-          <path fill="#102033" d="M0,50 C240,16 480,16 720,50 C960,84 1200,84 1440,50 C1680,16 1920,16 2160,50 C2400,84 2640,84 2880,50 L2880,120 L0,120 Z" />
-        </svg>
-        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 0.7, willChange: 'transform', animation: 'wv-left 13s linear infinite' }}>
-          <path fill="#102033" d="M0,60 C240,86 480,86 720,60 C960,34 1200,34 1440,60 C1680,86 1920,86 2160,60 C2400,34 2640,34 2880,60 L2880,120 L0,120 Z" />
-        </svg>
-        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 1, willChange: 'transform', animation: 'wv-right 9s linear infinite' }}>
-          <path fill="#102033" d="M0,66 C240,46 480,46 720,66 C960,86 1200,86 1440,66 C1680,46 1920,46 2160,66 C2400,86 2640,86 2880,66 L2880,120 L0,120 Z" />
-        </svg>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Wave divider mask (contact section → footer) ───────────── */
-const WAVE_DIVIDER_SVG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' width='100%25' height='100%25' preserveAspectRatio='none'%3E%3Cpath d='M0,0 H1440 V60 C1340,60 1250,104 1120,100 C960,95 860,44 700,50 C560,55 460,102 320,92 C220,85 110,60 0,60 Z' fill='%23ffffff'/%3E%3C/svg%3E";
-
-const waveDividerMask: React.CSSProperties = {
-  WebkitMaskImage: `url("${WAVE_DIVIDER_SVG}"), linear-gradient(#fff,#fff)`,
-  maskImage: `url("${WAVE_DIVIDER_SVG}"), linear-gradient(#fff,#fff)`,
-  WebkitMaskSize: '105% 112px, 105% calc(100% - 110px)',
-  maskSize: '105% 112px, 105% calc(100% - 110px)',
-  WebkitMaskPosition: 'center bottom, center top',
-  maskPosition: 'center bottom, center top',
-  WebkitMaskRepeat: 'no-repeat',
-  maskRepeat: 'no-repeat',
-};
-
 /* ─── Main landing page ─────────────────────────────────────── */
 export default function LandingPage() {
   const [form, setForm] = useState<LeadForm>({
@@ -651,17 +372,17 @@ export default function LandingPage() {
               <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#536b80', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου για να εξετάσετε τις διαθέσιμες επιλογές.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
                 <a href="tel:+302102255000" className="footer-link" style={{ fontWeight: 700, color: '#183f63' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
-                <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
-                <span style={{ color: '#D7DDE5' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
+                <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#183f63' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
+                <span style={{ color: '#536b80' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
               </div>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#657d91' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
             </div>
 
-            <div data-motion="right" ref={cTilt.ref} className="tilt-card" onMouseMove={cTilt.onMove} onMouseLeave={cTilt.onLeave} style={{ background: 'rgba(255,255,255,.96)', border: '1px solid #d5e5f1', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', boxShadow: '0 22px 52px rgba(28,72,111,.10)' }}>
+            <div data-motion="right" style={{ background: 'rgba(255,255,255,.96)', border: '1px solid #d5e5f1', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', boxShadow: '0 22px 52px rgba(28,72,111,.10)' }}>
               {submitted ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
                   <span style={{ width: 56, height: 56, borderRadius: 999, background: '#e6f4ff', border: '1px solid #b7d7ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#174a75' }}>✓</span>
-                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20, color: '#fff' }}>Ευχαριστούμε!</h3>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20, color: '#174a75' }}>Ευχαριστούμε!</h3>
                   <p style={{ fontSize: 14.5, color: '#657d91', maxWidth: 320 }}>
                     Λάβαμε το αίτημά σου{sentFiles > 0 ? ` και ${sentFiles === 1 ? '1 αρχείο' : `${sentFiles} αρχεία`}` : ''}. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailSent ? ' — μόλις σου στείλαμε και email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : '.'}
                   </p>
@@ -669,27 +390,27 @@ export default function LandingPage() {
               ) : (
                 <form onSubmit={submitLead}>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ζητήστε να σας καλέσουμε</h3>
-                  <p style={{ fontSize: 14, color: '#a9bcc6', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε μαζί σου.</p>
+                  <p style={{ fontSize: 14, color: '#657d91', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε μαζί σου.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
                     <div className="l-form-row">
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Όνομα
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Όνομα
                         <input required type="text" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#163e63', fontSize: 14.5 }} />
                       </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Επώνυμο
-                        <input required type="text" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Επώνυμο
+                        <input required type="text" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5 }} />
                       </label>
                     </div>
                     <div className="l-form-row">
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Email (προαιρετικό)
-                        <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Email (προαιρετικό)
+                        <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5 }} />
                       </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Τηλέφωνο *
-                        <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Τηλέφωνο *
+                        <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5 }} />
                       </label>
                     </div>
                     <div className="l-form-row">
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Τύπος Ακινήτου *
-                        <select required className="lead-select" value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Τύπος Ακινήτου *
+                        <select required className="lead-select" value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', backgroundColor: 'rgba(255,255,255,.05)', color: '#183f63', fontSize: 14.5 }}>
                           <option value="" disabled>Επιλέξτε τύπο...</option>
                           <option>Κατοικία</option>
                           <option>Διαμέρισμα</option>
@@ -697,28 +418,28 @@ export default function LandingPage() {
                           <option>Κατάστημα</option>
                         </select>
                       </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Περιοχή (προαιρετικό)
-                        <select className="lead-select" value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Περιοχή (προαιρετικό)
+                        <select className="lead-select" value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', backgroundColor: 'rgba(255,255,255,.05)', color: '#183f63', fontSize: 14.5 }}>
                           <option value="">Επιλέξτε περιοχή...</option>
                           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </label>
                     </div>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Υπηρεσία ενδιαφέροντος
-                      <select className="lead-select" value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Υπηρεσία ενδιαφέροντος
+                      <select className="lead-select" value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', backgroundColor: 'rgba(255,255,255,.05)', color: '#183f63', fontSize: 14.5 }}>
                         {serviceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Σχόλια (προαιρετικά)
-                      <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Σχόλια (προαιρετικά)
+                      <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
                     </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>
-                      <span style={{ fontSize: 13, color: '#D7DDE5' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>
+                      <span style={{ fontSize: 13, color: '#536b80' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)</span>
                       {form.billFiles.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
                           {form.billFiles.map((f, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#D7DDE5' }}>
-                              <FileText size={14} style={{ color: '#fff', flexShrink: 0 }} />
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#536b80' }}>
+                              <FileText size={14} style={{ color: '#174a75', flexShrink: 0 }} />
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{f.name}</span>
                               <span style={{ fontSize: 11, flexShrink: 0 }}>{f.size < 1024 * 1024 ? `${Math.max(1, Math.round(f.size / 1024))}KB` : `${(f.size / 1024 / 1024).toFixed(1)}MB`}</span>
                               <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2, lineHeight: 1 }}>×</button>
@@ -732,11 +453,11 @@ export default function LandingPage() {
                         role="button"
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-file-input')?.click(); } }}
                         tabIndex={0}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderRadius: 10, border: '1px dashed #b6cbdd', background: '#f7fbff', cursor: 'pointer', fontSize: 13.5, color: '#D7DDE5', transition: 'background .2s ease, border-color .2s ease' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderRadius: 10, border: '1px dashed #b6cbdd', background: '#f7fbff', cursor: 'pointer', fontSize: 13.5, color: '#536b80', transition: 'background .2s ease, border-color .2s ease' }}
                         onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#5f94bc'; e.currentTarget.style.background = '#edf6fc'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#b6cbdd'; e.currentTarget.style.background = '#f7fbff'; }}
                       >
-                        <Upload size={16} style={{ color: '#fff', flexShrink: 0 }} />
+                        <Upload size={16} style={{ color: '#174a75', flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>
                           {form.billFiles.length === 0 ? 'Επίλεξε αρχεία ή φωτογραφίες — πολλά μαζί' : `Πρόσθεσε κι άλλα (${form.billFiles.length} από ${MAX_FORM_FILES})`}
                         </span>
@@ -747,18 +468,18 @@ export default function LandingPage() {
                           <input id="lead-camera-input" type="file" accept="image/*" capture="environment" onChange={handleBillChange} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }} />
                           <label htmlFor="lead-camera-input" role="button" tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-camera-input')?.click(); } }}
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderRadius: 10, border: '1px solid #b6cbdd', background: '#edf6fc', cursor: 'pointer', fontSize: 13.5, color: '#fff' }}>
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderRadius: 10, border: '1px solid #b6cbdd', background: '#edf6fc', cursor: 'pointer', fontSize: 13.5, color: '#174a75' }}>
                             <Camera size={16} aria-hidden="true" /> Φωτογράφισε τον λογαριασμό
                           </label>
                         </>
                       )}
-                      <span style={{ fontSize: 12, color: '#7f939c' }}>Μπορείς να στείλεις όλες τις σελίδες: διάλεξε πολλά αρχεία ή φωτογραφίες μαζί, ή πρόσθεσε κι άλλα μετά (έως {MAX_FORM_FILES}, 25MB το καθένα). Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
+                      <span style={{ fontSize: 12, color: '#72899d' }}>Μπορείς να στείλεις όλες τις σελίδες: διάλεξε πολλά αρχεία ή φωτογραφίες μαζί, ή πρόσθεσε κι άλλα μετά (έως {MAX_FORM_FILES}, 25MB το καθένα). Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
                     </div>
-                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#657d91' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
-                      <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>
+                      <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#174a75' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>
                     </label>
-                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#657d91' }}>
                       <input required type="checkbox" checked={form.adult} onChange={(e) => update('adult', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
                       Δηλώνω ότι είμαι ενήλικας (18 ετών και άνω).
                     </label>

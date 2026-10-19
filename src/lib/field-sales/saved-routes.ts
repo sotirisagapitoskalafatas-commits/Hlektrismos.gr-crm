@@ -165,6 +165,7 @@ export type DuplicateSignalKind = 'possible_match' | 'check_failed';
 export interface FieldSalesDuplicateReview {
   id: string;
   requested_by: string;
+  prospective_owner_id: string | null;
   route_id: string | null;
   route_stop_id: string | null;
   candidate_name: string;
@@ -202,6 +203,7 @@ export async function checkFieldSalesDuplicateSignal(candidate: {
 
 export async function createFieldSalesDuplicateReview(input: {
   requested_by: string;
+  prospective_owner_id: string;
   route_id?: string | null;
   route_stop_id?: string | null;
   candidate_name: string;

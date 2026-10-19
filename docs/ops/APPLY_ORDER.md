@@ -264,10 +264,10 @@ select exists (select 1 from pg_policies where schemaname='public' and tablename
 
 
 ## 23. `phase5/19_field_sales_saved_routes.sql` — multiple saved routes for Field Sales
-- **Depends on:** active staff role helpers (`is_staff()`, `is_role(text)`) and `profiles`; after step 22 in this ordered runbook. The migration creates two new tables, an invoker-secured route-stop replacement RPC and ownership/history guards. It does not rewrite existing CRM rows.
+- **Depends on:** active staff role helpers (`is_staff()`, `is_role(text)`), `profiles`, and existing `leads`, `customers`, and `cases` tables; after step 22 in this ordered runbook. Adds saved-route tables, a Back Office duplicate-review queue, a privacy-preserving boolean duplicate-signal RPC, an invoker-secured route-stop replacement RPC, plus ownership/history guards. No existing CRM rows are rewritten.
 - **Unlocks on screen:** multiple saved routes per Sales Agent, route date/status/travel-mode/origin, ordered stops from CRM, existing visits or discovered public-map candidates, save/reopen/pause/resume/complete, and Back Office route reassignment. Route owner must be an active Sales Agent. Anonymous callers have no route access.
 - **History safety:** a saved route with an `arrived` or `completed` stop cannot be deleted; retain it and change its status.
-- **Business discovery:** this SQL stores candidate route stops; the app uses the available OpenStreetMap/Photon source, so results are not guaranteed to include every business in a corridor. Provider attribution and rate limits still apply.
+- **Business discovery & duplicate handling:** public OpenStreetMap/Photon candidates are never treated as a complete business directory. The duplicate-signal function returns only true/false and does not reveal the matching customer or its owner. Potential matches or failed checks enter `field_sales_duplicate_reviews`; only Back Office can approve/reject them. Approval creates a Lead only after an active Sales Agent owner is verified. Public visitors cannot read the queue or call the signal function.
 - **Rollback:** [`rollback_phase5_19_field_sales_saved_routes.sql`](rollback_phase5_19_field_sales_saved_routes.sql). **Destructive:** drops saved routes/stops. Export user-created routes and stop history first; do not use for routine cleanup.
 - **Check (must be true):**
 ```sql
@@ -276,8 +276,12 @@ select
   and to_regclass('public.field_sales_route_stops') is not null
   and to_regprocedure('public.field_sales_replace_route_stops(uuid,jsonb)') is not null
   and to_regprocedure('public.field_sales_route_owner_allowed(uuid)') is not null
+  and to_regprocedure('public.field_sales_candidate_duplicate_signal(text,text,text,double precision,double precision)') is not null
+  and to_regprocedure('public.field_sales_duplicate_review_stamp()') is not null
+  and to_regclass('public.field_sales_duplicate_reviews') is not null
   and exists (select 1 from pg_trigger where tgname='field_sales_protect_route_history' and not tgisinternal)
+  and exists (select 1 from pg_trigger where tgname='field_sales_duplicate_review_stamp' and not tgisinternal)
   as applied;
 ```
-- **Required staging tests:** two Sales Agents can save/reopen separate routes with 40–60+ stops; one agent cannot read/edit the other's route; Back Office can reassign routes only to active Sales Agents; completed visit history prevents deletion; route-stop reordering and replacement are atomic; public anonymous access is denied. Test website intake and normal CRM screens in the same test window.
+- **Required staging tests:** two Sales Agents can save/reopen separate routes with 40–60+ stops; cross-agent route reads/edits are denied; Back Office can reassign only to active Sales Agents; completed visit history cannot be removed; stop replacement preserves IDs/history; duplicate signal exposes only a boolean; queue requests are requester/office scoped; only Back Office can approve/reject; failed checks never create a Lead; anonymous signal/queue access is denied. Test website intake and normal CRM screens in the same window.
 

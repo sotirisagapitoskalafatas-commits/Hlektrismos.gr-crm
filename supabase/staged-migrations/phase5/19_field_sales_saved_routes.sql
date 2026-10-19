@@ -174,6 +174,9 @@ create policy "field route stops insert permitted route" on public.field_sales_r
   for insert to authenticated
   with check (
     public.is_staff()
+    and stop_status = 'pending'
+    and arrived_at is null
+    and completed_at is null
     and exists (
       select 1 from public.field_sales_routes r
       where r.id = route_id

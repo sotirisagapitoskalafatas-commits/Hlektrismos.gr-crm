@@ -434,6 +434,184 @@ drop trigger if exists field_sales_protect_route_history on public.field_sales_r
 create trigger field_sales_protect_route_history before delete on public.field_sales_routes
   for each row execute function public.field_sales_protect_route_history();
 
+-- Candidate duplicate signal: SECURITY DEFINER sees CRM rows hidden from a Sales Agent's RLS scope,
+-- but returns only a boolean. It never returns customer names, phone numbers, record IDs or owner identities.
+create or replace function public.field_sales_candidate_duplicate_signal(
+  p_name text,
+  p_address text default null,
+  p_phone text default null,
+  p_lat double precision default null,
+  p_lng double precision default null
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+declare
+  v_role text;
+  v_name text := lower(btrim(coalesce(p_name,'')));
+  v_address text := lower(btrim(coalesce(p_address,'')));
+  v_phone text := regexp_replace(coalesce(p_phone,''), '[^0-9]', '', 'g');
+  v_match boolean := false;
+begin
+  select p.role into v_role
+  from public.profiles p
+  where p.id = auth.uid() and coalesce(p.is_active,true);
+
+  if v_role is null or v_role not in ('admin','manager','back_office','inside_sales','field_sales') then
+    raise exception 'field_sales_candidate_duplicate_signal: not allowed' using errcode = '42501';
+  end if;
+
+  select
+    exists (
+      select 1
+      from public.leads l
+      where
+        (length(v_name) > 1 and v_name in (
+          lower(btrim(coalesce(l.full_name,''))),
+          lower(btrim(coalesce(l.client_name,''))),
+          lower(btrim(coalesce(l.company,'')))
+        ))
+        or (length(v_address) > 3 and v_address = lower(btrim(coalesce(l.address,''))))
+        or (length(v_phone) >= 6 and v_phone = regexp_replace(coalesce(l.phone,''), '[^0-9]', '', 'g'))
+        or (p_lat between -90 and 90 and p_lng between -180 and 180 and l.lat is not null and l.lng is not null
+            and abs(l.lat - p_lat) <= 0.0025 and abs(l.lng - p_lng) <= 0.0032)
+    )
+    or exists (
+      select 1
+      from public.customers cu
+      where
+        (length(v_name) > 1 and v_name = lower(btrim(coalesce(cu.full_name,''))))
+        or (length(v_address) > 3 and v_address = lower(btrim(coalesce(cu.address,''))))
+        or (length(v_phone) >= 6 and v_phone = regexp_replace(coalesce(cu.phone,''), '[^0-9]', '', 'g'))
+        or (p_lat between -90 and 90 and p_lng between -180 and 180 and cu.lat is not null and cu.lng is not null
+            and abs(cu.lat - p_lat) <= 0.0025 and abs(cu.lng - p_lng) <= 0.0032)
+    )
+    or exists (
+      select 1
+      from public.cases ca
+      left join public.customers cu on cu.id = ca.customer_id
+      where
+        (length(v_name) > 1 and (
+          v_name = lower(btrim(coalesce(ca.title,'')))
+          or v_name = lower(btrim(coalesce(cu.full_name,'')))
+        ))
+        or (length(v_address) > 3 and (
+          v_address = lower(btrim(coalesce(ca.address,'')))
+          or v_address = lower(btrim(coalesce(cu.address,'')))
+        ))
+        or (length(v_phone) >= 6 and v_phone = regexp_replace(coalesce(cu.phone,''), '[^0-9]', '', 'g'))
+        or (p_lat between -90 and 90 and p_lng between -180 and 180 and ca.lat is not null and ca.lng is not null
+            and abs(ca.lat - p_lat) <= 0.0025 and abs(ca.lng - p_lng) <= 0.0032)
+    )
+  into v_match;
+
+  return coalesce(v_match,false);
+end;
+$;
+revoke all on function public.field_sales_candidate_duplicate_signal(text,text,text,double precision,double precision) from public, anon;
+grant execute on function public.field_sales_candidate_duplicate_signal(text,text,text,double precision,double precision) to authenticated, service_role;
+
+-- Back Office queue for any possible duplicate or incomplete duplicate check.
+create table if not exists public.field_sales_duplicate_reviews (
+  id uuid primary key default gen_random_uuid(),
+  requested_by uuid not null references auth.users(id) on delete restrict default auth.uid(),
+  route_id uuid references public.field_sales_routes(id) on delete set null,
+  route_stop_id uuid references public.field_sales_route_stops(id) on delete set null,
+  candidate_name text not null check (length(btrim(candidate_name)) between 2 and 200),
+  candidate_address text,
+  candidate_phone text,
+  candidate_category text,
+  candidate_lat double precision,
+  candidate_lng double precision,
+  source_provider text not null default 'OpenStreetMap / Photon',
+  source_url text,
+  duplicate_signal text not null default 'possible_match' check (duplicate_signal in ('possible_match','check_failed')),
+  status text not null default 'pending' check (status in ('pending','approved','rejected','converted')),
+  request_note text,
+  review_note text,
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_at timestamptz,
+  created_lead_id uuid references public.leads(id) on delete set null,
+  requested_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint field_sales_duplicate_reviews_coords_pair check ((candidate_lat is null) = (candidate_lng is null)),
+  constraint field_sales_duplicate_reviews_lat check (candidate_lat is null or candidate_lat between -90 and 90),
+  constraint field_sales_duplicate_reviews_lng check (candidate_lng is null or candidate_lng between -180 and 180)
+);
+create index if not exists idx_field_sales_duplicate_reviews_status
+  on public.field_sales_duplicate_reviews(status, requested_at desc);
+create index if not exists idx_field_sales_duplicate_reviews_requester
+  on public.field_sales_duplicate_reviews(requested_by, requested_at desc);
+
+alter table public.field_sales_duplicate_reviews enable row level security;
+revoke all on table public.field_sales_duplicate_reviews from public, anon;
+grant select, insert, update on table public.field_sales_duplicate_reviews to authenticated;
+grant all on table public.field_sales_duplicate_reviews to service_role;
+
+drop policy if exists "field duplicate reviews read own or office" on public.field_sales_duplicate_reviews;
+create policy "field duplicate reviews read own or office" on public.field_sales_duplicate_reviews
+  for select to authenticated
+  using (
+    public.is_staff()
+    and (
+      requested_by = auth.uid()
+      or public.is_role('admin') or public.is_role('manager') or public.is_role('back_office')
+    )
+  );
+
+drop policy if exists "field duplicate reviews insert own" on public.field_sales_duplicate_reviews;
+create policy "field duplicate reviews insert own" on public.field_sales_duplicate_reviews
+  for insert to authenticated
+  with check (
+    public.is_staff()
+    and requested_by = auth.uid()
+    and status = 'pending'
+    and reviewed_by is null
+    and reviewed_at is null
+    and created_lead_id is null
+  );
+
+drop policy if exists "field duplicate reviews update office" on public.field_sales_duplicate_reviews;
+create policy "field duplicate reviews update office" on public.field_sales_duplicate_reviews
+  for update to authenticated
+  using (
+    public.is_staff()
+    and (public.is_role('admin') or public.is_role('manager') or public.is_role('back_office'))
+  )
+  with check (
+    public.is_staff()
+    and (public.is_role('admin') or public.is_role('manager') or public.is_role('back_office'))
+  );
+
+create or replace function public.field_sales_duplicate_review_stamp()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+begin
+  if tg_op = 'INSERT' then
+    new.requested_at := coalesce(new.requested_at, now());
+    new.updated_at := now();
+  else
+    new.updated_at := now();
+    if new.status is distinct from old.status then
+      new.reviewed_by := auth.uid();
+      new.reviewed_at := now();
+    end if;
+  end if;
+  return new;
+end;
+$;
+revoke all on function public.field_sales_duplicate_review_stamp() from public, anon, authenticated;
+grant execute on function public.field_sales_duplicate_review_stamp() to service_role;
+drop trigger if exists field_sales_duplicate_review_stamp on public.field_sales_duplicate_reviews;
+create trigger field_sales_duplicate_review_stamp before insert or update on public.field_sales_duplicate_reviews
+  for each row execute function public.field_sales_duplicate_review_stamp();
+
 comment on table public.field_sales_routes is
   'Saved Field Sales routes; agents can manage their own, office roles can view/reassign team routes.';
 comment on table public.field_sales_route_stops is

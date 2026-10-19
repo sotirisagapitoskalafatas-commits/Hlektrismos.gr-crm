@@ -564,6 +564,7 @@ grant execute on function public.field_sales_candidate_duplicate_signal(text,tex
 create table if not exists public.field_sales_duplicate_reviews (
   id uuid primary key default gen_random_uuid(),
   requested_by uuid not null references auth.users(id) on delete restrict default auth.uid(),
+  prospective_owner_id uuid references auth.users(id) on delete restrict,
   route_id uuid references public.field_sales_routes(id) on delete set null,
   route_stop_id uuid references public.field_sales_route_stops(id) on delete set null,
   candidate_name text not null check (length(btrim(candidate_name)) between 2 and 200),
@@ -587,6 +588,8 @@ create table if not exists public.field_sales_duplicate_reviews (
   constraint field_sales_duplicate_reviews_lat check (candidate_lat is null or candidate_lat between -90 and 90),
   constraint field_sales_duplicate_reviews_lng check (candidate_lng is null or candidate_lng between -180 and 180)
 );
+
+alter table public.field_sales_duplicate_reviews add column if not exists prospective_owner_id uuid references auth.users(id) on delete restrict;
 create index if not exists idx_field_sales_duplicate_reviews_status
   on public.field_sales_duplicate_reviews(status, requested_at desc);
 create index if not exists idx_field_sales_duplicate_reviews_requester
@@ -637,6 +640,8 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
+declare
+  v_requester_role text;
 as $duplicate_review_stamp$
 begin
   if tg_op = 'INSERT' then
@@ -647,9 +652,29 @@ begin
     new.reviewed_by := null;
     new.reviewed_at := null;
     new.created_lead_id := null;
+
+    select p.role into v_requester_role
+    from public.profiles p
+    where p.id = auth.uid() and coalesce(p.is_active,true);
+    if v_requester_role in ('inside_sales','field_sales') then
+      -- A Sales Agent's own prospect request must remain assigned to that same account.
+      new.prospective_owner_id := auth.uid();
+    elsif v_requester_role in ('admin','manager','back_office') then
+      if new.prospective_owner_id is null or not exists (
+        select 1 from public.profiles p
+        where p.id = new.prospective_owner_id
+          and p.role in ('inside_sales','field_sales')
+          and coalesce(p.is_active,true)
+      ) then
+        raise exception 'field_sales_duplicate_reviews: choose an active Sales Agent owner' using errcode = '42501';
+      end if;
+    else
+      raise exception 'field_sales_duplicate_reviews: active staff account required' using errcode = '42501';
+    end if;
   else
     -- Request/candidate evidence is immutable after submission. Review edits cannot rewrite the submitted candidate.
     new.requested_by := old.requested_by;
+    new.prospective_owner_id := old.prospective_owner_id;
     new.route_id := old.route_id;
     new.route_stop_id := old.route_stop_id;
     new.candidate_name := old.candidate_name;

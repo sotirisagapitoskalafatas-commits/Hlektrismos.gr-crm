@@ -10,11 +10,11 @@ type OrsRoute = {
 };
 
 export class OrsRoutingProvider implements RoutingProvider {
-  constructor(private apiKey: string) {}
+  constructor(private apiKey: string, private profile: 'driving-car' | 'foot-walking' | 'cycling-regular' = 'driving-car') {}
 
   async planRoute(stops: RouteStop[]): Promise<RoutePlan> {
     if (stops.length < 2) throw new Error('Χρειάζονται τουλάχιστον 2 στάσεις για δρομολόγηση.');
-    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/' + this.profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: this.apiKey },
       body: JSON.stringify({ coordinates: stops.map(s => [s.position.lng, s.position.lat]) }),

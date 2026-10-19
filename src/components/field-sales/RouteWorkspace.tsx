@@ -286,8 +286,10 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       return;
     }
     if (!selectedRouteId || !current.id) {
-      setStops(old => old.map((stop, i) => i === index ? { ...stop, stop_status: status } : stop));
-      toast('Η κατάσταση θα αποθηκευτεί μαζί με τη νέα διαδρομή.', 'info');
+      if (status !== 'pending') {
+        toast('Αποθηκεύστε πρώτα τη διαδρομή· μετά θα καταγραφεί η Άφιξη / Ολοκλήρωση με χρονική σήμανση από τη βάση.', 'warn');
+        return;
+      }
       return;
     }
 
@@ -715,7 +717,7 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
                   <div className="text-xs text-ink/45 truncate">{stop.subtitle ?? stop.address ?? (stop.source_type === 'discovery' ? 'Νέα επιχείρηση' : 'CRM στάση')}</div>
                   <div className="text-[10px] text-ink/35 mt-1">{stop.latitude.toFixed(5)}, {stop.longitude.toFixed(5)} · {stop.source_type === 'discovery' ? 'OpenStreetMap candidate' : stop.source_type.toUpperCase()}</div>
                   <label className="block mt-2 text-[10px] text-ink/45">Κατάσταση στάσης
-                    <select className="field mt-1 !py-1 !text-xs" value={stop.stop_status ?? 'pending'} onChange={event => void changeStopStatus(index, event.target.value as 'pending' | 'arrived' | 'completed' | 'skipped')} disabled={saving || stop.stop_status === 'completed'} aria-label={`Κατάσταση στάσης ${index + 1}`}>
+                    <select className="field mt-1 !py-1 !text-xs" value={stop.stop_status ?? 'pending'} onChange={event => void changeStopStatus(index, event.target.value as 'pending' | 'arrived' | 'completed' | 'skipped')} disabled={saving || stop.stop_status === 'completed' || !selectedRouteId || !stop.id} aria-label={`Κατάσταση στάσης ${index + 1}`}>
                       <option value="pending" disabled={stop.stop_status === 'arrived'}>Εκκρεμεί</option>
                       <option value="arrived">Άφιξη</option>
                       <option value="completed">Ολοκληρώθηκε</option>
@@ -726,9 +728,9 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
                   {stop.completed_at && <p className="text-[10px] text-emerald-700">Ολοκλήρωση: {new Date(stop.completed_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>}
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
-                  <button className="rounded-lg p-1.5 text-ink/45 hover:bg-ink/5 disabled:opacity-25" aria-label="Μετακίνηση στάσης επάνω" disabled={index === 0 || stop.stop_status === 'arrived' || stop.stop_status === 'completed'} onClick={() => void reorder(index, -1)}><ChevronUp className="h-4 w-4" /></button>
-                  <button className="rounded-lg p-1.5 text-ink/45 hover:bg-ink/5 disabled:opacity-25" aria-label="Μετακίνηση στάσης κάτω" disabled={index === stops.length - 1 || stop.stop_status === 'arrived' || stop.stop_status === 'completed'} onClick={() => void reorder(index, 1)}><ChevronDown className="h-4 w-4" /></button>
-                  <button className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-25" aria-label="Αφαίρεση στάσης" title={stop.stop_status === 'arrived' || stop.stop_status === 'completed' ? 'Το ιστορικό στάσης διατηρείται' : 'Αφαίρεση στάσης'} disabled={stop.stop_status === 'arrived' || stop.stop_status === 'completed'} onClick={() => setStops(current => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></button>
+                  <button className="rounded-lg p-1.5 text-ink/45 hover:bg-ink/5 disabled:opacity-25" aria-label="Μετακίνηση στάσης επάνω" disabled={index === 0 || stop.stop_status === 'arrived' || stop.stop_status === 'completed' || !selectedRouteId} onClick={() => void reorder(index, -1)}><ChevronUp className="h-4 w-4" /></button>
+                  <button className="rounded-lg p-1.5 text-ink/45 hover:bg-ink/5 disabled:opacity-25" aria-label="Μετακίνηση στάσης κάτω" disabled={index === stops.length - 1 || stop.stop_status === 'arrived' || stop.stop_status === 'completed' || !selectedRouteId} onClick={() => void reorder(index, 1)}><ChevronDown className="h-4 w-4" /></button>
+                  <button className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-25" aria-label="Αφαίρεση στάσης" title={stop.stop_status === 'arrived' || stop.stop_status === 'completed' ? 'Το ιστορικό στάσης διατηρείται' : 'Αφαίρεση στάσης'} disabled={stop.stop_status === 'arrived' || stop.stop_status === 'completed' || (!selectedRouteId && stop.stop_status !== 'pending')} onClick={() => setStops(current => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
             ))}

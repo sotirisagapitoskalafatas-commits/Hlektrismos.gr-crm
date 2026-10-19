@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, ROLE_COLOR, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
+import { MATURITY_LABEL, ROLE_COLOR, categoryColor, navForRole, accessGroupLabel, sectionColor } from '@/lib/roles';
 import type { NavLeaf, ShellCounts } from '@/lib/roles';
 import { Logo, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -114,7 +114,7 @@ export default function TabletShell({ counts }: TabletShellProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-white truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-              <span className="micro text-white/55">{roleLabel(role)}</span>
+              <span className="micro text-white/55">{accessGroupLabel(role)}</span>
             </div>
           </div>
         )}

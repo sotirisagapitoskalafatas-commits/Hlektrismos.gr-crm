@@ -723,6 +723,50 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
         </section>
 
         <aside className="space-y-4" aria-label="Εύρεση επιχειρήσεων και πλοήγηση">
+          {canManageTeam && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4" aria-label="Έλεγχος διπλοτύπων Back Office">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <Micro tone="brand">Back Office · Έλεγχος διπλοτύπων</Micro>
+                  <h4 className="text-sm font-semibold text-ink mt-1">Αιτήματα προς έγκριση ({duplicateReviews.length})</h4>
+                  <p className="text-xs text-ink/45 mt-1">Η δημιουργία Lead παραμένει σε αναμονή μέχρι να εγκριθεί. Οι πιθανές αντιστοιχίσεις εμφανίζονται ως σήμα, χωρίς στοιχεία άλλων εγγραφών CRM.</p>
+                </div>
+                <button className="text-xs font-semibold text-brand-700 underline" onClick={() => void refreshDuplicateReviews()} disabled={loadingDuplicateReviews}>
+                  {loadingDuplicateReviews ? 'Φόρτωση…' : 'Ανανέωση'}
+                </button>
+              </div>
+              {loadingDuplicateReviews && <div className="py-4 flex justify-center"><Spinner /></div>}
+              {!loadingDuplicateReviews && duplicateReviews.length === 0 && (
+                <p className="text-xs text-ink/45 mt-3">Δεν υπάρχουν εκκρεμή αιτήματα ελέγχου.</p>
+              )}
+              <div className="mt-3 space-y-2 max-h-[340px] overflow-y-auto">
+                {duplicateReviews.map(review => (
+                  <div key={review.id} className="rounded-xl border border-violet-100 bg-white p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-ink break-words">{review.candidate_name}</div>
+                        <div className="text-xs text-ink/45 mt-1">{review.candidate_address ?? 'Δεν δόθηκε διεύθυνση'}</div>
+                        <div className="text-[10px] text-ink/35 mt-1">
+                          {review.duplicate_signal === 'check_failed' ? 'Ο έλεγχος απέτυχε — επανέλεγχος απαιτείται' : 'Πιθανή υπάρχουσα CRM εγγραφή'}
+                          {' · '}{new Date(review.requested_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                      {review.source_url && <a href={review.source_url} target="_blank" rel="noreferrer" className="shrink-0 text-xs text-ink/50 underline">Πηγή</a>}
+                    </div>
+                    {review.request_note && <p className="text-xs text-ink/50 mt-2">{review.request_note}</p>}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Btn size="sm" onClick={() => void approveDuplicateReview(review)} disabled={reviewActionId === review.id}>
+                        {reviewActionId === review.id ? <Spinner /> : null} Έγκριση & δημιουργία Lead
+                      </Btn>
+                      <Btn size="sm" variant="outline" onClick={() => void rejectDuplicateReview(review)} disabled={reviewActionId === review.id}>
+                        Απόρριψη
+                      </Btn>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="rounded-2xl border border-line bg-slate-50 p-4">
             <Micro tone="brand">Ανακάλυψη επιχειρήσεων</Micro>
             <h4 className="text-sm font-semibold text-ink mt-1">Επιχειρήσεις κατά μήκος της διαδρομής</h4>
@@ -738,9 +782,15 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
               {candidates.map(candidate => (
                 <div key={candidate.id} className="rounded-xl border border-line bg-white p-3">
                   <div className="text-sm font-medium text-ink">{candidate.label}</div>
-                  <div className="text-xs text-ink/45 mt-1">{candidate.sublabel ?? candidate.category ?? 'Δημόσια καταχώριση'}</div>
+                  <div className="text-xs text-ink/45 mt-1">{candidate.address ?? candidate.sublabel ?? candidate.category ?? 'Δημόσια καταχώριση'}</div>
+                  {candidate.category && <div className="text-[10px] text-ink/35 mt-1">{candidate.category}</div>}
                   <div className="flex flex-wrap gap-3 mt-2 text-xs">
-                    <button className="font-semibold text-brand-600" onClick={() => void addCandidate(candidate)}>+ Προσθήκη ως στάση</button>
+                    <button className="font-semibold text-brand-600 disabled:opacity-40" disabled={reviewActionId === candidate.id} onClick={() => void addCandidate(candidate)}>
+                      {reviewActionId === candidate.id ? 'Έλεγχος…' : '+ Προσθήκη ως στάση'}
+                    </button>
+                    <button className="font-semibold text-emerald-700 disabled:opacity-40" disabled={reviewActionId === candidate.id} onClick={() => void createProspect(candidate)}>
+                      {reviewActionId === candidate.id ? 'Έλεγχος…' : 'Δημιουργία Prospect'}
+                    </button>
                     <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="text-ink/50 underline">OpenStreetMap</a>
                   </div>
                 </div>

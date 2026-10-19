@@ -438,6 +438,33 @@ begin
   end if;
 end $$;
 
+-- The legacy aggregate RPC contains team-wide names/counts. Its old body had no caller-role guard.
+-- Preserve it for the office dashboard, but do not expose other agents' aggregate counts to Sales users.
+create or replace function public.get_agent_lead_counts()
+returns table(agent_id uuid, agent_name text, lead_count bigint)
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $
+begin
+  if auth.uid() is null or not public.is_staff()
+     or not (public.is_role('admin') or public.is_role('back_office')) then
+    raise exception 'get_agent_lead_counts: office permission required' using errcode = '42501';
+  end if;
+
+  return query
+  select cu.id as agent_id,
+         coalesce(cu.full_name, 'Unknown') as agent_name,
+         count(hl.id) as lead_count
+  from public.crm_users cu
+  left join public.hlektrismos_leads hl
+    on hl.assigned_to = cu.id and hl.deleted_at is null
+  where cu.role::text = 'sales' and coalesce(cu.is_active, true)
+  group by cu.id, cu.full_name
+  order by lead_count asc;
+end;
+$;
+
 -- 10. Pin a safe search_path on SECURITY DEFINER functions that still have the mutable default.
 -- This only sets function configuration; it does not change their body or return shape.
 do $$

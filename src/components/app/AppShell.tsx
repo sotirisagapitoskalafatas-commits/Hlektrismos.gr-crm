@@ -302,7 +302,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
           </span>
           <span className="hidden lg:block text-left">
             <span className="block text-[13px] font-semibold text-ink leading-tight max-w-[140px] truncate">{profile?.full_name ?? 'Χρήστης'}</span>
-            <span className="block micro text-ink/40 leading-tight">{preview.role ? `Προεπισκόπηση: ${roleLabel(preview.role)}` : roleLabel(realRole)}</span>
+            <span className="block micro text-ink/40 leading-tight">{preview.role ? `Προεπισκόπηση: ${accessGroupLabel(preview.role)}` : roleLabel(realRole)}</span>
           </span>
           <ChevronDown className="hidden lg:block w-3.5 h-3.5 text-ink/40" />
         </button>

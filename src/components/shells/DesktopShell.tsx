@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, ROLE_COLOR, ROLES, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
+import { MATURITY_LABEL, ROLE_COLOR, ROLES, categoryColor, navForRole, accessGroupLabel, sectionColor } from '@/lib/roles';
 import type { NavLeaf, ShellCounts } from '@/lib/roles';
 import { Logo, Micro, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -138,7 +138,7 @@ export default function DesktopShell({ counts }: DesktopShellProps) {
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-white truncate">{profile?.full_name ?? 'Χρήστης'}</div>
               <div className="flex items-center gap-1.5">
-                <Micro>{roleLabel(role)}</Micro>
+                <Micro>{accessGroupLabel(role)}</Micro>
                 <span className="pill !text-[9px] !py-0 !px-1"
                   style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
                   {ROLES.find(r => r.id === role)?.short}

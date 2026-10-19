@@ -1,6 +1,6 @@
 # Apply order — every staged SQL file not yet on live
 
-**One list, in the exact order to run them.** 25 files (22 numbered steps, plus 2b, 2c and 3b added by the security audit and the account/visibility work), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
+**One list, in the exact order to run them.** 26 files (22 numbered steps, plus 2b, 2c, 2d and 3b added by the security audit and the account/visibility work), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
 ## Before step 1
@@ -55,6 +55,27 @@ select count(*) > 0 from pg_policies where schemaname='public' and policyname='a
 ```sql
 select count(*) > 0 from pg_policies where schemaname='public' and policyname='staff only (restrictive)';
 ```
+
+## 2d. `phase1/18_live_api_privilege_hardening.sql` — security hotfix (branch PR; not applied)
+- **Depends on:** review the read-only live findings first; run after 01/16/17/19 during the same controlled security window. It does not require data backfills, but it changes grants, RLS policies and legacy RPC bodies.
+- **Unlocks:** anonymous access to the audited private legacy tables is denied; profile role/status cannot be changed through direct API writes; exposed legacy reassignment and supply-point RPCs require office authorization; the audited non-public SECURITY DEFINER RPCs lose anonymous EXECUTE; mutable SECURITY DEFINER `search_path` values are pinned; the public tariff view runs with invoker permissions.
+- **Public paths that must keep working:** website/contact lead intake, chatbot public tariff lookup, and staff conversion/assignment flows. A successful local PGlite test is not a replacement for staging smoke tests.
+- **Runbook:** [`SECURITY_REMEDIATION_PR_20261019.md`](SECURITY_REMEDIATION_PR_20261019.md). Do not apply this file as part of an automated batch. Check the exact target database, take a backup/PITR checkpoint, apply only this file, then run the checks below.
+- **Rollback:** [`rollback_phase1_18_live_api_privilege_hardening.sql`](rollback_phase1_18_live_api_privilege_hardening.sql). Emergency only: it intentionally restores prior vulnerable access.
+- **Catalog checks (run against the target only during an approved change window):**
+```sql
+select
+  not has_table_privilege('anon','public.crm_users','SELECT') as anon_cannot_read_crm_users,
+  not has_table_privilege('anon','public.customer_documents','SELECT') as anon_cannot_read_customer_documents,
+  not has_table_privilege('anon','public.hlektrismos_leads','SELECT') as anon_cannot_read_legacy_leads,
+  not has_function_privilege('anon','public.reassign_lead(uuid,uuid)','EXECUTE') as anon_cannot_reassign,
+  not has_function_privilege('anon','public.upsert_supply_point(uuid,text,text,text,text,uuid,numeric,numeric)','EXECUTE') as anon_cannot_upsert_supply,
+  has_function_privilege('anon','public.insert_website_lead(text,jsonb)','EXECUTE') as public_intake_rpc_preserved,
+  has_function_privilege('anon','public.get_active_tariff_prices(text)','EXECUTE') as public_tariff_lookup_preserved,
+  exists (select 1 from pg_trigger where tgname='profiles_guard_privileged' and not tgisinternal) as profile_guard_exists,
+  (select coalesce('security_invoker=true'=any(reloptions),false) from pg_class where oid=to_regclass('public.market_tariffs_view')) as tariff_view_invoker;
+```
+- **Required before production:** on staging, test website/contact intake including invalid consent/age cases, chatbot tariff lookup, Admin/Back Office account provisioning, Sales Agent login, and routine lead/case/customer/document flows. If anything fails, stop and diagnose.
 
 ## 3. `phase2/05_staff_admin_and_role_preview.sql` — security
 - **Depends on:** the role-model decision (see above); then deploy `admin-users`.

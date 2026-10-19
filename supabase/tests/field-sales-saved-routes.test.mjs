@@ -166,6 +166,62 @@ test('Back Office can inspect, reassign and manage routes and their stops', asyn
   assert.equal(updated.rows.length, 1);
 });
 
+test('manual arrival/completion timestamps are server-stamped and cannot be reversed or deleted', async () => {
+  const route = await createRoute(AGENT_A, 'Timestamped visit route');
+  const stop = await createStop(AGENT_A, route, 0, 'Manual check-in', 37.98, 23.73);
+  assert.equal(stop.ok, true, stop.error);
+  const stopId = stop.rows[0].id;
+
+  await as(AGENT_A);
+  const arrived = await run("update public.field_sales_route_stops set stop_status='arrived' where id=$1 returning arrived_at,completed_at", [stopId]);
+  assert.equal(arrived.ok, true, arrived.error);
+  assert.ok(arrived.rows[0].arrived_at, 'arrival timestamp is populated by the database');
+  assert.equal(arrived.rows[0].completed_at, null);
+
+  const completed = await run("update public.field_sales_route_stops set stop_status='completed' where id=$1 returning arrived_at,completed_at", [stopId]);
+  assert.equal(completed.ok, true, completed.error);
+  assert.ok(completed.rows[0].arrived_at);
+  assert.ok(completed.rows[0].completed_at, 'completion timestamp is populated by the database');
+
+  const regression = await run("update public.field_sales_route_stops set stop_status='pending' where id=$1 returning id", [stopId]);
+  assert.equal(regression.ok, false, 'completed history cannot regress to pending');
+  const deletion = await run('delete from public.field_sales_route_stops where id=$1 returning id', [stopId]);
+  assert.equal(deletion.ok, false, 'a completed stop cannot be removed');
+});
+
+test('saving a route with historical stop IDs keeps the historical row and refuses omission', async () => {
+  const route = await createRoute(AGENT_A, 'Preserved history route');
+  const historical = await createStop(AGENT_A, route, 0, 'History that stays', 37.98, 23.73);
+  const pending = await createStop(AGENT_A, route, 1, 'Editable pending stop', 37.97, 23.72);
+  assert.equal(historical.ok, true, historical.error);
+  assert.equal(pending.ok, true, pending.error);
+
+  await as(AGENT_A);
+  await run("update public.field_sales_route_stops set stop_status='completed' where id=$1", [historical.rows[0].id]);
+  const updated = await run('select public.field_sales_replace_route_stops($1,$2::jsonb)', [route, JSON.stringify([
+    { id: historical.rows[0].id, sort_order: 0, source_type: 'manual', label: 'Edited text must not overwrite history', latitude: 37.98, longitude: 23.73, stop_status: 'completed', metadata: {} },
+    { id: pending.rows[0].id, sort_order: 1, source_type: 'manual', label: 'Updated pending stop', latitude: 37.971, longitude: 23.721, stop_status: 'pending', metadata: {} },
+  ])]);
+  assert.equal(updated.ok, true, updated.error);
+  await owner();
+  const preserved = (await db.query('select id,label,stop_status,completed_at from public.field_sales_route_stops where id=$1', [historical.rows[0].id])).rows[0];
+  assert.equal(preserved.label, 'History that stays');
+  assert.equal(preserved.stop_status, 'completed');
+  assert.ok(preserved.completed_at);
+  const pendingAfter = (await db.query('select id,label,latitude from public.field_sales_route_stops where id=$1', [pending.rows[0].id])).rows[0];
+  assert.equal(pendingAfter.id, pending.rows[0].id);
+  assert.equal(pendingAfter.label, 'Updated pending stop');
+  assert.equal(Number(pendingAfter.latitude), 37.971);
+
+  await as(AGENT_A);
+  const omitted = await run('select public.field_sales_replace_route_stops($1,$2::jsonb)', [route, JSON.stringify([
+    { id: pending.rows[0].id, source_type: 'manual', label: 'Still editable', latitude: 37.971, longitude: 23.721, stop_status: 'pending', metadata: {} },
+  ])]);
+  assert.equal(omitted.ok, false, 'historical stop omission is refused');
+  await owner();
+  assert.equal((await db.query('select count(*)::int n from public.field_sales_route_stops where id=$1', [historical.rows[0].id])).rows[0].n, 1);
+});
+
 test('Back Office can assign only to active Sales Agents; route history cannot be deleted', async () => {
   await as(BO);
   const invalidOwner = await run(

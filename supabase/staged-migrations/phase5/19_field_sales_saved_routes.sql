@@ -494,7 +494,7 @@ language plpgsql
 stable
 security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $duplicate_signal$
 declare
   v_role text;
   v_name text := lower(btrim(coalesce(p_name,'')));
@@ -556,7 +556,7 @@ begin
 
   return coalesce(v_match,false);
 end;
-$;
+$duplicate_signal$;
 revoke all on function public.field_sales_candidate_duplicate_signal(text,text,text,double precision,double precision) from public, anon;
 grant execute on function public.field_sales_candidate_duplicate_signal(text,text,text,double precision,double precision) to authenticated, service_role;
 
@@ -637,7 +637,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $duplicate_review_stamp$
 begin
   if tg_op = 'INSERT' then
     new.requested_by := auth.uid();
@@ -687,7 +687,7 @@ begin
   end if;
   return new;
 end;
-$;
+$duplicate_review_stamp$;
 revoke all on function public.field_sales_duplicate_review_stamp() from public, anon, authenticated;
 grant execute on function public.field_sales_duplicate_review_stamp() to service_role;
 drop trigger if exists field_sales_duplicate_review_stamp on public.field_sales_duplicate_reviews;

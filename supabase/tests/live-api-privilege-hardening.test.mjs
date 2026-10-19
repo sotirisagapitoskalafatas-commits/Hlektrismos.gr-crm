@@ -91,7 +91,7 @@ before(async () => {
     create table public.hlektrismos_leads (
       id uuid primary key default gen_random_uuid(), first_name text, last_name text, phone text, email text,
       consent boolean not null default false, age_confirmed boolean not null default false,
-      assigned_to uuid, assigned_at timestamptz, assigned_by uuid
+      assigned_to uuid, assigned_at timestamptz, assigned_by uuid, deleted_at timestamptz
     );
     create table public.customers (id uuid primary key default gen_random_uuid(), note text);
     create table public.cases (id uuid primary key default gen_random_uuid(), note text);
@@ -292,6 +292,16 @@ test('authenticated role can still use the guarded case-conversion RPC, not anon
   assert.equal((await run("select public.convert_lead_to_case('" + LEAD + "')")).ok, false);
   await as('authenticated', AGENT);
   assert.equal((await run("select public.convert_lead_to_case('" + LEAD + "')")).ok, true);
+});
+
+test('team-wide lead counts are limited to Admin / Back Office', async () => {
+  await as('authenticated', AGENT);
+  assert.equal((await run('select * from public.get_agent_lead_counts()')).ok, false);
+  await as('authenticated', ADMIN);
+  const r = await run('select * from public.get_agent_lead_counts()');
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].agent_id, AGENT);
 });
 
 test('public tariff catalogue remains readable with a security-invoker view', async () => {

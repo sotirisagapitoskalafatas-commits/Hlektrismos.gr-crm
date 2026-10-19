@@ -7,24 +7,41 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 const out = buildSync({ entryPoints: [fileURLToPath(new URL('../staff-admin.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent' });
 const S = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 
-test('matrix (admin-only provisioning, §2.4): admin manages all roles; manager, back office and sales manage nobody; inactive nothing', () => {
-  assert.deepEqual(S.manageableRoles('admin', true), ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office']);
-  for (const r of ['manager', 'back_office', 'inside_sales', 'field_sales']) assert.deepEqual(S.manageableRoles(r, true), [], `${r} manages nobody`);
-  assert.deepEqual(S.manageableRoles('admin', false), []);
-  assert.deepEqual(S.manageableRoles(undefined, true), [], 'unknown role is denied by default');
-  assert.equal(S.canManage('manager', true, null, 'inside_sales'), false, 'manager cannot create staff any more');
-  assert.equal(S.canManage('manager', true, 'field_sales', 'back_office'), false);
-  assert.equal(S.canManage('back_office', true, null, 'back_office'), false, 'back office cannot create back office accounts (each person gets one from an admin)');
-  assert.equal(S.canManage('admin', true, null, 'back_office'), true);
-  assert.equal(S.canManage('admin', true, 'field_sales', 'manager'), true);
-});
+test('two-group matrix: only Sales Agent roles can be created/promoted; Admin retains legacy-office maintenance only', () => {
+  assert.deepEqual(S.manageableRoles('admin', true), ['field_sales', 'inside_sales']);
+  assert.deepEqual(S.manageableRoles('back_office', true), ['field_sales', 'inside_sales']);
+  assert.deepEqual(S.manageableRoles('manager', true), ['field_sales', 'inside_sales']);
 
-test('password reset: admin only, only for an account that has an e-mail; refusals are 403/404', () => {
-  const ok = { actorRole: 'admin', actorActive: true, targetRole: 'back_office', targetEmail: 'a@b.gr' };
-  assert.deepEqual(S.decideReset(ok), { ok: true });
-  for (const r of ['manager', 'back_office', 'inside_sales', 'field_sales']) assert.equal(S.decideReset({ ...ok, actorRole: r }).status, 403, `${r} cannot reset`);
-  assert.equal(S.decideReset({ ...ok, actorActive: false }).status, 403, 'a disabled admin cannot reset');
-  assert.equal(S.decideReset({ ...ok, targetEmail: null }).status, 404);
+  for (const officeRole of ['admin', 'manager', 'back_office']) {
+    assert.equal(S.canManage(officeRole, true, null, 'field_sales'), true, officeRole + ' can create Sales Agents');
+    assert.equal(S.canManage(officeRole, true, null, 'inside_sales'), true, officeRole + ' can maintain the legacy Sales Agent group');
+    assert.equal(S.canManage(officeRole, true, null, 'back_office'), false, officeRole + ' cannot create office accounts');
+    assert.equal(S.canManage(officeRole, true, null, 'admin'), false, officeRole + ' cannot create admin accounts');
+    assert.equal(S.canManage(officeRole, true, 'field_sales', 'back_office'), false, officeRole + ' cannot promote a Sales Agent');
+  }
+
+  // During the compatibility period, the legacy admin can still reset/deactivate old office rows without changing their role.
+  assert.equal(S.canManage('admin', true, 'manager'), true);
+  assert.equal(S.canManage('admin', true, 'manager', 'back_office'), false);
+  assert.equal(S.canManage('back_office', true, 'admin'), false);
+  for (const salesRole of ['inside_sales', 'field_sales']) assert.deepEqual(S.manageableRoles(salesRole, true), []);
+  assert.deepEqual(S.manageableRoles('admin', false), []);
+  assert.deepEqual(S.manageableRoles('back_office', false), []);
+  assert.deepEqual(S.manageableRoles(undefined, true), [], 'unknown actor is denied by default');
+});
+test('password reset: Back Office can reset Sales Agent accounts only; missing email and privileged targets are refused', () => {
+  const admin = { actorRole: 'admin', actorActive: true, targetRole: 'back_office', targetEmail: 'a@b.gr' };
+  assert.deepEqual(S.decideReset(admin), { ok: true });
+  for (const actorRole of ['manager', 'back_office']) {
+    assert.deepEqual(S.decideReset({ ...admin, actorRole, targetRole: 'field_sales' }), { ok: true }, actorRole + ' may reset Sales Agents');
+    assert.equal(S.decideReset({ ...admin, actorRole, targetRole: 'admin' }).status, 403, actorRole + ' cannot reset admins');
+  }
+  for (const actorRole of ['inside_sales', 'field_sales']) {
+    assert.equal(S.decideReset({ ...admin, actorRole, targetRole: 'field_sales' }).status, 403, actorRole + ' cannot reset');
+  }
+  assert.equal(S.decideReset({ ...admin, actorActive: false }).status, 403, 'inactive admin cannot reset');
+  assert.equal(S.decideReset({ ...admin, actorRole: 'back_office', actorActive: false, targetRole: 'field_sales' }).status, 403, 'inactive back office cannot reset');
+  assert.equal(S.decideReset({ ...admin, targetEmail: null }).status, 404);
 });
 
 test('edge function wiring: reset is audited, returns no link or password, and the public sign-up path is not used', () => {
@@ -49,7 +66,7 @@ test('create validation: email, name, role, phone and temporary password strengt
   assert.equal(S.validateCreate({ email: 'a@b.gr', full_name: 'Α Β', role: 'admin', phone: 'abc' }).ok, false);
 });
 
-test('delete: never yourself, never the last admin, never someone in CRM history, only within your scope', () => {
+test('delete: never yourself, protect last admin, preserve CRM history, and scope Back Office to Sales Agents', () => {
   const base = { actorId: 'a', actorRole: 'admin', actorActive: true, targetId: 't', targetRole: 'field_sales', targetActive: true, activeAdmins: 2, references: 0 };
   assert.deepEqual(S.decideDelete(base), { ok: true });
   assert.equal(S.decideDelete({ ...base, targetId: 'a' }).status, 403);
@@ -57,7 +74,13 @@ test('delete: never yourself, never the last admin, never someone in CRM history
   assert.equal(S.decideDelete({ ...base, targetRole: 'admin', activeAdmins: 2 }).ok, true);
   const refs = S.decideDelete({ ...base, references: 3 });
   assert.equal(refs.status, 409); assert.match(refs.error, /Απενεργοποιήστε/);
-  for (const r of ['manager', 'back_office', 'inside_sales', 'field_sales']) assert.equal(S.decideDelete({ ...base, actorRole: r, targetRole: 'field_sales' }).status, 403, `${r} cannot delete accounts`);
+  for (const actorRole of ['manager', 'back_office']) {
+    assert.deepEqual(S.decideDelete({ ...base, actorRole, targetRole: 'field_sales' }), { ok: true }, actorRole + ' may administer Sales Agents');
+    assert.equal(S.decideDelete({ ...base, actorRole, targetRole: 'admin' }).status, 403, actorRole + ' cannot delete privileged users');
+  }
+  for (const actorRole of ['inside_sales', 'field_sales']) {
+    assert.equal(S.decideDelete({ ...base, actorRole, targetRole: 'field_sales' }).status, 403, actorRole + ' cannot delete accounts');
+  }
 });
 
 test('no public sign-up anywhere in the app or the edge functions (§2.4): accounts exist only because an admin created them', () => {

@@ -1391,6 +1391,77 @@ export async function fetchFieldTargets(search?: string): Promise<FieldTarget[]>
   return results;
 }
 
+export type PotentialCRMMatch = {
+  entity_type: 'case' | 'customer' | 'lead';
+  id: string;
+  label: string;
+  address: string | null;
+  phone: string | null;
+  lat: number | null;
+  lng: number | null;
+};
+
+/**
+ * Duplicate signal query for a map-discovered business. Unlike fetchFieldTargets(), this deliberately
+ * includes records without coordinates so an unlocated existing CRM record is not mistaken for a new lead.
+ * Only the matching rows are returned; it never downloads the full CRM.
+ */
+export async function findPotentialCRMMatches(search: string): Promise<{ rows: PotentialCRMMatch[]; error: string | null }> {
+  if (!supabase) return { rows: [], error: 'Η βάση δεδομένων δεν είναι διαθέσιμη.' };
+  const needle = search.trim().replace(/[\u0000-\u001f%_*]/g, '').slice(0, 80);
+  if (needle.length < 2) return { rows: [], error: null };
+  const pattern = `%${needle}%`;
+
+  const [caseTitle, caseAddress, customerName, customerAddress, customerPhone, leadName, leadClient, leadCompany, leadAddress] = await Promise.all([
+    supabase.from('cases').select('id,title,address,lat,lng,customer:customers(full_name,phone)').ilike('title', pattern).limit(10),
+    supabase.from('cases').select('id,title,address,lat,lng,customer:customers(full_name,phone)').ilike('address', pattern).limit(10),
+    supabase.from('customers').select('id,full_name,address,phone,lat,lng').ilike('full_name', pattern).limit(10),
+    supabase.from('customers').select('id,full_name,address,phone,lat,lng').ilike('address', pattern).limit(10),
+    supabase.from('customers').select('id,full_name,address,phone,lat,lng').ilike('phone', pattern).limit(10),
+    supabase.from('leads').select('id,full_name,client_name,first_name,last_name,address,phone,lat,lng').ilike('full_name', pattern).limit(10),
+    supabase.from('leads').select('id,full_name,client_name,first_name,last_name,address,phone,lat,lng').ilike('client_name', pattern).limit(10),
+    supabase.from('leads').select('id,full_name,client_name,company,first_name,last_name,address,phone,lat,lng').ilike('company', pattern).limit(10),
+    supabase.from('leads').select('id,full_name,client_name,first_name,last_name,address,phone,lat,lng').ilike('address', pattern).limit(10),
+  ]);
+
+  const responses = [caseTitle, caseAddress, customerName, customerAddress, customerPhone, leadName, leadClient, leadCompany, leadAddress];
+  const failed = responses.some(result => result.error);
+  responses.forEach((result, index) => { if (result.error) logError('findPotentialCRMMatches[' + index + ']', result.error); });
+
+  const rows: PotentialCRMMatch[] = [
+    ...[...(caseTitle.data ?? []), ...(caseAddress.data ?? [])].map(row => ({
+      entity_type: 'case' as const,
+      id: row.id,
+      label: row.customer?.full_name || row.title || 'Υπόθεση χωρίς τίτλο',
+      address: row.address ?? null,
+      phone: row.customer?.phone ?? null,
+      lat: row.lat ?? null,
+      lng: row.lng ?? null,
+    })),
+    ...[...(customerName.data ?? []), ...(customerAddress.data ?? []), ...(customerPhone.data ?? [])].map(row => ({
+      entity_type: 'customer' as const,
+      id: row.id,
+      label: row.full_name || 'Πελάτης χωρίς όνομα',
+      address: row.address ?? null,
+      phone: row.phone ?? null,
+      lat: row.lat ?? null,
+      lng: row.lng ?? null,
+    })),
+    ...[...(leadName.data ?? []), ...(leadClient.data ?? []), ...(leadCompany.data ?? []), ...(leadAddress.data ?? [])].map(row => ({
+      entity_type: 'lead' as const,
+      id: row.id,
+      label: row.full_name || row.client_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Lead χωρίς όνομα',
+      address: row.address ?? null,
+      phone: row.phone ?? null,
+      lat: row.lat ?? null,
+      lng: row.lng ?? null,
+    })),
+  ];
+  const unique = new Map<string, PotentialCRMMatch>();
+  for (const row of rows) unique.set(row.entity_type + ':' + row.id, row);
+  return { rows: [...unique.values()], error: failed ? 'Δεν ολοκληρώθηκε ο έλεγχος σε όλους τους πίνακες CRM. Απαιτείται έλεγχος από Back Office πριν δημιουργηθεί νέο lead.' : null };
+}
+
 /* Write coordinates to a lead row (from geocoded map pin). */
 export async function updateLeadLocation(leadId: string, coords: { lat: number; lng: number }, source: string): Promise<boolean> {
   if (!supabase) return false;

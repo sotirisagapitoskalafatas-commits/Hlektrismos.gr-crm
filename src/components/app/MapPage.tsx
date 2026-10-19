@@ -10,11 +10,13 @@ import type { MapCoordinate, MapProvider, MapMarkerData } from '@/lib/maps/types
 import { GEO_ERRORS, getCurrentLocation } from '@/lib/geo/location';
 import type { GeoErrorCode, UserLocation } from '@/lib/geo/location';
 import { geocodeAddress } from '@/lib/geo/geocoder';
+import type { BusinessCandidate } from '@/lib/geo/geocoder';
+import type { SavedRouteStopDraft } from '@/lib/field-sales/saved-routes';
 import { distanceKm, formatDistance, formatDuration } from '@/lib/geo/distance';
 import { planRoute } from '@/lib/routing/routing-provider';
-import type { RoutePlan } from '@/lib/routing/types';
+import type { RoutePlan, RouteStop } from '@/lib/routing/types';
 import { useToast } from '@/lib/toast';
-import RoutePanel from '@/components/field-sales/RoutePanel';
+import RouteWorkspace from '@/components/field-sales/RouteWorkspace';
 import type { RouteStopInput } from '@/components/field-sales/RoutePanel';
 import NavigationButton from '@/components/navigation/NavigationButton';
 import type { NavigationTravelMode } from '@/lib/navigation/external-maps';
@@ -77,7 +79,7 @@ function visitPos(c: Case | undefined, v: CaseVisit): MapCoordinate | null {
 
 export default function MapPage() {
   const { openCase, go, view } = useNav();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { toast } = useToast();
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapProvider | null>(null);
@@ -95,6 +97,8 @@ export default function MapPage() {
   const [q, setQ] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [discoveryCandidates, setDiscoveryCandidates] = useState<BusinessCandidate[]>([]);
+  const [routeStopsOnMap, setRouteStopsOnMap] = useState<SavedRouteStopDraft[]>([]);
 
   const [myLoc, setMyLoc] = useState<UserLocation | null>(null);
   const [locErr, setLocErr] = useState<GeoErrorCode | null>(null);
@@ -335,8 +339,12 @@ export default function MapPage() {
         break;
       case 'today': {
         const ids = new Set(todayVisits.map(v => v.case_id));
-        cases.filter(c => ids.has(c.id)).forEach(c => addCase(c, 'lg', true));
-        todayVisits.forEach(v => {
+        cases.filter(c => ids.has(c.id) && matchesQ(c)).forEach(c => addCase(c, 'lg', true));
+        todayVisits.filter(v => {
+          if (!ql) return true;
+          const c = caseById.get(v.case_id);
+          return (!!c && matchesQ(c)) || (v.purpose ?? '').toLowerCase().includes(ql);
+        }).forEach(v => {
           const c = caseById.get(v.case_id);
           const pos = visitPos(c, v);
           if (pos) {
@@ -355,7 +363,8 @@ export default function MapPage() {
       case 'followups': {
         followUps.forEach(f => {
           const c = f.case_id ? caseById.get(f.case_id) : undefined;
-          if (c?.lat != null && c.lng != null) {
+          const followUpMatches = !ql || (!!c && matchesQ(c)) || (f.reason ?? '').toLowerCase().includes(ql);
+          if (followUpMatches && c?.lat != null && c.lng != null) {
             out.push({
               id: `fu-${f.id}`,
               position: { lat: c.lat, lng: c.lng },
@@ -378,27 +387,38 @@ export default function MapPage() {
         list = cases.filter(c => c.current_stage === 'completed');
         break;
       case 'leads': {
-        leads.filter(l => l.lat != null && l.lng != null).forEach(l => out.push({
-          id: `lead-${l.id}`, position: { lat: l.lat!, lng: l.lng! }, title: l.name, subtitle: l.status ?? 'lead', color: '#15803d', size: 'sm',
-        }));
+        // Added once below, after the active text filter has been applied.
         break;
       }
     }
     if (list.length > 0 || filter === 'all' || filter === 'active' || filter === 'backoffice' || filter === 'completed' || filter === 'pending_sig') {
-      list = list.filter(c => filter === 'all' || matchesQ(c));
+      list = list.filter(matchesQ);
       list.forEach(c => addCase(c));
     }
-    if (ql && filter === 'today') {
-      const ids = new Set(todayVisits.map(v => v.case_id));
-      cases.filter(c => ids.has(c.id) && !matchesQ(c)).forEach(c => addCase(c));
-    }
-    if (filter !== 'leads') {
-      leads.filter(l => l.lat != null && l.lng != null).forEach(l => out.push({
+    // Leads are shown in the unfiltered map and the Leads filter, never leaked into unrelated filters.
+    if (filter === 'all' || filter === 'leads') {
+      leads.filter(l => l.lat != null && l.lng != null && (!ql || `${l.name} ${l.address ?? ''} ${l.phone ?? ''} ${l.service ?? ''}`.toLowerCase().includes(ql))).forEach(l => out.push({
         id: `lead-${l.id}`, position: { lat: l.lat!, lng: l.lng! }, title: l.name, subtitle: l.status ?? 'lead', color: '#15803d', size: 'sm',
       }));
     }
+    // Stops from the currently edited/saved route are shown as a separate layer.
+    if (routeOpen) {
+      routeStopsOnMap.filter(stop => !ql || `${stop.label} ${stop.subtitle ?? ''} ${stop.address ?? ''}`.toLocaleLowerCase('el').includes(ql)).forEach((stop, index) => out.push({
+        id: `route-stop-${stop.id ?? 'draft-' + index}`,
+        position: { lat: stop.latitude, lng: stop.longitude },
+        title: stop.label,
+        subtitle: (index + 1) + '. στάση · ' + (stop.source_type === 'discovery' ? 'Επιχείρηση προς έλεγχο' : stop.source_type === 'crm' ? 'CRM' : stop.source_type === 'visit' ? 'Επίσκεψη' : 'Στάση'),
+        color: stop.source_type === 'discovery' ? '#0e7490' : '#7c3aed',
+        size: 'md',
+      }));
+      // Route discoveries are separate from route stops and never create CRM leads on their own.
+      discoveryCandidates.filter(candidate => !ql || `${candidate.label} ${candidate.sublabel ?? ''} ${candidate.category ?? ''}`.toLocaleLowerCase('el').includes(ql)).forEach(candidate => out.push({
+        id: `business-${candidate.id}`, position: candidate.position, title: candidate.label,
+        subtitle: `${candidate.category ?? 'Επιχείρηση'} · OpenStreetMap`, color: '#0e7490', size: 'sm',
+      }));
+    }
     return out;
-  }, [cases, filter, q, todayVisits, caseById, followUps, sigPending, leads]);
+  }, [cases, filter, q, todayVisits, caseById, followUps, sigPending, leads, routeOpen, discoveryCandidates, routeStopsOnMap]);
 
   useEffect(() => {
     const m = mapRef.current;
@@ -491,16 +511,16 @@ export default function MapPage() {
     const c = caseById.get(v.case_id);
     const pos = visitPos(c, v);
     return {
-      id: v.id,
+      id: `visit-${v.id}`,
       label: c?.customer?.full_name ?? v.purpose ?? 'Στάση',
       subtitle: c ? `${c.case_no} · ${c.title}` : undefined,
       lat: pos?.lat ?? 0,
       lng: pos?.lng ?? 0,
       scheduledAt: v.scheduled_at,
     };
-  }).filter(s => s.lat !== 0 && !Number.isNaN(s.lat)), [todayVisits, caseById]);
+  }).filter(s => s.lat !== 0 && s.lng !== 0 && Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.lat >= -90 && s.lat <= 90 && s.lng >= -180 && s.lng <= 180), [todayVisits, caseById]);
 
-  const onPlan = useCallback((plan: { polyline?: { lat: number; lng: number }[]; estimated: boolean }, ordered: { position: { lat: number; lng: number } }[]) => {
+  const onPlan = useCallback((plan: RoutePlan, ordered: RouteStop[]) => {
     const m = mapRef.current;
     if (!m || !m.isReady()) return;
     const points = plan.polyline && plan.polyline.length > 0 ? plan.polyline : ordered.map(o => o.position);
@@ -530,8 +550,17 @@ export default function MapPage() {
       const l = leads.find(x => x.id === selectedId.slice(5));
       return l ? { kind: 'lead' as const, l } : null;
     }
+    if (selectedId.startsWith('business-')) {
+      const b = discoveryCandidates.find(x => x.id === selectedId.slice(9));
+      return b ? { kind: 'business' as const, b } : null;
+    }
+    if (selectedId.startsWith('route-stop-')) {
+      const key = selectedId.slice(11);
+      const entry = routeStopsOnMap.find((item, index) => (item.id ?? 'draft-' + index) === key);
+      return entry ? { kind: 'routeStop' as const, stop: entry, index: routeStopsOnMap.indexOf(entry) } : null;
+    }
     return null;
-  }, [selectedId, caseById, visitById, fuById, leads]);
+  }, [selectedId, caseById, visitById, fuById, leads, discoveryCandidates, routeStopsOnMap]);
 
   const previewPos = useMemo(() => {
     if (!preview) return null;
@@ -539,6 +568,8 @@ export default function MapPage() {
     if (preview.kind === 'visit') return visitPos(caseById.get(preview.v.case_id), preview.v);
     if (preview.kind === 'fu') return casePos(preview.c);
     if (preview.kind === 'lead' && preview.l.lat != null && preview.l.lng != null) return { lat: preview.l.lat, lng: preview.l.lng } as MapCoordinate;
+    if (preview.kind === 'business') return preview.b.position;
+    if (preview.kind === 'routeStop') return { lat: preview.stop.latitude, lng: preview.stop.longitude };
     return null;
   }, [preview, caseById]);
 
@@ -564,7 +595,7 @@ export default function MapPage() {
           <Micro tone="brand">Field sales</Micro>
           <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Χάρτης · Πωλήσεις πεδίου</h2>
         </div>
-        <Btn variant="ghost" onClick={() => go('myday')}><Sun className="w-3.5 h-3.5" /> Ημέρα μου</Btn>
+        <Btn variant="ghost" onClick={() => { setFilter('today'); setSelectedId(null); setRouteOpen(open => !open); }}><Sun className="w-3.5 h-3.5" /> Ημέρα μου</Btn>
       </div>
 
       {/* Layer filters + text search of CRM points on the map */}
@@ -781,6 +812,21 @@ export default function MapPage() {
                       <p className="text-xs text-ink/45 truncate">{preview.l.status ?? 'νέο'}{preview.l.address ? ` · ${preview.l.address}` : ''}</p>
                     </>
                   )}
+                  {preview.kind === 'routeStop' && (
+                    <>
+                      <Micro tone="brand">Στάση διαδρομής · {preview.index + 1}</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.stop.label}</h3>
+                      <p className="text-xs text-ink/45 truncate">{preview.stop.subtitle ?? preview.stop.address ?? preview.stop.source_type}</p>
+                    </>
+                  )}
+                  {preview.kind === 'business' && (
+                    <>
+                      <Micro tone="brand">Νέα επιχείρηση · OpenStreetMap</Micro>
+                      <h3 className="text-[14px] font-semibold text-ink truncate mt-0.5">{preview.b.label}</h3>
+                      <p className="text-xs text-ink/45 truncate">{preview.b.sublabel ?? preview.b.category ?? 'Δημόσια καταχώριση'} · Δεν έχει δημιουργηθεί CRM lead.</p>
+                      {previewPos && myLoc && <p className="text-[11px] text-ink/45 mt-1">{formatDistance(distanceKm(myLoc, previewPos))} από εσάς</p>}
+                    </>
+                  )}
                   {preview.kind === 'me' && (
                     <>
                       <Micro tone="brand">GPS</Micro>
@@ -828,6 +874,27 @@ export default function MapPage() {
                         <MapPin className="w-3.5 h-3.5" /> Καταχώρηση στον χάρτη
                       </Btn>
                     )}
+                  </>
+                )}
+                {preview.kind === 'routeStop' && previewPos && (
+                  <>
+                    <NavigationButton destination={{ ...previewPos, label: preview.stop.label }} origin={origin} label="Πλοήγηση" showSelector={false} travelMode={travelMode} />
+                    {preview.stop.source_type === 'visit' && preview.stop.source_id && (
+                      <Btn variant="ok" onClick={() => setSelectedId('visit-' + preview.stop.source_id)}>
+                        <LogIn className="w-3.5 h-3.5" /> Άνοιγμα επίσκεψης / Check In
+                      </Btn>
+                    )}
+                    {preview.stop.source_type === 'crm' && preview.stop.category === 'case' && preview.stop.source_id && (
+                      <Btn onClick={() => openCase(preview.stop.source_id!)}>
+                        <MapPin className="w-3.5 h-3.5" /> Άνοιγμα Case
+                      </Btn>
+                    )}
+                  </>
+                )}
+                {preview.kind === 'business' && (
+                  <>
+                    {previewPos && <NavigationButton destination={{ ...previewPos, label: preview.b.label }} origin={origin} label="Πλοήγηση" showSelector={false} travelMode={travelMode} />}
+                    <Btn onClick={() => { setRouteOpen(true); setSelectedId(null); }}>Διαχείριση διαδρομής</Btn>
                   </>
                 )}
                 {preview.kind === 'me' && (
@@ -918,7 +985,12 @@ export default function MapPage() {
             </button>
           ))}
           {results.length === 0 && (
-            <p className="px-4 py-4 text-xs text-ink/40">Δεν βρέθηκαν σημεία για το επιλεγμένο φίλτρο. Προσθέστε lat/lng στο case ή χρησιμοποιήστε το Check In για GPS.</p>
+            <div className="px-4 py-4 text-xs text-ink/45 space-y-2">
+              <p>Δεν βρέθηκαν γεωκωδικοποιημένα σημεία για το επιλεγμένο φίλτρο.</p>
+              <p>{cases.filter(item => item.lat == null || item.lng == null).length} cases και {leads.filter(item => item.lat == null || item.lng == null).length} leads δεν έχουν αποθηκευμένες συντεταγμένες. Αναζητήστε διεύθυνση ή χρησιμοποιήστε GPS· δεν δημιουργούνται ψεύτικα σημεία.</p>
+              {leads.some(item => item.lat == null || item.lng == null) && <button className="font-semibold text-brand-600" onClick={() => { setFilter('leads'); setQ(''); }}>Εμφάνιση leads προς γεωκωδικοποίηση</button>}
+              {routeOpen && <p>Μπορείτε επίσης να ανοίξετε τη διαδρομή και να αναζητήσετε διαθέσιμες επιχειρήσεις κατά μήκος της.</p>}
+            </div>
           )}
         </div>
       </Card>
@@ -959,11 +1031,15 @@ export default function MapPage() {
         </Card>
       )}
 
-      {routeOpen && (
-        <RoutePanel
-          stops={routeStops}
+      {routeOpen && user?.id && (
+        <RouteWorkspace
+          seedStops={routeStops}
+          currentUserId={user.id}
+          currentRole={role}
+          origin={origin}
           onPlan={onPlan}
-          onClose={() => setRouteOpen(false)}
+          onDiscoveryChange={setDiscoveryCandidates}
+          onRouteStopsChange={setRouteStopsOnMap}
         />
       )}
     </div>

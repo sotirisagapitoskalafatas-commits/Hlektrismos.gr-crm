@@ -6,6 +6,9 @@ import {
 import { supabase } from '@/lib/supabase';
 import { classifyUpload, MAX_FORM_FILES, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
+import { useLandingMotion } from '@/hooks/useLandingMotion';
+import WaveDivider from '@/components/marketing/WaveDivider';
+import '@/landing-motion.css';
 import LegalLinks from '@/components/LegalLinks';
 
 /* ─── 3D tilt cursor hook ─────────────────────────────────────── */
@@ -337,7 +340,32 @@ function CinematicTour() {
             style={{ position: 'absolute', inset: 0, opacity: i === 0 ? 1 : 0, transform: 'scale(1.06)', willChange: 'transform,opacity' }}
           >
             {i === 0
-              ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" decoding="async" />
+              ? <>
+                  <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" decoding="async" />
+                  <div className="hlk-hero-bolt" data-motion-scrub data-motion-y="-16" data-motion-rotate="5" data-motion-scale="1.015" style={{ position: 'absolute', zIndex: 1, pointerEvents: 'none', right: 'clamp(22px,16vw,290px)', top: '10%', width: 'clamp(190px,25vw,390px)', aspectRatio: '3 / 4', opacity: .94 }}>
+                    <svg viewBox="0 0 300 420" width="100%" height="100%" role="img" aria-label="Διακοσμητικός φωτεινός κεραυνός ενέργειας" style={{ overflow: 'visible', filter: 'drop-shadow(0 0 26px rgba(37,145,255,.52))' }}>
+                      <defs>
+                        <linearGradient id="hlk-bolt-gradient" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#d9fbff" />
+                          <stop offset="35%" stopColor="#59c9ff" />
+                          <stop offset="68%" stopColor="#1477ed" />
+                          <stop offset="100%" stopColor="#0b45b4" />
+                        </linearGradient>
+                        <linearGradient id="hlk-bolt-edge" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#ffffff" stopOpacity=".95" />
+                          <stop offset="100%" stopColor="#76dbff" stopOpacity=".25" />
+                        </linearGradient>
+                      </defs>
+                      <ellipse cx="150" cy="210" rx="108" ry="176" fill="none" stroke="#9fe7ff" strokeOpacity=".25" strokeWidth="1.4" transform="rotate(22 150 210)" />
+                      <ellipse cx="150" cy="210" rx="132" ry="148" fill="none" stroke="#5bbdff" strokeOpacity=".38" strokeWidth="1.2" transform="rotate(-28 150 210)" />
+                      <path d="M177 20 L80 211 Q75 222 89 220 L138 210 L101 379 L233 170 Q240 159 224 161 L169 171 Z" fill="url(#hlk-bolt-gradient)" stroke="url(#hlk-bolt-edge)" strokeWidth="4" strokeLinejoin="round" />
+                      <path d="M176 32 L105 195 L151 186 L126 333 L214 174 L159 184 Z" fill="#a5eeff" fillOpacity=".25" />
+                      <path d="M185 43 L121 188" stroke="#fff" strokeOpacity=".74" strokeWidth="5" strokeLinecap="round" />
+                      <path d="M60 118 C20 160 35 225 67 245" fill="none" stroke="#8ee5ff" strokeOpacity=".75" strokeWidth="2" strokeDasharray="4 9" />
+                      <path d="M231 94 C273 126 278 185 244 224" fill="none" stroke="#4bbcff" strokeOpacity=".85" strokeWidth="2" strokeDasharray="4 8" />
+                    </svg>
+                  </div>
+                </>
               : <img ref={(el) => { imgRefs.current[i] = el; }} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             }
           </div>
@@ -445,12 +473,14 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const headerRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
   const fTilts = [useTilt(), useTilt(), useTilt()];
   const gTilts = [useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>()];
   const sTilts = [useTilt(), useTilt(), useTilt(), useTilt(), useTilt(), useTilt()];
   const cTilt = useTilt();
 
   useLenis();
+  useLandingMotion(mainRef);
 
   // Landed on a plain in-page anchor from another page (e.g. #/services → #about).
   // The browser can't scroll before LandingPage mounts, so do it once Lenis is up.
@@ -591,26 +621,28 @@ export default function LandingPage() {
             <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#D7DDE5', borderLeft: '1px solid rgba(255,255,255,.22)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
           </a>
           <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
-            <a href="#/services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
-            <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-            <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
+            <a href="#top" onClick={() => setMenuOpen(false)}>Αρχική</a>
+            <a href="#services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
+            <a href="#comparison" onClick={() => setMenuOpen(false)}>Σύγκριση τιμολογίων</a>
+            <a href="#how-it-works" onClick={() => setMenuOpen(false)}>Πώς λειτουργεί</a>
+            <a href="#faq" onClick={() => setMenuOpen(false)}>Συχνές ερωτήσεις</a>
             <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
             <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
           </nav>
           <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-          <a href="#contact" className="header-cta">Ζητήστε κλήση <ArrowRight size={16} /></a>
+          <a href="#contact" className="header-cta">Ζητήστε προσφορά <ArrowRight size={16} /></a>
         </div>
       </header>
 
-      <main id="top">
+      <main id="top" ref={mainRef}>
         {/* ── Cinematic tour ── */}
         <CinematicTour />
 
         {/* ── Features band ── */}
         <section style={{ padding: '0 clamp(20px,5vw,70px) 56px', background: '#102033', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-          <div style={{ maxWidth: 1200, margin: '-70px auto 0', position: 'relative', zIndex: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
+          <div data-motion-stagger="up" style={{ maxWidth: 1200, margin: '-70px auto 0', position: 'relative', zIndex: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
             {features.map((f, fi) => (
-              <div key={f.num} ref={fTilts[fi].ref} className="tilt-card" onMouseMove={fTilts[fi].onMove} onMouseLeave={fTilts[fi].onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
+              <div key={f.num} ref={fTilts[fi].ref} className="tilt-card" data-motion-item onMouseMove={fTilts[fi].onMove} onMouseLeave={fTilts[fi].onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
                 <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid rgba(255,255,255,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: '#fff' }}>{f.num}</span>
                 <div>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 17.5, color: '#fff' }}>{f.title}</h3>
@@ -621,15 +653,45 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <WaveDivider variant="dark-to-light" />
+
+        {/* ── Verified energy comparison entry point ── */}
+        <section id="comparison" style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(68px,9vh,116px) clamp(20px,5vw,70px)', background: '#f7faff', color: '#102c4e' }}>
+          <div className="l-split is-1to1" style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <div data-motion="left">
+              <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#3474aa' }}>Σύγκριση τιμολογίων</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.2vw,56px)', lineHeight: 1.04, letterSpacing: '-.025em', marginTop: 14, color: '#102c4e' }}>Η ενέργεια που σου ταιριάζει.</h2>
+              <p style={{ fontSize: 17, lineHeight: 1.65, color: '#52687d', marginTop: 18, maxWidth: 520 }}>Συγκρίνουμε διαθέσιμα προγράμματα και σε βοηθάμε να κατανοήσεις τιμή, πάγια και βασικούς όρους. Οι πραγματικές τιμές και οι προϋποθέσεις εμφανίζονται στην ενότητα σύγκρισης, από τα διαθέσιμα στοιχεία της αγοράς.</p>
+              <a href="#/energy" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginTop: 26, padding: '14px 22px', borderRadius: 999, background: '#103c6c', color: '#fff', fontWeight: 800, textDecoration: 'none', boxShadow: '0 12px 30px rgba(16,60,108,.2)' }}>Σύγκρινε διαθέσιμα προγράμματα <ArrowRight size={16} /></a>
+              <p style={{ marginTop: 12, color: '#7c8d9e', fontSize: 12 }}>Χωρίς επινοημένες τιμές ή μη επιβεβαιωμένες υποσχέσεις εξοικονόμησης.</p>
+            </div>
+            <div data-motion="right" style={{ position: 'relative', minHeight: 300, borderRadius: 28, overflow: 'hidden', background: 'linear-gradient(135deg,#e1effe 0%,#f6fbff 55%,#d9f0f7 100%)', boxShadow: '0 24px 60px rgba(16,52,91,.12)', border: '1px solid rgba(32,101,159,.12)' }}>
+              <img data-motion-parallax src="/images/house-tour/06-panel-closeup.png" alt="Μετρητής ενέργειας και τεχνικός εξοπλισμός" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', mixBlendMode: 'multiply', opacity: .86 }} />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(247,250,255,.9) 0%,rgba(247,250,255,.2) 58%,rgba(247,250,255,0) 100%)' }} />
+              <div style={{ position: 'absolute', top: '12%', right: '7%', width: 'min(56%,280px)', padding: 22, borderRadius: 20, background: 'rgba(255,255,255,.88)', border: '1px solid rgba(255,255,255,.8)', backdropFilter: 'blur(14px)', boxShadow: '0 18px 44px rgba(25,71,115,.16)' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', color: '#3474aa' }}>Η ΔΙΚΗ ΣΟΥ ΣΥΓΚΡΙΣΗ</span>
+                <div style={{ display: 'grid', gap: 12, marginTop: 17 }}>
+                  {['Τιμή ενέργειας', 'Μηνιαίο πάγιο', 'Διάρκεια & όροι'].map(label => <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#284966', fontSize: 13, fontWeight: 650 }}><span style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 9, background: '#e8f4ff', color: '#2e79b9' }}>✓</span>{label}</div>)}
+                </div>
+                <span style={{ display: 'inline-flex', marginTop: 18, fontSize: 11, color: '#71859b' }}>Σύγκριση με διαθέσιμα στοιχεία</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <WaveDivider variant="light-to-dark" />
+
         {/* ── Gallery ── */}
         <section style={{ padding: 'clamp(70px,9vh,120px) clamp(20px,5vw,70px)', background: '#0d1b2d' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <div data-motion="left">
             <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Gallery</span>
             <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#F8FAFC' }}>Η ενέργεια σε εικόνα</h2>
             <p style={{ fontSize: 17, color: '#D7DDE5', marginTop: 14, maxWidth: 600 }}>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 44 }}>
+            </div>
+            <div data-motion-stagger="right" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 44 }}>
               {galleryCards.map((g, gi) => (
-                <a key={g.title} href="#services" ref={gTilts[gi].ref} className="tilt-card" onMouseMove={gTilts[gi].onMove} onMouseLeave={gTilts[gi].onLeave} style={{ position: 'relative', display: 'block', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', textDecoration: 'none', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
+                <a key={g.title} data-motion-item href="#services" ref={gTilts[gi].ref} className="tilt-card" onMouseMove={gTilts[gi].onMove} onMouseLeave={gTilts[gi].onLeave} style={{ position: 'relative', display: 'block', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', textDecoration: 'none', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
                   <img src={g.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .6s ease' }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(16,32,51,0) 42%,rgba(16,32,51,.94))' }} />
                   <div style={{ position: 'absolute', left: 18, right: 18, bottom: 16 }}>
@@ -646,14 +708,14 @@ export default function LandingPage() {
         {/* ── Services ── */}
         <section id="services" style={{ position: 'relative', padding: 'clamp(80px,11vh,150px) clamp(20px,5vw,70px) clamp(90px,12vh,160px)', background: 'radial-gradient(120% 90% at 80% 0%,rgba(255,255,255,.03),transparent 55%),radial-gradient(100% 80% at 10% 100%,rgba(255,255,255,.02),transparent 55%),#102033' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ maxWidth: 720 }}>
+            <div style={{ maxWidth: 720 }} data-motion="left">
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Υπηρεσίες</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.4vw,58px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC' }}>Για το σπίτι και<br />την επιχείρηση!</h2>
               <p style={{ fontSize: 'clamp(16px,1.5vw,19px)', lineHeight: 1.55, color: '#D7DDE5', marginTop: 18 }}>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 22, marginTop: 'clamp(44px,6vh,72px)' }}>
+            <div data-motion-stagger="up" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 22, marginTop: 'clamp(44px,6vh,72px)' }}>
               {serviceCards.map((s, si) => (
-                <div key={s.num} ref={sTilts[si].ref} className="tilt-card" onMouseMove={sTilts[si].onMove} onMouseLeave={sTilts[si].onLeave}
+                <div key={s.num} data-motion-item ref={sTilts[si].ref} className="tilt-card" onMouseMove={sTilts[si].onMove} onMouseLeave={sTilts[si].onLeave}
                   style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}
                 >
                   <div style={{ position: 'relative', height: 178, overflow: 'hidden' }}>
@@ -674,10 +736,43 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <WaveDivider variant="dark-to-light" />
+
+        {/* ── How it works ── */}
+        <section id="how-it-works" style={{ padding: 'clamp(70px,10vh,126px) clamp(20px,5vw,70px)', background: '#f7faff', color: '#102c4e' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <div className="l-split is-1to1" style={{ alignItems: 'end' }}>
+              <div data-motion="left">
+                <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#3474aa' }}>Πώς λειτουργεί</span>
+                <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.2vw,54px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#102c4e' }}>Απλά. Προσωπικά.<br />Χωρίς περιττή πολυπλοκότητα.</h2>
+              </div>
+              <p data-motion="right" style={{ maxWidth: 480, margin: '0 0 4px auto', fontSize: 16.5, lineHeight: 1.65, color: '#52687d' }}>Μαθαίνουμε τις ανάγκες σου, εξετάζουμε τις διαθέσιμες επιλογές και σε καθοδηγούμε στη λύση που ταιριάζει στην περίπτωσή σου.</p>
+            </div>
+            <div data-motion-stagger="up" style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 20, marginTop: 'clamp(36px,5vh,58px)' }}>
+              <svg aria-hidden="true" viewBox="0 0 1000 40" preserveAspectRatio="none" style={{ position: 'absolute', top: 28, left: '8%', width: '84%', height: 32, overflow: 'visible', pointerEvents: 'none' }}>
+                <path d="M0 20 H1000" fill="none" stroke="#b7d6ef" strokeWidth="2" strokeDasharray="8 10" className="hlk-energy-trail" />
+              </svg>
+              {[
+                { num: '01', title: 'Μας λες τις ανάγκες σου', text: 'Μοιράζεσαι βασικές πληροφορίες για το σπίτι ή την επιχείρησή σου.' },
+                { num: '02', title: 'Μελετάμε τις διαθέσιμες επιλογές', text: 'Εξετάζουμε τα πραγματικά διαθέσιμα προγράμματα, τα πάγια και τους όρους.' },
+                { num: '03', title: 'Σε καθοδηγούμε στην κατάλληλη λύση', text: 'Σου εξηγούμε τις επιλογές και τα επόμενα βήματα με σαφήνεια.' },
+              ].map(step => (
+                <article key={step.num} data-motion-item style={{ position: 'relative', zIndex: 1, padding: '24px 24px 26px', borderRadius: 20, background: 'rgba(255,255,255,.86)', border: '1px solid #dbe9f6', boxShadow: '0 14px 40px rgba(19,66,111,.06)' }}>
+                  <span style={{ display: 'inline-grid', placeItems: 'center', width: 48, height: 48, borderRadius: '50%', border: '1px solid #8cbfe8', background: '#edf7ff', color: '#164b7c', fontFamily: 'var(--font-cinematic)', fontSize: 14, fontWeight: 800 }}>{step.num}</span>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', color: '#102c4e', fontSize: 20, lineHeight: 1.2, marginTop: 22, fontWeight: 750 }}>{step.title}</h3>
+                  <p style={{ color: '#607488', fontSize: 14.5, lineHeight: 1.65, marginTop: 10 }}>{step.text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <WaveDivider variant="light-to-dark" />
+
         {/* ── About ── */}
         <section id="about" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#0d1b2d' }}>
           <div className="l-split is-1to1" style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div>
+            <div data-motion="left">
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Ποιοι Είμαστε</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', lineHeight: 1.06, color: '#F8FAFC' }}>Ο προσωπικός σου<br />σύμβουλος ενέργειας!</h2>
               <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 20 }}>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
@@ -686,8 +781,8 @@ export default function LandingPage() {
                 <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 8 }}>Διασφαλίζουμε ότι κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, που παρέχει εξατομικευμένες υπηρεσίες καθ' όλη τη διάρκεια της συνεργασίας.</p>
               </div>
             </div>
-            <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', boxShadow: '0 24px 60px rgba(23,38,61,.18)' }}>
-              <img src="/images/energy1.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div data-motion="right" style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', boxShadow: '0 24px 60px rgba(23,38,61,.18)' }}>
+              <img data-motion-parallax src="/images/energy1.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           </div>
         </section>
@@ -695,14 +790,14 @@ export default function LandingPage() {
         {/* ── FAQ ── */}
         <section id="faq" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#102033' }}>
           <div style={{ maxWidth: 820, margin: '0 auto' }}>
-            <div style={{ textAlign: 'center' as const, marginBottom: 48 }}>
+            <div data-motion="up" style={{ textAlign: 'center' as const, marginBottom: 48 }}>
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Συχνές Ερωτήσεις</span>
               <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#F8FAFC' }}>Όλα όσα χρειάζεται να γνωρίζεις</h2>
               <p style={{ fontSize: 16.5, color: '#D7DDE5', marginTop: 14 }}>Όλα όσα πρέπει να ξέρεις για την αλλαγή παρόχου ενέργειας.</p>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div data-motion-stagger="up" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {faqs.map((f, i) => (
-                <details key={i} open={i === 0} style={{ padding: '20px 22px', borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                <details key={i} data-motion-item open={i === 0} style={{ padding: '20px 22px', borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
                   <summary onClick={(e) => { e.preventDefault(); setOpenFaq(openFaq === i ? null : i); }} style={{ cursor: 'pointer', fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 16, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, color: '#eef4f7' }}>
                     {f.q}
                     <span style={{ flex: 'none', color: '#fff', fontSize: 19, fontWeight: 400, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}>+</span>
@@ -719,10 +814,10 @@ export default function LandingPage() {
           <img src="/images/house-tour/10-terrace-lounge-b.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(16,32,51,.96) 0%,rgba(16,32,51,.86) 42%,rgba(16,32,51,.55) 100%)' }} />
           <div className="l-split" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ background: 'rgba(16,32,51,.74)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 24px 60px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07)' }}>
+            <div data-motion="left" style={{ background: 'rgba(16,32,51,.74)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 24px 60px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07)' }}>
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Ζητήστε να σας καλέσουμε!</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC' }}>Έτοιμος να εξοικονομήσεις χρήματα;</h2>
-              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC' }}>Βρες την ενεργειακή λύση που σου ταιριάζει.</h2>
+              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου για να εξετάσετε τις διαθέσιμες επιλογές.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
                 <a href="tel:+302102255000" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
                 <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
@@ -731,7 +826,7 @@ export default function LandingPage() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#9fb2bc' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
             </div>
 
-            <div ref={cTilt.ref} className="tilt-card" onMouseMove={cTilt.onMove} onMouseLeave={cTilt.onLeave} style={{ background: 'rgba(16,32,51,.85)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
+            <div data-motion="right" ref={cTilt.ref} className="tilt-card" onMouseMove={cTilt.onMove} onMouseLeave={cTilt.onLeave} style={{ background: 'rgba(16,32,51,.85)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
               {submitted ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
                   <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fff' }}>✓</span>
@@ -743,7 +838,7 @@ export default function LandingPage() {
               ) : (
                 <form onSubmit={submitLead}>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ζητήστε να σας καλέσουμε</h3>
-                  <p style={{ fontSize: 14, color: '#a9bcc6', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε άμεσα. 100% δωρεάν.</p>
+                  <p style={{ fontSize: 14, color: '#a9bcc6', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε μαζί σου.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
                     <div className="l-form-row">
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Όνομα

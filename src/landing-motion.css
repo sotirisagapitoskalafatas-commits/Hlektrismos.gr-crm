@@ -1,0 +1,49 @@
+/* Premium landing motion primitives — no content is hidden until the animation hook is active. */
+.hlk-wave-divider {
+  position: relative;
+  isolation: isolate;
+  height: clamp(72px, 8.5vw, 132px);
+  overflow: hidden;
+  margin-top: -1px;
+  margin-bottom: -1px;
+  background: var(--wave-from, #102033);
+  pointer-events: none;
+  line-height: 0;
+}
+.hlk-wave-layer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  will-change: transform;
+}
+.hlk-wave-layer-a { opacity: .82; animation: hlk-wave-a 19s linear infinite; }
+.hlk-wave-layer-b { opacity: .84; animation: hlk-wave-b 14s linear infinite; }
+.hlk-wave-layer-c { animation: hlk-wave-a 25s linear infinite reverse; }
+@keyframes hlk-wave-a { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes hlk-wave-b { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+
+.hlk-motion-ornament {
+  transform-origin: center;
+  will-change: transform;
+}
+.hlk-energy-trail {
+  stroke-dasharray: 9 11;
+  animation: hlk-energy-dash 18s linear infinite;
+}
+@keyframes hlk-energy-dash { to { stroke-dashoffset: -320; } }
+
+@media (max-width: 767px) {
+  .hlk-wave-divider { height: 64px; }
+  .hlk-wave-layer-a { animation-duration: 27s; }
+  .hlk-wave-layer-b { animation-duration: 23s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hlk-wave-layer, .hlk-energy-trail { animation: none !important; }
+  [data-motion], [data-motion-item], [data-motion-parallax], [data-motion-scrub] {
+    transform: none !important;
+    filter: none !important;
+  }
+  html { scroll-behavior: auto !important; }
+}

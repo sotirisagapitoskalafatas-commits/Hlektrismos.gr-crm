@@ -11,7 +11,7 @@ import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
 import {
-  ROLE_DESCRIPTION, canManage, createStaff, deleteStaff, generatePassword, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
+  ROLE_DESCRIPTION, CREATEABLE_SALES_ROLES, canManage, createStaff, deleteStaff, generatePassword, isSalesAgentRole, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
   staffReferenceCount, updateStaff,
 } from '@/lib/staff-admin';
 import type { StaffMember, StaffSource } from '@/lib/staff-admin';
@@ -42,12 +42,13 @@ export default function StaffAdmin() {
   // The displayed role decides what is OFFERED; the server decides what is ALLOWED (real session), and a
   // presentation preview blocks every write anyway.
   const allowedRoles = manageableRoles(viewRole, true) as Role[];
-  const canCreate = source === 'server' && allowedRoles.length > 0;
+  const createableRoles = allowedRoles.filter(r => CREATEABLE_SALES_ROLES.includes(r as (typeof CREATEABLE_SALES_ROLES)[number]));
+  const canCreate = source === 'server' && createableRoles.length > 0;
 
   const load = useCallback(async () => {
     const r = await listStaff();
     const scoped = r.rows
-      .filter(x => viewRole !== 'back_office' || x.role === 'back_office')
+      .filter(x => viewRole === 'admin' || isSalesAgentRole(x.role))
       .map(x => ({ ...x, can_manage: x.can_manage && canManage(viewRole, true, x.role) }));
     setRows(scoped); setSource(r.source); setError(r.error); setLoading(false);
     return scoped;
@@ -79,7 +80,7 @@ export default function StaffAdmin() {
       )}
       {error && <div className="atx-notice" role="alert">{error}</div>}
       {source === 'server' && allowedRoles.length === 0 && (
-        <div className="atx-notice" role="status" data-testid="admin-only-note">Η δημιουργία και η διαχείριση λογαριασμών (νέοι χρήστες, ρόλοι, επαναφορά κωδικού, απενεργοποίηση) γίνεται μόνο από διαχειριστή. Εδώ βλέπετε την ομάδα.</div>
+        <div className="atx-notice" role="status" data-testid="admin-only-note">Το Back Office μπορεί να διαχειρίζεται λογαριασμούς Sales Agent. Οι Sales Agents δεν μπορούν να δημιουργούν ή να διαχειρίζονται λογαριασμούς.</div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -150,12 +151,11 @@ export default function StaffAdmin() {
         )}
       </div>
       <p className="text-[12px] text-[var(--atx-faint)]">
-        Μόνο οι διαχειριστές δημιουργούν χρήστες, ορίζουν ρόλο, επαναφέρουν κωδικούς και απενεργοποιούν λογαριασμούς. Δεν υπάρχει δημόσια εγγραφή.
-        Κάθε άτομο έχει δικό του λογαριασμό (και στο Back Office)· δεν μοιραζόμαστε κωδικούς. Κανείς δεν αλλάζει τον δικό του ρόλο· ο τελευταίος ενεργός διαχειριστής προστατεύεται. Ελέγχεται από τον server και καταγράφεται στο Audit Log.
+        Το Back Office μπορεί να δημιουργεί/προσκαλεί Sales Agents, να στέλνει email ανάκτησης και να ενεργοποιεί ή απενεργοποιεί λογαριασμούς. Οι νέοι λογαριασμοί δημιουργούνται ως Field Sales, με χάρτη και δρομολόγια. Δεν υπάρχει δημόσια εγγραφή ή αυτο-εγγραφή. Οι προνομιακές αλλαγές παραμένουν server-side και καταγράφονται στο Audit Log.
       </p>
 
       {dialog?.kind === 'create' && (
-        <CreateDialog roles={allowedRoles} onClose={() => setDialog(null)} onDone={async (email, invited) => {
+        <CreateDialog roles={createableRoles} onClose={() => setDialog(null)} onDone={async (email, invited) => {
           const fresh = await load();
           const ok = fresh.some(r => r.email?.toLowerCase() === email.toLowerCase());
           toast(ok ? (invited ? `Στάλθηκε πρόσκληση στο ${email}.` : `Ο λογαριασμός ${email} δημιουργήθηκε.`) : 'Η δημιουργία δεν επιβεβαιώθηκε — ελέγξτε τη λίστα.', ok ? 'ok' : 'bad');
@@ -286,7 +286,7 @@ function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
   const [role, setRole] = useState<Role>(s.role);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const roleChoices = roles.includes(s.role) ? roles : [s.role, ...roles];
+  const roleChoices = isSalesAgentRole(s.role) ? (roles.includes(s.role) ? roles : [s.role, ...roles]) : [s.role];
   const submit = async () => {
     setBusy(true); setErr(null);
     const e = await updateStaff(s.id, { full_name: full_name.trim(), phone: phone.trim(), role });
@@ -302,8 +302,9 @@ function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
           <Field label="Τηλέφωνο"><input className="field" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
         </div>
         <Field label="Ρόλος">
-          <RolePicker roles={roleChoices} value={role} onChange={setRole} disabled={isSelf} />
+          <RolePicker roles={roleChoices} value={role} onChange={setRole} disabled={isSelf || !isSalesAgentRole(s.role)} />
           {isSelf && <p className="text-xs text-ink/50 mt-1">Δεν μπορείτε να αλλάξετε τον δικό σας ρόλο.</p>}
+          {!isSelf && !isSalesAgentRole(s.role) && <p className="text-xs text-ink/50 mt-1">Οι υφιστάμενοι ρόλοι γραφείου διατηρούνται για συμβατότητα. Δεν δημιουργούνται νέοι λογαριασμοί γραφείου από αυτή την οθόνη.</p>}
         </Field>
         <p className="text-[13px] text-[var(--atx-muted)]">Συνδέσεις στο CRM: {refs === null ? '…' : refs < 0 ? 'μη διαθέσιμο' : `${refs} εγγραφές (cases, follow-ups, δραστηριότητα κ.λπ.)`}</p>
         {err && <div className="atx-notice" role="alert">{err}</div>}

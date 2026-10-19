@@ -251,10 +251,12 @@ test('Back Office can assign only to active Sales Agents; route history cannot b
   assert.equal(validOwner.ok, true, validOwner.error);
   const historicalRoute = validOwner.rows[0].id;
   const historicalStop = await run(
-    "insert into public.field_sales_route_stops (route_id,sort_order,label,latitude,longitude,stop_status) values ($1,0,'Completed stop',37.97,23.74,'completed') returning id",
+    "insert into public.field_sales_route_stops (route_id,sort_order,label,latitude,longitude) values ($1,0,'Completed stop',37.97,23.74) returning id",
     [historicalRoute],
   );
   assert.equal(historicalStop.ok, true, historicalStop.error);
+  const completeStop = await run("update public.field_sales_route_stops set stop_status='completed' where id=$1 returning id", [historicalStop.rows[0].id]);
+  assert.equal(completeStop.ok, true, completeStop.error);
   const deletion = await run('delete from public.field_sales_routes where id=$1 returning id', [historicalRoute]);
   assert.equal(deletion.ok, false, 'routes with arrived/completed stops must be retained as history');
   assert.match(deletion.error, /visit history/i);

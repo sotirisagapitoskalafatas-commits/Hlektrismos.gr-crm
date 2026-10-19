@@ -5,7 +5,7 @@ import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, can,
-  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, accessGroupLabel, sectionColor, stageLabel,
+  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, accessGroupColor, accessGroupLabel, sectionColor, stageLabel,
 } from '@/lib/roles';
 import type { NavLeaf, PageKey, ShellCounts, Stage } from '@/lib/roles';
 import { Btn, IconBtn, Logo, Micro, Modal, Spinner, fmtMoney, rgbaOf, timeUntil } from '@/lib/ui';
@@ -297,7 +297,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
         <button onClick={() => setAcctOpen(o => !o)} aria-label="Λογαριασμός" aria-haspopup="menu"
           className="flex items-center gap-2 rounded-full bg-ink/[0.045] hover:bg-ink/[0.08] pl-1 pr-2 py-1 transition-colors">
           <span className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold"
-            style={{ background: rgbaOf(ROLE_COLOR[realRole], 0.14), color: ROLE_COLOR[realRole] }}>
+            style={{ background: rgbaOf(accessGroupColor(realRole), 0.14), color: ROLE_COLOR[realRole] }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </span>
           <span className="hidden lg:block text-left">

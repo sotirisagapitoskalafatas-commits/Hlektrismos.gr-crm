@@ -1,128 +1,20 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import {
-  ArrowRight, Phone, Mail, Home, FileText, Upload, X, Menu,
-  Lock, Camera,
+  ArrowRight, Phone, Mail, Home, FileText, Upload, X, Menu, Lock, Camera,
+  Zap, Flame, Sun, CarFront, ChevronDown, ArrowDown, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { classifyUpload, MAX_FORM_FILES, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
+import { useLandingMotion } from '@/hooks/useLandingMotion';
 import LegalLinks from '@/components/LegalLinks';
 
-/* ─── 3D tilt cursor hook ─────────────────────────────────────── */
-function useTilt<T extends HTMLElement = HTMLDivElement>() {
-  const ref = useRef<T>(null);
-  const onMove = (e: React.MouseEvent<T>) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    el.style.setProperty('--mx', `${x * 100}%`);
-    el.style.setProperty('--my', `${y * 100}%`);
-    const tiltX = (0.5 - y) * 12;
-    const tiltY = (x - 0.5) * 12;
-    el.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale(1.02)`;
-    el.style.boxShadow = `${-tiltY * 2}px ${tiltX * 2}px 40px rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.12)`;
-  };
-  const onLeave = () => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)';
-    el.style.boxShadow = '0 1px 2px rgba(20,30,25,.04)';
-  };
-  return { ref, onMove, onLeave };
-}
-
-/* ─── Cinematic tour frames ─────────────────────────────────── */
-const FRAMES = [
-  '/images/house-tour/01-terrace-hero.png',
-  '/images/house-tour/02-living-room-entry.png',
-  '/images/house-tour/03-living-room-deep.png',
-  '/images/house-tour/04-kitchen-wide.png',
-  '/images/house-tour/05-panel-hallway.png',
-  '/images/house-tour/06-panel-closeup.png',
-  '/images/house-tour/07-kitchen-sunset.png',
-  '/images/house-tour/08-terrace-acropolis.png',
-  '/images/house-tour/09-terrace-lounge-a.png',
-  '/images/house-tour/10-terrace-lounge-b.png',
-  '/images/house-tour/11-terrace-wide.png',
-  '/images/house-tour/12-rooftop-solar.png',
-];
-
-type CaptionDef = {
-  eyebrow: string;
-  title: string;
-  text: string;
-  start: number;
-  end: number;
-  pos: 'left' | 'right' | 'center';
-  vPos: 'center' | 'bottom';
-  maxW?: number;
-  hero?: boolean;
-};
-
-const CAPTIONS: CaptionDef[] = [
-  {
-    eyebrow: 'Εξειδικευμένοι Σύμβουλοι Ενέργειας',
-    title: 'Ο προσωπικός σου σύμβουλος ενέργειας',
-    text: 'Δίπλα σου με όλες τις ενεργειακές λύσεις για το σπίτι και την επιχείρησή σου. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο δωρεάν.',
-    start: 0, end: 0.055, pos: 'left', vPos: 'center', maxW: 640, hero: true,
-  },
-  {
-    eyebrow: 'Μπαίνουμε μέσα',
-    title: 'Η ενέργεια ζει σε κάθε γωνιά του σπιτιού σου',
-    text: 'Ακολουθούμε τη ροή της ενέργειας από την είσοδο μέχρι την καρδιά του σπιτιού.',
-    start: 0.10, end: 0.24, pos: 'left', vPos: 'bottom', maxW: 560,
-  },
-  {
-    eyebrow: 'Έξυπνη διαχείριση',
-    title: 'Ρεύμα & Αέριο, υπό πλήρη έλεγχο',
-    text: 'Παρακολούθηση κατανάλωσης, αυτοπαραγωγή και δίκτυο σε πραγματικό χρόνο, δίπλα στο έξυπνο σύστημα του σπιτιού.',
-    start: 0.33, end: 0.50, pos: 'right', vPos: 'center', maxW: 420,
-  },
-  {
-    eyebrow: 'Άνεση & θέρμανση',
-    title: 'Ζεστασιά χωρίς συμβιβασμούς',
-    text: 'Εξατομικευμένες λύσεις φυσικού αερίου με τα πιο αποδοτικά τιμολογιακά πλάνα.',
-    start: 0.55, end: 0.66, pos: 'left', vPos: 'bottom', maxW: 520,
-  },
-  {
-    eyebrow: 'Έξω, στη θέα',
-    title: 'Αποθήκευση & εξοικονόμηση',
-    text: 'Η ενέργεια που παράγεις μένει δική σου — αυτονομία, ανεξαρτησία, μικρότερος λογαριασμός.',
-    start: 0.70, end: 0.86, pos: 'left', vPos: 'center', maxW: 520,
-  },
-  {
-    eyebrow: 'Φωτοβολταϊκά',
-    title: 'Η πράσινη επόμενη μέρα',
-    text: 'Η ενέργεια που κινεί όλο το ταξίδι — από τη στέγη σου, στον ήλιο της Μεσογείου.',
-    start: 0.90, end: 1.01, pos: 'center', vPos: 'center', maxW: 720,
-  },
-];
-
-/* ─── Section content ───────────────────────────────────────── */
-const features = [
-  { num: '01', title: '100% Δωρεάν', text: 'Η υπηρεσία μας είναι εντελώς δωρεάν, χωρίς κρυφές χρεώσεις.' },
-  { num: '02', title: 'Άμεση Εξυπηρέτηση', text: 'Επικοινωνία μέσα σε λίγες ώρες με τον προσωπικό σου σύμβουλο.' },
-  { num: '03', title: 'Εξατομικευμένη Λύση', text: 'Πρόταση φτιαγμένη ειδικά για τις δικές σου ανάγκες κατανάλωσης.' },
-];
-
-const galleryCards = [
-  { img: '/images/house-tour/06-panel-closeup.png', title: 'Ρεύμα', sub: 'Φθηνά Προγράμματα Ενέργειας' },
-  { img: '/images/house-tour/07-kitchen-sunset.png', title: 'Αέριο', sub: 'Εξατομικευμένες Λύσεις Φυσικού Αερίου' },
-  { img: '/images/house-tour/12-rooftop-solar.png', title: 'Φωτοβολταϊκά', sub: 'Καινοτομία & Βιώσιμη Ανάπτυξη' },
-  { img: '/images/house-tour/01-terrace-hero.png', title: 'Ηλεκτροκίνηση', sub: 'Οδηγούμε Οικολογικά' },
-  { img: '/images/house-tour/05-panel-hallway.png', title: 'Αποθήκευση Ενέργειας', sub: 'Αυτονομία & Εξοικονόμηση' },
-  { img: '/images/house-tour/11-terrace-wide.png', title: 'Εξοικονόμηση Ενέργειας', sub: 'Ανάλυση & Στρατηγική' },
-];
-
+/* ─── Landing page content ─────────────────────────────────── */
 const serviceCards = [
-  { num: '01', img: '/images/house-tour/06-panel-closeup.png', title: 'Ρεύμα', desc: 'Τα φθηνά προγράμματα ενέργειας ειδικά για σένα.' },
-  { num: '02', img: '/images/house-tour/07-kitchen-sunset.png', title: 'Αέριο', desc: 'Εξατομικευμένες λύσεις φυσικού αερίου για το σπίτι και την επιχείρηση.' },
-  { num: '03', img: '/images/house-tour/12-rooftop-solar.png', title: 'Φωτοβολταϊκά', desc: 'Καινοτομία και βιώσιμη ανάπτυξη στον χώρο σου.' },
-  { num: '04', img: '/images/house-tour/01-terrace-hero.png', title: 'Ηλεκτροκίνηση', desc: 'Οδηγούμε οικολογικά, κινούμαστε ηλεκτρικά.' },
-  { num: '05', img: '/images/house-tour/04-kitchen-wide.png', title: 'Αποθήκευση Ενέργειας', desc: 'Λύσεις αποθήκευσης με μπαταρίες για αυτονομία και εξοικονόμηση.' },
-  { num: '06', img: '/images/house-tour/11-terrace-wide.png', title: 'Εξοικονόμηση Ενέργειας', desc: 'Ανάλυση κατανάλωσης και στρατηγικές για μείωση του λογαριασμού.' },
+  { icon: Zap, title: 'Ρεύμα', desc: 'Σύγκριση διαθέσιμων προγραμμάτων για το σπίτι και την επιχείρηση.' },
+  { icon: Flame, title: 'Φυσικό αέριο', desc: 'Καθοδήγηση στις διαθέσιμες επιλογές αερίου.' },
+  { icon: Sun, title: 'Φωτοβολταϊκά', desc: 'Λύσεις ηλιακής ενέργειας, όπου ταιριάζουν στις ανάγκες σου.' },
+  { icon: CarFront, title: 'Ηλεκτροκίνηση', desc: 'Επιλογές φόρτισης και ηλεκτρικής μετακίνησης.' },
 ];
 
 const regions = [
@@ -142,22 +34,6 @@ const SERVICE_KEYS: Record<string, string> = {
   'Εξοικονόμηση Ενέργειας': 'efficiency',
 };
 
-const faqs = [
-  { q: 'Είναι δωρεάν η υπηρεσία;', a: 'Ναι, η υπηρεσία μας είναι εντελώς δωρεάν, χωρίς κρυφές χρεώσεις. Αποζημιωνόμαστε από τους παρόχους, όχι από εσάς.' },
-  { q: 'Πώς γίνεται η αλλαγή παρόχου;', a: 'Η διαδικασία είναι απλή: υπογράφεις Σύμβαση Προμήθειας με τον νέο πάροχο και καταθέτεις τα απαραίτητα δικαιολογητικά. Αναλαμβάνουμε εμείς όλη τη γραφειοκρατία.' },
-  { q: 'Χρειάζεται να πληρώσω για αλλαγή;', a: 'Όχι, η αλλαγή παρόχου είναι δωρεάν διαδικασία για όλους τους καταναλωτές.' },
-  { q: 'Πόσος χρόνος χρειάζεται;', a: 'Από την ημέρα που θα υπογράψεις τη σύμβαση απαιτούνται 7 εργάσιμες ημέρες για να ολοκληρωθεί η αλλαγή μέσω του ΔΕΔΔΗΕ.' },
-  { q: 'Μπορεί να διακοπεί το ρεύμα;', a: 'Όχι. Η αλλαγή παρόχου είναι καθαρά εμπορική/λογιστική μεταβολή. Η παροχή ρεύματος είναι εγγυημένη από τον ΔΕΔΔΗΕ.' },
-  { q: 'Πόσοι πάροχοι ηλεκτρικού ρεύματος υπάρχουν;', a: 'Υπάρχει μια τεράστια γκάμα επιλογών. Θα πρέπει να είμαστε προσεκτικοί για την επιλογή και τους όρους του συμβολαίου. Εμείς σας βοηθάμε να βρείτε τον κατάλληλο.' },
-  { q: 'Τι είναι ο Προμηθευτής Τελευταίου Καταφυγίου;', a: 'Ο πάροχος που είναι υποχρεωμένος να προμηθεύει ρεύμα σε καταναλωτές που δεν εκπροσωπούνται από κάποιον προμηθευτή. Ορίζεται από τη ΡΑΕ και η μεταφορά γίνεται αυτόματα.' },
-  { q: 'Τι είναι η Καθολική Υπηρεσία;', a: 'Η Καθολική Υπηρεσία θεσπίστηκε το 2011 για να παρέχει ρεύμα σε νοικοκυριά και μικρές επιχειρήσεις που δεν εκπροσωπούνται από κάποιον πάροχο. Οι χρεώσεις έχουν προσαύξηση ~12%.' },
-  { q: 'Τι γίνεται με την εγγύηση;', a: 'Η εγγύηση επιστρέφεται και συμψηφίζεται στον τελευταίο λογαριασμό του υφιστάμενου παρόχου. Στον νέο πάροχο, η εγγύηση είναι συνήθως ίσο με το κόστος 45 ημερών.' },
-  { q: 'Πόσο συχνά λαμβάνω λογαριασμό;', a: 'Ο λογαριασμός είναι μηνιαίος: έναντι (εκτιμητικός) και εκκαθαριστικός (με βάση την πραγματική κατανάλωση του ΔΕΔΔΗΕ). Υπάρχει επίσης ο Τελικός λογαριασμός.' },
-  { q: 'Τι είναι η ΟΤΣ;', a: 'Η Τιμή Εκκαθάρισης Εσωτερικής Αγοράς είναι η τιμή στην οποία εκκαθαρίζεται η αγορά ηλεκτρικού ρεύματος. Αποτελεί το μεγαλύτερο μέρος του ανταγωνιστικού κόστους.' },
-  { q: 'Ποιος είναι υπεύθυνος για τη μέτρηση;', a: 'Ο ΔΕΔΔΗΕ είναι υπεύθυνος για την καταμέτρηση και τις αποστέλλει στους προμηθευτές για τον υπολογισμό του κόστους.' },
-  { q: 'Που απευθυνόμαστε σε περίπτωση διακοπής;', a: 'Σε περίπτωση διακοπής, απευθυνόμαστε στον ΔΕΔΔΗΕ που είναι υπεύθυνος για τη λειτουργία και συντήρηση του δικτύου.' },
-];
-
 /* ─── Lead form types ───────────────────────────────────────── */
 type LeadForm = {
   firstName: string;
@@ -171,260 +47,6 @@ type LeadForm = {
   billFiles: File[];
   consent: boolean;
   adult: boolean;
-};
-
-/* ─── Cinematic tour (scroll-scrubbed 12-frame sequence) ────── */
-function CinematicTour() {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const frameRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
-  const captionRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const hintRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section) return;
-
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const N = FRAMES.length;
-    let cur = -1;
-    let target = 0;
-    let running = false;
-    let raf = 0;
-    const shown = new Set<number>();
-
-    frameRefs.current.forEach((f, i) => {
-      if (f) {
-        f.style.visibility = i === 0 ? 'visible' : 'hidden';
-        f.style.opacity = i === 0 ? '1' : '0';
-      }
-    });
-    shown.add(0);
-
-    /* Frames stay src-less until their turn comes up. All 12 cover the same
-       inset:0 spot, so loading="lazy" can't defer them — that pulled every
-       full-screen PNG on first paint and froze low-end phones. Only the
-       current + next frames get their src attached, as the scrubbed
-       position advances. */
-    const imgs = imgRefs.current;
-    const load = (i: number) => {
-      const im = imgs[i];
-      if (im && !im.dataset.loaded) { im.src = FRAMES[i]; im.dataset.loaded = '1'; }
-    };
-    load(0);
-    load(1);
-
-    const apply = (p: number) => {
-      const sp = p * (N - 1);
-      const base = Math.min(Math.floor(sp), N - 2);
-      const frac = sp - base;
-
-      for (const i of shown) {
-        if (i !== base && i !== base + 1) {
-          const f = frameRefs.current[i];
-          if (f) { f.style.visibility = 'hidden'; f.style.opacity = '0'; }
-          shown.delete(i);
-        }
-      }
-
-      const pairs: [number, number, number][] = [
-        [base, 1 - frac, 1 + 0.14 * frac],
-        [base + 1, frac, 1.14 - 0.14 * frac],
-      ];
-      for (const [i, op, sc] of pairs) {
-        if (i >= N) continue;
-        load(i);
-        load(i + 1);
-        const f = frameRefs.current[i];
-        if (!f) continue;
-        if (!shown.has(i)) { f.style.visibility = 'visible'; shown.add(i); }
-        f.style.opacity = op.toFixed(3);
-        f.style.transform = reduce ? 'scale(1.02)' : `scale(${sc.toFixed(4)})`;
-      }
-
-      const m = 0.028;
-      captionRefs.current.forEach((c) => {
-        if (!c) return;
-        const s = +(c.dataset.start ?? 0);
-        const e = +(c.dataset.end ?? 0);
-        let o = 0;
-        if (p >= s - m && p <= e + m) o = Math.max(0, Math.min((p - (s - m)) / m, ((e + m) - p) / m, 1));
-        c.style.opacity = o.toFixed(3);
-        c.style.visibility = o > 0 ? 'visible' : 'hidden';
-        c.style.pointerEvents = o > 0.5 ? 'auto' : 'none';
-      });
-
-      if (hintRef.current) hintRef.current.style.opacity = p > 0.04 ? '0' : '1';
-    };
-
-    const readTarget = () => {
-      const total = section.offsetHeight - window.innerHeight;
-      const scrolled = Math.min(Math.max(window.scrollY - section.offsetTop, 0), total);
-      return total > 0 ? scrolled / total : 0;
-    };
-
-    const ease = reduce ? 1 : 0.09;
-
-    const tick = () => {
-      target = readTarget();
-      if (cur < 0) cur = target;
-      cur += (target - cur) * ease;
-      if (Math.abs(target - cur) < 0.0004) {
-        cur = target; apply(cur); running = false; return;
-      }
-      apply(cur);
-      raf = requestAnimationFrame(tick);
-    };
-
-    const kick = () => { if (!running) { running = true; raf = requestAnimationFrame(tick); } };
-
-    apply(readTarget());
-    window.addEventListener('scroll', kick, { passive: true });
-    window.addEventListener('resize', kick);
-    kick();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', kick);
-      window.removeEventListener('resize', kick);
-    };
-  }, []);
-
-  const capStyle = (c: CaptionDef): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      position: 'absolute',
-      maxWidth: c.maxW ?? 560,
-      opacity: 0,
-      padding: 'clamp(24px,3vw,40px)',
-      borderRadius: 22,
-      background: 'rgba(16,32,51,0.52)',
-      border: '1px solid rgba(139,164,200,0.20)',
-      backdropFilter: 'blur(14px)',
-      WebkitBackdropFilter: 'blur(14px)',
-      boxShadow: '0 24px 60px rgba(2,6,12,0.45), inset 0 1px 0 rgba(255,255,255,0.09)',
-      color: '#F8FAFC',
-    };
-    if (c.pos === 'right') {
-      base.right = 'clamp(20px,5vw,70px)';
-      base.textAlign = 'right';
-    } else if (c.pos === 'center') {
-      base.left = '50%';
-      base.textAlign = 'center';
-    } else {
-      base.left = 'clamp(20px,5vw,70px)';
-    }
-    if (c.vPos === 'bottom') {
-      base.bottom = 'clamp(60px,12vh,120px)';
-    } else {
-      base.top = '50%';
-      base.transform = c.pos === 'center' ? 'translate(-50%,-50%)' : 'translateY(-50%)';
-    }
-    return base;
-  };
-
-  const seeSolutions = () => {
-    const s = sectionRef.current;
-    if (s) window.scrollTo({ top: s.offsetTop + s.offsetHeight - window.innerHeight + 2, behavior: 'smooth' });
-  };
-
-  return (
-    <section ref={sectionRef} data-cine-section style={{ position: 'relative', width: '100%', height: '1180vh' }}>
-      <div className="cine-sticky" style={{ background: '#102033' }}>
-        {FRAMES.map((src, i) => (
-          <div
-            key={i}
-            ref={(el) => { frameRefs.current[i] = el; }}
-            style={{ position: 'absolute', inset: 0, opacity: i === 0 ? 1 : 0, transform: 'scale(1.06)', willChange: 'transform,opacity' }}
-          >
-            {i === 0
-              ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} fetchPriority="high" decoding="async" />
-              : <img ref={(el) => { imgRefs.current[i] = el; }} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            }
-          </div>
-        ))}
-
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(16,32,51,.74) 0%,rgba(16,32,51,.30) 42%,rgba(16,32,51,0) 68%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg,rgba(16,32,51,.60) 0%,rgba(16,32,51,0) 32%)', pointerEvents: 'none' }} />
-
-        {CAPTIONS.map((c, i) => (
-          <div
-            key={i}
-            ref={(el) => { captionRefs.current[i] = el; }}
-            data-start={c.start}
-            data-end={c.end}
-            className={c.pos === 'right' ? 'cap-box cap-right' : 'cap-box'}
-            style={capStyle(c)}
-          >
-            {c.hero && (
-              <span className="cap-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(59,130,246,.38)', background: 'rgba(59,130,246,.10)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
-                {c.eyebrow}
-              </span>
-            )}
-            {!c.hero && (
-              <span className="cap-eyebrow" style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>
-                {c.eyebrow}
-              </span>
-            )}
-            <h2 className="cap-title" style={{ fontFamily: 'var(--font-cinematic)', fontWeight: c.hero ? 800 : 700, fontSize: c.hero ? 'clamp(38px,5.4vw,74px)' : 'clamp(28px,3.6vw,48px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC', textShadow: '0 4px 30px rgba(0,0,0,.55)' }}>
-              {c.hero ? (
-                c.title.includes(' ενέργειας')
-                  ? <>{c.title.split(' ενέργειας')[0]}{' '}<span style={{ color: '#3B82F6' }}>ενέργειας</span></>
-                  : c.title
-              ) : c.title}
-            </h2>
-            <p className="cap-body" style={{ fontSize: c.hero ? 'clamp(16px,1.5vw,20px)' : 17, lineHeight: 1.55, color: '#D7DDE5', marginTop: 14, maxWidth: c.hero ? 520 : undefined, textWrap: 'pretty' as const }}>
-              {c.text}
-            </p>
-            {c.hero && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 32 }}>
-                <button onClick={seeSolutions} className="cine-cta" style={{ fontFamily: 'var(--font-body)' }}>
-                  Δες τις Λύσεις <span className="arrow" style={{ fontSize: 18, lineHeight: 1 }}>→</span>
-                </button>
-                <a href="tel:+302102255000" className="cine-cta ghost">
-                  <Phone size={16} /> +30 210 22 55 000
-                </a>
-              </div>
-            )}
-          </div>
-        ))}
-
-        <div ref={hintRef} style={{ position: 'absolute', left: '50%', bottom: 34, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, opacity: 1, transition: 'opacity .4s' }}>
-          <span style={{ fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase' as const, color: '#9fb2bc' }}>Κύλιση</span>
-            <div style={{ width: 24, height: 38, border: '2px solid rgba(255,255,255,.4)', borderRadius: 14, display: 'flex', justifyContent: 'center', paddingTop: 7 }}>
-              <div style={{ width: 4, height: 8, borderRadius: 2, background: '#fff', animation: 'hlk-bob 1.5s ease-in-out infinite' }} />
-          </div>
-        </div>
-      </div>
-
-      {/* animated multi-layer wave divider → hands off to the Features band */}
-      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 'clamp(80px,9vw,130px)', overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
-        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 0.4, willChange: 'transform', animation: 'wv-right 19s linear infinite' }}>
-          <path fill="#102033" d="M0,50 C240,16 480,16 720,50 C960,84 1200,84 1440,50 C1680,16 1920,16 2160,50 C2400,84 2640,84 2880,50 L2880,120 L0,120 Z" />
-        </svg>
-        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 0.7, willChange: 'transform', animation: 'wv-left 13s linear infinite' }}>
-          <path fill="#102033" d="M0,60 C240,86 480,86 720,60 C960,34 1200,34 1440,60 C1680,86 1920,86 2160,60 C2400,34 2640,34 2880,60 L2880,120 L0,120 Z" />
-        </svg>
-        <svg className="wv-layer" viewBox="0 0 2880 120" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: '100%', opacity: 1, willChange: 'transform', animation: 'wv-right 9s linear infinite' }}>
-          <path fill="#102033" d="M0,66 C240,46 480,46 720,66 C960,86 1200,86 1440,66 C1680,46 1920,46 2160,66 C2400,86 2640,86 2880,66 L2880,120 L0,120 Z" />
-        </svg>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Wave divider mask (contact section → footer) ───────────── */
-const WAVE_DIVIDER_SVG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' width='100%25' height='100%25' preserveAspectRatio='none'%3E%3Cpath d='M0,0 H1440 V60 C1340,60 1250,104 1120,100 C960,95 860,44 700,50 C560,55 460,102 320,92 C220,85 110,60 0,60 Z' fill='%23ffffff'/%3E%3C/svg%3E";
-
-const waveDividerMask: React.CSSProperties = {
-  WebkitMaskImage: `url("${WAVE_DIVIDER_SVG}"), linear-gradient(#fff,#fff)`,
-  maskImage: `url("${WAVE_DIVIDER_SVG}"), linear-gradient(#fff,#fff)`,
-  WebkitMaskSize: '105% 112px, 105% calc(100% - 110px)',
-  maskSize: '105% 112px, 105% calc(100% - 110px)',
-  WebkitMaskPosition: 'center bottom, center top',
-  maskPosition: 'center bottom, center top',
-  WebkitMaskRepeat: 'no-repeat',
-  maskRepeat: 'no-repeat',
 };
 
 /* ─── Main landing page ─────────────────────────────────────── */
@@ -442,15 +64,12 @@ export default function LandingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const headerRef = useRef<HTMLElement>(null);
-  const fTilts = [useTilt(), useTilt(), useTilt()];
-  const gTilts = [useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>(), useTilt<HTMLAnchorElement>()];
-  const sTilts = [useTilt(), useTilt(), useTilt(), useTilt(), useTilt(), useTilt()];
-  const cTilt = useTilt();
+  const mainRef = useRef<HTMLElement | null>(null);
 
   useLenis();
+  useLandingMotion(mainRef);
 
   // Landed on a plain in-page anchor from another page (e.g. #/services → #about).
   // The browser can't scroll before LandingPage mounts, so do it once Lenis is up.
@@ -583,187 +202,215 @@ export default function LandingPage() {
 
   return (
     <div className="app-shell">
-      {/* ── Header ── */}
-      <header className="site-header" ref={headerRef}>
-        <div className="container nav-wrap">
-          <a href="#top" className="brand">
-            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 60, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-            <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#D7DDE5', borderLeft: '1px solid rgba(255,255,255,.22)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
+      {/* ── Compact header matching the supplied design ── */}
+      <header className="site-header scrolled" ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(248,251,255,.91)', borderBottom: '1px solid rgba(24,69,105,.08)', boxShadow: '0 4px 24px rgba(17,54,86,.06)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+        <div className="container nav-wrap" style={{ height: 72, gap: 22 }}>
+          <a href="#top" className="brand" style={{ color: '#14395d', gap: 8, flex: 'none', textDecoration: 'none' }}>
+            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 40, width: 'auto', filter: 'none' }} />
           </a>
-          <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
-            <a href="#/services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
-            <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-            <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
-            <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
-            <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
+          <nav className={menuOpen ? 'main-nav open' : 'main-nav'} aria-label="Κύρια πλοήγηση" style={{ alignItems: 'center', gap: 26 }}>
+            <a href="#top" onClick={() => setMenuOpen(false)} style={{ color: '#244b6e', fontSize: 12.5 }}>Αρχική</a>
+            <a href="#services" onClick={() => setMenuOpen(false)} style={{ color: '#244b6e', fontSize: 12.5 }}>Υπηρεσίες</a>
+            <a href="#comparison" onClick={() => setMenuOpen(false)} style={{ color: '#244b6e', fontSize: 12.5 }}>Σύγκριση τιμολογίων</a>
+            <details style={{ position: 'relative', color: '#244b6e', fontSize: 12.5 }}>
+              <summary style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', listStyle: 'none', padding: '8px 0' }}>Περισσότερα <ChevronDown size={13}/></summary>
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: 190, padding: 8, borderRadius: 14, background: 'rgba(255,255,255,.98)', border: '1px solid #dce8f2', boxShadow: '0 16px 42px rgba(17,54,86,.15)', display: 'grid', gap: 2 }}>
+                <a href="#how-it-works" onClick={() => setMenuOpen(false)} style={{ color: '#244b6e', padding: '10px 12px', borderRadius: 9 }}>Πώς λειτουργεί</a>
+                <a href="#advisor" onClick={() => setMenuOpen(false)} style={{ color: '#244b6e', padding: '10px 12px', borderRadius: 9 }}>Ο σύμβουλός σου</a>
+              </div>
+            </details>
           </nav>
-          <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-          <a href="#contact" className="header-cta">Ζητήστε κλήση <ArrowRight size={16} /></a>
+          <a href="tel:+302102255000" className="landing-header-phone" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: '#244b6e', textDecoration: 'none', fontSize: 12, fontWeight: 750, whiteSpace: 'nowrap' }}><Phone size={14}/>210 22 55 000</a>
+          <button className="menu-button" aria-label={menuOpen ? 'Κλείσιμο μενού' : 'Άνοιγμα μενού'} onClick={() => setMenuOpen(!menuOpen)} style={{ color: '#14395d' }}>{menuOpen ? <X size={22}/> : <Menu size={22}/>}</button>
+          <a href="#contact" className="header-cta" style={{ background: '#123e6b', border: '1px solid #123e6b', boxShadow: '0 7px 18px rgba(18,62,107,.16)', color: '#fff', fontSize: 12, padding: '11px 18px', textDecoration: 'none', whiteSpace: 'nowrap' }}>Επικοινωνία <ArrowRight size={14}/></a>
         </div>
       </header>
 
-      <main id="top">
-        {/* ── Cinematic tour ── */}
-        <CinematicTour />
-
-        {/* ── Features band ── */}
-        <section style={{ padding: '0 clamp(20px,5vw,70px) 56px', background: '#102033', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-          <div style={{ maxWidth: 1200, margin: '-70px auto 0', position: 'relative', zIndex: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32 }}>
-            {features.map((f, fi) => (
-              <div key={f.num} ref={fTilts[fi].ref} className="tilt-card" onMouseMove={fTilts[fi].onMove} onMouseLeave={fTilts[fi].onLeave} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 20, borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
-                <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 999, border: '1.5px solid rgba(255,255,255,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 12.5, color: '#fff' }}>{f.num}</span>
-                <div>
-                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 17.5, color: '#fff' }}>{f.title}</h3>
-                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: '#D7DDE5', marginTop: 6 }}>{f.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── Gallery ── */}
-        <section style={{ padding: 'clamp(70px,9vh,120px) clamp(20px,5vw,70px)', background: '#0d1b2d' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Gallery</span>
-            <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#F8FAFC' }}>Η ενέργεια σε εικόνα</h2>
-            <p style={{ fontSize: 17, color: '#D7DDE5', marginTop: 14, maxWidth: 600 }}>Ανακαλύψτε τις λύσεις μας μέσα από φωτογραφίες από πραγματικές εγκαταστάσεις.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 44 }}>
-              {galleryCards.map((g, gi) => (
-                <a key={g.title} href="#services" ref={gTilts[gi].ref} className="tilt-card" onMouseMove={gTilts[gi].onMove} onMouseLeave={gTilts[gi].onLeave} style={{ position: 'relative', display: 'block', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', textDecoration: 'none', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
-                  <img src={g.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .6s ease' }} />
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(16,32,51,0) 42%,rgba(16,32,51,.94))' }} />
-                  <div style={{ position: 'absolute', left: 18, right: 18, bottom: 16 }}>
-                    <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 19, color: '#fff' }}>{g.title}</h4>
-                    <p style={{ fontSize: 13, color: '#D7DDE5', marginTop: 4 }}>{g.sub}</p>
-                    <span style={{ display: 'inline-flex', marginTop: 9, fontSize: 12.5, fontWeight: 800, color: '#fff' }}>Μάθε περισσότερα →</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Services ── */}
-        <section id="services" style={{ position: 'relative', padding: 'clamp(80px,11vh,150px) clamp(20px,5vw,70px) clamp(90px,12vh,160px)', background: 'radial-gradient(120% 90% at 80% 0%,rgba(255,255,255,.03),transparent 55%),radial-gradient(100% 80% at 10% 100%,rgba(255,255,255,.02),transparent 55%),#102033' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ maxWidth: 720 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Υπηρεσίες</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.4vw,58px)', lineHeight: 1.04, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC' }}>Για το σπίτι και<br />την επιχείρηση!</h2>
-              <p style={{ fontSize: 'clamp(16px,1.5vw,19px)', lineHeight: 1.55, color: '#D7DDE5', marginTop: 18 }}>Ολοκληρωμένες ενεργειακές λύσεις προσαρμοσμένες στις δικές σου ανάγκες.</p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 22, marginTop: 'clamp(44px,6vh,72px)' }}>
-              {serviceCards.map((s, si) => (
-                <div key={s.num} ref={sTilts[si].ref} className="tilt-card" onMouseMove={sTilts[si].onMove} onMouseLeave={sTilts[si].onLeave}
-                  style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}
-                >
-                  <div style={{ position: 'relative', height: 178, overflow: 'hidden' }}>
-                    <img src={s.img} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(16,32,51,0) 30%,rgba(16,32,51,.88))' }} />
-                  </div>
-                  <div style={{ padding: '26px 26px 30px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: -52, position: 'relative' }}>
-                      <span style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 15, color: '#102033', background: '#fff', boxShadow: '0 8px 22px rgba(0,0,0,.3)' }}>{s.num}</span>
-                    </div>
-                    <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 23, marginTop: 16, color: '#fff' }}>{s.title}</h3>
-                    <p style={{ fontSize: 15, lineHeight: 1.55, color: '#D7DDE5', marginTop: 10 }}>{s.desc}</p>
-                    <a href="#contact" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 18, fontWeight: 800, fontSize: 14.5, color: '#fff', textDecoration: 'none' }}>Δες περισσότερα →</a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── About ── */}
-        <section id="about" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#0d1b2d' }}>
-          <div className="l-split is-1to1" style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Ποιοι Είμαστε</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', lineHeight: 1.06, color: '#F8FAFC' }}>Ο προσωπικός σου<br />σύμβουλος ενέργειας!</h2>
-              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 20 }}>Είμαστε μια ομάδα εξειδικευμένων ενεργειακών συμβούλων, αφοσιωμένοι στη δημιουργία αξίας και ασφάλειας για τους πελάτες μας. Στόχος μας είναι η παροχή ολοκληρωμένων ενεργειακών λύσεων που ικανοποιούν πλήρως τις ανάγκες και τις προσδοκίες σου.</p>
-              <div style={{ marginTop: 26, padding: '22px 24px', borderRadius: 16, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)' }}>
-                <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 15.5, color: '#fff' }}>Το όραμά μας</h3>
-                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 8 }}>Διασφαλίζουμε ότι κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, που παρέχει εξατομικευμένες υπηρεσίες καθ' όλη τη διάρκεια της συνεργασίας.</p>
+      <main id="top" ref={mainRef}>
+        {/* ── Hero: match the supplied reference layout ── */}
+        <section id="hero" aria-labelledby="hero-title" style={{ position: 'relative', isolation: 'isolate', minHeight: 'clamp(560px, 38vw, 690px)', overflow: 'hidden', background: 'linear-gradient(110deg,#f7faff 0%,#edf5fb 52%,#d8e9f7 100%)', color: '#10345b' }}>
+          <img src="/images/house-tour/01-terrace-hero.png" alt="" fetchPriority="high" decoding="async" style={{ position: 'absolute', zIndex: -2, inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '62% center' }} />
+          <div aria-hidden="true" style={{ position: 'absolute', zIndex: -1, inset: 0, background: 'linear-gradient(90deg,#f7faff 0%,rgba(247,250,255,.98) 28%,rgba(247,250,255,.76) 48%,rgba(233,244,253,.28) 72%,rgba(224,239,251,.15) 100%),linear-gradient(0deg,rgba(247,250,255,.6),rgba(247,250,255,.04) 45%,rgba(247,250,255,.5))' }} />
+          <div style={{ position: 'relative', maxWidth: 1280, minHeight: 'clamp(560px, 38vw, 690px)', margin: '0 auto', padding: 'clamp(64px,8vw,112px) clamp(22px,5.5vw,72px) 76px', display: 'grid', gridTemplateColumns: 'minmax(0, .92fr) minmax(0, 1.08fr)', alignItems: 'center', gap: 20 }}>
+            <div data-motion="left" style={{ position: 'relative', zIndex: 3, maxWidth: 560 }}>
+              <span style={{ display: 'inline-block', color: '#42719b', letterSpacing: '.22em', fontWeight: 800, fontSize: 11, textTransform: 'uppercase' }}>Ενέργεια · Σύγκριση · Εξοικονόμηση</span>
+              <h1 id="hero-title" style={{ color: '#10345b', fontFamily: 'var(--font-cinematic)', fontWeight: 850, fontSize: 'clamp(38px,5.2vw,68px)', letterSpacing: '-.045em', lineHeight: 1.02, marginTop: 20, maxWidth: 600 }}>Ο προσωπικός σου σύμβουλος ενέργειας</h1>
+              <p style={{ color: '#486078', fontSize: 'clamp(15px,1.5vw,18px)', lineHeight: 1.65, maxWidth: 435, marginTop: 20 }}>Συγκρίνουμε τις επιλογές σου και βρίσκουμε μαζί την ενεργειακή λύση που σου ταιριάζει.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 28 }}>
+                <a href="#comparison" className="cine-cta" style={{ background: '#123c68', color: '#fff', boxShadow: '0 10px 26px rgba(16,60,104,.2)', textDecoration: 'none' }}>Βρες το πρόγραμμά σου <ArrowRight size={16} /></a>
+                <a href="#contact" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, minHeight: 46, padding: '12px 20px', borderRadius: 999, border: '1px solid #9bb6cd', color: '#173e63', background: 'rgba(255,255,255,.65)', fontSize: 13, fontWeight: 750, textDecoration: 'none' }}>Μίλησε με σύμβουλο <Phone size={14} /></a>
               </div>
             </div>
-            <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', boxShadow: '0 24px 60px rgba(23,38,61,.18)' }}>
-              <img src="/images/energy1.jpg" alt="Πραγματική ενεργειακή εγκατάσταση της Hlektrismos.gr" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div aria-hidden="true" className="hlk-hero-scene" style={{ position: 'relative', minHeight: 360, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div data-motion-scrub data-motion-y="-12" data-motion-rotate="0" style={{ position: 'relative', width: 'clamp(190px,24vw,320px)', aspectRatio: '3/4', filter: 'drop-shadow(0 20px 36px rgba(14,102,214,.2))' }}>
+                <svg viewBox="0 0 300 420" width="100%" height="100%" style={{ overflow: 'visible' }}>
+                  <defs>
+                    <linearGradient id="hlk-ref-bolt" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#dcfbff"/><stop offset="35%" stopColor="#63d4ff"/><stop offset="66%" stopColor="#187df0"/><stop offset="100%" stopColor="#0a439e"/></linearGradient>
+                    <linearGradient id="hlk-ref-edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#fff"/><stop offset="100%" stopColor="#78dfff" stopOpacity=".25"/></linearGradient>
+                    <radialGradient id="hlk-ref-aura"><stop offset="0%" stopColor="#7cdbff" stopOpacity=".5"/><stop offset="100%" stopColor="#7cdbff" stopOpacity="0"/></radialGradient>
+                  </defs>
+                  <ellipse cx="150" cy="210" rx="145" ry="195" fill="url(#hlk-ref-aura)"/>
+                  <ellipse cx="150" cy="210" rx="118" ry="176" fill="none" stroke="#8adfff" strokeOpacity=".6" strokeWidth="2" transform="rotate(22 150 210)"/>
+                  <ellipse cx="150" cy="210" rx="134" ry="154" fill="none" stroke="#41a9ff" strokeOpacity=".35" strokeWidth="1.5" transform="rotate(-28 150 210)"/>
+                  <path d="M177 20 L80 211 Q75 222 89 220 L138 210 L101 379 L233 170 Q240 159 224 161 L169 171 Z" fill="url(#hlk-ref-bolt)" stroke="url(#hlk-ref-edge)" strokeWidth="4" strokeLinejoin="round"/>
+                  <path d="M176 32 L105 195 L151 186 L126 333 L214 174 L159 184 Z" fill="#c5f6ff" fillOpacity=".3"/>
+                  <path d="M185 43 L121 188" stroke="#fff" strokeOpacity=".8" strokeWidth="5" strokeLinecap="round"/>
+                  <path className="hlk-energy-trail" d="M60 118 C20 160 35 225 67 245 M231 94 C273 126 278 185 244 224" fill="none" stroke="#5bbfff" strokeOpacity=".8" strokeWidth="2" strokeDasharray="5 10"/>
+                </svg>
+              </div>
+              <div className="hlk-service-float" style={{ position: 'absolute', top: '10%', left: '4%', display: 'flex', gap: 9, alignItems: 'center', padding: '11px 14px', borderRadius: 15, border: '1px solid rgba(255,255,255,.9)', background: 'rgba(255,255,255,.78)', color: '#17456f', boxShadow: '0 12px 34px rgba(31,83,126,.1)', backdropFilter: 'blur(12px)', fontSize: 12, fontWeight: 750 }}><Zap size={18} color="#2583de"/>Ρεύμα</div>
+              <div className="hlk-service-float" style={{ position: 'absolute', top: '15%', right: '0%', display: 'flex', gap: 9, alignItems: 'center', padding: '11px 14px', borderRadius: 15, border: '1px solid rgba(255,255,255,.9)', background: 'rgba(255,255,255,.78)', color: '#17456f', boxShadow: '0 12px 34px rgba(31,83,126,.1)', backdropFilter: 'blur(12px)', fontSize: 12, fontWeight: 750 }}><Flame size={18} color="#2583de"/>Φυσικό αέριο</div>
+              <div className="hlk-service-float" style={{ position: 'absolute', bottom: '20%', left: '0%', display: 'flex', gap: 9, alignItems: 'center', padding: '11px 14px', borderRadius: 15, border: '1px solid rgba(255,255,255,.9)', background: 'rgba(255,255,255,.78)', color: '#17456f', boxShadow: '0 12px 34px rgba(31,83,126,.1)', backdropFilter: 'blur(12px)', fontSize: 12, fontWeight: 750 }}><Sun size={18} color="#2583de"/>Φωτοβολταϊκά</div>
+              <div className="hlk-service-float" style={{ position: 'absolute', bottom: '14%', right: '2%', display: 'flex', gap: 9, alignItems: 'center', padding: '11px 14px', borderRadius: 15, border: '1px solid rgba(255,255,255,.9)', background: 'rgba(255,255,255,.78)', color: '#17456f', boxShadow: '0 12px 34px rgba(31,83,126,.1)', backdropFilter: 'blur(12px)', fontSize: 12, fontWeight: 750 }}><CarFront size={18} color="#2583de"/>Ηλεκτροκίνηση</div>
+            </div>
+            <a href="#comparison" aria-label="Μετάβαση στη σύγκριση τιμολογίων" style={{ position: 'absolute', left: '50%', bottom: 22, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 8, color: '#55738c', fontSize: 11, textDecoration: 'none' }}>Scroll <ArrowDown size={14}/></a>
+          </div>
+        </section>
+
+        {/* ── Energy comparison ── */}
+        <section id="comparison" style={{ padding: 'clamp(54px,6vw,84px) clamp(22px,5.5vw,72px)', background: '#f8fbff', color: '#10345b' }}>
+          <div className="l-split is-1to1" style={{ maxWidth: 1240, margin: '0 auto' }}>
+            <div data-motion="left" style={{ maxWidth: 430 }}>
+              <span style={{ color: '#5686ad', letterSpacing: '.2em', fontWeight: 800, fontSize: 10.5 }}>ΣΥΓΚΡΙΣΗ ΤΙΜΟΛΟΓΙΩΝ</span>
+              <h2 style={{ color: '#12395f', fontFamily: 'var(--font-cinematic)', fontSize: 'clamp(30px,3.7vw,48px)', lineHeight: 1.05, letterSpacing: '-.035em', marginTop: 14 }}>Η ενέργεια που σου ταιριάζει.</h2>
+              <p style={{ color: '#62788d', fontSize: 15, lineHeight: 1.7, marginTop: 17 }}>Σύγκρινε τις διαθέσιμες επιλογές με τη βοήθεια ενός προσωπικού συμβούλου — με καθαρή εικόνα για την τιμή, το πάγιο και τους βασικούς όρους.</p>
+              <a href="#contact" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginTop: 24, padding: '13px 20px', borderRadius: 999, background: '#123e6b', color: '#fff', fontSize: 12, fontWeight: 800, textDecoration: 'none', boxShadow: '0 10px 25px rgba(18,62,107,.18)' }}>Ζήτησε εξατομικευμένη πρόταση <ArrowRight size={15}/></a>
+            </div>
+            <div data-motion="right" style={{ position: 'relative', minHeight: 300, borderRadius: 26, overflow: 'hidden', background: 'linear-gradient(130deg,#e2effb,#f9fcff 60%,#d3e9f9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/images/house-tour/06-panel-closeup.png" alt="Μετρητής και λογαριασμός ενέργειας" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: .24, mixBlendMode: 'multiply' }}/>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, width: '100%', padding: '28px 24px' }}>
+                <div style={{ transform: 'rotate(-5deg) translateY(12px)', width: '30%', minWidth: 120, maxWidth: 190, minHeight: 170, padding: 16, borderRadius: 16, background: 'rgba(255,255,255,.88)', border: '1px solid #d5e5f3', boxShadow: '0 16px 38px rgba(23,70,112,.12)' }}>
+                  <span style={{ color: '#4178a7', fontSize: 10, fontWeight: 800 }}>ΛΟΓΑΡΙΑΣΜΟΣ</span><div style={{ marginTop: 22, height: 7, width: '84%', borderRadius: 6, background: '#b8d8ed' }} /><div style={{ marginTop: 9, height: 7, width: '62%', borderRadius: 6, background: '#dcebf6' }} /><div style={{ marginTop: 22, display: 'flex', gap: 4, alignItems: 'end', height: 42 }}>{[16,28,22,38,30,41].map((h,i)=><span key={i} style={{ width: 9, height: h, borderRadius: 4, background: i===5?'#328cdb':'#a9cee9'}/>)}</div>
+                </div>
+                <div style={{ zIndex: 1, width: '34%', minWidth: 140, maxWidth: 200, minHeight: 205, padding: 18, borderRadius: 18, background: '#fff', border: '1px solid #d5e5f3', boxShadow: '0 24px 54px rgba(23,70,112,.16)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#1764a2', fontSize: 11, fontWeight: 850 }}><CheckCircle2 size={17}/>Σύγκριση επιλογών</div>
+                  <div style={{ marginTop: 22, fontSize: 12, color: '#315b7c', fontWeight: 800 }}>Τιμή ενέργειας</div><div style={{ height: 7, marginTop: 7, background: '#e4f0f8', borderRadius: 8 }}/>
+                  <div style={{ marginTop: 15, fontSize: 12, color: '#315b7c', fontWeight: 800 }}>Μηνιαίο πάγιο</div><div style={{ height: 7, marginTop: 7, width: '70%', background: '#e4f0f8', borderRadius: 8 }}/>
+                  <div style={{ marginTop: 15, fontSize: 12, color: '#315b7c', fontWeight: 800 }}>Διάρκεια & όροι</div><div style={{ height: 7, marginTop: 7, width: '82%', background: '#e4f0f8', borderRadius: 8 }}/>
+                </div>
+                <div style={{ transform: 'rotate(5deg) translateY(8px)', width: '30%', minWidth: 120, maxWidth: 190, minHeight: 170, padding: 16, borderRadius: 16, background: 'rgba(255,255,255,.88)', border: '1px solid #d5e5f3', boxShadow: '0 16px 38px rgba(23,70,112,.12)' }}>
+                  <span style={{ color: '#4178a7', fontSize: 10, fontWeight: 800 }}>ΠΡΟΓΡΑΜΜΑ</span><div style={{ marginTop: 22, height: 7, width: '80%', borderRadius: 6, background: '#b8d8ed' }}/><div style={{ marginTop: 9, height: 7, width: '58%', borderRadius: 6, background: '#dcebf6' }}/><div style={{ marginTop: 24, padding: '8px 4px', textAlign: 'center', background: '#eaf5ff', color: '#2269a2', borderRadius: 8, fontWeight: 800, fontSize: 10 }}>Διαθέσιμα στοιχεία</div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ── FAQ ── */}
-        <section id="faq" style={{ padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px)', background: '#102033' }}>
-          <div style={{ maxWidth: 820, margin: '0 auto' }}>
-            <div style={{ textAlign: 'center' as const, marginBottom: 48 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Συχνές Ερωτήσεις</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', marginTop: 14, letterSpacing: '-.02em', color: '#F8FAFC' }}>Όλα όσα χρειάζεται να γνωρίζεις</h2>
-              <p style={{ fontSize: 16.5, color: '#D7DDE5', marginTop: 14 }}>Όλα όσα πρέπει να ξέρεις για την αλλαγή παρόχου ενέργειας.</p>
+        {/* ── Complete energy solutions ── */}
+        <section id="services" style={{ padding: '0 0 clamp(58px,7vw,90px)', background: '#fff', color: '#10345b' }}>
+          <div style={{ maxWidth: 1360, margin: '0 auto', padding: 'clamp(48px,5vw,68px) clamp(22px,5.5vw,72px) 0' }}>
+            <span data-motion="left" style={{ color: '#5686ad', letterSpacing: '.2em', fontWeight: 800, fontSize: 10.5 }}>ΟΛΟΚΛΗΡΩΜΕΝΕΣ ΛΥΣΕΙΣ</span>
+            <h2 data-motion="left" style={{ color: '#12395f', fontFamily: 'var(--font-cinematic)', fontSize: 'clamp(30px,3.7vw,48px)', lineHeight: 1.05, letterSpacing: '-.035em', marginTop: 12, maxWidth: 560 }}>Ολοκληρωμένες λύσεις. Ένας προσωπικός σύμβουλος.</h2>
+          </div>
+          <div data-motion-parallax style={{ height: 'clamp(200px,26vw,330px)', marginTop: 28, background: 'linear-gradient(90deg,rgba(245,250,255,.05),rgba(245,250,255,.03)),url(/images/house-tour/12-rooftop-solar.png) center 54%/cover no-repeat' }} aria-label="Αρχιτεκτονική κατοικία με ενεργειακές λύσεις" role="img"/>
+          <div style={{ maxWidth: 1240, margin: '-30px auto 0', position: 'relative', padding: '0 clamp(22px,5.5vw,72px)', display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 0 }}>
+            {serviceCards.map((item) => {
+              const Icon = item.icon;
+              return <article key={item.title} data-motion="up" style={{ padding: '20px clamp(12px,1.6vw,22px) 8px', background: 'rgba(255,255,255,.94)', borderTop: '1px solid #e2edf6', borderRight: '1px solid #e2edf6' }}>
+                <span style={{ width: 42, height: 42, borderRadius: 999, background: '#eef7ff', color: '#247bc1', display: 'grid', placeItems: 'center' }}><Icon size={20}/></span>
+                <h3 style={{ color: '#163e63', fontSize: 15, fontWeight: 850, marginTop: 14 }}>{item.title}</h3>
+                <p style={{ color: '#63798d', fontSize: 12, lineHeight: 1.55, marginTop: 7 }}>{item.desc}</p>
+              </article>;
+            })}
+          </div>
+        </section>
+
+        {/* ── How it works: one calm dark band ── */}
+        <section id="how-it-works" style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(50px,6vw,76px) clamp(22px,5.5vw,72px)', background: '#103354', color: '#fff' }}>
+          <img src="/images/house-tour/11-terrace-wide.png" alt="" loading="lazy" style={{ position: 'absolute', right: 0, top: 0, height: '100%', width: '42%', objectFit: 'cover', objectPosition: 'center', opacity: .22, maskImage: 'linear-gradient(90deg,transparent,#000 45%)' }}/>
+          <div style={{ maxWidth: 1240, margin: '0 auto', position: 'relative' }}>
+            <div className="l-split is-1to1">
+              <div data-motion="left">
+                <span style={{ fontSize: 10.5, color: '#a9d6f5', letterSpacing: '.2em', fontWeight: 800 }}>ΠΩΣ ΛΕΙΤΟΥΡΓΕΙ</span>
+                <h2 style={{ color: '#fff', fontFamily: 'var(--font-cinematic)', fontSize: 'clamp(28px,3.6vw,44px)', lineHeight: 1.08, marginTop: 12 }}>Απλά. Προσωπικά. Χωρίς περιττή πολυπλοκότητα.</h2>
+                <p style={{ color: '#c6d9e8', fontSize: 14, lineHeight: 1.7, marginTop: 15, maxWidth: 430 }}>Τρία ξεκάθαρα βήματα, με καθοδήγηση από τον προσωπικό σου σύμβουλο.</p>
+              </div>
+              <div data-motion-stagger="up" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 18, alignItems: 'start' }}>
+                {[
+                  { num: '01', title: 'Μας λες τις ανάγκες σου', text: 'Συμπληρώνεις λίγα στοιχεία ή μιλάς μαζί μας.' },
+                  { num: '02', title: 'Μελετάμε τις διαθέσιμες επιλογές', text: 'Εξετάζουμε τα προγράμματα και τους όρους.' },
+                  { num: '03', title: 'Σε καθοδηγούμε στην κατάλληλη λύση', text: 'Εξηγούμε τα επόμενα βήματα με σαφήνεια.' },
+                ].map((step) => <article key={step.num} data-motion-item style={{ position: 'relative', paddingTop: 8 }}>
+                  <span style={{ display: 'grid', placeItems: 'center', width: 48, height: 48, borderRadius: '50%', border: '1px solid #74b4df', color: '#dcf4ff', background: 'rgba(84,160,213,.12)', fontWeight: 850, fontSize: 14 }}>{step.num}</span>
+                  <h3 style={{ color: '#fff', fontWeight: 800, fontSize: 13.5, lineHeight: 1.4, marginTop: 16 }}>{step.title}</h3>
+                  <p style={{ color: '#b9ccdd', fontSize: 11.5, lineHeight: 1.6, marginTop: 8 }}>{step.text}</p>
+                </article>)}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {faqs.map((f, i) => (
-                <details key={i} open={i === 0} style={{ padding: '20px 22px', borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
-                  <summary onClick={(e) => { e.preventDefault(); setOpenFaq(openFaq === i ? null : i); }} style={{ cursor: 'pointer', fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 16, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, color: '#eef4f7' }}>
-                    {f.q}
-                    <span style={{ flex: 'none', color: '#fff', fontSize: 19, fontWeight: 400, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}>+</span>
-                  </summary>
-                  <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 13 }}>{f.a}</p>
-                </details>
-              ))}
+          </div>
+        </section>
+
+        {/* ── Personal advisor — warm, light consultation scene ── */}
+        <section id="advisor" style={{ padding: 'clamp(54px,6vw,82px) clamp(22px,5.5vw,72px)', background: '#fff', color: '#10345b' }}>
+          <div className="l-split is-1to1" style={{ maxWidth: 1240, margin: '0 auto' }}>
+            <div data-motion="left" style={{ position: 'relative', minHeight: 280, borderRadius: 22, overflow: 'hidden', background: '#edf4f9' }}>
+              <img src="/images/house-tour/02-living-room-entry.png" alt="Χώρος συμβουλευτικής με σύγχρονη αρχιτεκτονική" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}/>
+              <div style={{ position: 'absolute', left: 18, bottom: 18, display: 'flex', alignItems: 'center', gap: 11, padding: '12px 16px', borderRadius: 15, background: 'rgba(255,255,255,.92)', boxShadow: '0 12px 34px rgba(20,60,97,.12)', color: '#16466d' }}>
+                <span style={{ display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '50%', background: '#e6f3ff', color: '#227bc2' }}><Phone size={15}/></span>
+                <span style={{ fontSize: 11, fontWeight: 800 }}>Εξατομικευμένη συμβουλευτική</span>
+              </div>
+            </div>
+            <div data-motion="right" style={{ maxWidth: 530 }}>
+              <span style={{ color: '#5686ad', letterSpacing: '.2em', fontWeight: 800, fontSize: 10.5 }}>Ο ΠΡΟΣΩΠΙΚΟΣ ΣΟΥ ΣΥΜΒΟΥΛΟΣ</span>
+              <h2 style={{ color: '#12395f', fontFamily: 'var(--font-cinematic)', fontSize: 'clamp(30px,3.7vw,46px)', lineHeight: 1.05, letterSpacing: '-.03em', marginTop: 14 }}>Δεν χρειάζεται να το ψάχνεις μόνος σου.</h2>
+              <p style={{ color: '#62788d', fontSize: 14.5, lineHeight: 1.75, marginTop: 17 }}>Ο προσωπικός σου σύμβουλος είναι δίπλα σου για να εξηγήσει τις διαθέσιμες επιλογές, να απαντήσει στις απορίες σου και να σε βοηθήσει να αποφασίσεις με σιγουριά.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12, marginTop: 26 }}>
+                {['Εξατομικευμένες προτάσεις','Καθαρή σύγκριση επιλογών','Συνεχής υποστήριξη'].map((item) => <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, color: '#335a79', fontSize: 11.5, lineHeight: 1.5 }}><CheckCircle2 size={17} style={{ flex: 'none', color: '#3383bd' }}/>{item}</div>)}
+              </div>
             </div>
           </div>
         </section>
 
         {/* ── Contact ── */}
-        <section id="contact" style={{ position: 'relative', overflow: 'hidden', zIndex: 1, padding: 'clamp(70px,10vh,130px) clamp(20px,5vw,70px) calc(clamp(70px,10vh,130px) + 70px)', ...waveDividerMask }}>
-          <img src="/images/house-tour/10-terrace-lounge-b.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(16,32,51,.96) 0%,rgba(16,32,51,.86) 42%,rgba(16,32,51,.55) 100%)' }} />
+        <section id="contact" style={{ position: 'relative', overflow: 'hidden', zIndex: 1, padding: 'clamp(58px,6vw,84px) clamp(22px,5.5vw,72px)', background: '#eaf4fb' }}>
+          <img src="/images/house-tour/01-terrace-hero.png" alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: .17 }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(232,243,252,.70) 0%,rgba(238,247,254,.58) 100%)' }} />
           <div className="l-split" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ background: 'rgba(16,32,51,.74)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 24px 60px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07)' }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#DCE7F5' }}>Ζητήστε να σας καλέσουμε!</span>
-              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#F8FAFC' }}>Έτοιμος να εξοικονομήσεις χρήματα;</h2>
-              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#D7DDE5', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας εξειδικευμένος σύμβουλος θα επικοινωνήσει άμεσα για να σου προτείνει το κατάλληλο πρόγραμμα — ΔΩΡΕΑΝ!</p>
+            <div data-motion="left" style={{ background: 'rgba(255,255,255,.88)', border: '1px solid rgba(201,220,236,.9)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(12px)', boxShadow: '0 22px 52px rgba(28,72,111,.10)' }}>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase' as const, color: '#5686ad' }}>ΕΠΙΚΟΙΝΩΝΗΣΤΕ ΜΑΖΙ ΜΑΣ</span>
+              <h2 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(30px,4vw,50px)', lineHeight: 1.05, letterSpacing: '-.02em', marginTop: 14, color: '#12395f' }}>Ας βρούμε μαζί τη λύση που σου ταιριάζει.</h2>
+              <p style={{ fontSize: 16.5, lineHeight: 1.6, color: '#536b80', marginTop: 16, maxWidth: 440 }}>Συμπλήρωσε τη φόρμα και ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου για να εξετάσετε τις διαθέσιμες επιλογές.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 30, fontSize: 15.5 }}>
-                <a href="tel:+302102255000" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
-                <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#eef4f7' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
-                <span style={{ color: '#D7DDE5' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
+                <a href="tel:+302102255000" className="footer-link" style={{ fontWeight: 700, color: '#183f63' }}><Phone size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />+30 210 22 55 000</a>
+                <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ fontWeight: 700, color: '#183f63' }}><Mail size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />info@hlektrismos.gr</a>
+                <span style={{ color: '#536b80' }}><Home size={16} style={{ marginRight: 8, verticalAlign: '-3px' }} />Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#9fb2bc' }}><Lock size={12} /> Τα δεδομένα σου είναι ασφαλή. GDPR-compliant.</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 26, fontSize: 13, color: '#657d91' }}><Lock size={12} /> Τα στοιχεία σου θα χρησιμοποιηθούν για να επικοινωνήσουμε μαζί σου.</span>
             </div>
 
-            <div ref={cTilt.ref} className="tilt-card" onMouseMove={cTilt.onMove} onMouseLeave={cTilt.onLeave} style={{ background: 'rgba(16,32,51,.85)', border: '1px solid rgba(139,164,200,.20)', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', transition: 'transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s cubic-bezier(.22,1,.36,1)' }}>
+            <div data-motion="right" style={{ background: 'rgba(255,255,255,.96)', border: '1px solid #d5e5f1', borderRadius: 22, padding: 'clamp(24px,3vw,36px)', backdropFilter: 'blur(10px)', boxShadow: '0 22px 52px rgba(28,72,111,.10)' }}>
               {submitted ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' as const, justifyContent: 'center', minHeight: 360, gap: 14 }}>
-                  <span style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fff' }}>✓</span>
-                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20, color: '#fff' }}>Ευχαριστούμε!</h3>
-                  <p style={{ fontSize: 14.5, color: '#a9bcc6', maxWidth: 320 }}>
+                  <span style={{ width: 56, height: 56, borderRadius: 999, background: '#e6f4ff', border: '1px solid #b7d7ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#174a75' }}>✓</span>
+                  <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20, color: '#174a75' }}>Ευχαριστούμε!</h3>
+                  <p style={{ fontSize: 14.5, color: '#657d91', maxWidth: 320 }}>
                     Λάβαμε το αίτημά σου{sentFiles > 0 ? ` και ${sentFiles === 1 ? '1 αρχείο' : `${sentFiles} αρχεία`}` : ''}. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailSent ? ' — μόλις σου στείλαμε και email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : '.'}
                   </p>
                 </div>
               ) : (
                 <form onSubmit={submitLead}>
                   <h3 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 20 }}>Ζητήστε να σας καλέσουμε</h3>
-                  <p style={{ fontSize: 14, color: '#a9bcc6', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε άμεσα. 100% δωρεάν.</p>
+                  <p style={{ fontSize: 14, color: '#657d91', marginTop: 6 }}>Συμπλήρωσε τη φόρμα και θα επικοινωνήσουμε μαζί σου.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
                     <div className="l-form-row">
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Όνομα
-                        <input required type="text" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Όνομα
+                        <input required type="text" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#163e63', fontSize: 14.5 }} />
                       </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Επώνυμο
-                        <input required type="text" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
-                      </label>
-                    </div>
-                    <div className="l-form-row">
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Email (προαιρετικό)
-                        <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
-                      </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Τηλέφωνο *
-                        <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }} />
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Επώνυμο
+                        <input required type="text" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5 }} />
                       </label>
                     </div>
                     <div className="l-form-row">
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Τύπος Ακινήτου *
-                        <select required className="lead-select" value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Email (προαιρετικό)
+                        <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5 }} />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Τηλέφωνο *
+                        <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5 }} />
+                      </label>
+                    </div>
+                    <div className="l-form-row">
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Τύπος Ακινήτου *
+                        <select required className="lead-select" value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', backgroundColor: 'rgba(255,255,255,.05)', color: '#183f63', fontSize: 14.5 }}>
                           <option value="" disabled>Επιλέξτε τύπο...</option>
                           <option>Κατοικία</option>
                           <option>Διαμέρισμα</option>
@@ -771,28 +418,34 @@ export default function LandingPage() {
                           <option>Κατάστημα</option>
                         </select>
                       </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Περιοχή (προαιρετικό)
-                        <select className="lead-select" value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Περιοχή (προαιρετικό)
+                        <select className="lead-select" value={form.region} onChange={(e) => update('region', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', backgroundColor: 'rgba(255,255,255,.05)', color: '#183f63', fontSize: 14.5 }}>
                           <option value="">Επιλέξτε περιοχή...</option>
                           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </label>
                     </div>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Υπηρεσία ενδιαφέροντος
-                      <select className="lead-select" value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', backgroundColor: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Υπηρεσία ενδιαφέροντος
+                      <select className="lead-select" value={form.service} onChange={(e) => update('service', e.target.value)} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', backgroundColor: 'rgba(255,255,255,.05)', color: '#183f63', fontSize: 14.5 }}>
                         {serviceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>Σχόλια (προαιρετικά)
-                      <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.05)', color: '#eef4f7', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+                    <details className="landing-optional-fields" style={{ border: '1px solid #dce8f2', borderRadius: 12, padding: '12px 14px', background: '#fbfdff' }}>
+                      <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, color: '#315b7c', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', listStyle: 'none' }}>
+                        Σχόλια ή λογαριασμός ενέργειας (προαιρετικό)
+                        <ChevronDown size={15} aria-hidden="true"/>
+                      </summary>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>Σχόλια (προαιρετικά)
+                      <textarea rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #d5e3ee', background: '#f7fbff', color: '#183f63', fontSize: 14.5, resize: 'vertical' as const, fontFamily: 'inherit' }} />
                     </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#D7DDE5' }}>
-                      <span style={{ fontSize: 13, color: '#D7DDE5' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#536b80' }}>
+                      <span style={{ fontSize: 13, color: '#536b80' }}>Ανέβασε λογαριασμούς / αρχεία (προαιρετικό)</span>
                       {form.billFiles.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
                           {form.billFiles.map((f, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#D7DDE5' }}>
-                              <FileText size={14} style={{ color: '#fff', flexShrink: 0 }} />
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8, fontSize: 13, color: '#536b80' }}>
+                              <FileText size={14} style={{ color: '#174a75', flexShrink: 0 }} />
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{f.name}</span>
                               <span style={{ fontSize: 11, flexShrink: 0 }}>{f.size < 1024 * 1024 ? `${Math.max(1, Math.round(f.size / 1024))}KB` : `${(f.size / 1024 / 1024).toFixed(1)}MB`}</span>
                               <button type="button" onClick={() => removeBillFile(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2, lineHeight: 1 }}>×</button>
@@ -806,37 +459,39 @@ export default function LandingPage() {
                         role="button"
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-file-input')?.click(); } }}
                         tabIndex={0}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderRadius: 10, border: '1px dashed rgba(255,255,255,.3)', background: 'rgba(255,255,255,.03)', cursor: 'pointer', fontSize: 13.5, color: '#D7DDE5', transition: 'background .2s ease, border-color .2s ease' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.6)'; e.currentTarget.style.background = 'rgba(255,255,255,.07)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.3)'; e.currentTarget.style.background = 'rgba(255,255,255,.03)'; }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderRadius: 10, border: '1px dashed #b6cbdd', background: '#f7fbff', cursor: 'pointer', fontSize: 13.5, color: '#536b80', transition: 'background .2s ease, border-color .2s ease' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#5f94bc'; e.currentTarget.style.background = '#edf6fc'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#b6cbdd'; e.currentTarget.style.background = '#f7fbff'; }}
                       >
-                        <Upload size={16} style={{ color: '#fff', flexShrink: 0 }} />
+                        <Upload size={16} style={{ color: '#174a75', flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>
                           {form.billFiles.length === 0 ? 'Επίλεξε αρχεία ή φωτογραφίες — πολλά μαζί' : `Πρόσθεσε κι άλλα (${form.billFiles.length} από ${MAX_FORM_FILES})`}
                         </span>
-                        <span style={{ fontSize: 12, color: '#7f939c', flexShrink: 0 }}>PDF / φωτογραφία</span>
+                        <span style={{ fontSize: 12, color: '#72899d', flexShrink: 0 }}>PDF / φωτογραφία</span>
                       </label>
                       {hasCamera && (
                         <>
                           <input id="lead-camera-input" type="file" accept="image/*" capture="environment" onChange={handleBillChange} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }} />
                           <label htmlFor="lead-camera-input" role="button" tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-camera-input')?.click(); } }}
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.3)', background: 'rgba(255,255,255,.07)', cursor: 'pointer', fontSize: 13.5, color: '#fff' }}>
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderRadius: 10, border: '1px solid #b6cbdd', background: '#edf6fc', cursor: 'pointer', fontSize: 13.5, color: '#174a75' }}>
                             <Camera size={16} aria-hidden="true" /> Φωτογράφισε τον λογαριασμό
                           </label>
                         </>
                       )}
-                      <span style={{ fontSize: 12, color: '#7f939c' }}>Μπορείς να στείλεις όλες τις σελίδες: διάλεξε πολλά αρχεία ή φωτογραφίες μαζί, ή πρόσθεσε κι άλλα μετά (έως {MAX_FORM_FILES}, 25MB το καθένα). Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
+                      <span style={{ fontSize: 12, color: '#72899d' }}>Μπορείς να στείλεις όλες τις σελίδες: διάλεξε πολλά αρχεία ή φωτογραφίες μαζί, ή πρόσθεσε κι άλλα μετά (έως {MAX_FORM_FILES}, 25MB το καθένα). Οι λογαριασμοί χρησιμοποιούνται μόνο για την εξατομικευμένη ενεργειακή πρότασή σου.</span>
                     </div>
-                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
+                      </div>
+                    </details>
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#657d91' }}>
                       <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
-                      <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#fff' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>
+                      <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy" style={{ color: '#174a75' }}>πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>
                     </label>
-                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#a9bcc6' }}>
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.5, color: '#657d91' }}>
                       <input required type="checkbox" checked={form.adult} onChange={(e) => update('adult', e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
                       Δηλώνω ότι είμαι ενήλικας (18 ετών και άνω).
                     </label>
-                    {formError && <p style={{ color: '#f87171', fontSize: 14 }}>{formError}</p>}
+                    {formError && <p style={{ color: '#b42318', fontSize: 14 }}>{formError}</p>}
                     <button type="submit" disabled={submitting} className="cine-cta" style={{ marginTop: 6, fontFamily: 'var(--font-body)', justifyContent: 'center', width: '100%' }}>
                       {submitting ? (uploadStatus || 'Αποστολή...') : 'Ζητήστε κλήση'}
                     </button>
@@ -848,53 +503,45 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* ── Footer ── */}
-      <footer style={{ position: 'relative', overflow: 'hidden', marginTop: -110, padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px', paddingTop: 'calc(clamp(56px,7vh,80px) + 110px)' }}>
-        <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(9,17,28,.94) 0%,rgba(9,17,28,.90) 55%,rgba(9,17,28,.96) 100%)' }} />
-        <div className="l-footer-grid" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
-          <div>
-            <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 70, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: '#D7DDE5', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18, fontSize: 14, color: '#D7DDE5' }}>
-              <span>Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
-              <a href="tel:+302102255000" className="footer-link">+30 210 22 55 000</a>
-              <a href="mailto:info@hlektrismos.gr" className="footer-link">info@hlektrismos.gr</a>
+      {/* ── Quiet navy footer, as in the reference ── */}
+      <footer style={{ position: 'relative', overflow: 'hidden', padding: '46px clamp(22px,5.5vw,72px) 22px', background: '#082b4a', color: '#dbe7f0' }}>
+        <div style={{ position: 'absolute', inset: 0, opacity: .15, background: 'linear-gradient(135deg,#0d4a78,#061a30)' }} aria-hidden="true"/>
+        <div style={{ position: 'relative', maxWidth: 1240, margin: '0 auto' }}>
+          <div className="l-footer-grid" style={{ gridTemplateColumns: 'minmax(220px,1.4fr) repeat(3,minmax(130px,1fr))', gap: 30 }}>
+            <div>
+              <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 44, width: 'auto', filter: 'brightness(0) invert(1)' }}/>
+              <p style={{ fontSize: 12, lineHeight: 1.65, color: '#c1d2e0', marginTop: 12, maxWidth: 260 }}>Ο προσωπικός σου σύμβουλος ενέργειας.</p>
+              <div style={{ display: 'grid', gap: 8, marginTop: 15, fontSize: 12 }}>
+                <a href="tel:+302102255000" className="footer-link" style={{ color: '#e4eef6' }}>+30 210 22 55 000</a>
+                <a href="mailto:info@hlektrismos.gr" className="footer-link" style={{ color: '#e4eef6' }}>info@hlektrismos.gr</a>
+              </div>
+            </div>
+            <div>
+              <h4 style={{ color: '#fff', fontSize: 12.5, fontWeight: 800 }}>Υπηρεσίες</h4>
+              <div style={{ display: 'grid', gap: 9, marginTop: 13, fontSize: 12 }}>
+                <a href="#services" className="footer-link" style={{ color: '#c1d2e0' }}>Ρεύμα</a>
+                <a href="#services" className="footer-link" style={{ color: '#c1d2e0' }}>Φυσικό αέριο</a>
+                <a href="#services" className="footer-link" style={{ color: '#c1d2e0' }}>Φωτοβολταϊκά</a>
+                <a href="#services" className="footer-link" style={{ color: '#c1d2e0' }}>Ηλεκτροκίνηση</a>
+              </div>
+            </div>
+            <div>
+              <h4 style={{ color: '#fff', fontSize: 12.5, fontWeight: 800 }}>Χρήσιμοι σύνδεσμοι</h4>
+              <div style={{ display: 'grid', gap: 9, marginTop: 13, fontSize: 12 }}>
+                <a href="#comparison" className="footer-link" style={{ color: '#c1d2e0' }}>Σύγκριση τιμολογίων</a>
+                <a href="#how-it-works" className="footer-link" style={{ color: '#c1d2e0' }}>Πώς λειτουργεί</a>
+                <a href="#contact" className="footer-link" style={{ color: '#c1d2e0' }}>Επικοινωνία</a>
+              </div>
+            </div>
+            <div>
+              <h4 style={{ color: '#fff', fontSize: 12.5, fontWeight: 800 }}>Εξυπηρέτηση</h4>
+              <p style={{ fontSize: 12, color: '#c1d2e0', lineHeight: 1.65, marginTop: 13 }}>Δευτέρα–Παρασκευή<br/>09:00–17:00</p>
+              <p style={{ fontSize: 12, color: '#c1d2e0', marginTop: 5 }}>Σάββατο–Κυριακή: Κλειστά</p>
             </div>
           </div>
-          <div>
-            <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Υπηρεσίες</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#D7DDE5' }}>
-              <a href="#/services" className="footer-link">Ρεύμα</a>
-              <a href="#/services" className="footer-link">Αέριο</a>
-              <a href="#/services" className="footer-link">Φωτοβολταϊκά</a>
-              <a href="#/services" className="footer-link">Ηλεκτροκίνηση</a>
-              <a href="#/services" className="footer-link">Ολοκληρωμένες Λύσεις</a>
-            </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginTop: 30, paddingTop: 17, borderTop: '1px solid rgba(255,255,255,.16)', fontSize: 11, color: '#9fb7c9' }}>
+            <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span><LegalLinks/>
           </div>
-          <div>
-            <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Χρήσιμοι Σύνδεσμοι</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#D7DDE5' }}>
-              <a href="#/" className="footer-link">Αρχική</a>
-              <a href="#about" className="footer-link">Σχετικά με εμάς</a>
-              <a href="#/services" className="footer-link">Λύσεις</a>
-              <a href="#faq" className="footer-link">Ενέργεια Σήμερα</a>
-              <a href="#/faq" className="footer-link">Συχνές Ερωτήσεις</a>
-              <a href="#contact" className="footer-link">Επικοινωνία</a>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Ώρες Λειτουργίας</h4>
-            <p style={{ fontSize: 13, color: '#9fb0b7', marginTop: 16 }}>Είμαστε εδώ για εσένα</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, fontSize: 14, color: '#D7DDE5' }}>
-              <span>Δευτέρα - Παρασκευή 09:00 - 17:00</span>
-              <span>Σάββατο - Κυριακή Κλειστά</span>
-            </div>
-          </div>
-        </div>
-        <div style={{ position: 'relative', maxWidth: 1200, margin: '44px auto 0', paddingTop: 24, borderTop: '1px solid rgba(255,255,255,.15)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, fontSize: 13, color: '#9fb0b7' }}>
-          <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
-          <LegalLinks />
         </div>
       </footer>
     </div>

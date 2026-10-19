@@ -1,5 +1,5 @@
 // Staff accounts: create (invite or temporary password), password reset e-mail and permanent delete, via the Supabase Auth Admin API.
-// ADMIN-ONLY (master prompt §2.4): managers and back office can see the team but cannot create, change, reset or delete accounts.
+// Two effective groups: Admin keeps legacy super-admin scope; Back Office and legacy Manager may administer Sales Agent accounts only. Sales users cannot provision or manage accounts.
 // Edits, role changes and (de)activation go through the audited SQL functions staff_update / staff_set_active
 // (staged migration phase2/05), so the same matrix is enforced by the database for every path.
 //

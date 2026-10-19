@@ -1,6 +1,8 @@
 # Staging apply script (for OpenCode)
 
-The 25 staged SQL files of `docs/ops/APPLY_ORDER.md` (steps 1–22 and 2b, 2c, 3b) as exact `psql` commands, **one per step, each followed by its check query**, with a **STOP** between steps.
+The original 25 staged SQL files of `docs/ops/APPLY_ORDER.md` (steps 1–22 and 2b, 2c, 3b) as exact `psql` commands, **one per step, each followed by its check query**, with a **STOP** between steps.
+
+> **Scope warning (19/10/2026):** this script does NOT yet include feature-branch migrations `phase4/20_backoffice_sales_agent_provisioning.sql` and `phase5/19_field_sales_saved_routes.sql`. They are staged only and must not be assumed covered by this script. Add dedicated steps/checks after code review and successful test execution before anyone runs a fully updated staging sequence.
 
 > **STAGING ONLY.** Never run this against the live database. Never print or commit the connection string. Nothing here deploys an edge function: a step that needs a deploy says so, and you **report that it is pending**.
 

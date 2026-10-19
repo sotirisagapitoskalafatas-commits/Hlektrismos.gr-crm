@@ -2673,3 +2673,142 @@ body {
 @keyframes wv-left  { from { transform: translateX(0); }    to { transform: translateX(-50%); } }
 @keyframes wv-right { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .wv-layer { animation: none !important; } }
+
+
+/* Hlektrismos landing reference layout: light header, airy hero, deliberate section rhythm. */
+#root .app-shell .site-header {
+  color: #244b6e;
+}
+#root .app-shell .site-header .brand {
+  color: #14395d;
+}
+#root .app-shell .site-header .main-nav a::after {
+  background: linear-gradient(90deg, #287fbe, #9ec9ff);
+}
+#root .app-shell .site-header .main-nav a:hover {
+  color: #0f4c7a;
+  text-shadow: none;
+}
+#root .landing-more summary::-webkit-details-marker { display: none; }
+#hero .cine-cta {
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 13px 21px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+#hero .hlk-hero-scene { min-width: 0; }
+#hero .hlk-service-float { white-space: nowrap; }
+#services > div:last-of-type article:last-child { border-right: 0; }
+#contact .cine-cta {
+  background: #123e6b;
+  color: #fff;
+  border: 0;
+}
+
+@media (max-width: 1100px) {
+  .landing-header-phone { display: none !important; }
+  #root .app-shell .site-header .nav-wrap { gap: 14px !important; }
+  #root .app-shell .site-header .main-nav { gap: 18px !important; }
+}
+@media (max-width: 900px) {
+  #root .app-shell .site-header .main-nav {
+    background: rgba(249,252,255,.98) !important;
+    border: 1px solid #dce8f2 !important;
+    box-shadow: 0 16px 40px rgba(17,54,86,.14) !important;
+  }
+  #root .app-shell .site-header .main-nav a,
+  #root .app-shell .site-header .main-nav summary {
+    color: #244b6e !important;
+    text-shadow: none !important;
+  }
+  #root .app-shell .site-header .main-nav a:hover { background: #edf6fc !important; }
+  #hero > div:last-of-type {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding-top: 48px !important;
+    padding-bottom: 72px !important;
+  }
+  #hero .hlk-hero-scene {
+    grid-row: 2;
+    min-height: 300px !important;
+    max-height: 330px;
+    margin-top: 4px;
+  }
+  #hero h1 { max-width: 590px; }
+  #comparison .l-split { gap: 24px; }
+  #how-it-works .l-split { grid-template-columns: 1fr; gap: 28px; }
+}
+@media (max-width: 767px) {
+  #hero { min-height: 0 !important; }
+  #hero > div:last-of-type { min-height: 0 !important; padding: 38px 20px 64px !important; }
+  #hero h1 { font-size: clamp(36px, 10vw, 46px) !important; }
+  #hero .hlk-hero-scene { min-height: 255px !important; max-height: 275px; }
+  #hero .hlk-service-float { font-size: 10px !important; padding: 8px 9px !important; border-radius: 12px !important; gap: 5px !important; }
+  #hero .hlk-service-float svg { width: 14px; height: 14px; }
+  #hero .hlk-service-float:nth-of-type(2) { right: 0 !important; }
+  #comparison .l-split { grid-template-columns: 1fr; }
+  #comparison .l-split > div:last-child { min-height: 240px !important; }
+  #comparison .l-split > div:last-child > div > div {
+    min-width: 0 !important;
+    width: 33.333% !important;
+    padding: 10px !important;
+    min-height: 150px !important;
+    border-radius: 12px !important;
+  }
+  #comparison .l-split > div:last-child > div > div span { font-size: 8px !important; }
+  #comparison .l-split > div:last-child > div > div div { font-size: 10px !important; }
+  #services > div:last-of-type {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    padding: 0 20px !important;
+  }
+  #services > div:last-of-type article {
+    border-bottom: 1px solid #e2edf6;
+    padding: 16px 12px 18px !important;
+  }
+  #how-it-works .l-split > div:last-child { grid-template-columns: 1fr !important; gap: 16px !important; }
+  #how-it-works .l-split > div:last-child article {
+    display: grid;
+    grid-template-columns: 44px minmax(0,1fr);
+    column-gap: 13px;
+    align-items: start;
+  }
+  #how-it-works .l-split > div:last-child article > span { grid-row: span 2; width: 40px !important; height: 40px !important; }
+  #how-it-works .l-split > div:last-child article h3 { margin-top: 2px !important; }
+  #how-it-works .l-split > div:last-child article p { margin-top: 4px !important; }
+  #advisor .l-split > div:first-child { min-height: 230px !important; }
+  #advisor .l-split > div:last-child > div { grid-template-columns: 1fr !important; }
+  #contact .l-split { grid-template-columns: 1fr; }
+  #contact .l-split > div { padding: 22px !important; }
+  #contact h2 { font-size: clamp(29px, 8vw, 38px) !important; }
+  .l-footer-grid { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .l-footer-grid > div:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) {
+  #root .app-shell .site-header .nav-wrap { height: 64px !important; }
+  #root .app-shell .site-header .brand img { height: 32px !important; }
+  #root .app-shell .site-header .menu-button { margin-left: auto; }
+  #hero .hlk-hero-scene { margin-left: -5px; margin-right: -5px; }
+  #comparison .l-split > div:last-child > div { padding: 12px 8px !important; }
+  #comparison .l-split > div:last-child > div > div { min-height: 136px !important; }
+  #services > div:last-of-type { padding: 0 16px !important; }
+  .l-footer-grid { grid-template-columns: 1fr !important; }
+  .l-footer-grid > div:first-child { grid-column: auto; }
+}
+
+/* Respect the system motion preference on every piece of the landing. */
+@media (prefers-reduced-motion: reduce) {
+  #hero .hlk-energy-trail { animation: none !important; }
+  #hero [data-motion-scrub], #hero [data-motion] { transform: none !important; }
+}
+
+@keyframes hlk-energy-dash { to { stroke-dashoffset: -320; } }
+.hlk-energy-trail { stroke-dasharray: 9 11; animation: hlk-energy-dash 18s linear infinite; }
+@media (max-width: 900px) {
+  #root .app-shell .site-header .main-nav { align-items: stretch !important; }
+  #root .app-shell .site-header .main-nav details > div { position: static !important; box-shadow: none !important; border: 0 !important; background: #f3f8fc !important; margin: 2px 8px 8px; }
+}

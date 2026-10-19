@@ -6,6 +6,7 @@ import { formatDistance, formatDuration } from '@/lib/geo/distance';
 import NavigationButton from '@/components/navigation/NavigationButton';
 import { Btn, Card, Micro, Spinner } from '@/lib/ui';
 import { Route as RouteIcon, X } from 'lucide-react';
+import type { NavigationTravelMode } from '@/lib/navigation/external-maps';
 
 export type RouteStopInput = {
   id: string;
@@ -20,10 +21,11 @@ function toInternal(s: RouteStopInput): RouteStop {
   return { id: s.id, label: s.label, position: { lat: s.lat, lng: s.lng }, scheduledAt: s.scheduledAt };
 }
 
-export default function RoutePanel({ stops, onPlan, onClose }: {
+export default function RoutePanel({ stops, onPlan, onClose, travelMode = 'driving' }: {
   stops: RouteStopInput[];
   onPlan?: (plan: RoutePlan, ordered: RouteStop[]) => void;
   onClose?: () => void;
+  travelMode?: NavigationTravelMode;
 }) {
   const [plan, setPlan] = useState<RoutePlan | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,7 +52,7 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
     setError(null);
     setPlan(null);
     const internal = ordered.map(toInternal);
-    planRoute(internal)
+    planRoute(internal, travelMode)
       .then(p => {
         if (!alive) return;
         setPlan(p);
@@ -62,7 +64,7 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [ordered, onPlan]);
+  }, [ordered, onPlan, travelMode]);
 
   const navigateStops = ordered.length < 2
     ? null
@@ -98,6 +100,7 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
             <span className="pill bg-brand-100 text-brand-600">{formatDuration(plan.totalDurationSeconds)}</span>
             <span className="pill bg-ink/10 text-ink/70">{plan.source === 'osrm' ? 'OSRM' : plan.source === 'ors' ? 'openrouteservice' : 'Εκτίμηση ευθείας γραμμής'}</span>
           </div>
+          {travelMode !== 'driving' && <p className="px-5 pb-2 text-[11px] text-ink/45">Η επιλεγμένη λειτουργία ({travelMode === 'walking' ? 'πεζή' : travelMode === 'bicycling' ? 'ποδήλατο' : 'μεταφορά'}) εφαρμόζεται στην εξωτερική πλοήγηση. Η προεπισκόπηση απόστασης ακολουθεί το προφίλ του ρυθμισμένου routing provider.</p>}
           {plan.estimated && (
             <p className="px-5 pb-2 text-[11px] text-warn-600">
               {plan.error ?? 'Δεν έχει ρυθμιστεί υπηρεσία δρομολόγησης — η απόσταση είναι οδική εκτίμηση χωρίς χάρτη δρόμων.'}
@@ -125,7 +128,7 @@ export default function RoutePanel({ stops, onPlan, onClose }: {
 
           <div className="px-5 pb-4">
             {navigateStops && (
-              <NavigationButton variant="primary" label="Πλοήγηση διαδρομής" className="w-full justify-center" showSelector={false} {...navigateStops} />
+              <NavigationButton variant="primary" label="Πλοήγηση διαδρομής" className="w-full justify-center" showSelector={false} travelMode={travelMode} {...navigateStops} />
             )}
           </div>
         </>

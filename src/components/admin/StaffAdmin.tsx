@@ -11,7 +11,7 @@ import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
 import {
-  ROLE_DESCRIPTION, CREATEABLE_SALES_ROLES, canManage, createStaff, deleteStaff, generatePassword, isSalesAgentRole, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
+  CREATEABLE_SALES_ROLES, canManage, createStaff, deleteStaff, generatePassword, isSalesAgentRole, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
   staffReferenceCount, updateStaff,
 } from '@/lib/staff-admin';
 import type { StaffMember, StaffSource } from '@/lib/staff-admin';

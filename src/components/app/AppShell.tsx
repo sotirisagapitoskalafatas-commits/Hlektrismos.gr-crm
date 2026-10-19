@@ -5,7 +5,7 @@ import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, can,
-  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, roleLabel, sectionColor, stageLabel,
+  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, accessGroupLabel, sectionColor, stageLabel,
 } from '@/lib/roles';
 import type { NavLeaf, PageKey, ShellCounts, Stage } from '@/lib/roles';
 import { Btn, IconBtn, Logo, Micro, Modal, Spinner, fmtMoney, rgbaOf, timeUntil } from '@/lib/ui';
@@ -167,7 +167,7 @@ function Drawer({ open, onClose }: {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-                  <Micro>{roleLabel(profile?.role ?? role)}</Micro>
+                  <Micro>{accessGroupLabel(profile?.role ?? role)}</Micro>
                 </div>
               </div>
               <Btn variant="danger" onClick={() => { signOut(); window.location.hash = '/'; onClose(); }} className="w-full justify-center">

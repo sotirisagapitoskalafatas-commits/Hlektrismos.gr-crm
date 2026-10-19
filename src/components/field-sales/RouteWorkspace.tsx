@@ -755,10 +755,10 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
                     </div>
                     {review.request_note && <p className="text-xs text-ink/50 mt-2">{review.request_note}</p>}
                     <div className="flex flex-wrap gap-2 mt-3">
-                      <Btn size="sm" onClick={() => void approveDuplicateReview(review)} disabled={reviewActionId === review.id}>
+                      <Btn className="!px-2 !py-1 !text-xs" onClick={() => void approveDuplicateReview(review)} disabled={reviewActionId !== null}>
                         {reviewActionId === review.id ? <Spinner /> : null} Έγκριση & δημιουργία Lead
                       </Btn>
-                      <Btn size="sm" variant="outline" onClick={() => void rejectDuplicateReview(review)} disabled={reviewActionId === review.id}>
+                      <Btn className="!px-2 !py-1 !text-xs" variant="outline" onClick={() => void rejectDuplicateReview(review)} disabled={reviewActionId !== null}>
                         Απόρριψη
                       </Btn>
                     </div>
@@ -785,10 +785,10 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
                   <div className="text-xs text-ink/45 mt-1">{candidate.address ?? candidate.sublabel ?? candidate.category ?? 'Δημόσια καταχώριση'}</div>
                   {candidate.category && <div className="text-[10px] text-ink/35 mt-1">{candidate.category}</div>}
                   <div className="flex flex-wrap gap-3 mt-2 text-xs">
-                    <button className="font-semibold text-brand-600 disabled:opacity-40" disabled={reviewActionId === candidate.id} onClick={() => void addCandidate(candidate)}>
+                    <button className="font-semibold text-brand-600 disabled:opacity-40" disabled={reviewActionId !== null} onClick={() => void addCandidate(candidate)}>
                       {reviewActionId === candidate.id ? 'Έλεγχος…' : '+ Προσθήκη ως στάση'}
                     </button>
-                    <button className="font-semibold text-emerald-700 disabled:opacity-40" disabled={reviewActionId === candidate.id} onClick={() => void createProspect(candidate)}>
+                    <button className="font-semibold text-emerald-700 disabled:opacity-40" disabled={reviewActionId !== null} onClick={() => void createProspect(candidate)}>
                       {reviewActionId === candidate.id ? 'Έλεγχος…' : 'Δημιουργία Prospect'}
                     </button>
                     <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="text-ink/50 underline">OpenStreetMap</a>

@@ -469,10 +469,10 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       source_label: candidate.source,
       status: 'new',
       property_type: 'Επιχείρηση',
-      service_category: candidate.category ?? null,
+      service_category: null,
       lead_type: 'B2B',
       assigned_to_user_id: currentUserId,
-      comments: 'Πηγή ανακάλυψης: ' + candidate.source + '. ' + candidate.sourceUrl,
+      comments: 'Πηγή ανακάλυψης: ' + candidate.source + (candidate.category ? '. Κατηγορία πηγής: ' + candidate.category : '') + '. ' + candidate.sourceUrl,
     });
     setReviewActionId(null);
     if (created.error || !created.lead) {
@@ -559,10 +559,10 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       source_label: review.source_provider,
       status: 'new',
       property_type: 'Επιχείρηση',
-      service_category: review.candidate_category,
+      service_category: null,
       lead_type: 'business',
       assigned_to_user_id: requester.id,
-      comments: 'Εγκρίθηκε από Back Office. Αίτημα: ' + review.id + '. Πηγή: ' + (review.source_url ?? review.source_provider),
+      comments: 'Εγκρίθηκε από Back Office. Αίτημα: ' + review.id + (review.candidate_category ? '. Κατηγορία πηγής: ' + review.candidate_category : '') + '. Πηγή: ' + (review.source_url ?? review.source_provider),
     });
     if (created.error || !created.lead) {
       const resetError = await updateFieldSalesDuplicateReview(

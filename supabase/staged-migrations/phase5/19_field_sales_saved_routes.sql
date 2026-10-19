@@ -1,8 +1,9 @@
 -- STAGED ONLY — do not apply to Supabase staging/production without an owner-approved change window.
 -- Phase 5 / 19: persisted multi-route workspaces for Field Sales.
--- Backward-compatible: adds new tables only; no existing CRM rows are changed.
+-- Backward-compatible: adds route and duplicate-review tables/functions only; no existing CRM rows are changed.
 -- Routes are per authenticated user; Admin/Manager/Back Office can inspect and reassign team routes.
 -- Sales Agents can manage only their own routes/stops. Discovery candidates remain distinct from CRM entities.
+-- Includes privacy-preserving duplicate-signal RPC and a Back Office duplicate review queue. A duplicate or failed check never auto-creates a lead.
 -- Rollback: docs/ops/rollback_phase5_19_field_sales_saved_routes.sql.
 
 create table if not exists public.field_sales_routes (

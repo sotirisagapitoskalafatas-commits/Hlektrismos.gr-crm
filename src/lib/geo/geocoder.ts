@@ -16,6 +16,8 @@ import type { MapCoordinate } from '../maps/types';
 export type GeocodeResult = {
   label: string;
   sublabel?: string;
+  address?: string;
+  phone?: string;
   position: MapCoordinate;
   source: 'crm' | 'geocoder';
 };
@@ -203,6 +205,8 @@ export async function discoverBusinessesAlongRoute(
           id: name.toLocaleLowerCase('el') + '-' + lat.toFixed(5) + '-' + lng.toFixed(5),
           label: name,
           sublabel: [line.sublabel, category].filter(Boolean).join(' · ') || undefined,
+          address: [props.street ? [props.street, props.housenumber].filter(Boolean).join(' ') : '', props.postcode || '', areaOf(props), props.state || ''].filter(Boolean).join(', ') || undefined,
+          phone: props.phone || props['contact:phone'] || undefined,
           position,
           category,
           source: 'OpenStreetMap / Photon',

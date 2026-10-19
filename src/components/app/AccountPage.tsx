@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { accessGroupLabel } from '@/lib/roles';
+import { ROLES, accessGroupLabel } from '@/lib/roles';
 import { updateProfile } from '@/lib/api';
 import { Btn, Card, CardHeader, Field, Micro, Pill } from '@/lib/ui';
 import { Check, LogOut, Mail, Phone as PhoneIcon, ShieldCheck } from 'lucide-react';

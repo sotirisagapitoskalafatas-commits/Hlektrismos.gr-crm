@@ -989,10 +989,25 @@ export default function MapPage() {
           ))}
           {results.length === 0 && (
             <div className="px-4 py-4 text-xs text-ink/45 space-y-2">
-              <p>Δεν βρέθηκαν γεωκωδικοποιημένα σημεία για το επιλεγμένο φίλτρο.</p>
-              <p>{cases.filter(item => item.lat == null || item.lng == null).length} cases και {leads.filter(item => item.lat == null || item.lng == null).length} leads δεν έχουν αποθηκευμένες συντεταγμένες. Αναζητήστε διεύθυνση ή χρησιμοποιήστε GPS· δεν δημιουργούνται ψεύτικα σημεία.</p>
+              {mapDiagnostics && (mapDiagnostics.cases.error || mapDiagnostics.leads.error) ? (
+                <p role="alert" className="text-amber-800">
+                  {mapDiagnostics.cases.error === 'permission' || mapDiagnostics.leads.error === 'permission'
+                    ? 'Δεν επιτρέπεται η ανάγνωση ορισμένων στοιχείων του χάρτη. Ελέγξτε τον ρόλο και τις πολιτικές πρόσβασης.'
+                    : 'Η αναζήτηση δεδομένων του χάρτη απέτυχε. Αυτό δεν σημαίνει ότι δεν υπάρχουν εγγραφές· δοκιμάστε ξανά ή αναφέρετε το πρόβλημα στον διαχειριστή.'}
+                </p>
+              ) : (
+                <p>Δεν βρέθηκαν γεωκωδικοποιημένα σημεία για το επιλεγμένο φίλτρο.</p>
+              )}
+              {mapDiagnostics && !mapDiagnostics.cases.error && !mapDiagnostics.leads.error && mapDiagnostics.cases.visibleTotal === 0 && mapDiagnostics.leads.visibleTotal === 0 ? (
+                <p>Δεν υπάρχουν CRM εγγραφές ορατές στον τρέχοντα λογαριασμό. Οι μετρήσεις ακολουθούν τα δικαιώματα πρόσβασης και δεν αποκαλύπτουν εγγραφές άλλων agents.</p>
+              ) : (
+                <p>
+                  {mapDiagnostics?.cases.withCoordinates ?? '—'} cases και {mapDiagnostics?.leads.withCoordinates ?? '—'} leads έχουν συντεταγμένες ορατές σε εσάς.
+                  {' '}{cases.filter(item => item.lat == null || item.lng == null).length} cases και {leads.filter(item => item.lat == null || item.lng == null).length} leads που φορτώθηκαν δεν έχουν συντεταγμένες.
+                </p>
+              )}
               {leads.some(item => item.lat == null || item.lng == null) && <button className="font-semibold text-brand-600" onClick={() => { setFilter('leads'); setQ(''); }}>Εμφάνιση leads προς γεωκωδικοποίηση</button>}
-              {routeOpen && <p>Μπορείτε επίσης να ανοίξετε τη διαδρομή και να αναζητήσετε διαθέσιμες επιχειρήσεις κατά μήκος της.</p>}
+              {routeOpen && <p>Μπορείτε επίσης να αναζητήσετε δημόσιες επιχειρήσεις κατά μήκος της διαδρομής.</p>}
             </div>
           )}
         </div>

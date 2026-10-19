@@ -169,5 +169,6 @@ test('phase4/20 permission helper cannot be used to probe another user role', as
   assert.equal(own.ok, true);
   assert.equal(own.rows[0].v, false, 'Sales cannot manage self or create accounts');
   const probe = await run('select public.staff_admin_can($1, $2, $3) v', [ADMIN, 'field_sales', null]);
-  assert.equal(probe.ok, false, 'actor id must match auth.uid()');
+  assert.equal(probe.ok, true, probe.error);
+  assert.equal(probe.rows[0].v, false, 'actor id must match auth.uid()');
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { ROLES, accessGroupLabel } from '@/lib/roles';
+import { accessGroupLabel } from '@/lib/roles';
 import { updateProfile } from '@/lib/api';
 import { Btn, Card, CardHeader, Field, Micro, Pill } from '@/lib/ui';
 import { Check, LogOut, Mail, Phone as PhoneIcon, ShieldCheck } from 'lucide-react';
@@ -82,7 +82,7 @@ export default function AccountPage() {
           <Field label="Ρόλος">
             <div className="flex items-center gap-2 text-[13px] border border-line rounded-lg px-3 py-2 text-ink/70 bg-ink/[0.02]" aria-readonly="true">
               <ShieldCheck className="w-3.5 h-3.5 text-ink/40" />
-              <span>{realRole ? roleLabel(realRole) : '—'}</span>
+              <span>{realRole ? accessGroupLabel(realRole) : '—'}</span>
               <span className="text-ink/40">· {ROLES.find(r => r.id === realRole)?.hint}</span>
             </div>
             <p className="text-[11px] text-ink/45 mt-1">Ο ρόλος και τα δικαιώματά σας ορίζονται από τον διαχειριστή.</p>

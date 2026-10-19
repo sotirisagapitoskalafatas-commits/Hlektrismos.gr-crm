@@ -22,7 +22,7 @@ export const ROLES: { id: Role; label: string; short: string; hint: string }[] =
 ];
 
 export function roleLabel(r: Role) {
-  return ROLES.find(x => x.id === r)?.label ?? r;
+  return r === 'inside_sales' || r === 'field_sales' ? 'Sales Agent' : 'Admin / Back Office';
 }
 
 /* ---------------- Two access groups (master prompt §2) ----------------
@@ -32,8 +32,8 @@ export function roleLabel(r: Role) {
    SQL phase4/18; until it is applied the database still lets them read everything). */
 export type AccessGroup = 'office' | 'sales';
 export const ACCESS_GROUPS: { id: AccessGroup; label: string; hint: string; roles: Role[] }[] = [
-  { id: 'office', label: 'Back Office / Admin', hint: 'Βλέπουν όλα τα δεδομένα.', roles: ['admin', 'manager', 'back_office'] },
-  { id: 'sales', label: 'Πωλητής', hint: 'Βλέπουν μόνο τα δικά τους leads, cases και πελάτες.', roles: ['inside_sales', 'field_sales'] },
+  { id: 'office', label: 'Admin / Back Office', hint: 'Διαχείριση ομάδας, αναθέσεων και back-office εργασιών.', roles: ['admin', 'manager', 'back_office'] },
+  { id: 'sales', label: 'Sales Agent', hint: 'Προσωπικά leads, πελάτες, επισκέψεις, follow-ups και διαδρομές.', roles: ['inside_sales', 'field_sales'] },
 ];
 export const accessGroup = (r: Role): AccessGroup => (r === 'inside_sales' || r === 'field_sales' ? 'sales' : 'office');
 export const ACCESS_GROUP_COLOR = {

@@ -157,7 +157,24 @@ before(async () => {
     create function public.get_agent_lead_counts()
       returns table(agent_id uuid, agent_name text, lead_count bigint)
       language sql security definer as $$ select null::uuid, null::text, 0::bigint where false $$;
-    create function public.test_mutable_definer() returns integer language sql security definer as $$ select 1 $$;
+    create function public.insert_website_lead(p_source text, p_payload jsonb)
+      returns uuid language plpgsql security definer set search_path=public as $
+      declare v_id uuid; v_age boolean := coalesce((p_payload->>'age_confirmed')::boolean, false);
+        v_consent boolean := coalesce((p_payload->>'gdpr_consent')::boolean, false);
+      begin
+        if v_age is not true then raise exception 'age confirmation required'; end if;
+        if p_source = 'website' and v_consent is not true then raise exception 'consent required'; end if;
+        insert into public.leads (client_name, age_confirmed, gdpr_consent, source)
+          values (coalesce(p_payload->>'client_name','Website test'), v_age, v_consent, p_source)
+          returning id into v_id;
+        return v_id;
+      end $;
+    create function public.get_active_tariff_prices(p_month text)
+      returns table(provider_name text, program_name text, unit_rate_kwh numeric)
+      language sql security definer as $
+        select provider_name, program_name, unit_rate_kwh from public.market_tariffs_view
+      $;
+    create function public.test_mutable_definer() returns integer language sql security definer as $ select 1 $;
 
     grant usage on schema public to anon, authenticated, service_role;
     grant all on all tables in schema public to public, anon, authenticated, service_role;
@@ -208,6 +225,20 @@ test('website public intake remains available but requires the existing consent/
   assert.equal((await run("insert into public.hlektrismos_leads (first_name,last_name,phone,email,consent,age_confirmed) values ('No','Consent','6900000001','no@example.invalid',false,true)")).ok, false);
   assert.equal((await run("insert into public.hlektrismos_leads (first_name,last_name,phone,email,consent,age_confirmed) values ('Allowed','Lead','6900000002','yes@example.invalid',true,true)")).ok, true);
   assert.equal((await run('select * from public.leads')).ok, false);
+});
+
+test('public website intake and tariff reads remain while sensitive anonymous RPCs are denied', async () => {
+  await as('anon');
+  const website = await run("select public.insert_website_lead('website', '{\"client_name\":\"Via RPC\",\"age_confirmed\":true,\"gdpr_consent\":true}'::jsonb)");
+  assert.equal(website.ok, true, website.error);
+  assert.equal((await run("select public.insert_website_lead('website', '{\"client_name\":\"No consent\",\"age_confirmed\":true,\"gdpr_consent\":false}'::jsonb)")).ok, false);
+  assert.equal((await run("select public.insert_website_lead('website', '{\"client_name\":\"No age\",\"age_confirmed\":false,\"gdpr_consent\":true}'::jsonb)")).ok, false);
+  const prices = await run("select * from public.get_active_tariff_prices('2026-10')");
+  assert.equal(prices.ok, true, prices.error);
+  assert.equal(prices.rows.length, 1);
+  assert.equal((await run("select public.check_dnc_status('6900000000')")).ok, false);
+  assert.equal((await run("select public.crm_grant_role('" + AGENT + "','field_sales',true)")).ok, false);
+  assert.equal((await run("select public.convert_lead_to_customer('" + LEAD + "')")).ok, false);
 });
 
 test('profile self-promotion is denied while safe self-profile edits remain possible', async () => {

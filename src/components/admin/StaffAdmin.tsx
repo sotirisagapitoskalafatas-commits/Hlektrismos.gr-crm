@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Mail, Plus, Search, ShieldAlert, UserCheck, UserX, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { ACCESS_GROUPS, ROLE_COLOR, accessGroup, accessGroupLabel } from '@/lib/roles';
+import { ACCESS_GROUPS, accessGroup, accessGroupColor, accessGroupLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
@@ -112,7 +112,7 @@ export default function StaffAdmin() {
             </thead>
             <tbody>
               {visible.map(s => {
-                const c = ROLE_COLOR[s.role] ?? '#64748b';
+                const c = accessGroupColor(s.role);
                 const me = s.id === user?.id;
                 return (
                   <tr key={s.id} data-staff={s.email ?? s.full_name} className={s.is_active ? '' : 'is-muted'}>

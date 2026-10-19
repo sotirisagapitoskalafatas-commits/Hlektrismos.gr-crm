@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Btn, Card, Micro, Spinner } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
-import { findPotentialCRMMatches } from '@/lib/api';
+import { createLead } from '@/lib/api';
 import type { MapCoordinate } from '@/lib/maps/types';
 import type { RoutePlan, RouteStop } from '@/lib/routing/types';
 import { getOrderingProvider } from '@/lib/routing/ordering';
@@ -13,9 +13,11 @@ import RoutePanel, { type RouteStopInput } from '@/components/field-sales/RouteP
 import {
   deleteSavedRoute, fetchSavedRoutes, fetchSavedRouteStops, replaceSavedRouteStops,
   saveSavedRoute, updateSavedRouteStatus, updateSavedRouteStopStatus,
+  checkFieldSalesDuplicateSignal, createFieldSalesDuplicateReview, fetchPendingFieldSalesDuplicateReviews,
+  claimFieldSalesDuplicateReview, updateFieldSalesDuplicateReview,
 } from '@/lib/field-sales/saved-routes';
 import type {
-  SavedRoute, SavedRouteDraft, SavedRouteStatus, SavedRouteStopDraft, SavedRouteTravelMode,
+  FieldSalesDuplicateReview, SavedRoute, SavedRouteDraft, SavedRouteStatus, SavedRouteStopDraft, SavedRouteTravelMode,
 } from '@/lib/field-sales/saved-routes';
 import { discoverBusinessesAlongRoute } from '@/lib/geo/geocoder';
 import type { BusinessCandidate } from '@/lib/geo/geocoder';
@@ -74,6 +76,9 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
   const [discoveryQuery, setDiscoveryQuery] = useState('');
   const [discovering, setDiscovering] = useState(false);
   const [candidates, setCandidates] = useState<BusinessCandidate[]>([]);
+  const [duplicateReviews, setDuplicateReviews] = useState<FieldSalesDuplicateReview[]>([]);
+  const [loadingDuplicateReviews, setLoadingDuplicateReviews] = useState(false);
+  const [reviewActionId, setReviewActionId] = useState<string | null>(null);
 
   const refreshRoutes = useCallback(async (selectId?: string | null) => {
     const result = await fetchSavedRoutes({ includeArchived: true });
@@ -170,6 +175,24 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
     else if (origin) points.unshift(origin);
     return points;
   }, [stops, originLat, originLng, origin]);
+
+  const refreshDuplicateReviews = useCallback(async () => {
+    if (!canManageTeam) {
+      setDuplicateReviews([]);
+      return;
+    }
+    setLoadingDuplicateReviews(true);
+    const result = await fetchPendingFieldSalesDuplicateReviews();
+    setDuplicateReviews(result.rows);
+    setLoadingDuplicateReviews(false);
+    if (result.error) {
+      setRouteError(result.error);
+    }
+  }, [canManageTeam]);
+
+  useEffect(() => {
+    if (canManageTeam) void refreshDuplicateReviews();
+  }, [canManageTeam, refreshDuplicateReviews]);
 
   useEffect(() => { onDiscoveryChange?.(candidates); }, [candidates, onDiscoveryChange]);
   useEffect(() => { onRouteStopsChange?.(stops); }, [stops, onRouteStopsChange]);
@@ -317,74 +340,251 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
     else toast('Βρέθηκαν ' + results.length + ' διαθέσιμες καταχωρίσεις OpenStreetMap κοντά στη διαδρομή.', 'ok');
   };
 
-  const addCandidate = async (candidate: BusinessCandidate) => {
-    const lookup = await findPotentialCRMMatches(candidate.label);
-    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('el').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-    const candidateName = normalize(candidate.label);
-    const exactMatches = lookup.rows.filter(row => normalize(row.label) === candidateName);
-    const close = exactMatches.filter(row => {
-      if (row.lat == null || row.lng == null) return false;
-      const dy = (row.lat - candidate.position.lat) * 111320;
-      const dx = (row.lng - candidate.position.lng) * 111320 * Math.cos(candidate.position.lat * Math.PI / 180);
-      return Math.hypot(dx, dy) <= 250;
-    });
-
-    // Link only when the CRM name is an exact match, only one record matches, and coordinates are nearby.
-    // These OSM coordinates are stored on the route stop only; they never overwrite the CRM entity.
-    if (!lookup.error && close.length === 1 && exactMatches.length === 1) {
-      const match = close[0];
-      if (!window.confirm('Βρέθηκε πιθανή ίδια CRM εγγραφή: ' + match.label + ' (' + match.entity_type + '). Θα χρησιμοποιηθεί ως συνδεδεμένη στάση. Δεν θα δημιουργηθεί lead και δεν θα αλλάξουν τα στοιχεία ή η ιδιοκτησία της CRM εγγραφής. Συνέχεια;')) return;
-      setStops(current => [...current, {
-        source_type: 'crm',
-        source_id: match.id,
-        label: match.label,
-        subtitle: match.address ?? candidate.sublabel ?? match.entity_type,
-        address: match.address ?? null,
+  const appendCandidateStop = (candidate: BusinessCandidate, extraMetadata: Record<string, unknown> = {}) => {
+    setStops(current => {
+      const alreadyPresent = current.some(stop =>
+        stop.source_url === candidate.sourceUrl
+        || stop.metadata?.external_candidate_id === candidate.id,
+      );
+      if (alreadyPresent) return current;
+      return [...current, {
+        source_type: 'discovery',
+        label: candidate.label,
+        subtitle: candidate.sublabel ?? candidate.category ?? 'Δημόσια καταχώριση OpenStreetMap',
+        address: candidate.address ?? candidate.sublabel ?? null,
         latitude: candidate.position.lat,
         longitude: candidate.position.lng,
-        category: match.entity_type,
+        category: candidate.category ?? null,
         source_url: candidate.sourceUrl,
         metadata: {
-          coordinate_source: candidate.source,
-          coordinate_verified_against_crm: false,
-          duplicate_check: 'exact_name_and_nearby_coordinates',
+          source: candidate.source,
+          external_candidate_id: candidate.id,
+          ...extraMetadata,
         },
-      }]);
-      setCandidates(current => current.filter(item => item.id !== candidate.id));
-      toast('Η υπάρχουσα CRM εγγραφή προστέθηκε ως στάση. Δεν άλλαξαν στοιχεία ή ιδιοκτησία.', 'ok');
+      }];
+    });
+  };
+
+  const queueDuplicateReview = async (
+    candidate: BusinessCandidate,
+    signal: { possibleDuplicate: boolean; error: string | null },
+  ) => {
+    setReviewActionId(candidate.id);
+    const request = await createFieldSalesDuplicateReview({
+      requested_by: currentUserId,
+      route_id: selectedRouteId,
+      candidate_name: candidate.label,
+      candidate_address: candidate.address ?? candidate.sublabel ?? null,
+      candidate_phone: candidate.phone ?? null,
+      candidate_category: candidate.category ?? null,
+      candidate_lat: candidate.position.lat,
+      candidate_lng: candidate.position.lng,
+      source_provider: candidate.source,
+      source_url: candidate.sourceUrl,
+      duplicate_signal: signal.error ? 'check_failed' : 'possible_match',
+      request_note: signal.error
+        ? 'Ο έλεγχος διπλοτύπων απέτυχε. Απαιτείται έλεγχος Back Office πριν δημιουργηθεί lead.'
+        : 'Υπάρχει πιθανή αντιστοίχιση σε CRM. Απαιτείται έλεγχος Back Office πριν δημιουργηθεί lead.',
+    });
+    setReviewActionId(null);
+    if (request.error || !request.row) {
+      appendCandidateStop(candidate, { duplicate_check: 'review_request_failed' });
+      toast(
+        'Δεν δημιουργήθηκε lead. Η δημόσια καταχώριση μπορεί να αποθηκευτεί μόνο ως στάση· ο έλεγχος Back Office δεν μπόρεσε να υποβληθεί: '
+          + (request.error ?? 'άγνωστο σφάλμα'),
+        'warn',
+      );
+      return false;
+    }
+    appendCandidateStop(candidate, {
+      duplicate_check: signal.error ? 'check_failed' : 'possible_match_requires_review',
+      duplicate_review_id: request.row.id,
+    });
+    setCandidates(current => current.filter(item => item.id !== candidate.id));
+    if (canManageTeam) void refreshDuplicateReviews();
+    toast('Υποβλήθηκε αίτημα ελέγχου Back Office. Δεν δημιουργήθηκε lead και δεν άλλαξε ιδιοκτησία.', 'warn');
+    return true;
+  };
+
+  const addCandidate = async (candidate: BusinessCandidate) => {
+    setReviewActionId(candidate.id);
+    const signal = await checkFieldSalesDuplicateSignal({
+      name: candidate.label,
+      address: candidate.address ?? candidate.sublabel ?? null,
+      phone: candidate.phone ?? null,
+      lat: candidate.position.lat,
+      lng: candidate.position.lng,
+    });
+    if (signal.possibleDuplicate || signal.error) {
+      await queueDuplicateReview(candidate, signal);
+      setReviewActionId(null);
       return;
     }
+    appendCandidateStop(candidate, { duplicate_check: 'no_match_found_at_add_time' });
+    setCandidates(current => current.filter(item => item.id !== candidate.id));
+    setReviewActionId(null);
+    toast('Η επιχείρηση προστέθηκε ως υποψήφια στάση. Δεν δημιουργήθηκε lead.', 'ok');
+  };
 
-    const possible = lookup.rows.slice(0, 3);
-    if (possible.length > 0 && !window.confirm(
-      'Υπάρχουν πιθανές εγγραφές CRM: ' + possible.map(row => row.label + ' (' + row.entity_type + ')').join('; ')
-      + '. Η επιχείρηση θα προστεθεί μόνο ως μη συνδεδεμένη στάση ανακάλυψης. Δεν θα δημιουργηθεί lead, δεν θα συγχωνευτούν εγγραφές και δεν θα αλλάξει ιδιοκτησία. Συνέχεια?'
-    )) return;
-
+  const createProspect = async (candidate: BusinessCandidate) => {
+    setReviewActionId(candidate.id);
+    const signal = await checkFieldSalesDuplicateSignal({
+      name: candidate.label,
+      address: candidate.address ?? candidate.sublabel ?? null,
+      phone: candidate.phone ?? null,
+      lat: candidate.position.lat,
+      lng: candidate.position.lng,
+    });
+    if (signal.possibleDuplicate || signal.error) {
+      await queueDuplicateReview(candidate, signal);
+      setReviewActionId(null);
+      return;
+    }
+    const confirmed = window.confirm(
+      'Δεν εντοπίστηκε πιθανή υπάρχουσα εγγραφή από τον διαθέσιμο έλεγχο. Να δημιουργηθεί νέο Lead για «'
+        + candidate.label
+        + '» και να ανατεθεί στον δικό σας λογαριασμό;'
+    );
+    if (!confirmed) {
+      setReviewActionId(null);
+      return;
+    }
+    const created = await createLead({
+      full_name: candidate.label,
+      company: candidate.label,
+      phone: candidate.phone ?? null,
+      address: candidate.address ?? candidate.sublabel ?? null,
+      lat: candidate.position.lat,
+      lng: candidate.position.lng,
+      location_source: 'openstreetmap',
+      source: 'field_sales',
+      source_label: candidate.source,
+      status: 'new',
+      property_type: 'Επιχείρηση',
+      service_category: candidate.category ?? null,
+      lead_type: 'business',
+      assigned_to_user_id: currentUserId,
+      comments: 'Πηγή ανακάλυψης: ' + candidate.source + '. ' + candidate.sourceUrl,
+    });
+    setReviewActionId(null);
+    if (created.error || !created.lead) {
+      toast(created.error ?? 'Το Lead δεν δημιουργήθηκε.', 'bad');
+      return;
+    }
     setStops(current => [...current, {
-      source_type: 'discovery',
+      source_type: 'crm',
+      source_id: created.lead!.id,
       label: candidate.label,
-      subtitle: candidate.sublabel ?? candidate.category ?? 'Δημόσια καταχώριση OpenStreetMap',
-      address: candidate.sublabel ?? null,
+      subtitle: 'Νέο Lead',
+      address: candidate.address ?? candidate.sublabel ?? null,
       latitude: candidate.position.lat,
       longitude: candidate.position.lng,
-      category: candidate.category ?? null,
+      category: 'lead',
       source_url: candidate.sourceUrl,
       metadata: {
         source: candidate.source,
         external_candidate_id: candidate.id,
-        duplicate_check: lookup.error ? 'incomplete' : possible.length ? 'possible_match_requires_review' : 'no_match_found',
-        possible_crm_match_ids: possible.map(row => row.entity_type + ':' + row.id),
+        created_lead_id: created.lead.id,
+        duplicate_check: 'clear_at_creation',
       },
     }]);
     setCandidates(current => current.filter(item => item.id !== candidate.id));
-    if (lookup.error) {
-      toast('Η στάση προστέθηκε, αλλά ο έλεγχος διπλοτύπων δεν ολοκληρώθηκε. Ζητήστε έλεγχο Back Office πριν δημιουργηθεί lead.', 'warn');
-    } else if (possible.length) {
-      toast('Η στάση προστέθηκε χωρίς σύνδεση με CRM. Απαιτείται έλεγχος πριν δημιουργηθεί lead.', 'warn');
-    } else {
-      toast('Η επιχείρηση προστέθηκε ως υποψήφια στάση. Δεν δημιουργήθηκε lead.', 'ok');
+    toast('Το Lead δημιουργήθηκε και ανατέθηκε στον δικό σας λογαριασμό.', 'ok');
+  };
+
+  const rejectDuplicateReview = async (review: FieldSalesDuplicateReview) => {
+    setReviewActionId(review.id);
+    const claimed = await claimFieldSalesDuplicateReview(review.id, currentUserId, 'Το αίτημα εξετάζεται από Back Office.');
+    if (claimed.error || !claimed.row) {
+      setReviewActionId(null);
+      toast(claimed.error ?? 'Το αίτημα δεν είναι πλέον εκκρεμές.', 'warn');
+      await refreshDuplicateReviews();
+      return;
     }
+    const error = await updateFieldSalesDuplicateReview(
+      review.id, 'rejected', currentUserId, 'Απορρίφθηκε από Back Office. Δεν δημιουργήθηκε Lead.',
+    );
+    setReviewActionId(null);
+    if (error) {
+      toast('Το αίτημα βρίσκεται σε κατάσταση ελέγχου, αλλά η απόρριψη δεν αποθηκεύτηκε: ' + error, 'bad');
+      return;
+    }
+    toast('Το αίτημα απορρίφθηκε. Δεν δημιουργήθηκε Lead.', 'ok');
+    await refreshDuplicateReviews();
+  };
+
+  const approveDuplicateReview = async (review: FieldSalesDuplicateReview) => {
+    setReviewActionId(review.id);
+    const claimed = await claimFieldSalesDuplicateReview(review.id, currentUserId, 'Εγκρίθηκε από Back Office· δημιουργία Lead σε εξέλιξη.');
+    if (claimed.error || !claimed.row) {
+      setReviewActionId(null);
+      toast(claimed.error ?? 'Το αίτημα δεν είναι πλέον εκκρεμές.', 'warn');
+      await refreshDuplicateReviews();
+      return;
+    }
+    const staff = await listStaff();
+    const requester = staff.rows.find(row => row.id === review.requested_by && row.is_active && isSalesAgentRole(row.role));
+    if (!requester) {
+      const resetError = await updateFieldSalesDuplicateReview(
+        review.id, 'pending', currentUserId,
+        'Δεν δημιουργήθηκε Lead: ο αρχικός αιτών δεν είναι πλέον ενεργός Sales Agent. Απαιτείται επανεκχώρηση από Back Office.',
+      );
+      setReviewActionId(null);
+      toast(
+        'Δεν δημιουργήθηκε Lead: ο αρχικός Sales Agent δεν είναι πλέον ενεργός. '
+          + (resetError ? 'Το αίτημα παραμένει προς έλεγχο· ' + resetError : 'Το αίτημα επέστρεψε στην ουρά.'),
+        'warn',
+      );
+      await refreshDuplicateReviews();
+      return;
+    }
+
+    const created = await createLead({
+      full_name: review.candidate_name,
+      company: review.candidate_name,
+      phone: review.candidate_phone,
+      address: review.candidate_address,
+      lat: review.candidate_lat,
+      lng: review.candidate_lng,
+      location_source: 'openstreetmap',
+      source: 'field_sales',
+      source_label: review.source_provider,
+      status: 'new',
+      property_type: 'Επιχείρηση',
+      service_category: review.candidate_category,
+      lead_type: 'business',
+      assigned_to_user_id: requester.id,
+      comments: 'Εγκρίθηκε από Back Office. Αίτημα: ' + review.id + '. Πηγή: ' + (review.source_url ?? review.source_provider),
+    });
+    if (created.error || !created.lead) {
+      const resetError = await updateFieldSalesDuplicateReview(
+        review.id, 'pending', currentUserId,
+        'Δεν δημιουργήθηκε Lead· απαιτείται επανέλεγχος. ' + (created.error ?? 'Άγνωστο σφάλμα.'),
+      );
+      setReviewActionId(null);
+      toast(
+        'Το Lead δεν δημιουργήθηκε. '
+          + (resetError ? 'Το αίτημα δεν μπόρεσε να επιστρέψει στην ουρά: ' + resetError : 'Το αίτημα επέστρεψε στην ουρά.'),
+        'bad',
+      );
+      await refreshDuplicateReviews();
+      return;
+    }
+    const updateError = await updateFieldSalesDuplicateReview(
+      review.id, 'converted', currentUserId,
+      'Εγκρίθηκε και μετατράπηκε σε Lead.', created.lead.id,
+    );
+    setReviewActionId(null);
+    if (updateError) {
+      toast(
+        'Το Lead δημιουργήθηκε, αλλά η ενημέρωση κατάστασης του αιτήματος απέτυχε. Μην επαναλάβετε χειροκίνητα· αναφέρετε το ID αιτήματος ' + review.id + '.',
+        'warn',
+      );
+      await refreshDuplicateReviews();
+      return;
+    }
+    toast('Το αίτημα εγκρίθηκε και το Lead δημιουργήθηκε για τον ενεργό Sales Agent.', 'ok');
+    await refreshDuplicateReviews();
   };
 
   const hasVisitHistory = useMemo(() => stops.some(stop => stop.stop_status === 'arrived' || stop.stop_status === 'completed'), [stops]);

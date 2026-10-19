@@ -2805,3 +2805,10 @@ body {
   #hero .hlk-energy-trail { animation: none !important; }
   #hero [data-motion-scrub], #hero [data-motion] { transform: none !important; }
 }
+
+@keyframes hlk-energy-dash { to { stroke-dashoffset: -320; } }
+.hlk-energy-trail { stroke-dasharray: 9 11; animation: hlk-energy-dash 18s linear infinite; }
+@media (max-width: 900px) {
+  #root .app-shell .site-header .main-nav { align-items: stretch !important; }
+  #root .app-shell .site-header .main-nav details > div { position: static !important; box-shadow: none !important; border: 0 !important; background: #f3f8fc !important; margin: 2px 8px 8px; }
+}

@@ -67,7 +67,8 @@ create or replace function public.reassign_lead(lead_id uuid, new_agent_id uuid)
 returns void
 language plpgsql
 security definer
-as $$
+set search_path = pg_catalog, public, pg_temp
+as $
 begin
   update public.hlektrismos_leads
   set assigned_to = new_agent_id, assigned_at = now(), assigned_by = auth.uid()
@@ -85,7 +86,8 @@ create or replace function public.upsert_supply_point(
 returns uuid
 language plpgsql
 security definer
-as $$
+set search_path = pg_catalog, public, pg_temp
+as $
 declare v_id uuid;
 begin
   insert into public.supply_points (
@@ -149,7 +151,41 @@ begin
   if to_regprocedure('public.get_agent_lead_counts()') is not null then
     grant execute on function public.get_agent_lead_counts() to public, anon, authenticated, service_role;
   end if;
-end $$;
+
+  -- Restore the EXECUTE grants found in the pre-hotfix read-only production audit.
+  -- This intentionally reopens the prior exposure and is for emergencies only.
+  foreach sig in array array[
+    'public.bump_case_stage_entered()',
+    'public.calculate_agent_commission()',
+    'public.check_dnc_status(text)',
+    'public.convert_lead_to_case(uuid)',
+    'public.convert_lead_to_customer(uuid)',
+    'public.crm_can_view_team(uuid)',
+    'public.crm_can_view_territory(uuid)',
+    'public.crm_current_organization_id()',
+    'public.crm_grant_role(uuid,text,boolean)',
+    'public.crm_has_role(text)',
+    'public.crm_revoke_role(uuid,text)',
+    'public.crm_set_primary_role(uuid,text)',
+    'public.customer_supply_points_audit()',
+    'public.distribute_leads_equally()',
+    'public.get_agent_lead_counts()',
+    'public.handle_new_user()',
+    'public.insert_website_lead(text,jsonb)',
+    'public.is_role(text)',
+    'public.is_staff()',
+    'public.leads_move_supply_points()',
+    'public.reassign_lead(uuid,uuid)',
+    'public.set_user_role(uuid,text)',
+    'public.upsert_scraped_b2b_leads(jsonb)',
+    'public.upsert_supply_point(uuid,text,text,text,text,uuid,numeric,numeric)',
+    'public.get_active_tariff_prices(text)'
+  ] loop
+    if to_regprocedure(sig) is not null then
+      execute format('grant execute on function %s to public, anon, authenticated, service_role', to_regprocedure(sig));
+    end if;
+  end loop;
+end $;
 
 do $$
 begin
@@ -161,21 +197,5 @@ begin
   end if;
 end $$;
 
--- Restore previously mutable search paths for functions that this migration pinned.
--- This is intentionally a regression to the old risk and should only be done if the owner accepts it.
-do $$
-declare
-  f record;
-begin
-  for f in
-    select p.oid::regprocedure as signature
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname='public' and p.prosecdef
-      and exists (
-        select 1 from unnest(coalesce(p.proconfig, array[]::text[])) as cfg
-        where cfg = 'search_path=pg_catalog, public, pg_temp'
-      )
-  loop
-    execute format('alter function %s reset search_path', f.signature);
-  end loop;
-end $$;
+-- Safe search_path pins are deliberately retained during rollback; they are compatible hardening
+-- and should not be removed as part of an emergency service-restoration procedure.

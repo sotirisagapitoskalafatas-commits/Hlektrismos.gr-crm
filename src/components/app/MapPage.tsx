@@ -510,19 +510,80 @@ export default function MapPage() {
     return () => { alive = false; window.clearTimeout(t); };
   }, [destQuery, origin]);
 
-  const routeStops: RouteStopInput[] = useMemo(() => todayVisits.map(v => {
-    const c = caseById.get(v.case_id);
-    const pos = visitPos(c, v);
-    return {
-      id: `visit-${v.id}`,
-      label: c?.customer?.full_name ?? v.purpose ?? 'Στάση',
-      subtitle: c ? `${c.case_no} · ${c.title}` : undefined,
-      lat: pos?.lat ?? 0,
-      lng: pos?.lng ?? 0,
-      scheduledAt: v.scheduled_at,
+  const routeStops: RouteStopInput[] = useMemo(() => {
+    const result = new Map<string, RouteStopInput>();
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+    const dueAtOrBeforeEndOfToday = (value: string | null | undefined) => {
+      if (!value) return false;
+      const time = new Date(value).getTime();
+      return Number.isFinite(time) && time <= endOfToday.getTime();
     };
-  }).filter(s => s.lat !== 0 && s.lng !== 0 && Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.lat >= -90 && s.lat <= 90 && s.lng >= -180 && s.lng <= 180), [todayVisits, caseById]);
+    const add = (stop: RouteStopInput) => {
+      if (
+        !Number.isFinite(stop.lat) || !Number.isFinite(stop.lng)
+        || stop.lat < -90 || stop.lat > 90 || stop.lng < -180 || stop.lng > 180
+        || (stop.lat === 0 && stop.lng === 0)
+      ) return;
+      if (!result.has(stop.id)) result.set(stop.id, stop);
+    };
 
+    // Include today's visits and unfinished planned/in-progress visits whose schedule is overdue or due today.
+    const dueVisits = visits.filter(v =>
+      v.status === 'in_progress'
+      || (v.status === 'planned' && dueAtOrBeforeEndOfToday(v.scheduled_at))
+      || todayVisits.some(today => today.id === v.id),
+    );
+    for (const visit of dueVisits) {
+      const itemCase = caseById.get(visit.case_id);
+      const position = visitPos(itemCase, visit);
+      if (!position) continue;
+      add({
+        id: `visit-${visit.id}`,
+        label: itemCase?.customer?.full_name ?? visit.purpose ?? 'Επίσκεψη',
+        subtitle: [itemCase?.case_no, visit.purpose, visit.status === 'in_progress' ? 'Σε εξέλιξη' : 'Εκκρεμεί'].filter(Boolean).join(' · '),
+        lat: position.lat,
+        lng: position.lng,
+        scheduledAt: visit.scheduled_at,
+      });
+    }
+
+    // Bring forward pending overdue/today follow-ups. The embedded case UUID links the route stop back to its CRM case;
+    // the follow-up UUID is retained as explicit metadata when the route is first saved.
+    for (const followUp of followUps.filter(item => dueAtOrBeforeEndOfToday(item.due_at))) {
+      const itemCase = followUp.case_id ? caseById.get(followUp.case_id) : undefined;
+      const position = itemCase ? casePos(itemCase) : null;
+      if (!itemCase || !position) continue;
+      add({
+        id: `case-${itemCase.id}-followup-${followUp.id}`,
+        label: itemCase.customer?.full_name ?? itemCase.title ?? 'Follow-up',
+        subtitle: [itemCase.case_no, 'Follow-up', followUp.reason].filter(Boolean).join(' · '),
+        lat: position.lat,
+        lng: position.lng,
+        scheduledAt: followUp.due_at,
+      });
+    }
+
+    // Cases with a due next action but no explicit pending follow-up row remain visible as an unfinished-work suggestion.
+    const pendingCaseIds = new Set(followUps.filter(item => item.case_id && dueAtOrBeforeEndOfToday(item.due_at)).map(item => item.case_id));
+    const terminalStages = new Set(['completed', 'lost', 'cancelled']);
+    for (const itemCase of cases) {
+      if (terminalStages.has(itemCase.current_stage) || pendingCaseIds.has(itemCase.id)) continue;
+      if (!dueAtOrBeforeEndOfToday(itemCase.next_follow_up_at)) continue;
+      const position = casePos(itemCase);
+      if (!position) continue;
+      add({
+        id: `case-${itemCase.id}`,
+        label: itemCase.customer?.full_name ?? itemCase.title,
+        subtitle: [itemCase.case_no, 'Εκκρεμής ενέργεια', itemCase.next_action].filter(Boolean).join(' · '),
+        lat: position.lat,
+        lng: position.lng,
+        scheduledAt: itemCase.next_follow_up_at,
+      });
+    }
+    return [...result.values()];
+  }, [visits, todayVisits, followUps, cases, caseById]);
   const onPlan = useCallback((plan: RoutePlan, ordered: RouteStop[]) => {
     const m = mapRef.current;
     if (!m || !m.isReady()) return;

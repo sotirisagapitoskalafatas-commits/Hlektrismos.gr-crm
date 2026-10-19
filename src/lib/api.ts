@@ -1462,6 +1462,36 @@ export async function findPotentialCRMMatches(search: string): Promise<{ rows: P
   return { rows: [...unique.values()], error: failed ? 'Δεν ολοκληρώθηκε ο έλεγχος σε όλους τους πίνακες CRM. Απαιτείται έλεγχος από Back Office πριν δημιουργηθεί νέο lead.' : null };
 }
 
+export type FieldMapCount = { visibleTotal: number | null; withCoordinates: number | null; error: 'permission' | 'query' | null };
+export type FieldMapDiagnostics = { cases: FieldMapCount; leads: FieldMapCount };
+
+/** Counts only rows visible to the caller under current RLS. Never returns customer data. */
+export async function fetchFieldMapDiagnostics(): Promise<FieldMapDiagnostics> {
+  if (!supabase) {
+    const unavailable: FieldMapCount = { visibleTotal: null, withCoordinates: null, error: 'query' };
+    return { cases: unavailable, leads: unavailable };
+  }
+  const [caseTotal, caseCoords, leadTotal, leadCoords] = await Promise.all([
+    supabase.from('cases').select('id', { count: 'exact', head: true }),
+    supabase.from('cases').select('id', { count: 'exact', head: true }).not('lat', 'is', null).not('lng', 'is', null),
+    supabase.from('leads').select('id', { count: 'exact', head: true }),
+    supabase.from('leads').select('id', { count: 'exact', head: true }).not('lat', 'is', null).not('lng', 'is', null),
+  ]);
+  const count = (total: typeof caseTotal, coords: typeof caseCoords): FieldMapCount => {
+    const error = total.error ?? coords.error;
+    const errorKind = error
+      ? ((error as { code?: string }).code === '42501' ? 'permission' : 'query')
+      : null;
+    if (error) logError('fieldMapDiagnostics', { code: (error as { code?: string }).code, message: error.message });
+    return {
+      visibleTotal: error ? null : (total.count ?? 0),
+      withCoordinates: error ? null : (coords.count ?? 0),
+      error: errorKind,
+    };
+  };
+  return { cases: count(caseTotal, caseCoords), leads: count(leadTotal, leadCoords) };
+}
+
 /* Write coordinates to a lead row (from geocoded map pin). */
 export async function updateLeadLocation(leadId: string, coords: { lat: number; lng: number }, source: string): Promise<boolean> {
   if (!supabase) return false;

@@ -68,7 +68,22 @@ before(async () => {
     create function public.is_staff() returns boolean language sql stable security definer set search_path=public
       as $$ select exists (select 1 from public.profiles p where p.id=auth.uid() and coalesce(p.is_active,true)) $$;
     create function public.is_role(r text) returns boolean language sql stable security definer set search_path=public
-      as $$ select exists (select 1 from public.profiles p where p.id=auth.uid() and p.role=r and coalesce(p.is_active,true)) $$;
+      as $ select exists (select 1 from public.profiles p where p.id=auth.uid() and p.role=r and coalesce(p.is_active,true)) $;
+    create table public.customers (
+      id uuid primary key default gen_random_uuid(),
+      full_name text, phone text, address text, lat double precision, lng double precision
+    );
+    create table public.cases (
+      id uuid primary key default gen_random_uuid(),
+      title text, customer_id uuid references public.customers(id), address text,
+      lat double precision, lng double precision
+    );
+    create table public.leads (
+      id uuid primary key default gen_random_uuid(),
+      full_name text, client_name text, company text, phone text, address text,
+      lat double precision, lng double precision
+    );
+    grant select on public.customers, public.cases, public.leads to authenticated;
     grant usage on schema public to anon, authenticated, service_role;
     insert into auth.users (id,email) values
       ('aaaaaaaa-0000-4000-8000-000000000001','admin@example.invalid'),
@@ -243,6 +258,68 @@ test('Back Office can assign only to active Sales Agents; route history cannot b
   const deletion = await run('delete from public.field_sales_routes where id=$1 returning id', [historicalRoute]);
   assert.equal(deletion.ok, false, 'routes with arrived/completed stops must be retained as history');
   assert.match(deletion.error, /visit history/i);
+});
+
+test('duplicate signal returns only a boolean and queue access is scoped to the requester or Back Office', async () => {
+  await owner();
+  await db.query(
+    "insert into public.leads (full_name, company, phone, address, lat, lng) values ($1,$2,$3,$4,$5,$6)",
+    ['Other Agent Prospect', 'Other Agent Prospect', '2105550101', 'Athens Business Road 10', 38.0100, 23.7500],
+  );
+  await as(AGENT_A);
+  const signal = await run(
+    'select public.field_sales_candidate_duplicate_signal($1,$2,$3,$4,$5) as possible',
+    ['Other Agent Prospect', null, null, null, null],
+  );
+  assert.equal(signal.ok, true, signal.error);
+  assert.equal(signal.rows[0].possible, true, 'a duplicate exists on another agent-visible scope');
+  assert.deepEqual(Object.keys(signal.rows[0]), ['possible'], 'signal returns no matching entity ID, name, phone or owner');
+  const noSignal = await run(
+    'select public.field_sales_candidate_duplicate_signal($1,$2,$3,$4,$5) as possible',
+    ['New Example Company', 'No Match Street 1', null, 37.98, 23.73],
+  );
+  assert.equal(noSignal.ok, true, noSignal.error);
+  assert.equal(noSignal.rows[0].possible, false);
+
+  const created = await run(
+    `insert into public.field_sales_duplicate_reviews
+      (requested_by,candidate_name,candidate_address,candidate_lat,candidate_lng,duplicate_signal,status,source_url)
+     values ($1,$2,$3,$4,$5,$6,'pending',$7) returning id,status,reviewed_by,reviewed_at`,
+    [AGENT_A, 'Possible Prospect', 'Example Avenue 3', 37.98, 23.73, 'possible_match', 'https://www.openstreetmap.org/'],
+  );
+  assert.equal(created.ok, true, created.error);
+  const reviewId = created.rows[0].id;
+  assert.equal(created.rows[0].status, 'pending');
+  assert.equal(created.rows[0].reviewed_by, null);
+  assert.equal(created.rows[0].reviewed_at, null);
+
+  await as(AGENT_B);
+  const otherSales = await run('select id,candidate_name from public.field_sales_duplicate_reviews where id=$1', [reviewId]);
+  assert.equal(otherSales.ok, true, otherSales.error);
+  assert.equal(otherSales.rows.length, 0, 'another Sales Agent cannot inspect the request or its candidate details');
+  const cannotUpdate = await run("update public.field_sales_duplicate_reviews set status='rejected' where id=$1 returning id", [reviewId]);
+  assert.equal(cannotUpdate.ok, true, cannotUpdate.error);
+  assert.equal(cannotUpdate.rows.length, 0, 'Sales Agents cannot approve/reject reviews');
+
+  await as(BO);
+  const officeRead = await run('select id,candidate_name,status from public.field_sales_duplicate_reviews where id=$1', [reviewId]);
+  assert.equal(officeRead.ok, true, officeRead.error);
+  assert.equal(officeRead.rows.length, 1, 'Back Office can inspect the queue');
+
+  const claim = await run("update public.field_sales_duplicate_reviews set status='approved',review_note='Reviewed' where id=$1 returning reviewed_by,reviewed_at", [reviewId]);
+  assert.equal(claim.ok, true, claim.error);
+  assert.equal(claim.rows.length, 1);
+  assert.equal(claim.rows[0].reviewed_by, BO, 'reviewer identity is stamped by the database, not trusted from the browser');
+  assert.ok(claim.rows[0].reviewed_at);
+
+  const reset = await run("update public.field_sales_duplicate_reviews set status='pending' where id=$1 returning reviewed_by,reviewed_at", [reviewId]);
+  assert.equal(reset.ok, true, reset.error);
+  assert.equal(reset.rows[0].reviewed_by, null, 'resetting after a failed conversion clears the prior review stamp');
+  assert.equal(reset.rows[0].reviewed_at, null);
+
+  await as(null, 'anon');
+  assert.equal((await run('select * from public.field_sales_duplicate_reviews')).ok, false, 'anonymous queue read denied');
+  assert.equal((await run('select public.field_sales_candidate_duplicate_signal($1,null,null,null,null)', ['Possible Prospect'])).ok, false, 'anonymous duplicate probing denied');
 });
 
 test('anonymous visitors cannot read or write saved routes', async () => {

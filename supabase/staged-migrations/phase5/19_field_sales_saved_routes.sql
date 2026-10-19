@@ -59,6 +59,10 @@ create index if not exists idx_field_sales_route_stops_source
 create index if not exists idx_field_sales_route_stops_coords
   on public.field_sales_route_stops(latitude, longitude);
 
+-- Server-stamped route-stop history. Additive for reruns if a staging copy was made from an earlier draft.
+alter table public.field_sales_route_stops add column if not exists arrived_at timestamptz;
+alter table public.field_sales_route_stops add column if not exists completed_at timestamptz;
+
 alter table public.field_sales_routes enable row level security;
 alter table public.field_sales_route_stops enable row level security;
 
@@ -221,6 +225,8 @@ create policy "field route stops delete permitted route" on public.field_sales_r
   );
 
 -- Transactional stop replacement for the browser route editor. SECURITY INVOKER preserves RLS checks.
+-- Existing stop IDs are retained. Arrived/completed stops must remain in the payload, and their recorded content/status
+-- cannot be rewritten by an ordinary list save. Only their route ordering may change.
 create or replace function public.field_sales_replace_route_stops(p_route_id uuid, p_stops jsonb)
 returns void
 language plpgsql
@@ -234,10 +240,95 @@ begin
   if p_stops is null or jsonb_typeof(p_stops) <> 'array' then
     raise exception 'field_sales_replace_route_stops: stops must be a JSON array' using errcode = '22023';
   end if;
+  if not exists (select 1 from public.field_sales_routes r where r.id = p_route_id) then
+    raise exception 'field_sales_replace_route_stops: route not found or not permitted' using errcode = '42501';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_stops) item(value)
+    where nullif(item.value->>'id','') is not null
+      and not exists (
+        select 1 from public.field_sales_route_stops s
+        where s.id = nullif(item.value->>'id','')::uuid and s.route_id = p_route_id
+      )
+  ) then
+    raise exception 'field_sales_replace_route_stops: one or more stop ids do not belong to this route' using errcode = '42501';
+  end if;
+  if exists (
+    select nullif(item.value->>'id','') as stop_id
+    from jsonb_array_elements(p_stops) item(value)
+    where nullif(item.value->>'id','') is not null
+    group by nullif(item.value->>'id','')
+    having count(*) > 1
+  ) then
+    raise exception 'field_sales_replace_route_stops: duplicate stop id in payload' using errcode = '22023';
+  end if;
 
-  -- A denied delete or insert raises and rolls back the whole function call; it cannot leave a half-saved route.
-  delete from public.field_sales_route_stops where route_id = p_route_id;
+  -- Never silently remove a stop with recorded arrival/completion.
+  if exists (
+    select 1 from public.field_sales_route_stops s
+    where s.route_id = p_route_id and s.stop_status in ('arrived','completed')
+      and not exists (
+        select 1 from jsonb_array_elements(p_stops) item(value)
+        where nullif(item.value->>'id','')::uuid = s.id
+      )
+  ) then
+    raise exception 'field_sales_replace_route_stops: route has visit history; historical stops must be retained' using errcode = '23514';
+  end if;
 
+  -- Temporarily move all existing order values out of the target range to avoid unique-order conflicts on reordering.
+  update public.field_sales_route_stops
+     set sort_order = sort_order + 1000000
+   where route_id = p_route_id;
+
+  -- Historical stop records are immutable except for their position in the route's ordered view.
+  with items as (
+    select value, ordinality
+    from jsonb_array_elements(p_stops) with ordinality
+  )
+  update public.field_sales_route_stops s
+     set sort_order = (i.ordinality - 1)::integer, updated_at = now()
+    from items i
+   where s.route_id = p_route_id
+     and s.id = nullif(i.value->>'id','')::uuid
+     and s.stop_status in ('arrived','completed');
+
+  -- Remove omitted pending/skipped stops only. Historical stops were checked above and stay in place.
+  delete from public.field_sales_route_stops s
+   where s.route_id = p_route_id
+     and s.stop_status not in ('arrived','completed')
+     and not exists (
+       select 1 from jsonb_array_elements(p_stops) item(value)
+       where nullif(item.value->>'id','')::uuid = s.id
+     );
+
+  -- Update existing non-historical stops in-place, preserving their row IDs.
+  with items as (
+    select value, ordinality
+    from jsonb_array_elements(p_stops) with ordinality
+  )
+  update public.field_sales_route_stops s
+     set sort_order = (i.ordinality - 1)::integer,
+         source_type = coalesce(nullif(i.value->>'source_type',''), 'manual'),
+         source_id = nullif(i.value->>'source_id','')::uuid,
+         label = btrim(coalesce(i.value->>'label','')),
+         subtitle = i.value->>'subtitle',
+         address = i.value->>'address',
+         latitude = (i.value->>'latitude')::double precision,
+         longitude = (i.value->>'longitude')::double precision,
+         category = i.value->>'category',
+         source_url = i.value->>'source_url',
+         stop_status = coalesce(nullif(i.value->>'stop_status',''), 'pending'),
+         scheduled_at = nullif(i.value->>'scheduled_at','')::timestamptz,
+         notes = i.value->>'notes',
+         metadata = coalesce(i.value->'metadata','{}'::jsonb),
+         updated_at = now()
+    from items i
+   where s.route_id = p_route_id
+     and s.id = nullif(i.value->>'id','')::uuid
+     and s.stop_status not in ('arrived','completed');
+
+  -- Insert new items (id omitted by the client). Unrecognized non-null IDs were refused above.
   insert into public.field_sales_route_stops (
     route_id, sort_order, source_type, source_id, label, subtitle, address,
     latitude, longitude, category, source_url, stop_status, scheduled_at, notes, metadata
@@ -258,11 +349,63 @@ begin
     nullif(item.value->>'scheduled_at','')::timestamptz,
     item.value->>'notes',
     coalesce(item.value->'metadata','{}'::jsonb)
-  from jsonb_array_elements(p_stops) with ordinality as item(value, ordinality);
+  from jsonb_array_elements(p_stops) with ordinality as item(value, ordinality)
+  where nullif(item.value->>'id','') is null;
 end;
 $function$;
 revoke all on function public.field_sales_replace_route_stops(uuid, jsonb) from public, anon;
 grant execute on function public.field_sales_replace_route_stops(uuid, jsonb) to authenticated, service_role;
+
+-- Set arrival/completion timestamps from the database clock and forbid history regression.
+create or replace function public.field_sales_track_route_stop_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  if old.stop_status = 'completed' and new.stop_status <> 'completed' then
+    raise exception 'field_sales_route_stops: completed visit history cannot be reversed' using errcode = '23514';
+  end if;
+  if old.stop_status = 'arrived' and new.stop_status in ('pending','skipped') then
+    raise exception 'field_sales_route_stops: arrival history cannot be cleared' using errcode = '23514';
+  end if;
+  if new.stop_status = 'arrived' and new.arrived_at is null then
+    new.arrived_at := now();
+  end if;
+  if new.stop_status = 'completed' then
+    if new.arrived_at is null then new.arrived_at := now(); end if;
+    if new.completed_at is null then new.completed_at := now(); end if;
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+revoke all on function public.field_sales_track_route_stop_status() from public, anon, authenticated;
+grant execute on function public.field_sales_track_route_stop_status() to service_role;
+drop trigger if exists field_sales_track_route_stop_status on public.field_sales_route_stops;
+create trigger field_sales_track_route_stop_status before update of stop_status on public.field_sales_route_stops
+  for each row execute function public.field_sales_track_route_stop_status();
+
+-- Do not allow direct deletion of a stop that has arrival/completion history.
+create or replace function public.field_sales_protect_route_stop_history()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  if old.stop_status in ('arrived','completed') then
+    raise exception 'field_sales_route_stops: route stop has visit history; keep the historical row' using errcode = '23514';
+  end if;
+  return old;
+end;
+$$;
+revoke all on function public.field_sales_protect_route_stop_history() from public, anon, authenticated;
+grant execute on function public.field_sales_protect_route_stop_history() to service_role;
+drop trigger if exists field_sales_protect_route_stop_history on public.field_sales_route_stops;
+create trigger field_sales_protect_route_stop_history before delete on public.field_sales_route_stops
+  for each row execute function public.field_sales_protect_route_stop_history();
 
 -- Preserve route history: once a route has an arrived/completed stop, it must not be deleted.
 -- Users can mark a route completed/cancelled and keep the route and stop audit trail.

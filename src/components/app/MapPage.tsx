@@ -3,7 +3,7 @@ import { useNav } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
 import { ACTIVE_STAGES, BACK_OFFICE_STAGES, serviceLabel, stageLabel } from '@/lib/roles';
 import { fieldAllowed, fieldDecision } from '@/lib/field-sales/policy';
-import { Case, CaseVisit, FollowUp, fetchAllCaseStats, fetchCases, fetchFollowUps, fetchLeads, fetchVisits, fetchFieldTargets, fieldCheckin, updateLeadLocation } from '@/lib/api';
+import { Case, CaseVisit, FollowUp, fetchAllCaseStats, fetchCases, fetchFollowUps, fetchLeads, fetchVisits, fetchFieldTargets, fetchFieldMapDiagnostics, fieldCheckin, updateLeadLocation } from '@/lib/api';
 import { Btn, Card, Micro, Spinner, StagePill, fmtTime, isToday } from '@/lib/ui';
 import { createMap } from '@/lib/maps/map-provider';
 import type { MapCoordinate, MapProvider, MapMarkerData } from '@/lib/maps/types';
@@ -92,6 +92,7 @@ export default function MapPage() {
   const [visits, setVisits] = useState<CaseVisit[]>([]);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [mapDiagnostics, setMapDiagnostics] = useState<Awaited<ReturnType<typeof fetchFieldMapDiagnostics>> | null>(null);
 
   const [filter, setFilter] = useState<FilterId>('all');
   const [q, setQ] = useState('');
@@ -136,14 +137,16 @@ export default function MapPage() {
   );
 
   const reload = useCallback(async () => {
-    const [c, v, f, l] = await Promise.all([
+    const [c, v, f, l, diagnostics] = await Promise.all([
       fetchCases({ includeDone: true }),
       fetchVisits(),
       fetchFollowUps({ status: 'all' }),
       fetchLeads(),
+      fetchFieldMapDiagnostics(),
     ]);
     setCases(c);
     setVisits(v);
+    setMapDiagnostics(diagnostics);
     setFollowUps(f.filter(x => x.status === 'pending'));
     setLeads(l.map(lead => ({
       id: lead.id,
@@ -246,7 +249,7 @@ export default function MapPage() {
       const p = await planRoute([
         { id: 'origin', label: 'Εδώ είμαι', position: from },
         { id: 'dest', label: label ?? 'Προορισμός', position: to },
-      ]);
+      ], travelMode);
       setEta(p);
       const m = mapRef.current;
       if (m?.isReady()) {
@@ -258,7 +261,7 @@ export default function MapPage() {
       setEta(null);
       toast('Δεν ήταν δυνατή η δρομολόγηση προς τον προορισμό.', 'bad');
     } finally { setEtaBusy(false); }
-  }, [toast]);
+  }, [toast, travelMode]);
 
   const pickDest = useCallback((d: DestSuggestion) => {
     setDest(d);

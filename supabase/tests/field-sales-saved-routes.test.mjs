@@ -52,7 +52,7 @@ async function createStop(actor, routeId, order, label, lat, lng, sourceType = '
 }
 
 before(async () => {
-  await db.exec(\`
+  await db.exec(`
     create role anon nologin;
     create role authenticated nologin;
     create role service_role nologin bypassrls;
@@ -95,7 +95,7 @@ before(async () => {
       ('aaaaaaaa-0000-4000-8000-000000000002','back_office',true),
       ('aaaaaaaa-0000-4000-8000-000000000003','field_sales',true),
       ('aaaaaaaa-0000-4000-8000-000000000004','field_sales',true);
-  \`);
+  `);
   await db.exec(SQL);
   await db.exec(SQL); // idempotent migration re-application
 });

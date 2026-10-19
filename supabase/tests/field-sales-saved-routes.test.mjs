@@ -293,6 +293,11 @@ test('duplicate signal returns only a boolean and queue access is scoped to the 
   assert.equal(created.rows[0].reviewed_by, null);
   assert.equal(created.rows[0].reviewed_at, null);
 
+  await as(AGENT_A);
+  const requesterRead = await run('select id,candidate_name from public.field_sales_duplicate_reviews where id=$1', [reviewId]);
+  assert.equal(requesterRead.ok, true, requesterRead.error);
+  assert.equal(requesterRead.rows.length, 1, 'the submitting agent can view their own request');
+
   await as(AGENT_B);
   const otherSales = await run('select id,candidate_name from public.field_sales_duplicate_reviews where id=$1', [reviewId]);
   assert.equal(otherSales.ok, true, otherSales.error);
@@ -320,6 +325,7 @@ test('duplicate signal returns only a boolean and queue access is scoped to the 
   await as(null, 'anon');
   assert.equal((await run('select * from public.field_sales_duplicate_reviews')).ok, false, 'anonymous queue read denied');
   assert.equal((await run('select public.field_sales_candidate_duplicate_signal($1,null,null,null,null)', ['Possible Prospect'])).ok, false, 'anonymous duplicate probing denied');
+  assert.equal((await run("insert into public.field_sales_duplicate_reviews (requested_by,candidate_name,status) values ('aaaaaaaa-0000-4000-8000-000000000003','Anonymous candidate','pending')")).ok, false, 'anonymous review submissions are denied');
 });
 
 test('anonymous visitors cannot read or write saved routes', async () => {

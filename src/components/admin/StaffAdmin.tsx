@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Mail, Plus, Search, ShieldAlert, UserCheck, UserX, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { ACCESS_GROUPS, ROLE_COLOR, accessGroupLabel, roleLabel } from '@/lib/roles';
+import { ACCESS_GROUPS, ROLE_COLOR, accessGroup, accessGroupLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
@@ -35,7 +35,7 @@ export default function StaffAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [roleF, setRoleF] = useState<'all' | Role>('all');
+  const [roleF, setRoleF] = useState<'all' | 'office' | 'sales'>('all');
   const [statusF, setStatusF] = useState<'active' | 'inactive' | 'all'>('active');
   const [dialog, setDialog] = useState<Dialog>(null);
 
@@ -58,7 +58,7 @@ export default function StaffAdmin() {
   const visible = useMemo(() => {
     const n = q.trim().toLocaleLowerCase('el');
     return rows.filter(r =>
-      (roleF === 'all' || r.role === roleF)
+      (roleF === 'all' || accessGroup(r.role) === roleF)
       && (statusF === 'all' || (statusF === 'active' ? r.is_active : !r.is_active))
       && (!n || `${r.full_name} ${r.email ?? ''} ${r.phone ?? ''}`.toLocaleLowerCase('el').includes(n)));
   }, [rows, q, roleF, statusF]);
@@ -88,9 +88,10 @@ export default function StaffAdmin() {
           <Search size={15} aria-hidden="true" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Αναζήτηση ονόματος, email, τηλεφώνου" aria-label="Αναζήτηση χρηστών" />
         </label>
-        <select className="atx-chip" value={roleF} onChange={e => setRoleF(e.target.value as 'all' | Role)} aria-label="Ρόλος">
-          <option value="all">Όλοι οι ρόλοι</option>
-          {ACCESS_GROUPS.map(g => <optgroup key={g.id} label={g.label}>{g.roles.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}</optgroup>)}
+        <select className="atx-chip" value={roleF} onChange={e => setRoleF(e.target.value as 'all' | 'office' | 'sales')} aria-label="Ομάδα πρόσβασης">
+          <option value="all">Όλες οι ομάδες</option>
+          <option value="office">{ACCESS_GROUPS.find(g => g.id === 'office')!.label}</option>
+          <option value="sales">{ACCESS_GROUPS.find(g => g.id === 'sales')!.label}</option>
         </select>
         <div className="atx-tabs" role="tablist" aria-label="Κατάσταση">
           {([['active', `Ενεργοί ${counts.active}`], ['inactive', `Ανενεργοί ${counts.inactive}`], ['all', 'Όλοι']] as const).map(([k, l]) => (
@@ -125,8 +126,7 @@ export default function StaffAdmin() {
                       </div>
                     </td>
                     <td>
-                      <span className="atx-role" style={{ background: rgbaOf(c, 0.12), color: c }}>{roleLabel(s.role)}</span>
-                      <span className="block text-[11.5px] text-[var(--atx-faint)] mt-0.5" data-group>{accessGroupLabel(s.role)}</span>
+                      <span className="atx-role" style={{ background: rgbaOf(c, 0.12), color: c }}>{accessGroupLabel(s.role)}</span>
                     </td>
                     <td><span className={`atx-tag ${s.is_active ? 't-success' : ''}`}>{s.is_active ? 'Ενεργός' : 'Ανενεργός'}</span></td>
                     <td className="max-md:hidden text-[13px] text-[var(--atx-muted)]">{s.created_at ? fmtDate(s.created_at) : '—'}</td>
@@ -209,8 +209,8 @@ function RolePicker({ roles, value, onChange, disabled }: { roles: Role[]; value
             {inGroup.map(r => (
               <button key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled} onClick={() => onChange(r)}
                 className={`text-left rounded-xl border px-3 py-2.5 transition-colors disabled:opacity-60 ${value === r ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-100' : 'border-line hover:bg-ink/[0.03]'}`}>
-                <span className="block text-[14px] font-medium text-ink">{roleLabel(r)}</span>
-                <span className="block text-xs text-ink/50 leading-snug">{ROLE_DESCRIPTION[r]}</span>
+                <span className="block text-[14px] font-medium text-ink">{accessGroupLabel(r)}</span>
+                <span className="block text-xs text-ink/50 leading-snug">{accessGroup(r) === 'office' ? 'Διαχείριση ομάδας, αναθέσεων και ολοκλήρωσης αιτήσεων.' : 'Διαχείριση προσωπικών leads, πελατών, επισκέψεων και follow-ups.'}</span>
               </button>
             ))}
           </Fragment>
@@ -286,7 +286,7 @@ function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
   const [role, setRole] = useState<Role>(s.role);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const roleChoices = isSalesAgentRole(s.role) ? (roles.includes(s.role) ? roles : [s.role, ...roles]) : [s.role];
+  const roleChoices = [s.role];
   const submit = async () => {
     setBusy(true); setErr(null);
     const e = await updateStaff(s.id, { full_name: full_name.trim(), phone: phone.trim(), role });

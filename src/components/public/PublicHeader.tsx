@@ -9,7 +9,7 @@ import '@/styles/landing.css';
      • `#id`  anything else keeps/returns the visitor to the landing page, which scrolls to that id on mount
    Staff login is NOT here — it lives in the footer (see StaffAccessLink). */
 
-export type PublicPage = 'landing' | 'services' | 'about' | 'faq' | 'contact' | 'energy';
+export type PublicPage = 'landing' | 'services' | 'about' | 'faq' | 'contact' | 'energy' | 'legal';
 
 const PHONE_HREF = `tel:${COMPANY.phone.replace(/\s+/g, '')}`;
 

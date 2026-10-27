@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, Phone } from 'lucide-react';
 import CinematicSkyBackground from '@/components/CinematicSkyBackground';
-import { footerWaveTopMask } from '@/lib/waveDivider';
-import LegalLinks from '@/components/LegalLinks';
 import PublicHeader from '@/components/public/PublicHeader';
-import StaffAccessLink from '@/components/public/StaffAccessLink';
+import PublicFooter from '@/components/public/PublicFooter';
+import WaveDivider from '@/components/public/WaveDivider';
 
 interface FaqItem {
   id: number;
@@ -57,7 +56,6 @@ const categories = [
   { label: 'ΟΤΣ, Μέτρηση & Διακοπές', count: 4 },
 ];
 
-const footerLink: React.CSSProperties = { color: '#c3d0d6', textDecoration: 'none' };
 
 // Dark glass matching the Services page cards over the cinematic sky.
 const CARD_BG = 'rgba(8,13,17,.72)';
@@ -128,6 +126,7 @@ export default function FaqPage() {
             <h1 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(32px,4.6vw,58px)', lineHeight: 1.08, letterSpacing: '-.02em', margin: '20px 0 0', color: '#fff', textShadow: '0 4px 40px rgba(0,0,0,.5)' }}>Όλα όσα χρειάζεται<br />να γνωρίζετε</h1>
             <p style={{ fontSize: 'clamp(16px,1.4vw,19px)', lineHeight: 1.6, color: '#b0c4cc', margin: '20px 0 0', maxWidth: 580 }}>Απαντήσεις για την αλλαγή παρόχου, τους προμηθευτές, τις χρεώσεις και τους λογαριασμούς ρεύματος.</p>
           </section>
+          <WaveDivider variant="lines" accent="#36c6f4" />
 
           <section style={{ padding: '0 clamp(20px,5vw,70px) clamp(24px,4vh,48px)' }}>
             <div style={{ maxWidth: 860, margin: '0 auto' }}>
@@ -162,6 +161,7 @@ export default function FaqPage() {
 
             </div>
           </section>
+          <WaveDivider variant="lines" accent="#36c6f4" />
 
           <section style={{ padding: 'clamp(48px,6vh,80px) clamp(20px,5vw,70px) calc(clamp(64px,9vh,110px) + 70px)' }}>
             <div style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(32px,4vw,48px)', borderRadius: 22, background: CARD_BG, border: '1px solid rgba(255,255,255,.1)', backdropFilter: 'blur(10px)', textAlign: 'center' as const }}>
@@ -179,54 +179,7 @@ export default function FaqPage() {
           </section>
         </main>
 
-        <footer style={{ position: 'relative', overflow: 'hidden', marginTop: -110, padding: 'clamp(56px,7vh,80px) clamp(20px,5vw,70px) 28px', paddingTop: 'calc(clamp(56px,7vh,80px) + 110px)', ...footerWaveTopMask }}>
-          <img src="/images/footer-bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(4,7,10,.94) 0%,rgba(4,7,10,.90) 55%,rgba(4,7,10,.96) 100%)' }} />
-          <div className="l-footer-grid" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
-            <div>
-              <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 70, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-              <p style={{ fontSize: 14, lineHeight: 1.6, color: '#c3d0d6', marginTop: 16, maxWidth: 280 }}>Εξειδικευμένοι Σύμβουλοι Ενέργειας. Συγκρίνουμε και βρίσκουμε μαζί τον φθηνότερο πάροχο ενέργειας για το σπίτι και την επιχείρησή σου.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18, fontSize: 14, color: '#c3d0d6' }}>
-                <span>Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671</span>
-                <a href="tel:+302102255000" style={footerLink}>+30 210 22 55 000</a>
-                <a href="mailto:info@hlektrismos.gr" style={footerLink}>info@hlektrismos.gr</a>
-              </div>
-            </div>
-            <div>
-              <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Υπηρεσίες</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
-                <a href="#/services" style={footerLink}>Ρεύμα</a>
-                <a href="#/services" style={footerLink}>Αέριο</a>
-                <a href="#/services" style={footerLink}>Φωτοβολταϊκά</a>
-                <a href="#/services" style={footerLink}>Ηλεκτροκίνηση</a>
-                <a href="#/services" style={footerLink}>Ολοκληρωμένες Λύσεις</a>
-              </div>
-            </div>
-            <div>
-              <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Χρήσιμοι Σύνδεσμοι</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
-                <a href="#top" style={footerLink}>Αρχική</a>
-                <a href="#/about" style={footerLink}>Σχετικά με εμάς</a>
-                <a href="#/services" style={footerLink}>Λύσεις</a>
-                <a href="#/faq" style={footerLink}>Συχνές Ερωτήσεις</a>
-                <a href="#contact" style={footerLink}>Επικοινωνία</a>
-              </div>
-            </div>
-            <div>
-              <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Ώρες Λειτουργίας</h4>
-              <p style={{ fontSize: 13, color: '#9fb0b7', marginTop: 16 }}>Είμαστε εδώ για εσένα</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, fontSize: 14, color: '#c3d0d6' }}>
-                <span>Δευτέρα - Παρασκευή 09:00 - 17:00</span>
-                <span>Σάββατο - Κυριακή Κλειστά</span>
-              </div>
-            </div>
-          </div>
-          <div style={{ position: 'relative', maxWidth: 1200, margin: '44px auto 0', paddingTop: 24, borderTop: '1px solid rgba(255,255,255,.15)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, fontSize: 13, color: '#9fb0b7' }}>
-            <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
-            <LegalLinks />
-          </div>
-          <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}><StaffAccessLink /></div>
-        </footer>
+        <PublicFooter />
 
       </div>
     </>

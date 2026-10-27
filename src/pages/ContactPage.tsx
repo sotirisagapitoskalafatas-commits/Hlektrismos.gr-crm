@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import LegalLinks from '@/components/LegalLinks';
 import PublicHeader from '@/components/public/PublicHeader';
-import StaffAccessLink from '@/components/public/StaffAccessLink';
+import PublicFooter from '@/components/public/PublicFooter';
+import WaveDivider from '@/components/public/WaveDivider';
 
 const contactCards = [
   { icon: MapPin, label: 'Διεύθυνση', value: 'Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671', link: null },
@@ -175,8 +175,9 @@ export default function ContactPage() {
             </div>
           </div>
         </section>
+        <WaveDivider variant="lines" accent="#2f86e0" />
 
-        <section style={{ padding: '60px 0', background: 'rgba(0,200,120,0.03)', borderTop: '1px solid var(--border)' }}>
+        <section style={{ padding: '60px 0 calc(60px + clamp(48px, 6vw, 96px))', background: 'rgba(0,200,120,0.03)', borderTop: '1px solid var(--border)' }}>
           <div className="container" style={{ maxWidth: 800 }}>
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
               <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
@@ -199,15 +200,7 @@ export default function ContactPage() {
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="container">
-          <div className="footer-bottom">
-            <span>© 2026 hlektrismos.gr</span>
-            <LegalLinks className="footer-legal-links" color="inherit" />
-          </div>
-          <StaffAccessLink />
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { ExternalLink } from 'lucide-react';
-import LegalLinks from '@/components/LegalLinks';
 import PublicHeader from '@/components/public/PublicHeader';
-import StaffAccessLink from '@/components/public/StaffAccessLink';
+import PublicFooter from '@/components/public/PublicFooter';
 
 const commodities = [
   { name: 'Dutch TTF Gas', source: 'Barchart', desc: 'Τιμές futures για το φυσικό αέριο TTF, βασικός δείκτης της ευρωπαϊκής αγοράς αερίου.', url: 'https://www.barchart.com/futures/quotes/NYMEX-TTFG1' },
@@ -72,15 +71,7 @@ export default function EnergyPage() {
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="container">
-          <div className="footer-bottom">
-            <span>© 2026 hlektrismos.gr</span>
-            <LegalLinks className="footer-legal-links" color="inherit" />
-          </div>
-          <StaffAccessLink />
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

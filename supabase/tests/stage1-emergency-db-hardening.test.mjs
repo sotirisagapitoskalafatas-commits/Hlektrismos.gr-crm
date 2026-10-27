@@ -339,4 +339,4 @@ test('AFTER: an explicit grant gives EXECUTE to exactly the role named, and nobo
   await db.exec('drop function public.zz_staff_rpc()');
 });
 
-test.todo('Stage 2 (phase4/18): Sales Agent A cannot read or update Sales Agent B\'s leads, cases, documents or visits. NOT in Stage 1: today every active staff account can.');
+// Cross-agent isolation (Stage 2A) is verified in stage2a-sales-isolation.test.mjs.

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { AI_IDENTITY_REPLY, AI_IDENTITY_RULES, isIdentityQuestion } from "../_shared/ai-identity.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,12 +67,24 @@ serve(async (req: any) => {
       })
     }
 
+    // A direct question about the assistant's identity always gets the fixed, truthful answer.
+    const lastUser = Array.isArray(messages) ? [...messages].reverse().find((m: { role?: string; content?: unknown }) => m?.role !== 'assistant') : null;
+    if (typeof lastUser?.content === 'string' && isIdentityQuestion(lastUser.content)) {
+      return new Response(JSON.stringify({ reply: AI_IDENTITY_REPLY }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
     const visitorContext = visitorInfo 
       ? `\n\nΠληροφορίες επισκέπτη που έχεις συλλέξει ήδη:\n${JSON.stringify(visitorInfo, null, 2)}`
       : '';
 
-    const systemPrompt = `Είσαι ο Αλέξης, ένας ζωντανός υπάλληλος υποστήριξης πελατών της Hlektrismos.gr. Μιλάς Ελληνικά.
-Προσωπικότητα: Είσαι φιλικός, επαγγελματίας, και ενεργός. Μιλάς σαν πραγματικός άνθρωπος, όχι ρομπότ. Χρησιμοποιείς φυσική γλώσσα.
+    const systemPrompt = `Είσαι ο Αλέξης, ο ψηφιακός βοηθός τεχνητής νοημοσύνης (AI) της Hlektrismos.gr. Μιλάς Ελληνικά.
+Προσωπικότητα: Είσαι φιλικός, επαγγελματίας, και ενεργός. Χρησιμοποιείς φυσική, ζεστή γλώσσα.
+
+ΤΑΥΤΟΤΗΤΑ (ΥΠΟΧΡΕΩΤΙΚΟ):
+${AI_IDENTITY_RULES}
 
 ΣΚΟΠΟΣ ΣΟΥ (σειρά προτεραιοτήτων):
 1. Καλωσόρισμα του επισκέπτη με ζεστό τρόπο.
@@ -89,7 +102,6 @@ serve(async (req: any) => {
 - Αν ρωτάει για τιμές, χρησιμοποίησε τα τιμολόγια παρακάτω.
 - Μην είσαι υπερβολικά μακρύς. Κράτα τις απαντήσεις σε 2-3 προτάσεις.
 - Αν δεν καταλαβαίνεις κάτι, ζήτα επεξήγηση φιλικά.
-- ΠΟΤΕ μην πεις ότι είσαι AI ή chatbot. Είσαι "Αλέξης, σύμβουλος ενέργειας".
 
 ΤΙΜΟΛΟΓΙΑ (RAG Data):
 ${tariffLines}
@@ -99,8 +111,7 @@ ${visitorContext}
 ΑΠΑΝΤΗΣΕΙΣ:
 - Αν σε ρωτήσουν για τιμές, δώσε συγκεκριμένα τιμολόγια.
 - Αν σε ρωτήσουν για διαδικασία, εξήγησε ότι υπογράφεις σύμβαση προμήθειας και τα υπόλοιπα τα διαχειριζόμαστε εμείς.
-- Αν θέλουν callback, ζήτα στοιχεία επικοινωνίας (όνομα, τηλέφωνο, email) και υπόσχεσαι κλήση.
-- Αν ρωτήσουν αν είσαι bot, απάντησε "Είμαι ο Αλέξης, σύμβουλος ενέργειας της Hlektrismos.gr".`;
+- Αν θέλουν callback, ζήτα στοιχεία επικοινωνίας (όνομα, τηλέφωνο, email) και υπόσχεσαι κλήση.`;
 
     const geminiMessages = messages.map((m: any) => ({
       role: m.role === 'assistant' ? 'model' : 'user',

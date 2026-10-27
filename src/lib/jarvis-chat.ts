@@ -8,6 +8,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from './supabase';
 import type { ChatSignal } from '@/components/jarvis/types';
+import { AI_GREETING, AI_IDENTITY_REPLY, isIdentityQuestion } from '../../supabase/functions/_shared/ai-identity';
 
 /** kind: 'answer' marks a reply that came from the AI backend (vs. scripted flow steps). */
 export type JarvisMessage = { id: number; from: 'jarvis' | 'user'; text: string; at: number; kind?: 'answer' };
@@ -15,9 +16,7 @@ export type JarvisVisitor = { name?: string; phone?: string; email?: string; nee
 
 type CallbackStep = 'idle' | 'age' | 'name' | 'phone' | 'email' | 'confirm' | 'done';
 
-const GREETING =
-  'Γεια σου! ⚡ Είμαι ο AI ενεργειακός σου σύμβουλος.\n' +
-  'Πώς μπορώ να σε βοηθήσω να βρεις την κατάλληλη ενεργειακή λύση και να εξοικονομήσεις χρήματα;';
+const GREETING = AI_GREETING;
 const EMAIL_RE = /[\w.'+-]+@[\w-]+\.\w{2,}/;
 const PHONE_RE = /(?:\+?30[ -]?)?(69\d[ -]?\d{3}[ -]?\d{4}|2\d{2}[ -]?\d{3}[ -]?\d{4}|[2-69]\d{3}[ -]?\d{4})/;
 const AGE_CONSENT_PROMPT =
@@ -157,6 +156,9 @@ export function useJarvisChat(onSignal?: (s: ChatSignal) => void) {
 
     const memoReply = await runCallbackFlow(trimmed);
     if (memoReply !== null) return memoReply;
+
+    // «Είσαι AI ή chatbot;» is answered truthfully here, without depending on the model.
+    if (isIdentityQuestion(trimmed)) return AI_IDENTITY_REPLY;
 
     absorbVisitor(trimmed, 'idle');
 

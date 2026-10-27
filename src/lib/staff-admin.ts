@@ -4,10 +4,10 @@
    The matrix below is the SAME module the edge function uses; the UI uses it only to decide what to offer. */
 
 import { supabase } from './supabase';
-import { manageableRoles, canManage, isStaffRole, STAFF_ROLES } from '../../supabase/functions/_shared/staff-admin';
+import { manageableRoles, canManage, isStaffRole, isSalesAgentRole, CREATEABLE_SALES_ROLES, STAFF_ROLES } from '../../supabase/functions/_shared/staff-admin';
 import type { Role } from './roles';
 
-export { manageableRoles, canManage, isStaffRole, STAFF_ROLES };
+export { manageableRoles, canManage, isStaffRole, isSalesAgentRole, CREATEABLE_SALES_ROLES, STAFF_ROLES };
 
 export interface StaffMember {
   id: string; full_name: string; email: string | null; phone: string | null; role: Role; is_active: boolean;
@@ -20,7 +20,7 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
   manager: 'Ομάδα, pipeline, φόρτος εργασίας, αναθέσεις και αναφορές. Διαχειρίζεται Inside Sales, Field Sales, Back Office.',
   inside_sales: 'Νέα leads, πρώτη επικοινωνία, κλήσεις, προσφορές και follow-ups.',
   field_sales: 'Επισκέψεις, ραντεβού, υπογραφές και follow-ups πεδίου.',
-  back_office: 'Αιτήσεις, έλεγχος εγγράφων, καταχώρηση στον πάροχο, ενεργοποιήσεις.',
+  back_office: 'Back Office / Admin: διαχείριση ομάδας, αναθέσεις και ολοκλήρωση αιτήσεων.',
 };
 
 export type StaffSource = 'server' | 'fallback';
@@ -43,7 +43,7 @@ const friendly = (msg: string | undefined, fallback: string) => {
   const m = msg ?? '';
   if (/last active administrator/i.test(m)) return 'Ο τελευταίος ενεργός διαχειριστής δεν μπορεί να αλλάξει ρόλο ή να απενεργοποιηθεί.';
   if (/own role|own status/i.test(m)) return 'Δεν μπορείτε να αλλάξετε τον δικό σας ρόλο ή την κατάστασή σας.';
-  if (/not allowed/i.test(m) || /permission|42501/i.test(m)) return 'Η δημιουργία και η διαχείριση λογαριασμών γίνεται μόνο από διαχειριστή.';
+  if (/not allowed/i.test(m) || /permission|42501/i.test(m)) return 'Το Back Office διαχειρίζεται λογαριασμούς Sales Agent. Η διαχείριση προνομιακών λογαριασμών απαιτεί εξουσιοδότηση Admin.';
   if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
   if (/Could not find the function|PGRST202/i.test(m)) return 'Η λειτουργία δεν είναι ακόμη διαθέσιμη.';
   return fallback;

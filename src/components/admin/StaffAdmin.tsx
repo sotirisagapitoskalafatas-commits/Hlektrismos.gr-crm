@@ -6,12 +6,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Mail, Plus, Search, ShieldAlert, UserCheck, UserX, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { ACCESS_GROUPS, ROLE_COLOR, accessGroupLabel, roleLabel } from '@/lib/roles';
+import { ACCESS_GROUPS, accessGroup, accessGroupColor, accessGroupLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { Btn, Field, Modal, Spinner, fmtDate, rgbaOf } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
 import {
-  ROLE_DESCRIPTION, canManage, createStaff, deleteStaff, generatePassword, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
+  CREATEABLE_SALES_ROLES, canManage, createStaff, deleteStaff, generatePassword, isSalesAgentRole, listStaff, manageableRoles, resetStaffPassword, setStaffActive,
   staffReferenceCount, updateStaff,
 } from '@/lib/staff-admin';
 import type { StaffMember, StaffSource } from '@/lib/staff-admin';
@@ -35,19 +35,20 @@ export default function StaffAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [roleF, setRoleF] = useState<'all' | Role>('all');
+  const [roleF, setRoleF] = useState<'all' | 'office' | 'sales'>('all');
   const [statusF, setStatusF] = useState<'active' | 'inactive' | 'all'>('active');
   const [dialog, setDialog] = useState<Dialog>(null);
 
   // The displayed role decides what is OFFERED; the server decides what is ALLOWED (real session), and a
   // presentation preview blocks every write anyway.
   const allowedRoles = manageableRoles(viewRole, true) as Role[];
-  const canCreate = source === 'server' && allowedRoles.length > 0;
+  const createableRoles = allowedRoles.filter(r => CREATEABLE_SALES_ROLES.includes(r as (typeof CREATEABLE_SALES_ROLES)[number]));
+  const canCreate = source === 'server' && createableRoles.length > 0;
 
   const load = useCallback(async () => {
     const r = await listStaff();
     const scoped = r.rows
-      .filter(x => viewRole !== 'back_office' || x.role === 'back_office')
+      .filter(x => viewRole === 'admin' || isSalesAgentRole(x.role))
       .map(x => ({ ...x, can_manage: x.can_manage && canManage(viewRole, true, x.role) }));
     setRows(scoped); setSource(r.source); setError(r.error); setLoading(false);
     return scoped;
@@ -57,7 +58,7 @@ export default function StaffAdmin() {
   const visible = useMemo(() => {
     const n = q.trim().toLocaleLowerCase('el');
     return rows.filter(r =>
-      (roleF === 'all' || r.role === roleF)
+      (roleF === 'all' || accessGroup(r.role) === roleF)
       && (statusF === 'all' || (statusF === 'active' ? r.is_active : !r.is_active))
       && (!n || `${r.full_name} ${r.email ?? ''} ${r.phone ?? ''}`.toLocaleLowerCase('el').includes(n)));
   }, [rows, q, roleF, statusF]);
@@ -79,7 +80,7 @@ export default function StaffAdmin() {
       )}
       {error && <div className="atx-notice" role="alert">{error}</div>}
       {source === 'server' && allowedRoles.length === 0 && (
-        <div className="atx-notice" role="status" data-testid="admin-only-note">Η δημιουργία και η διαχείριση λογαριασμών (νέοι χρήστες, ρόλοι, επαναφορά κωδικού, απενεργοποίηση) γίνεται μόνο από διαχειριστή. Εδώ βλέπετε την ομάδα.</div>
+        <div className="atx-notice" role="status" data-testid="admin-only-note">Το Back Office μπορεί να διαχειρίζεται λογαριασμούς Sales Agent. Οι Sales Agents δεν μπορούν να δημιουργούν ή να διαχειρίζονται λογαριασμούς.</div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -87,9 +88,10 @@ export default function StaffAdmin() {
           <Search size={15} aria-hidden="true" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Αναζήτηση ονόματος, email, τηλεφώνου" aria-label="Αναζήτηση χρηστών" />
         </label>
-        <select className="atx-chip" value={roleF} onChange={e => setRoleF(e.target.value as 'all' | Role)} aria-label="Ρόλος">
-          <option value="all">Όλοι οι ρόλοι</option>
-          {ACCESS_GROUPS.map(g => <optgroup key={g.id} label={g.label}>{g.roles.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}</optgroup>)}
+        <select className="atx-chip" value={roleF} onChange={e => setRoleF(e.target.value as 'all' | 'office' | 'sales')} aria-label="Ομάδα πρόσβασης">
+          <option value="all">Όλες οι ομάδες</option>
+          <option value="office">{ACCESS_GROUPS.find(g => g.id === 'office')!.label}</option>
+          <option value="sales">{ACCESS_GROUPS.find(g => g.id === 'sales')!.label}</option>
         </select>
         <div className="atx-tabs" role="tablist" aria-label="Κατάσταση">
           {([['active', `Ενεργοί ${counts.active}`], ['inactive', `Ανενεργοί ${counts.inactive}`], ['all', 'Όλοι']] as const).map(([k, l]) => (
@@ -110,7 +112,7 @@ export default function StaffAdmin() {
             </thead>
             <tbody>
               {visible.map(s => {
-                const c = ROLE_COLOR[s.role] ?? '#64748b';
+                const c = accessGroupColor(s.role);
                 const me = s.id === user?.id;
                 return (
                   <tr key={s.id} data-staff={s.email ?? s.full_name} className={s.is_active ? '' : 'is-muted'}>
@@ -124,8 +126,7 @@ export default function StaffAdmin() {
                       </div>
                     </td>
                     <td>
-                      <span className="atx-role" style={{ background: rgbaOf(c, 0.12), color: c }}>{roleLabel(s.role)}</span>
-                      <span className="block text-[11.5px] text-[var(--atx-faint)] mt-0.5" data-group>{accessGroupLabel(s.role)}</span>
+                      <span className="atx-role" style={{ background: rgbaOf(c, 0.12), color: c }}>{accessGroupLabel(s.role)}</span>
                     </td>
                     <td><span className={`atx-tag ${s.is_active ? 't-success' : ''}`}>{s.is_active ? 'Ενεργός' : 'Ανενεργός'}</span></td>
                     <td className="max-md:hidden text-[13px] text-[var(--atx-muted)]">{s.created_at ? fmtDate(s.created_at) : '—'}</td>
@@ -150,12 +151,11 @@ export default function StaffAdmin() {
         )}
       </div>
       <p className="text-[12px] text-[var(--atx-faint)]">
-        Μόνο οι διαχειριστές δημιουργούν χρήστες, ορίζουν ρόλο, επαναφέρουν κωδικούς και απενεργοποιούν λογαριασμούς. Δεν υπάρχει δημόσια εγγραφή.
-        Κάθε άτομο έχει δικό του λογαριασμό (και στο Back Office)· δεν μοιραζόμαστε κωδικούς. Κανείς δεν αλλάζει τον δικό του ρόλο· ο τελευταίος ενεργός διαχειριστής προστατεύεται. Ελέγχεται από τον server και καταγράφεται στο Audit Log.
+        Το Back Office μπορεί να δημιουργεί/προσκαλεί Sales Agents, να στέλνει email ανάκτησης και να ενεργοποιεί ή απενεργοποιεί λογαριασμούς. Οι νέοι λογαριασμοί δημιουργούνται ως Field Sales, με χάρτη και δρομολόγια. Δεν υπάρχει δημόσια εγγραφή ή αυτο-εγγραφή. Οι προνομιακές αλλαγές παραμένουν server-side και καταγράφονται στο Audit Log.
       </p>
 
       {dialog?.kind === 'create' && (
-        <CreateDialog roles={allowedRoles} onClose={() => setDialog(null)} onDone={async (email, invited) => {
+        <CreateDialog roles={createableRoles} onClose={() => setDialog(null)} onDone={async (email, invited) => {
           const fresh = await load();
           const ok = fresh.some(r => r.email?.toLowerCase() === email.toLowerCase());
           toast(ok ? (invited ? `Στάλθηκε πρόσκληση στο ${email}.` : `Ο λογαριασμός ${email} δημιουργήθηκε.`) : 'Η δημιουργία δεν επιβεβαιώθηκε — ελέγξτε τη λίστα.', ok ? 'ok' : 'bad');
@@ -209,8 +209,8 @@ function RolePicker({ roles, value, onChange, disabled }: { roles: Role[]; value
             {inGroup.map(r => (
               <button key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled} onClick={() => onChange(r)}
                 className={`text-left rounded-xl border px-3 py-2.5 transition-colors disabled:opacity-60 ${value === r ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-100' : 'border-line hover:bg-ink/[0.03]'}`}>
-                <span className="block text-[14px] font-medium text-ink">{roleLabel(r)}</span>
-                <span className="block text-xs text-ink/50 leading-snug">{ROLE_DESCRIPTION[r]}</span>
+                <span className="block text-[14px] font-medium text-ink">{accessGroupLabel(r)}</span>
+                <span className="block text-xs text-ink/50 leading-snug">{accessGroup(r) === 'office' ? 'Διαχείριση ομάδας, αναθέσεων και ολοκλήρωσης αιτήσεων.' : 'Διαχείριση προσωπικών leads, πελατών, επισκέψεων και follow-ups.'}</span>
               </button>
             ))}
           </Fragment>
@@ -278,7 +278,7 @@ function CreateDialog({ roles, onClose, onDone }: { roles: Role[]; onClose: () =
   );
 }
 
-function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
+function EditDialog({ s, refs, isSelf, onClose, onDone }: {
   s: StaffMember; refs: number | null; roles: Role[]; isSelf: boolean; onClose: () => void; onDone: (want: { full_name: string; role: Role }) => Promise<void>;
 }) {
   const [full_name, setName] = useState(s.full_name);
@@ -286,7 +286,7 @@ function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
   const [role, setRole] = useState<Role>(s.role);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const roleChoices = roles.includes(s.role) ? roles : [s.role, ...roles];
+  const roleChoices = [s.role];
   const submit = async () => {
     setBusy(true); setErr(null);
     const e = await updateStaff(s.id, { full_name: full_name.trim(), phone: phone.trim(), role });
@@ -302,8 +302,9 @@ function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
           <Field label="Τηλέφωνο"><input className="field" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
         </div>
         <Field label="Ρόλος">
-          <RolePicker roles={roleChoices} value={role} onChange={setRole} disabled={isSelf} />
+          <RolePicker roles={roleChoices} value={role} onChange={setRole} disabled={isSelf || !isSalesAgentRole(s.role)} />
           {isSelf && <p className="text-xs text-ink/50 mt-1">Δεν μπορείτε να αλλάξετε τον δικό σας ρόλο.</p>}
+          {!isSelf && !isSalesAgentRole(s.role) && <p className="text-xs text-ink/50 mt-1">Οι υφιστάμενοι ρόλοι γραφείου διατηρούνται για συμβατότητα. Δεν δημιουργούνται νέοι λογαριασμοί γραφείου από αυτή την οθόνη.</p>}
         </Field>
         <p className="text-[13px] text-[var(--atx-muted)]">Συνδέσεις στο CRM: {refs === null ? '…' : refs < 0 ? 'μη διαθέσιμο' : `${refs} εγγραφές (cases, follow-ups, δραστηριότητα κ.λπ.)`}</p>
         {err && <div className="atx-notice" role="alert">{err}</div>}

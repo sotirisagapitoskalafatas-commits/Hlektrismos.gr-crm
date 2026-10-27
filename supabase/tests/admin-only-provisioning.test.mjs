@@ -69,10 +69,11 @@ beforeAll(async () => {
 
 const apply05 = () => db.exec(read('../staged-migrations/phase2/05_staff_admin_and_role_preview.sql'));
 const apply17 = () => db.exec(read('../staged-migrations/phase4/17_admin_only_staff_provisioning.sql'));
+const apply20 = () => db.exec(read('../staged-migrations/phase4/20_backoffice_sales_agent_provisioning.sql'));
 const rollback17 = () => db.exec(read('../../docs/ops/rollback_phase4_17_admin_only_staff_provisioning.sql'));
 const upd = async (actor, target, role) => { await as(actor); return run('select public.staff_update($1, null, null, $2)', [target, role]); };
 const act = async (actor, target, on) => { await as(actor); return run('select public.staff_set_active($1, $2)', [target, on]); };
-const can = async (actor, target, nw) => { await su(); return (await db.query('select public.staff_admin_can($1, $2, $3) v', [actor, target, nw])).rows[0].v; };
+const can = async (actor, target, nw) => { await as(actor); return (await db.query('select public.staff_admin_can($1, $2, $3) v', [actor, target, nw])).rows[0].v; };
 
 test('setup: phase2/05 first (managers and back office could manage ops staff — the behaviour being replaced)', async () => {
   await su(); await apply05();
@@ -126,4 +127,48 @@ test('the one-line check used in APPLY_ORDER / STAGING_APPLY_SCRIPT tells the tw
   assert.equal((await db.query(CHECK)).rows[0].ok, false, 'phase2/05 matrix: not admin-only');
   await apply17();
   assert.equal((await db.query(CHECK)).rows[0].ok, true, 'phase4/17 matrix: admin-only');
+});
+
+test('AFTER phase4/20: office roles can provision Sales Agents, Back Office sees that directory only, and sales remain denied', async () => {
+  await su(); await apply20(); await apply20(); // idempotent on top of 17
+  assert.equal(await can(BO, 'field_sales', null), true, 'Back Office can create/invite Sales Agents');
+  assert.equal(await can(BO, 'inside_sales', 'field_sales'), true, 'Back Office can manage legacy sales profiles');
+  assert.equal(await can(BO, 'back_office', null), false, 'Back Office cannot create another office account');
+  assert.equal(await can(BO, 'admin', 'manager'), false, 'Back Office cannot change privileged accounts');
+  assert.equal(await can(ADMIN, null, 'admin'), false, 'Admin cannot create another office account');
+  assert.equal(await can(ADMIN, null, 'back_office'), false, 'Admin cannot create a Back Office account');
+  assert.equal(await can(ADMIN, 'field_sales', 'back_office'), false, 'Admin cannot promote a Sales Agent into an office role');
+  assert.equal(await can(ADMIN, 'manager', null), true, 'Admin may maintain an existing legacy office account without changing its role');
+  assert.equal(await can(MANAGER, 'field_sales', null), true, 'legacy manager maps to the effective office group');
+  assert.equal(await can(FIELD, 'inside_sales', null), false, 'Sales cannot provision');
+
+  assert.equal((await upd(BO, FIELD, 'inside_sales')).ok, true, 'Back Office can edit a Sales Agent role');
+  assert.equal((await act(BO, FIELD, false)).ok, true, 'Back Office can deactivate a Sales Agent');
+  assert.equal((await act(BO, FIELD, true)).ok, true, 'Back Office can reactivate a Sales Agent');
+  assert.equal((await upd(BO, FIELD, 'back_office')).ok, false, 'Back Office cannot promote a Sales Agent to office');
+  assert.equal((await upd(FIELD, BO2, 'field_sales')).ok, false, 'Sales cannot change other users');
+
+  await as(BO);
+  const boList = await run('select id, role, can_manage from public.staff_list()');
+  assert.equal(boList.ok, true, 'Back Office can load the managed directory');
+  assert.ok(boList.rows.length >= 2);
+  assert.ok(boList.rows.every(r => ['inside_sales','field_sales'].includes(r.role)), 'Back Office directory contains Sales Agents only');
+  assert.ok(boList.rows.some(r => r.can_manage === true), 'Sales accounts display as manageable');
+  await as(MANAGER);
+  const managerList = await run('select id, role, can_manage from public.staff_list()');
+  assert.equal(managerList.ok, true, 'legacy Manager maps to the Back Office directory');
+  assert.ok(managerList.rows.every(r => ['inside_sales','field_sales'].includes(r.role)), 'legacy Manager cannot read extra office account rows');
+  await as(FIELD);
+  assert.equal((await run('select * from public.staff_list()')).ok, false, 'Sales has no staff directory');
+});
+
+
+test('phase4/20 permission helper cannot be used to probe another user role', async () => {
+  await as(FIELD);
+  const own = await run('select public.staff_admin_can($1, $2, $3) v', [FIELD, 'field_sales', null]);
+  assert.equal(own.ok, true);
+  assert.equal(own.rows[0].v, false, 'Sales cannot manage self or create accounts');
+  const probe = await run('select public.staff_admin_can($1, $2, $3) v', [ADMIN, 'field_sales', null]);
+  assert.equal(probe.ok, true, probe.error);
+  assert.equal(probe.rows[0].v, false, 'actor id must match auth.uid()');
 });

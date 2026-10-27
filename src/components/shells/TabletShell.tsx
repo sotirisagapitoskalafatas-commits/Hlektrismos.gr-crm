@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { MATURITY_LABEL, ROLE_COLOR, categoryColor, navForRole, roleLabel, sectionColor } from '@/lib/roles';
+import { MATURITY_LABEL, ROLE_COLOR, accessGroupColor, categoryColor, navForRole, accessGroupLabel, sectionColor } from '@/lib/roles';
 import type { NavLeaf, ShellCounts } from '@/lib/roles';
 import { Logo, rgbaOf } from '@/lib/ui';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -103,7 +103,7 @@ export default function TabletShell({ counts }: TabletShellProps) {
       <div className={`shrink-0 border-t border-white/10 py-3 ${collapsed ? 'flex justify-center' : 'px-3'}`}>
         {collapsed ? (
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold" aria-hidden="true"
-            style={{ background: rgbaOf(ROLE_COLOR[role], 0.28), color: '#fff' }}>
+            style={{ background: rgbaOf(accessGroupColor(role), 0.28), color: '#fff' }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </div>
         ) : (
@@ -114,7 +114,7 @@ export default function TabletShell({ counts }: TabletShellProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-white truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-              <span className="micro text-white/55">{roleLabel(role)}</span>
+              <span className="micro text-white/55">{accessGroupLabel(role)}</span>
             </div>
           </div>
         )}

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { ROLES, roleLabel } from '@/lib/roles';
+import { ACCESS_GROUPS, roleLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { fetchScraperSettings } from '@/lib/scraper';
 import { fetchStaffAudit, listStaff } from '@/lib/staff-admin';
@@ -89,7 +89,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
     if (role === 'admin' || role === 'manager') void fetchScraperSettings().then(s => alive && setKeySet(s ? s.keySet : 'n/a'));
     return () => { alive = false; };
   }, [role]);
-  const byRole = useMemo(() => ROLES.map(r => ({ r: r.id as Role, n: staff?.rows.filter(s => s.role === r.id && s.is_active).length ?? 0 })), [staff]);
+  const byGroup = useMemo(() => ACCESS_GROUPS.map(group => ({ group, n: staff?.rows.filter(s => group.roles.includes(s.role) && s.is_active).length ?? 0 })), [staff]);
   const last = lastAnonChecks();
   const issues = last?.results.filter(r => r.status === 'action').length ?? 0;
 
@@ -99,7 +99,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
         <button type="button" className="atx-ov" onClick={() => onOpen('users')}>
           <span className="atx-ov-k">Ενεργοί χρήστες</span>
           <span className="atx-ov-v">{staff ? staff.rows.filter(s => s.is_active).length : '…'}</span>
-          <span className="atx-ov-s">{byRole.filter(x => x.n).map(x => `${roleLabel(x.r)} ${x.n}`).join(' · ') || '—'}</span>
+          <span className="atx-ov-s">{byGroup.filter(x => x.n).map(x => `${x.group.label} ${x.n}`).join(' · ') || '—'}</span>
         </button>
         <button type="button" className="atx-ov" onClick={() => onOpen('users')}>
           <span className="atx-ov-k">Διαχείριση χρηστών</span>

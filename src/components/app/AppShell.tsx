@@ -5,7 +5,7 @@ import { useNav } from '@/lib/nav';
 import { usePwaInstall, isStandalone, cacheAppShell } from '@/lib/pwa';
 import {
   ACTIVE_STAGES, BACK_OFFICE_STAGES, MATURITY_LABEL, PAGE_TITLES, ROLE_COLOR, can,
-  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, roleLabel, sectionColor, stageLabel,
+  findNav, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, accessGroupColor, accessGroupLabel, sectionColor, stageLabel,
 } from '@/lib/roles';
 import type { NavLeaf, PageKey, ShellCounts, Stage } from '@/lib/roles';
 import { Btn, IconBtn, Logo, Micro, Modal, Spinner, fmtMoney, rgbaOf, timeUntil } from '@/lib/ui';
@@ -167,7 +167,7 @@ function Drawer({ open, onClose }: {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-semibold text-ink truncate">{profile?.full_name ?? 'Χρήστης'}</div>
-                  <Micro>{roleLabel(profile?.role ?? role)}</Micro>
+                  <Micro>{accessGroupLabel(profile?.role ?? role)}</Micro>
                 </div>
               </div>
               <Btn variant="danger" onClick={() => { signOut(); window.location.hash = '/'; onClose(); }} className="w-full justify-center">
@@ -297,12 +297,12 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
         <button onClick={() => setAcctOpen(o => !o)} aria-label="Λογαριασμός" aria-haspopup="menu"
           className="flex items-center gap-2 rounded-full bg-ink/[0.045] hover:bg-ink/[0.08] pl-1 pr-2 py-1 transition-colors">
           <span className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold"
-            style={{ background: rgbaOf(ROLE_COLOR[realRole], 0.14), color: ROLE_COLOR[realRole] }}>
+            style={{ background: rgbaOf(accessGroupColor(realRole), 0.14), color: ROLE_COLOR[realRole] }}>
             {(profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase()}
           </span>
           <span className="hidden lg:block text-left">
             <span className="block text-[13px] font-semibold text-ink leading-tight max-w-[140px] truncate">{profile?.full_name ?? 'Χρήστης'}</span>
-            <span className="block micro text-ink/40 leading-tight">{preview.role ? `Προεπισκόπηση: ${roleLabel(preview.role)}` : roleLabel(realRole)}</span>
+            <span className="block micro text-ink/40 leading-tight">{preview.role ? `Προεπισκόπηση: ${accessGroupLabel(preview.role)}` : accessGroupLabel(realRole)}</span>
           </span>
           <ChevronDown className="hidden lg:block w-3.5 h-3.5 text-ink/40" />
         </button>
@@ -322,7 +322,7 @@ function Header({ onOpenPalette, onOpenDrawer, onSignOut, onOpenAssistant }: {
 
               <div className="px-2 pb-2 flex items-center justify-between gap-2 border-b border-line mb-1">
                 <span className="text-[12px] text-ink/50">Ρόλος</span>
-                <span className="pill" style={{ background: rgbaOf(ROLE_COLOR[realRole], 0.12), color: ROLE_COLOR[realRole] }}>{roleLabel(realRole)}</span>
+                <span className="pill" style={{ background: rgbaOf(ROLE_COLOR[realRole], 0.12), color: ROLE_COLOR[realRole] }}>{accessGroupLabel(realRole)}</span>
               </div>
 
               <button onClick={() => { go('account'); setAcctOpen(false); }}

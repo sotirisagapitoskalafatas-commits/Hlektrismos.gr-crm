@@ -16,6 +16,8 @@ import type { MapCoordinate } from '../maps/types';
 export type GeocodeResult = {
   label: string;
   sublabel?: string;
+  address?: string;
+  phone?: string;
   position: MapCoordinate;
   source: 'crm' | 'geocoder';
 };
@@ -118,4 +120,113 @@ export async function geocodeAddress(
   } catch {
     return [];
   }
+}
+
+
+export type BusinessCandidate = {
+  id: string;
+  label: string;
+  sublabel?: string;
+  /** Public OSM street address, when the feature carries one. */
+  address?: string;
+  /** Public OSM phone tag, when present. */
+  phone?: string;
+  position: MapCoordinate;
+  category?: string;
+  source: 'OpenStreetMap / Photon';
+  sourceUrl: string;
+};
+
+function businessCategory(properties: Record<string, string>): string | undefined {
+  const key = properties.osm_key || properties.category || '';
+  const value = properties.osm_value || '';
+  const allowed = new Set(['shop', 'office', 'craft', 'industrial', 'commercial', 'amenity', 'healthcare', 'leisure', 'tourism']);
+  if (!allowed.has(key)) return undefined;
+  return [key, value].filter(Boolean).join(' · ');
+}
+
+function pointToSegmentKm(point: MapCoordinate, a: MapCoordinate, b: MapCoordinate): number {
+  const latScale = 111.32;
+  const lngScale = 111.32 * Math.cos((point.lat * Math.PI) / 180);
+  const ax = (a.lng - point.lng) * lngScale;
+  const ay = (a.lat - point.lat) * latScale;
+  const bx = (b.lng - point.lng) * lngScale;
+  const by = (b.lat - point.lat) * latScale;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const denominator = dx * dx + dy * dy;
+  const t = denominator > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / denominator)) : 0;
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+
+function distanceToRouteKm(point: MapCoordinate, route: MapCoordinate[]): number {
+  if (route.length === 0) return Infinity;
+  if (route.length === 1) {
+    const lat = (route[0].lat - point.lat) * 111.32;
+    const lng = (route[0].lng - point.lng) * 111.32 * Math.cos((point.lat * Math.PI) / 180);
+    return Math.hypot(lat, lng);
+  }
+  let distance = Infinity;
+  for (let i = 1; i < route.length; i++) distance = Math.min(distance, pointToSegmentKm(point, route[i - 1], route[i]));
+  return distance;
+}
+
+/**
+ * Searches named OSM features near a route through Photon. Results are limited to public map data,
+ * a small number of sampled route centres, and a configurable corridor; it does not imply complete business coverage.
+ */
+export async function discoverBusinessesAlongRoute(
+  query: string,
+  route: MapCoordinate[],
+  radiusKm = 1.25,
+): Promise<BusinessCandidate[]> {
+  const q = query.trim();
+  if (q.length < 2 || route.length === 0) return [];
+  const centreIndexes = route.length <= 3
+    ? route.map((_, i) => i)
+    : [...new Set([0, Math.floor((route.length - 1) / 2), route.length - 1])];
+  const centres = centreIndexes.map(i => route[i]);
+  const candidates = await Promise.all(centres.map(async (centre) => {
+    try {
+      const params = new URLSearchParams({ q, limit: '10', lat: String(centre.lat), lon: String(centre.lng) });
+      const response = await fetch(PHOTON_URL + '?' + params.toString(), { headers: { Accept: 'application/json' } });
+      if (!response.ok) return [] as BusinessCandidate[];
+      const json = await response.json() as { features?: PhotonFeature[] };
+      const found: BusinessCandidate[] = [];
+      for (const feature of json.features ?? []) {
+        const props = feature.properties ?? {};
+        const name = (props.name ?? '').trim();
+        const category = businessCategory(props);
+        const coordinates = feature.geometry?.coordinates;
+        const lat = coordinates?.[1];
+        const lng = coordinates?.[0];
+        if (!name || !category || typeof lat !== 'number' || typeof lng !== 'number') continue;
+        const position = { lat, lng };
+        if (distanceToRouteKm(position, route) > radiusKm) continue;
+        const line = labelOf(props);
+        const sourceUrl = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=18/' + lat + '/' + lng;
+        found.push({
+          id: name.toLocaleLowerCase('el') + '-' + lat.toFixed(5) + '-' + lng.toFixed(5),
+          label: name,
+          sublabel: [line.sublabel, category].filter(Boolean).join(' · ') || undefined,
+          address: [props.street ? [props.street, props.housenumber].filter(Boolean).join(' ') : '', props.postcode || '', areaOf(props), props.state || ''].filter(Boolean).join(', ') || undefined,
+          phone: props.phone || props['contact:phone'] || undefined,
+          position,
+          category,
+          source: 'OpenStreetMap / Photon',
+          sourceUrl,
+        });
+      }
+      return found;
+    } catch {
+      return [] as BusinessCandidate[];
+    }
+  }));
+  const seen = new Set<string>();
+  return candidates.flat().filter(candidate => {
+    const key = candidate.label.toLocaleLowerCase('el') + '|' + candidate.position.lat.toFixed(5) + ',' + candidate.position.lng.toFixed(5);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => distanceToRouteKm(a.position, route) - distanceToRouteKm(b.position, route));
 }

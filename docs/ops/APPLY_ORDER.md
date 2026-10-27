@@ -1,6 +1,6 @@
 # Apply order — every staged SQL file not yet on live
 
-**One list, in the exact order to run them.** 26 files (22 numbered steps, plus 2b, 2c, 2d and 3b added by the security audit and the account/visibility work), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
+**One list, in the exact order to run them.** 28 files (23 numbered steps, plus 2b, 2c, 2d, 3b and 3c added by the security audit, the live API hardening hotfix, account/visibility work and Field Sales route planning), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
 ## Before step 1
@@ -95,6 +95,14 @@ select exists (select 1 from pg_trigger where tgname='profiles_guard_privileged'
 ```sql
 select position('a.role = ''manager''' in pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure)) = 0;
 ```
+
+## 3c. `phase4/20_backoffice_sales_agent_provisioning.sql` — two effective access groups
+- **Depends on:** phase2/05 (creates the audited staff administration foundation) and phase4/17. Apply AFTER phase4/17; if phase4/17 is ever re-applied, run phase4/20 afterwards.
+- **Behavior:** Admin retains legacy super-admin scope. Back Office and legacy Manager can create/invite, activate/deactivate and initiate recovery for Sales Agent accounts only. They cannot create/promote office accounts. Sales Agents cannot administer accounts. The directory shown to Back Office includes Sales Agent profiles only.
+- **No role data is rewritten.** The migration replaces trusted function bodies and therefore must be reviewed as a security-sensitive, non-additive change.
+- **Deploy/redeploy:** the `admin-users` Edge Function uses the same two-group decision helper in this branch. The Edge Function source must be deployed to the intended environment separately, with protected secrets unchanged.
+- **Rollback:** [`rollback_phase4_20_backoffice_sales_agent_provisioning.sql`](rollback_phase4_20_backoffice_sales_agent_provisioning.sql). It restores the prior Admin-only staff matrix.
+- **Check:** run the local regression `supabase/tests/admin-only-provisioning.test.mjs`; on staging, run an approved positive/negative matrix with Back Office, Sales and inactive test users before production.
 
 ## 4. `phase1/03_drop_exec_sql.sql` — security
 - **Depends on:** save the definition first (audit query 9 in `docs/audit/audit-rls-readonly.sql`).
@@ -274,4 +282,27 @@ Security first (1–6): they close live findings and nothing on screen depends o
 ```sql
 select exists (select 1 from pg_policies where schemaname='public' and tablename='leads' and policyname='sales own records (restrictive)');
 ```
+
+
+## 23. `phase5/19_field_sales_saved_routes.sql` — multiple saved routes for Field Sales
+- **Depends on:** active staff role helpers (`is_staff()`, `is_role(text)`), `profiles`, and existing `leads`, `customers`, and `cases` tables; after step 22 in this ordered runbook. Adds saved-route tables, a Back Office duplicate-review queue, a privacy-preserving boolean duplicate-signal RPC, an invoker-secured route-stop replacement RPC, plus ownership/history guards. No existing CRM rows are rewritten.
+- **Unlocks on screen:** multiple saved routes per Sales Agent, route date/status/travel-mode/origin, ordered stops from CRM, existing visits or discovered public-map candidates, save/reopen/pause/resume/complete, and Back Office route reassignment. Route owner must be an active Sales Agent. Anonymous callers have no route access.
+- **History safety:** a saved route with an `arrived` or `completed` stop cannot be deleted; retain it and change its status.
+- **Business discovery & duplicate handling:** public OpenStreetMap/Photon candidates are never treated as a complete business directory. The duplicate-signal function returns only true/false and does not reveal the matching customer or its owner. Potential matches or failed checks enter `field_sales_duplicate_reviews`; only Back Office can approve/reject them. Approval creates a Lead only after an active Sales Agent owner is verified. Public visitors cannot read the queue or call the signal function.
+- **Rollback:** [`rollback_phase5_19_field_sales_saved_routes.sql`](rollback_phase5_19_field_sales_saved_routes.sql). **Destructive:** drops saved routes/stops. Export user-created routes and stop history first; do not use for routine cleanup.
+- **Check (must be true):**
+```sql
+select
+  to_regclass('public.field_sales_routes') is not null
+  and to_regclass('public.field_sales_route_stops') is not null
+  and to_regprocedure('public.field_sales_replace_route_stops(uuid,jsonb)') is not null
+  and to_regprocedure('public.field_sales_route_owner_allowed(uuid)') is not null
+  and to_regprocedure('public.field_sales_candidate_duplicate_signal(text,text,text,double precision,double precision)') is not null
+  and to_regprocedure('public.field_sales_duplicate_review_stamp()') is not null
+  and to_regclass('public.field_sales_duplicate_reviews') is not null
+  and exists (select 1 from pg_trigger where tgname='field_sales_protect_route_history' and not tgisinternal)
+  and exists (select 1 from pg_trigger where tgname='field_sales_duplicate_review_stamp' and not tgisinternal)
+  as applied;
+```
+- **Required staging tests:** two Sales Agents can save/reopen separate routes with 40–60+ stops; cross-agent route reads/edits are denied; Back Office can reassign only to active Sales Agents; completed visit history cannot be removed; stop replacement preserves IDs/history; duplicate signal exposes only a boolean; queue requests are requester/office scoped; only Back Office can approve/reject; failed checks never create a Lead; anonymous signal/queue access is denied. Test website intake and normal CRM screens in the same window.
 

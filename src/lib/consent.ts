@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 
    Categories:
    - analytics: Vercel Speed Insights (page URL, Web Vitals timings, device
-                and browser type, IP seen by Vercel). Loaded only when true.
+                and browser type). Loaded only when true.
    No session replay, heatmap, rage-click or keystroke recording SDK is
    installed. If one is ever added it MUST be off by default, only start when
    hasConsent('analytics') is true, mask every text input, and never record

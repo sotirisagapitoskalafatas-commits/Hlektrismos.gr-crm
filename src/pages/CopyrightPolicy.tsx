@@ -1,41 +1,30 @@
 import LegalLayout, { a, h2, ul } from '@/components/LegalLayout';
-import { COMPANY, COPYRIGHT_AGENT } from '@/lib/legal';
+import { COMPANY } from '@/lib/legal';
 
-/* Copyright / DMCA notice-and-takedown policy (17 U.S.C. 512(c)) and EU
-   Digital Services Act art. 16 notice-and-action. Agent details live in
-   lib/legal.ts (COPYRIGHT_AGENT) and must match the US Copyright Office
-   DMCA Designated Agent Directory registration. */
+/* Copyright notices. Deliberately procedure-neutral: no US DMCA agent is
+   registered and no Greek/EU notice-and-action procedure (e.g. DSA art. 16)
+   has been confirmed by counsel, so the page states only how to reach us and
+   what to include. Do not add deadlines, sworn statements, counter-notice or
+   repeat-infringer rules without legal sign-off. */
 export default function CopyrightPolicy() {
-  const mail = `mailto:${COPYRIGHT_AGENT.email}?subject=${encodeURIComponent('Ειδοποίηση παραβίασης πνευματικών δικαιωμάτων')}`;
+  const mail = `mailto:${COMPANY.email}?subject=${encodeURIComponent('Ειδοποίηση παραβίασης πνευματικών δικαιωμάτων')}`;
   return (
     <LegalLayout title="Πολιτική Πνευματικών Δικαιωμάτων">
       <p>Σεβόμαστε τα πνευματικά δικαιώματα τρίτων και αναμένουμε το ίδιο από όσους ανεβάζουν αρχεία στις υπηρεσίες μας (π.χ. λογαριασμούς ρεύματος, έγγραφα, φωτογραφίες).</p>
 
-      <h2 style={h2}>1. Υποβολή ειδοποίησης (takedown)</h2>
-      <p>Στείλτε γραπτή ειδοποίηση στον εντεταλμένο εκπρόσωπό μας (στοιχεία παρακάτω) που περιλαμβάνει:</p>
+      <h2 style={h2}>1. Αναφορά παραβίασης</h2>
+      <p>Αν θεωρείτε ότι περιεχόμενο που είναι διαθέσιμο μέσω των υπηρεσιών μας προσβάλλει δικαιώματά σας, στείλτε μας αναφορά στο <a href={mail} style={a}>{COMPANY.email}</a> με:</p>
       <ul style={ul}>
-        <li>φυσική ή ηλεκτρονική υπογραφή του δικαιούχου ή του εξουσιοδοτημένου εκπροσώπου του,</li>
-        <li>περιγραφή του έργου που προστατεύεται,</li>
+        <li>τα στοιχεία επικοινωνίας σας,</li>
+        <li>περιγραφή του έργου ή του δικαιώματος που θεωρείτε ότι προσβάλλεται,</li>
         <li>τη θέση του επίμαχου υλικού (URL ή άλλη ακριβή περιγραφή),</li>
-        <li>τα στοιχεία επικοινωνίας σας (διεύθυνση, τηλέφωνο, email),</li>
-        <li>δήλωση καλής πίστης ότι η χρήση δεν έχει εγκριθεί από τον δικαιούχο, τον εκπρόσωπό του ή τον νόμο,</li>
-        <li>δήλωση, υπό την ποινή ψευδορκίας, ότι οι πληροφορίες είναι ακριβείς και ότι είστε ο δικαιούχος ή εξουσιοδοτημένος να ενεργείτε για λογαριασμό του.</li>
+        <li>σύντομη εξήγηση του λόγου της αναφοράς.</li>
       </ul>
-      <p><a href={mail} style={a}>Αναφορά παραβίασης πνευματικών δικαιωμάτων →</a></p>
+      <p>Θα εξετάσουμε την αναφορά σύμφωνα με το εφαρμοστέο δίκαιο.</p>
 
-      <h2 style={h2}>2. Τι κάνουμε</h2>
-      <p>Μόλις λάβουμε πλήρη ειδοποίηση, αφαιρούμε ή απενεργοποιούμε άμεσα την πρόσβαση στο υλικό και ενημερώνουμε όποιον το ανέβασε.</p>
-
-      <h2 style={h2}>3. Αντι-ειδοποίηση</h2>
-      <p>Όποιος ανέβασε το υλικό μπορεί να στείλει αντι-ειδοποίηση με υπογραφή, ταυτοποίηση του υλικού, δήλωση υπό την ποινή ψευδορκίας ότι η αφαίρεση έγινε από λάθος, και αποδοχή της δικαιοδοσίας του αρμόδιου δικαστηρίου. Αποκαθιστούμε το υλικό σε 10 έως 14 εργάσιμες, εκτός αν ο δικαιούχος μάς ενημερώσει ότι κίνησε ένδικη διαδικασία.</p>
-
-      <h2 style={h2}>4. Επαναλαμβανόμενες παραβάσεις</h2>
-      <p>Λογαριασμοί ή αποστολείς που αποδεδειγμένα παραβιάζουν επανειλημμένα δικαιώματα τρίτων (δύο ή περισσότερες έγκυρες ειδοποιήσεις) απενεργοποιούνται οριστικά.</p>
-
-      <h2 style={h2}>5. Εντεταλμένος εκπρόσωπος (Designated Agent)</h2>
-      <p>{COPYRIGHT_AGENT.name}<br />{COMPANY.legalName}, {COPYRIGHT_AGENT.address}<br />
-        Τηλ.: {COPYRIGHT_AGENT.phone} · Email: <a href={mail} style={a}>{COPYRIGHT_AGENT.email}</a><br />
-        Αρ. καταχώρισης US Copyright Office: {COPYRIGHT_AGENT.registrationNumber}</p>
+      <h2 style={h2}>2. Επικοινωνία</h2>
+      <p>{COMPANY.legalName}, {COMPANY.address}<br />
+        Τηλ.: {COMPANY.phone} · Email: <a href={mail} style={a}>{COMPANY.email}</a></p>
     </LegalLayout>
   );
 }

@@ -1,27 +1,18 @@
 /* Single source of truth for the legal pages (Privacy, Cookies, Terms,
-   Copyright). Values marked TODO(owner) must be confirmed by the business;
-   the pages render them visibly so a missing value cannot go unnoticed. */
+   Copyright). Company identity and public contact details as supplied by the
+   owner on 27 Oct 2026 (to be cross-checked against the GEMI register before
+   publication). No ΔΟΥ was supplied, and no privacy@/copyright@ mailbox is
+   confirmed as monitored, so neither is published. Never ship a placeholder:
+   src/lib/__tests__/legal-placeholders.test.mjs fails the build on one. */
 
 export const COMPANY = {
   brand: 'Hlektrismos.gr',
-  legalName: 'TODO(owner): Επωνυμία νομικού προσώπου',
-  vatId: 'TODO(owner): ΑΦΜ / ΔΟΥ',
-  gemi: 'TODO(owner): Αριθμός ΓΕΜΗ',
-  address: 'Ζαλοκώστα 8, 10671 Αθήνα',
+  legalName: 'HLEKTRISMOS.GR ΜΟΝΟΠΡΟΣΩΠΗ Ι.Κ.Ε.',
+  vatId: 'ΑΦΜ 801198034',
+  gemi: 'Αρ. ΓΕΜΗ 151552422000',
+  address: 'Ζαλοκώστα 8, Αθήνα, Τ.Κ. 10671',
   phone: '+30 210 22 55 000',
   email: 'info@hlektrismos.gr',
-  privacyEmail: 'privacy@hlektrismos.gr',
-  copyrightEmail: 'copyright@hlektrismos.gr',
-};
-
-/* Designated copyright agent (US Copyright Office DMCA directory). Fill in
-   after registering at https://dmca.copyright.gov — see the audit notes. */
-export const COPYRIGHT_AGENT = {
-  name: 'TODO(owner): Όνομα / τίτλος υπευθύνου',
-  address: COMPANY.address,
-  phone: COMPANY.phone,
-  email: COMPANY.copyrightEmail,
-  registrationNumber: 'TODO(owner): DMCA-xxxxxxx',
 };
 
 export const POLICY_UPDATED = '1 Οκτωβρίου 2026';

@@ -1,7 +1,7 @@
 // Release guard: no unresolved placeholder may reach the public legal pages.
-// This test is EXPECTED to fail until the owner supplies the missing facts
-// (legal name, ΑΦΜ/ΔΟΥ, ΓΕΜΗ, retention periods). Do not weaken it to pass a
-// build: fill in the real values in lib/legal.ts and the page text instead.
+// Do not weaken it to pass a build: supply the real facts in lib/legal.ts and
+// the page text instead. The claim tests below keep material disclosures in and
+// unverified promises / internal details out (see docs/legal/LEGAL_AUDIT_2026-10-27.md).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
@@ -82,5 +82,38 @@ test('provider identity (owner-supplied 27 Oct 2026) is shown on Privacy and Ter
   }
   for (const page of ['PrivacyPolicy', 'Cookies', 'CopyrightPolicy']) {
     assert.doesNotMatch(M.render[page](), /privacy@|copyright@/, `${page}: unconfirmed mailboxes not published`);
+  }
+});
+
+// Claim guard: material disclosures stay, unverified promises and internal details stay out.
+const ALL = () => PAGES.map((p) => visibleText(M.render[p]())).join('\n');
+
+test('privacy policy keeps the material chatbot / AI / voice disclosures', () => {
+  const t = visibleText(M.render.PrivacyPolicy());
+  assert.match(t, /Google \(υπηρεσία Gemini\)/, 'names the external AI provider of the chatbot');
+  assert.match(t, /από το πρώτο μήνυμα/, 'says chat text leaves before any age declaration');
+  assert.match(t, /ηχογραφείται\s+και απομαγνητοφωνείται/, 'voice calls are recorded and transcribed');
+  assert.match(t, /εκτός\s+του Ευρωπαϊκού Οικονομικού Χώρου/, 'mentions possible transfers outside the EEA');
+  assert.match(t, /απαραίτητα για να απαντήσουμε/, 'says which data are required and the consequence');
+});
+
+test('no unverified promises on the public legal pages', () => {
+  const t = ALL();
+  for (const re of [
+    /Κάθε απόφαση[^.]*άνθρωπο/, // human review of every decision: not evidenced
+    /ενημερ\S+ από την αρχή/, // voice disclosure timing: deployed function not verified
+    /ενημερώνεστε στην αρχή/i,
+    /αυτόματες κλήσεις AI είναι απενεργοποιημένες/, // production setting not verified
+    /διαγράφονται με ασφάλεια/, // no implemented deletion process
+    /αποκλειστικά υπό τις οδηγίες/, // provider roles not verified
+    /Data Privacy Framework|Τυποποιημένων Συμβατικών Ρητρών/, // transfer safeguards not verified
+    /100%|πλήρως συμμορφ/i,
+  ]) assert.doesNotMatch(t, re, String(re));
+});
+
+test('no internal architecture or staff details on the public legal pages', () => {
+  const t = ALL();
+  for (const re of [/sb-\S*auth-token/, /atlas\.nav/, /\bGPS\b/, /check-in/i, /Supabase|SerpApi|OSRM|OpenRouteService|CARTO|Photon|Infobip|Resend|Vapi/, /edge functions?/i]) {
+    assert.doesNotMatch(t, re, String(re));
   }
 });

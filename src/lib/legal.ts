@@ -17,9 +17,13 @@ export const COMPANY = {
 
 export const POLICY_UPDATED = '1 Οκτωβρίου 2026';
 
-/* Every third party the code sends personal data to, taken from the code
-   (src/ and supabase/functions/). Add a row in the SAME change that adds a
-   new integration. */
+/* INTERNAL register (not rendered): every third party the code sends personal
+   data to, taken from the code (src/ and supabase/functions/). The public
+   Privacy Policy lists recipients by category; keep both in sync and add a row
+   in the SAME change that adds a new integration. Rows are code evidence, not
+   verified contracts or roles. Not yet listed: the repository's make-voice-call
+   also configures OpenAI as the call model and an Azure voice via Vapi; add them
+   once the deployed function is verified. */
 export const PROCESSORS: Array<{ name: string; purpose: string; data: string; where: string }> = [
   { name: 'Supabase Inc.', purpose: 'Βάση δεδομένων, αυθεντικοποίηση προσωπικού, αποθήκευση αρχείων, edge functions', data: 'Όλα τα δεδομένα αιτημάτων, πελατών, υποθέσεων και εγγράφων· διεύθυνση IP', where: 'Όλη η ιστοσελίδα και το CRM' },
   { name: 'Vercel Inc.', purpose: 'Φιλοξενία ιστοσελίδας· Speed Insights (μόνο με συγκατάθεση)', data: 'Διεύθυνση IP, User-Agent, URL σελίδας, χρόνοι φόρτωσης', where: 'Κάθε επίσκεψη· Speed Insights μόνο μετά από «Αποδοχή»' },

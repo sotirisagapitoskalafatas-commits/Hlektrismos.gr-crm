@@ -308,6 +308,10 @@ grant execute on function public.role_preview_event(text, text) to authenticated
 create or replace function public.crm_setting_is_credential(k text)
 returns boolean language sql immutable
 as $$ select k ilike any (array['%key%', '%secret%', '%password%', '%passwd%', '%token%', '%credential%', '%imap%', '%smtp%', '%vapi%', '%twilio%']) $$;
+-- Called inside the crm_settings RLS policy below, so signed-in users need EXECUTE explicitly (phase1/19 removes
+-- the implicit default). Pure name check: reads no data.
+revoke all on function public.crm_setting_is_credential(text) from public, anon;
+grant execute on function public.crm_setting_is_credential(text) to authenticated, service_role;
 
 drop policy if exists "crm_settings_admin_all" on public.crm_settings;
 drop policy if exists "crm_settings read" on public.crm_settings;

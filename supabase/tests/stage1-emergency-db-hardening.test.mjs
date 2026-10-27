@@ -134,7 +134,7 @@ test('APPLY: the Stage 1 sequence applies cleanly, in order, and is idempotent (
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-test('AFTER: set_user_role is service-role only, and its body refuses non-admins even if re-granted', async () => {
+test('AFTER: set_user_role is service-role only, in its grants AND its body (even for an admin claim, even if re-granted)', async () => {
   for (const who of ['anon', AGENT_A, ADMIN]) {
     await as(who);
     const r = await run('select public.set_user_role($1, $2)', [AGENT_B, 'admin']);
@@ -148,14 +148,23 @@ test('AFTER: set_user_role is service-role only, and its body refuses non-admins
   await as(null);
   assert.equal(await jwtRoleOf(AGENT_B), 'field_sales');
 
-  // Defence in depth: even with an accidental re-grant, the NULL-safe guard refuses a caller without the admin claim.
-  await db.exec('grant execute on function public.set_user_role(uuid, text) to anon');
-  await as('anon');
-  const again = await run('select public.set_user_role($1, $2)', [AGENT_B, 'admin']);
-  assert.equal(again.ok, false);
-  assert.match(again.error, /only an administrator/);
+  // Grants: EXECUTE for service_role only.
+  const acl = (await db.query(`select has_function_privilege('anon', 'public.set_user_role(uuid,text)', 'execute') anon,
+    has_function_privilege('authenticated', 'public.set_user_role(uuid,text)', 'execute') auth,
+    has_function_privilege('service_role', 'public.set_user_role(uuid,text)', 'execute') service`)).rows[0];
+  assert.deepEqual(acl, { anon: false, auth: false, service: true });
+
+  // Body: with an accidental re-grant, anon and even an authenticated caller carrying an admin JWT claim are refused.
+  await db.exec('grant execute on function public.set_user_role(uuid, text) to anon, authenticated');
+  for (const [who, claims] of [['anon', {}], [ADMIN, { app_metadata: { role: 'admin' } }]]) {
+    await as(who, claims);
+    const again = await run('select public.set_user_role($1, $2)', [AGENT_B, 'admin']);
+    assert.equal(again.ok, false, `${who}: body refuses`);
+    assert.match(again.error, /service-role only/);
+  }
   await as(null);
-  await db.exec('revoke execute on function public.set_user_role(uuid, text) from anon');
+  assert.equal(await jwtRoleOf(AGENT_B), 'field_sales', 'still unchanged');
+  await db.exec('revoke execute on function public.set_user_role(uuid, text) from anon, authenticated');
 });
 
 test('AFTER: nobody can change role or active status from the browser; own name/phone stay editable', async () => {
@@ -289,19 +298,45 @@ test('AFTER: Admin / Back Office keeps its working access to CRM records', async
   // infinite recursion for every role, BEFORE and AFTER Stage 1 (pre-existing; only the unused DashboardPage reads it).
 });
 
-test('AFTER: new tables and functions are no longer exposed to anonymous visitors automatically', async () => {
+test('AFTER: a new function is executable by nobody (PUBLIC, anon, authenticated) until a migration grants it', async () => {
   await as(null);
   await db.exec(`
     create table public.zz_future_table (id int primary key);
     create function public.zz_future_fn() returns int language sql as $$ select 1 $$;
+    create function public.zz_future_definer() returns int language sql security definer set search_path = public as $$ select 1 $$;
   `);
   const priv = (await db.query(`select
       has_table_privilege('anon', 'public.zz_future_table', 'select') anon_t,
       has_table_privilege('authenticated', 'public.zz_future_table', 'select') auth_t,
       has_function_privilege('anon', 'public.zz_future_fn()', 'execute') anon_f,
-      has_function_privilege('authenticated', 'public.zz_future_fn()', 'execute') auth_f`)).rows[0];
-  assert.deepEqual(priv, { anon_t: false, auth_t: true, anon_f: false, auth_f: true });
-  await db.exec('drop table public.zz_future_table; drop function public.zz_future_fn()');
+      has_function_privilege('authenticated', 'public.zz_future_fn()', 'execute') auth_f,
+      has_function_privilege('authenticated', 'public.zz_future_definer()', 'execute') auth_definer,
+      has_function_privilege('service_role', 'public.zz_future_fn()', 'execute') service_f`)).rows[0];
+  // service_role keeps the Supabase platform's own schema default (this PR adds no grant for it).
+  assert.deepEqual(priv, { anon_t: false, auth_t: true, anon_f: false, auth_f: false, auth_definer: false, service_f: true });
+  for (const who of ['anon', AGENT_A]) {
+    await as(who);
+    assert.equal((await run('select public.zz_future_definer()')).ok, false, `${who}: cannot call a new SECURITY DEFINER function`);
+  }
+  await as(null);
+  await db.exec('drop table public.zz_future_table; drop function public.zz_future_fn(); drop function public.zz_future_definer()');
+});
+
+test('AFTER: an explicit grant gives EXECUTE to exactly the role named, and nobody else', async () => {
+  await as(null);
+  await db.exec(`
+    create function public.zz_staff_rpc() returns int language sql security definer set search_path = public
+      as $$ select case when public.is_staff() then 1 else 0 end $$;
+    grant execute on function public.zz_staff_rpc() to authenticated;
+  `);
+  await as(AGENT_A);
+  const ok = await run('select public.zz_staff_rpc() as v');
+  assert.equal(ok.ok, true, ok.error);
+  assert.equal(ok.rows[0].v, 1);
+  await as('anon');
+  assert.equal((await run('select public.zz_staff_rpc()')).ok, false, 'anon still has no EXECUTE');
+  await as(null);
+  await db.exec('drop function public.zz_staff_rpc()');
 });
 
 test.todo('Stage 2 (phase4/18): Sales Agent A cannot read or update Sales Agent B\'s leads, cases, documents or visits. NOT in Stage 1: today every active staff account can.');

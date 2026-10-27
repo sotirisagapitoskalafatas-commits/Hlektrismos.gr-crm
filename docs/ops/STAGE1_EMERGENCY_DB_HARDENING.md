@@ -23,7 +23,7 @@ Steps 1, 2, 2b, 2c, 2d and 2e of [`APPLY_ORDER.md`](APPLY_ORDER.md):
 | 2b | `staged-migrations/phase1/17_anon_restrictive_lockdown.sql` | A RESTRICTIVE "anon never" policy on legacy `TO public USING (true)` tables. |
 | 2c | `staged-migrations/phase4/19_staff_only_legacy_tables.sql` | Deactivated accounts lose access to about 30 legacy tables. |
 | 2d | `staged-migrations/phase1/18_live_api_privilege_hardening.sql` | Anonymous table privileges; the `profiles` guard trigger (role, `is_active`); `reassign_lead` / `upsert_supply_point` / role RPCs (including `set_user_role`) restricted; settings and integrations restricted to the office roles; `search_path` pinned. |
-| 2e | `staged-migrations/phase1/19_stage1_gap_fixes.sql` (**new**) | A NULL-safe `set_user_role` body; the `energy-bills` bucket made read-only for active staff; new tables, sequences and functions no longer granted to anon by default. |
+| 2e | `staged-migrations/phase1/19_stage1_gap_fixes.sql` (**new**) | `set_user_role` made **service-role only** in both its grants and its body (no admin-claim alternative); the `energy-bills` bucket made read-only for active staff; **secure-by-default privileges**: new functions are executable by nobody (PUBLIC, anon, authenticated) until a migration grants EXECUTE explicitly, and new tables and sequences are not granted to anon. |
 
 ## Evidence that this works (local only)
 `supabase/tests/stage1-emergency-db-hardening.test.mjs` uses `supabase/tests/helpers/replay-migrations.mjs`. That helper rebuilds the database by replaying the **real `supabase/migrations/` chain** in PGlite (88 of 89 files; the one exception, `20260810185405`, only loosens `ai_agents`/`lead_sources` and can't replay in filename order). The test runs in three steps:
@@ -43,7 +43,18 @@ Steps 1, 2, 2b, 2c, 2d and 2e of [`APPLY_ORDER.md`](APPLY_ORDER.md):
    - the service role (trusted administration path) changing roles and status;
    - editing your own name and phone.
 
-Result on this branch: `npm test`: **381 tests: 380 pass, 0 fail, 1 todo** (the Stage 2 cross-agent item).
+**Coordination with later stages.** `supabase/tests/stage1-later-migrations-grants.test.mjs` builds two databases from the real chain:
+- **control:** Stage 1 without `phase1/19`;
+- **treated:** Stage 1 with `phase1/19`.
+
+It then applies all 23 later staged files (APPLY_ORDER steps 3–23) to both, and compares the EXECUTE privileges of the roughly 70 functions those files create.
+- All later files apply cleanly in both databases.
+- Only trigger functions, plus five normaliser helpers called solely by SECURITY DEFINER functions, lose their implicit EXECUTE. Losing it is correct: neither kind needs EXECUTE for the API roles.
+- One function did need a grant: `crm_setting_is_credential`, which the `crm_settings` RLS policy in `phase2/05` calls. That file now grants it explicitly to `authenticated`.
+- A behaviour check proves that Sales and the office can still query the RLS-protected tables after all later stages.
+- Removing that grant makes three of these tests fail, so the check really works.
+
+Result on this branch: `npm test`: **386 tests: 385 pass, 0 fail, 1 todo** (the Stage 2 cross-agent item).
 
 PGlite emulates the hosted platform's roles, `auth.*` and `storage.objects`. It does **not** prove real Supabase Auth, the Storage API, Edge Functions or the live catalog.
 
@@ -56,7 +67,11 @@ PGlite emulates the hosted platform's roles, `auth.*` and `storage.objects`. It 
    - If the shared login is `manager` or `back_office`, the legacy settings screens stop showing settings. Confirm: `select role, count(*) from public.profiles where is_active group by role;`.
 4. **Role and status changes from the browser are blocked for every role**, admin included, by the `profiles_guard_privileged` trigger. Legitimate changes go through the `admin-users` Edge Function (service role), which the audit judged properly authorised. Confirm that the live admin screens use that function, not a direct `profiles` update.
 5. **`energy-bills`.** No live code writes to this bucket. The unused legacy `LeadDetailSlideout` only reads from it, and active staff keep read access. Confirm that no external integration uploads there.
-6. **Default privileges** apply to objects created by the role that runs the migration (normally `postgres`). Objects created through the dashboard as another role are unaffected. **Coordination:** any future migration that genuinely needs anonymous access must `grant` it explicitly (as `insert_website_lead` already does).
+6. **Default privileges are per creating role.** No migration in this repo changes role or ownership (`set role`, `owner to`, `for role`). Files are applied by the owner in the Supabase SQL editor or CLI, which run as `postgres`. `phase1/19` therefore sets the defaults `FOR ROLE postgres`, and also for whichever role runs it if that is different. Objects created by `supabase_admin` (platform objects and extensions) are not affected, and this project's migrations never create objects as that role.
+   - Before applying, confirm the role: `select current_user;` in the SQL editor.
+   - Check afterwards: `select defaclrole::regrole, defaclnamespace::regnamespace, defaclobjtype, defaclacl from pg_default_acl;`.
+   - Existing functions keep their current grants; only **new** objects are affected.
+   - **Coordination:** from now on, every migration that creates a function called by the browser, an RLS policy or an Edge Function must `grant execute ... to authenticated` (or anon) explicitly. `insert_website_lead` and `phase4/18` already do. `service_role` keeps the platform's own schema default.
 7. **Live app reads checked:** `fetchArrivalRadius()` (`src/lib/api.ts:1269`) reads `crm_settings` as a Sales Agent. After Stage 1 it gets no row and keeps its built-in default radius, so nothing breaks.
 
 ## Procedure (owner or operator)
@@ -73,6 +88,9 @@ PGlite emulates the hosted platform's roles, `auth.*` and `storage.objects`. It 
 
 ## Rollback
 Each file has its own rollback (the end of the file, or `docs/ops/rollback_phase1_17_*.sql` / `rollback_phase4_19_*.sql` / `rollback_phase1_18_*.sql`). Roll back in **reverse order** (2e → 1), and only to restore service: rollback re-opens the findings. Never re-grant `set_user_role` to anon or authenticated.
+
+## `set_user_role` policy
+It is service-role only: EXECUTE is granted to `service_role` alone, and the body refuses any caller whose session role is not `service_role`. The earlier admin-JWT-claim alternative has been removed. Nothing in the app or the Edge Functions calls it; staff roles are managed through the `admin-users` Edge Function. The test checks the grants, and checks that anon and an authenticated caller with an admin claim are refused even after an accidental re-grant.
 
 ## Remaining risks after Stage 1
 - Cross-agent read and write between active Sales Agents (Stage 2, `phase4/18`). Storage is not scoped per owner.

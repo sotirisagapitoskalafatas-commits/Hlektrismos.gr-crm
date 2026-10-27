@@ -28,7 +28,7 @@ export async function planRoute(stops: RouteStop[], travelMode: NavigationTravel
       const profile = travelMode === 'walking' ? 'foot-walking' : 'cycling-regular';
       try {
         return await new OrsRoutingProvider(ORS_API_KEY, profile).planRoute(stops);
-      } catch (error) {
+      } catch {
         const estimated = await new HaversineRoutingProvider().planRoute(stops);
         estimated.error = 'Το προφίλ ' + (travelMode === 'walking' ? 'πεζής μετακίνησης' : 'ποδηλάτου')
           + ' δεν είναι διαθέσιμο από τον πάροχο. Η απόσταση είναι ευθείας γραμμής, όχι πραγματική διαδρομή.';

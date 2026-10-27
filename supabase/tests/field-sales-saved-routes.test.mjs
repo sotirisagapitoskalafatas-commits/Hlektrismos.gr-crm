@@ -203,7 +203,8 @@ test('manual arrival/completion timestamps are server-stamped and cannot be reve
   assert.equal(contentTamper.ok, false, 'arrived/completed stop content is immutable');
   const timestampTamper = await run("update public.field_sales_route_stops set completed_at='2099-01-01T00:00:00Z' where id=$1 returning completed_at", [stopId]);
   assert.equal(timestampTamper.ok, true, timestampTamper.error);
-  assert.equal(timestampTamper.rows[0].completed_at, recordedAt, 'clients cannot rewrite database-stamped visit times');
+  // Compare instants, not Date object identity (pglite returns a new Date per row).
+  assert.equal(new Date(timestampTamper.rows[0].completed_at).getTime(), new Date(recordedAt).getTime(), 'clients cannot rewrite database-stamped visit times');
 
   const regression = await run("update public.field_sales_route_stops set stop_status='pending' where id=$1 returning id", [stopId]);
   assert.equal(regression.ok, false, 'completed history cannot regress to pending');

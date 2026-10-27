@@ -1408,6 +1408,7 @@ export type PotentialCRMMatch = {
  */
 export async function findPotentialCRMMatches(search: string): Promise<{ rows: PotentialCRMMatch[]; error: string | null }> {
   if (!supabase) return { rows: [], error: 'Η βάση δεδομένων δεν είναι διαθέσιμη.' };
+  // eslint-disable-next-line no-control-regex -- intentionally strips control characters from user search input
   const needle = search.trim().replace(/[\u0000-\u001f%_*]/g, '').slice(0, 80);
   if (needle.length < 2) return { rows: [], error: null };
   const pattern = `%${needle}%`;
@@ -1429,15 +1430,19 @@ export async function findPotentialCRMMatches(search: string): Promise<{ rows: P
   responses.forEach((result, index) => { if (result.error) logError('findPotentialCRMMatches[' + index + ']', result.error); });
 
   const rows: PotentialCRMMatch[] = [
-    ...[...(caseTitle.data ?? []), ...(caseAddress.data ?? [])].map(row => ({
-      entity_type: 'case' as const,
-      id: row.id,
-      label: row.customer?.full_name || row.title || 'Υπόθεση χωρίς τίτλο',
-      address: row.address ?? null,
-      phone: row.customer?.phone ?? null,
-      lat: row.lat ?? null,
-      lng: row.lng ?? null,
-    })),
+    ...[...(caseTitle.data ?? []), ...(caseAddress.data ?? [])].map(row => {
+      // Untyped client models the many-to-one join as an array; at runtime it is a single object.
+      const customer = (Array.isArray(row.customer) ? row.customer[0] : row.customer) as { full_name?: string | null; phone?: string | null } | null | undefined;
+      return {
+        entity_type: 'case' as const,
+        id: row.id,
+        label: customer?.full_name || row.title || 'Υπόθεση χωρίς τίτλο',
+        address: row.address ?? null,
+        phone: customer?.phone ?? null,
+        lat: row.lat ?? null,
+        lng: row.lng ?? null,
+      };
+    }),
     ...[...(customerName.data ?? []), ...(customerAddress.data ?? []), ...(customerPhone.data ?? [])].map(row => ({
       entity_type: 'customer' as const,
       id: row.id,

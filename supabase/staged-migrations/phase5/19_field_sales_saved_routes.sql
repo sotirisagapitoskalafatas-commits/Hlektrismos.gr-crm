@@ -640,9 +640,9 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
+as $duplicate_review_stamp$
 declare
   v_requester_role text;
-as $duplicate_review_stamp$
 begin
   if tg_op = 'INSERT' then
     new.requested_by := auth.uid();

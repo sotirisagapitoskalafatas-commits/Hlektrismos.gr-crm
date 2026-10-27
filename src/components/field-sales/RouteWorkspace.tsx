@@ -380,6 +380,9 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
     setReviewActionId(candidate.id);
     const request = await createFieldSalesDuplicateReview({
       requested_by: currentUserId,
+      // The route's Sales Agent: the agent themself, or the agent Back Office selected for this route.
+      // The database trigger re-validates it (and forces it to auth.uid() for Sales Agents).
+      prospective_owner_id: routeOwner,
       route_id: selectedRouteId,
       candidate_name: candidate.label,
       candidate_address: candidate.address ?? candidate.sublabel ?? null,
@@ -475,13 +478,14 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       comments: 'Πηγή ανακάλυψης: ' + candidate.source + (candidate.category ? '. Κατηγορία πηγής: ' + candidate.category : '') + '. ' + candidate.sourceUrl,
     });
     setReviewActionId(null);
-    if (created.error || !created.lead) {
+    const lead = created.lead;
+    if (created.error || !lead) {
       toast(created.error ?? 'Το Lead δεν δημιουργήθηκε.', 'bad');
       return;
     }
     setStops(current => [...current, {
       source_type: 'crm',
-      source_id: created.lead!.id,
+      source_id: lead.id,
       label: candidate.label,
       subtitle: 'Νέο Lead',
       address: candidate.address ?? candidate.sublabel ?? null,
@@ -492,7 +496,7 @@ export default function RouteWorkspace({ seedStops, currentUserId, currentRole, 
       metadata: {
         source: candidate.source,
         external_candidate_id: candidate.id,
-        created_lead_id: created.lead.id,
+        created_lead_id: lead.id,
         duplicate_check: 'clear_at_creation',
       },
     }]);

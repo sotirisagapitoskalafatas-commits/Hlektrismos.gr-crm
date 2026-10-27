@@ -278,7 +278,7 @@ function CreateDialog({ roles, onClose, onDone }: { roles: Role[]; onClose: () =
   );
 }
 
-function EditDialog({ s, refs, roles, isSelf, onClose, onDone }: {
+function EditDialog({ s, refs, isSelf, onClose, onDone }: {
   s: StaffMember; refs: number | null; roles: Role[]; isSelf: boolean; onClose: () => void; onDone: (want: { full_name: string; role: Role }) => Promise<void>;
 }) {
   const [full_name, setName] = useState(s.full_name);

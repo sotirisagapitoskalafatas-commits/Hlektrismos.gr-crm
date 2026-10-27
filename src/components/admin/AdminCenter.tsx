@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { ACCESS_GROUPS, accessGroupLabel, roleLabel } from '@/lib/roles';
+import { ACCESS_GROUPS, roleLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
 import { fetchScraperSettings } from '@/lib/scraper';
 import { fetchStaffAudit, listStaff } from '@/lib/staff-admin';

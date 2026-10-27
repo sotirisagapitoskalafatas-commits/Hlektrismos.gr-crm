@@ -127,6 +127,10 @@ export type BusinessCandidate = {
   id: string;
   label: string;
   sublabel?: string;
+  /** Public OSM street address, when the feature carries one. */
+  address?: string;
+  /** Public OSM phone tag, when present. */
+  phone?: string;
   position: MapCoordinate;
   category?: string;
   source: 'OpenStreetMap / Photon';
@@ -182,7 +186,7 @@ export async function discoverBusinessesAlongRoute(
     ? route.map((_, i) => i)
     : [...new Set([0, Math.floor((route.length - 1) / 2), route.length - 1])];
   const centres = centreIndexes.map(i => route[i]);
-  const candidates = await Promise.all(centres.map(async (centre, index) => {
+  const candidates = await Promise.all(centres.map(async (centre) => {
     try {
       const params = new URLSearchParams({ q, limit: '10', lat: String(centre.lat), lon: String(centre.lng) });
       const response = await fetch(PHOTON_URL + '?' + params.toString(), { headers: { Accept: 'application/json' } });

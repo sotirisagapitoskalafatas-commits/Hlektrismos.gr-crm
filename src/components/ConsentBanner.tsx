@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { saveConsent, useConsent } from '@/lib/consent';
+import { saveConsent, speedInsightsBeforeSend, useConsent } from '@/lib/consent';
 import '@/styles/landing.css';
 
 /* Opt-in consent banner. Nothing optional loads until the visitor clicks
@@ -60,7 +60,8 @@ export default function ConsentBanner() {
   return (
     <>
       {/* Vercel Speed Insights is mounted ONLY after opt-in. */}
-      {choices.analytics && <SpeedInsights />}
+      {/* Loaded only after «Αποδοχή»; beforeSend drops measurements again as soon as consent is withdrawn. */}
+      {choices.analytics && <SpeedInsights beforeSend={speedInsightsBeforeSend} />}
       {visible && (
         <div className="lp-chrome lp-consent">
           <div ref={cardRef} className="lp-consent__card" role="dialog" aria-modal="false" aria-labelledby="lp-consent-title" aria-describedby="lp-consent-text">

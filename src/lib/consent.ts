@@ -48,6 +48,14 @@ export function saveConsent(choices: Partial<ConsentState>): void {
   window.dispatchEvent(new Event(EVENT));
 }
 
+/* Passed to <SpeedInsights beforeSend>. The Speed Insights script has no
+   unload: once loaded it keeps measuring until the page reloads, even after
+   the component unmounts. Checking consent at send time makes a withdrawal
+   effective immediately: every later measurement is dropped. */
+export function speedInsightsBeforeSend<T>(event: T): T | null {
+  return hasConsent('analytics') ? event : null;
+}
+
 export function resetConsent(): void {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
   window.dispatchEvent(new Event(EVENT));

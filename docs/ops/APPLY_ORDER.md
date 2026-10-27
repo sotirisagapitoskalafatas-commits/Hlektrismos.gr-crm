@@ -77,6 +77,12 @@ select
 ```
 - **Required before production:** on staging, test website/contact intake including invalid consent/age cases, chatbot tariff lookup, Admin/Back Office account provisioning, Sales Agent login, and routine lead/case/customer/document flows. If anything fails, stop and diagnose.
 
+## 2e. `phase1/19_stage1_gap_fixes.sql` — security (Stage 1, last file)
+- **Depends on:** 2d (`phase1/18`), in the same window. Full Stage 1 order and checks: [`STAGE1_EMERGENCY_DB_HARDENING.md`](STAGE1_EMERGENCY_DB_HARDENING.md).
+- **Unlocks on screen:** nothing visible. `set_user_role` guard made NULL-safe (service role only); `energy-bills` bucket: active staff read only; new tables/functions are no longer granted to anon automatically.
+- **Rollback:** end of the file (re-opens the findings).
+- **Check:** see `pending_migrations_check.sql` row `phase1/19_stage1_gap_fixes`.
+
 ## 3. `phase2/05_staff_admin_and_role_preview.sql` — security
 - **Depends on:** the role-model decision (see above); then deploy `admin-users`.
 - **Unlocks on screen:** no more self-promotion to admin; user management (Χρήστες & Ρόλοι) becomes editable; managers can no longer read credential rows in `crm_settings`.

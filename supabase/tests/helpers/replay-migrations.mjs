@@ -9,6 +9,21 @@ import { PGlite } from '@electric-sql/pglite';
 const MIGRATIONS = fileURLToPath(new URL('../../migrations/', import.meta.url));
 export const readRepo = (rel) => readFileSync(fileURLToPath(new URL(`../../../${rel}`, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 
+// docs/ops/APPLY_ORDER.md, in order (paths under supabase/staged-migrations/, without .sql).
+export const STAGE1_FILES = ['phase1/16_storage_docs_lockdown', 'phase1/01_rls_hardening', 'phase1/17_anon_restrictive_lockdown',
+  'phase4/19_staff_only_legacy_tables', 'phase1/18_live_api_privilege_hardening', 'phase1/19_stage1_gap_fixes'];
+export const LATER_FILES = ['phase2/05_staff_admin_and_role_preview', 'phase4/17_admin_only_staff_provisioning',
+  'phase4/20_backoffice_sales_agent_provisioning', 'phase1/03_drop_exec_sql', 'phase1/02_outreach_decisions_audit',
+  'phase1/04_cron_secret_and_pause', 'phase4/15_convert_lead_match_phone_only', 'phase2/06_trash_leads_customers',
+  'phase2/07a_document_checklist_and_return', 'phase2/07b_case_stage_guard_and_set_stage', 'phase2/07c_reopen_completed_case',
+  'phase4/10_field_checkin_manual_flag', 'phase4/11_customer_names', 'phase4/12_default_backoffice_assignee',
+  'phase4/13_case_exception_state', 'phase4/14_follow_up_kind', 'phase3/08_b2b_prospects_review_distribution',
+  'phase3/09_contact_eligibility', 'phase5/17_customer_supply_points', 'phase5/18_lead_supply_points',
+  'phase4/16_import_legacy_leads', 'phase4/18_sales_own_records_scope', 'phase5/19_field_sales_saved_routes'];
+export const applyStaged = async (db, files) => {
+  for (const f of files) await db.exec(readRepo(`supabase/staged-migrations/${f}.sql`));
+};
+
 // Supabase platform stand-ins. Roles and helper functions mirror the hosted platform's names and behaviour
 // closely enough for RLS/grant tests: the JWT sub/role/claims come from session settings set by as().
 const PLATFORM = `

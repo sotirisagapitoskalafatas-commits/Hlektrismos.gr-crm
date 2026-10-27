@@ -290,6 +290,13 @@ select exists (select 1 from pg_policies where schemaname='public' and tablename
 ```
 
 
+## 22b. `phase4/21_sales_isolation_completion.sql` — Stage 2A: Sales Agent isolation (security), **right after step 22**
+- **Depends on:** step 22 (`phase4/18`, its `sales_owns_*` helpers) and Stage 1. Runbook: [`STAGE2A_SALES_ISOLATION.md`](STAGE2A_SALES_ISOLATION.md).
+- **Unlocks on screen:** nothing visible for Back Office. Sales Agents stop seeing other agents' offers, signatures, consents, events and files, cannot reassign or verify, and RPCs refuse other agents' ids.
+- **Rollback:** [`rollback_phase4_21_sales_isolation_completion.sql`](rollback_phase4_21_sales_isolation_completion.sql) (re-opens the findings).
+- **Re-apply after:** any later migration that `create or replace`s `convert_lead_to_case`, `route_lead_to_backoffice`, `set_case_exception`, `case_document_blockers` or `field_sales_metrics` in `public` (it would replace the wrapper).
+- **Check:** `pending_migrations_check.sql` row `phase4/21_sales_isolation_completion`.
+
 ## 23. `phase5/19_field_sales_saved_routes.sql` — multiple saved routes for Field Sales
 - **Depends on:** active staff role helpers (`is_staff()`, `is_role(text)`), `profiles`, and existing `leads`, `customers`, and `cases` tables; after step 22 in this ordered runbook. Adds saved-route tables, a Back Office duplicate-review queue, a privacy-preserving boolean duplicate-signal RPC, an invoker-secured route-stop replacement RPC, plus ownership/history guards. No existing CRM rows are rewritten.
 - **Unlocks on screen:** multiple saved routes per Sales Agent, route date/status/travel-mode/origin, ordered stops from CRM, existing visits or discovered public-map candidates, save/reopen/pause/resume/complete, and Back Office route reassignment. Route owner must be an active Sales Agent. Anonymous callers have no route access.

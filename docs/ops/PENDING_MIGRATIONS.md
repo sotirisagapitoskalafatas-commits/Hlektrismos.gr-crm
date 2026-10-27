@@ -2,9 +2,7 @@
 
 **Status, 16/10/2026:** nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or production.
 
-**Correction.** I earlier said that "only six files were pending" (07 and 10–14). That was wrong. **18 staged SQL files** are pending:
-- **16** written before today;
-- **2** new in this branch: `phase4/15` (finding D1) and `phase1/16` (storage lockdown).
+**Inventory note (updated 19/10/2026).** The file count above is historical and predates later staged queue work. `APPLY_ORDER.md` is the authoritative ordered list; it now includes the branch-only `phase1/18_live_api_privilege_hardening.sql`. Do not infer which SQL has reached live from a count: run `pending_migrations_check.sql` against the target database first.
 
 The Admin centre findings match this: anonymous read of integration settings, self-promotion to admin, credentials readable in `crm_settings`, and anonymous listing of files.
 
@@ -24,6 +22,7 @@ These files sit outside `supabase/migrations/`, so the GitHub integration never 
 | 2 | `phase1/16_storage_docs_lockdown.sql` *(new)* | Anonymous visitors can no longer list or download files in `hlektrismos_docs`. They may upload only into `contact-forms/`. Inactive accounts lose access | **No**: drops policies | none | **Website upload: must keep working.** Upload with `upsert:false` needs INSERT only, which is kept. Proved locally in `storage-docs.test.mjs`. **Verify on staging with the incognito upload test** in `SECURITY_LIVE_FINDINGS.md` | **Security: high** |
 | 2b | `phase1/17_anon_restrictive_lockdown.sql` *(new, security audit F-02/F-06)* | RESTRICTIVE «anon: never» policy on 12 legacy tables that still allow the public anon key to read (and some to write) them; pins `create_crm_user()`'s `search_path` | **Yes**: nothing dropped, nothing revoked | after phase1/01 | No (the website form does not use these tables) | **Security: high** |
 | 2c | `phase4/19_staff_only_legacy_tables.sql` *(new, security audit F-08)* | RESTRICTIVE «staff only» policy on ~30 legacy tables, so a deactivated account loses them | **Yes**: nothing dropped | none | No (anonymous is not touched) | **Security: medium** |
+| 2d | `phase1/18_live_api_privilege_hardening.sql` *(security branch, 19/10)* | Removes direct anonymous access to private legacy CRM tables; restores the profile role/status guard; restricts exposed legacy RPCs; pins mutable SECURITY DEFINER paths; changes `market_tariffs_view` to invoker permissions | **No**: adjusts existing grants, policies and function bodies; no business rows are written | After 01/16/17/19; read the PR runbook and inspect current catalog first | **Must verify on staging**: website lead form, chatbot tariff lookup, lead reassign and customer/connection flows | **Security: critical** |
 | 3 | `phase2/05_staff_admin_and_role_preview.sql` | Stops self-promotion to admin (trigger). Adds staff administration functions and audit. Managers can no longer read credential rows in `crm_settings` | **No**: replaces the `profiles update own` and `crm_settings` policies | none (then deploy the `admin-users` function) | No | **Security: high.** ⚠ Decide the role model first (`docs/product/ROLE_MODEL.md`): its permission matrix names the five roles |
 | 3b | `phase4/17_admin_only_staff_provisioning.sql` *(new, queue item 4)* | Only administrators create users, change roles and disable accounts; managers/back office keep the read-only list | **Yes**: one function body replaced | step 3 | No | **Roles: high** |
 | 4 | `phase1/03_drop_exec_sql.sql` | Drops a hand-made `exec_sql` RPC if one exists | **No**: drops a function | Save its definition first (audit query 9) | No (nothing in the repo calls it) | Security |

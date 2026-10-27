@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react';
-import { Phone, Menu, X } from 'lucide-react';
+import { useRef } from 'react';
+import { Phone } from 'lucide-react';
 import CinematicSkyBackground from '@/components/CinematicSkyBackground';
 import { footerWaveTopMask } from '@/lib/waveDivider';
 import LegalLinks from '@/components/LegalLinks';
+import PublicHeader from '@/components/public/PublicHeader';
+import StaffAccessLink from '@/components/public/StaffAccessLink';
 
 const services = [
   {
@@ -94,32 +96,15 @@ function ServiceCard({ service }: { service: (typeof services)[number] }) {
 }
 
 export default function ServicesPage() {
-  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <>
       <CinematicSkyBackground pushScreens={1.5} mistIntensity={0.6} />
       <div style={{ position: 'relative', zIndex: 10 }}>
 
-        <header className="site-header scrolled">
-          <div className="container nav-wrap">
-            <a href="#/" className="brand">
-              <img src="/images/brand-logo.png" alt="Hlektrismos.gr" style={{ height: 60, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-              <span style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' as const, color: '#b0c4cc', borderLeft: '1px solid rgba(255,255,255,.22)', paddingLeft: 10, lineHeight: 1.3, marginLeft: 10 }}>Σύμβουλοι<br />Ενέργειας</span>
-            </a>
-            <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
-              <a href="#/services" onClick={() => setMenuOpen(false)} style={{ color: '#fff', fontWeight: 800 }}>Υπηρεσίες</a>
-              <a href="#about" onClick={() => setMenuOpen(false)}>Ποιοι Είμαστε</a>
-              <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
-              <a href="#contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
-              <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
-            </nav>
-            <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-            <a href="#contact" className="header-cta">Ζητήστε κλήση</a>
-          </div>
-        </header>
+        <PublicHeader current="services" />
 
-        <main style={{ paddingTop: 72 }}>
+        <main>
           <section style={{ padding: 'clamp(110px,18vh,170px) clamp(20px,5vw,70px) clamp(50px,7vh,80px)', maxWidth: 900 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.3)', background: 'rgba(255,255,255,.08)', fontSize: 12.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' as const, color: '#fff' }}>Υπηρεσίες</span>
             <h1 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 800, fontSize: 'clamp(34px,5vw,64px)', lineHeight: 1.05, letterSpacing: '-.02em', margin: '20px 0 0', color: '#fff', textShadow: '0 4px 40px rgba(0,0,0,.5)' }}>Ενεργειακές λύσεις<br />για κάθε ανάγκη</h1>
@@ -167,8 +152,8 @@ export default function ServicesPage() {
             <div>
               <h4 style={{ fontFamily: 'var(--font-cinematic)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', color: '#fff' }}>Χρήσιμοι Σύνδεσμοι</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, fontSize: 14, color: '#c3d0d6' }}>
-                <a href="#/" style={footerLink}>Αρχική</a>
-                <a href="#about" style={footerLink}>Σχετικά με εμάς</a>
+                <a href="#top" style={footerLink}>Αρχική</a>
+                <a href="#/about" style={footerLink}>Σχετικά με εμάς</a>
                 <a href="#/services" style={footerLink}>Λύσεις</a>
                 <a href="#/faq" style={footerLink}>Συχνές Ερωτήσεις</a>
                 <a href="#contact" style={footerLink}>Επικοινωνία</a>
@@ -187,6 +172,7 @@ export default function ServicesPage() {
             <span>© 2026 hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
             <LegalLinks />
           </div>
+          <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}><StaffAccessLink /></div>
         </footer>
 
       </div>

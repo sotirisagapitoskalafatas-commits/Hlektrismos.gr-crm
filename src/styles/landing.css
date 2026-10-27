@@ -1,10 +1,11 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    Hlektrismos.gr — public landing page.
-   Every selector is scoped under `.lp` so nothing here can reach CRM screens.
+   Every selector is scoped under `.lp` (the landing page) or `.lp-chrome` (the shared public header and the
+   staff-access link, which also render on the other public pages), so nothing here can reach CRM screens.
    Fonts: Inter (bundled with a Greek subset) for headings and body.
    ───────────────────────────────────────────────────────────────────────────── */
 
-.lp {
+.lp, .lp-chrome {
   --lp-navy: #0b2547;
   --lp-navy-2: #12355f;
   --lp-ink: #0f2b4f;
@@ -28,10 +29,6 @@
      whose --acc is not defined anywhere (without this, keyboard focus would be invisible on this page). */
   --acc: #1667d9;
 
-  position: relative;
-  min-height: 100vh;
-  overflow-x: clip;
-  background: var(--lp-canvas);
   color: var(--lp-ink);
   font-family: 'Inter', 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 16px;
@@ -39,14 +36,20 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+.lp { position: relative; min-height: 100vh; overflow-x: clip; background: var(--lp-canvas); }
 /* Resets use :where() so they carry no specificity and never override component rules. */
-.lp :where(*, *::before, *::after) { box-sizing: border-box; }
-.lp :where(h1, h2, h3, h4, p) { margin: 0; }
-.lp :where(img) { display: block; max-width: 100%; }
-.lp :where(a) { color: inherit; text-decoration: none; }
+:is(.lp, .lp-chrome) :where(*, *::before, *::after) { box-sizing: border-box; }
+:is(.lp, .lp-chrome) :where(h1, h2, h3, h4, p) { margin: 0; }
+:is(.lp, .lp-chrome) :where(img) { display: block; max-width: 100%; }
+:is(.lp, .lp-chrome) :where(a) { color: inherit; text-decoration: none; }
+.lp-chrome { box-sizing: border-box; }
 
-#root .lp :focus-visible,
-.lp :focus-visible {
+/* index.css draws every keyboard focus ring with var(--acc) but never defines it, so focus is invisible. Define it only on
+   pages that show the public header (this selector never matches CRM screens), which also fixes the old page content. */
+body:has(.lp-chrome) { --acc: #1667d9; }
+
+#root :is(.lp, .lp-chrome) :focus-visible,
+:is(.lp, .lp-chrome) :focus-visible {
   outline: 3px solid var(--acc);
   outline-offset: 3px;
   border-radius: 8px;
@@ -157,6 +160,11 @@
 }
 .lp-nav__link:hover, .lp-more > summary:hover { color: var(--lp-blue-2); }
 .lp-nav__link:hover::after { transform: scaleX(1); }
+/* Subtle "you are here" state for the page the visitor is on (the header itself never changes). */
+.lp-nav__link[aria-current='page'], .lp-more.is-current > summary { color: var(--lp-blue-2); }
+.lp-nav__link[aria-current='page']::after { transform: scaleX(1); }
+.lp-more__menu a[aria-current='page'] { background: var(--lp-pale); color: var(--lp-ink); font-weight: 650; }
+.lp-drawer a[aria-current='page'] { color: var(--lp-blue-2); }
 
 .lp-more { position: relative; }
 .lp-more > summary { list-style: none; }
@@ -711,3 +719,11 @@ textarea.lp-input { min-height: 96px; resize: vertical; font-family: inherit; }
   .lp-contact__photo { height: 260px; }
   .lp-footer__grid { grid-template-columns: 1fr; }
 }
+
+/* ── Staff access: a quiet footer link, deliberately not part of the customer navigation ───────────────── */
+.lp-staff { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 14px; font-size: 12px; line-height: 1.4; color: #b4c6d6; }
+.lp-staff__label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; }
+.lp-staff a { display: inline-flex; align-items: center; min-height: 24px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(127, 140, 160, 0.55); }
+.lp-staff a:hover { opacity: 1; text-decoration-color: currentColor; }
+.lp-staff a:focus-visible { outline-color: #7fd4ff; }
+@media (max-width: 640px) { .lp-staff a { min-height: 44px; } }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { ExternalLink, Zap, Menu, X } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import LegalLinks from '@/components/LegalLinks';
+import PublicHeader from '@/components/public/PublicHeader';
+import StaffAccessLink from '@/components/public/StaffAccessLink';
 
 const commodities = [
   { name: 'Dutch TTF Gas', source: 'Barchart', desc: 'Τιμές futures για το φυσικό αέριο TTF, βασικός δείκτης της ευρωπαϊκής αγοράς αερίου.', url: 'https://www.barchart.com/futures/quotes/NYMEX-TTFG1' },
@@ -15,26 +16,11 @@ const reports = [
 ];
 
 export default function EnergyPage() {
-  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-shell">
-      <header className="site-header scrolled">
-        <div className="container nav-wrap">
-          <a href="#top" className="brand"><span className="brand-mark"><Zap size={18} fill="currentColor" /></span><span>Hlektrismos<span>.gr</span></span></a>
-          <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>
-            <a href="#/" onClick={() => setMenuOpen(false)}>Αρχική</a>
-            <a href="#/about" onClick={() => setMenuOpen(false)}>Σχετικά</a>
-            <a href="#/services" onClick={() => setMenuOpen(false)}>Υπηρεσίες</a>
-            <a href="#/energy" onClick={() => setMenuOpen(false)}>Ενέργεια</a>
-            <a href="#/faq" onClick={() => setMenuOpen(false)}>Συχνές Ερωτήσεις</a>
-            <a href="#/contact" onClick={() => setMenuOpen(false)}>Επικοινωνία</a>
-            <a href="#/login" onClick={() => setMenuOpen(false)} className="nav-dashboard">Σύνδεση</a>
-          </nav>
-          <button className="menu-button" aria-label="Μενού" aria-expanded={menuOpen} onClick={() => setMenuOpen(o => !o)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
-        </div>
-      </header>
+      <PublicHeader current="energy" />
 
-      <main style={{ paddingTop: 80 }}>
+      <main>
         <section className="section" style={{ background: 'transparent' }}>
           <div className="container">
             <div className="section-heading" style={{ textAlign: 'left', maxWidth: 800 }}>
@@ -92,6 +78,7 @@ export default function EnergyPage() {
             <span>© 2026 hlektrismos.gr</span>
             <LegalLinks className="footer-legal-links" color="inherit" />
           </div>
+          <StaffAccessLink />
         </div>
       </footer>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent, RefObject } from 'react';
 import {
-  ArrowRight, Phone, Mail, MapPin, FileText, Upload, X, Menu, Lock, Camera, Clock,
+  ArrowRight, Phone, Mail, MapPin, FileText, Upload, X, Lock, Camera, Clock,
   Zap, Flame, Sun, CarFront, ChevronDown, CheckCircle2, MessageSquareText, Search,
   Compass, Headset, Sparkles, LifeBuoy, Gauge,
 } from 'lucide-react';
@@ -10,6 +10,8 @@ import { useLenis, scrollToTarget } from '@/hooks/useLenis';
 import { COMPANY } from '@/lib/legal';
 import LegalLinks from '@/components/LegalLinks';
 import EnergyBolt from '@/components/landing/EnergyBolt';
+import PublicHeader, { PublicBrand } from '@/components/public/PublicHeader';
+import StaffAccessLink from '@/components/public/StaffAccessLink';
 import '@/styles/landing.css';
 
 /* ─── Landing page content ─────────────────────────────────── */
@@ -32,21 +34,6 @@ const benefits = [
   { icon: Sparkles, label: 'Εξατομικευμένη καθοδήγηση' },
   { icon: Headset, label: 'Απλή και κατανοητή εξυπηρέτηση' },
   { icon: LifeBuoy, label: 'Συνεχής υποστήριξη' },
-];
-
-const navLinks = [
-  { href: '#top', label: 'Αρχική' },
-  { href: '#services', label: 'Υπηρεσίες' },
-  { href: '#comparison', label: 'Σύγκριση Τιμολογίων' },
-  { href: '#how-it-works', label: 'Πώς Λειτουργεί' },
-  { href: '#contact', label: 'Επικοινωνία' },
-];
-
-const moreLinks = [
-  { href: '#advisor', label: 'Ο σύμβουλός σου' },
-  { href: '#/services', label: 'Αναλυτικά οι υπηρεσίες' },
-  { href: '#/faq', label: 'Συχνές ερωτήσεις' },
-  { href: '#/about', label: 'Η εταιρεία' },
 ];
 
 const regions = [
@@ -115,12 +102,8 @@ export default function LandingPage() {
   const uploadedRef = useRef(new WeakMap<File, { path: string; name: string; type: string; size: number }>());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const moreRef = useRef<HTMLDetailsElement>(null);
-  const burgerRef = useRef<HTMLButtonElement>(null);
 
   useLenis();
   useReveal(rootRef);
@@ -143,44 +126,6 @@ export default function LandingPage() {
     document.documentElement.classList.remove('dark');
     localStorage.setItem('theme', 'light');
   }, []);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Mobile menu: Escape closes and returns focus; widening to desktop closes it.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenuOpen(false); burgerRef.current?.focus(); } };
-    const mq = window.matchMedia('(min-width: 1120px)');
-    const onWide = () => { if (mq.matches) setMenuOpen(false); };
-    window.addEventListener('keydown', onKey);
-    mq.addEventListener('change', onWide);
-    return () => { window.removeEventListener('keydown', onKey); mq.removeEventListener('change', onWide); };
-  }, [menuOpen]);
-
-  // «Περισσότερα»: close when clicking elsewhere or pressing Escape.
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      const d = moreRef.current;
-      if (d?.open && !d.contains(e.target as Node)) d.open = false;
-    };
-    const onKey = (e: KeyboardEvent) => {
-      const d = moreRef.current;
-      if (e.key === 'Escape' && d?.open) { d.open = false; d.querySelector('summary')?.focus(); }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, []);
-
-  const closeMenus = () => {
-    setMenuOpen(false);
-    if (moreRef.current) moreRef.current.open = false;
-  };
 
   const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((c) => ({ ...c, [field]: value }));
 
@@ -283,49 +228,10 @@ export default function LandingPage() {
     setForm({ firstName: '', lastName: '', email: '', phone: '', region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false, adult: false });
   };
 
-  const Brand = ({ alt = 'Hlektrismos.gr — αρχική' }: { alt?: string }) => (
-    <>
-      <img className="lp-brand__mark" src="/images/landing/logo-mark.png" alt="" width={256} height={312} />
-      <img className="lp-brand__word" src="/images/landing/logo-wordmark.png" alt={alt} width={800} height={73} />
-    </>
-  );
-
   return (
     <div className="lp" ref={rootRef}>
-      {/* ── A. Compact header ── */}
-      <header className={`lp-header${scrolled ? ' is-scrolled' : ''}`}>
-        <div className="lp-wrap lp-header__bar">
-          <a href="#top" className="lp-brand" onClick={closeMenus}><Brand /></a>
-
-          <nav className="lp-nav" aria-label="Κύρια πλοήγηση">
-            {navLinks.map((l) => <a key={l.href} href={l.href} className="lp-nav__link" onClick={closeMenus}>{l.label}</a>)}
-            <details className="lp-more" ref={moreRef}>
-              <summary>Περισσότερα <ChevronDown size={14} aria-hidden="true" /></summary>
-              <div className="lp-more__menu">
-                {moreLinks.map((l) => <a key={l.href} href={l.href} onClick={closeMenus}>{l.label}</a>)}
-              </div>
-            </details>
-          </nav>
-
-          <div className="lp-header__actions">
-            <a href={PHONE_HREF} className="lp-phone" aria-label={`Κάλεσέ μας στο ${COMPANY.phone}`}><Phone size={16} aria-hidden="true" /><span>{COMPANY.phone}</span></a>
-            <a href="#contact" className="lp-btn lp-btn--primary lp-btn--sm" onClick={closeMenus}>Ζήτησε πρόταση <ArrowRight size={15} aria-hidden="true" /></a>
-            <button ref={burgerRef} type="button" className="lp-burger" aria-expanded={menuOpen} aria-controls="lp-drawer"
-              aria-label={menuOpen ? 'Κλείσιμο μενού' : 'Άνοιγμα μενού'} onClick={() => setMenuOpen((o) => !o)}>
-              {menuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
-            </button>
-          </div>
-        </div>
-
-        <div id="lp-drawer" className="lp-drawer" hidden={!menuOpen}>
-          <nav aria-label="Πλοήγηση κινητού">
-            {navLinks.map((l) => <a key={l.href} href={l.href} onClick={closeMenus}>{l.label}</a>)}
-            <p className="lp-drawer__sub">ΠΕΡΙΣΣΟΤΕΡΑ</p>
-            {moreLinks.map((l) => <a key={l.href} href={l.href} onClick={closeMenus}>{l.label}</a>)}
-            <a href="#contact" className="lp-btn lp-btn--primary" onClick={closeMenus}>Ζήτησε εξατομικευμένη πρόταση <ArrowRight size={16} aria-hidden="true" /></a>
-          </nav>
-        </div>
-      </header>
+      {/* ── A. Compact header (shared by every public page) ── */}
+      <PublicHeader current="landing" />
 
       <main id="top">
         {/* ── B. Cinematic hero ── */}
@@ -620,7 +526,7 @@ export default function LandingPage() {
         <div className="lp-wrap">
           <div className="lp-footer__grid">
             <div>
-              <a href="#top" className="lp-brand"><Brand alt="Hlektrismos.gr" /></a>
+              <a href="#top" className="lp-brand"><PublicBrand alt="Hlektrismos.gr" /></a>
               <p className="lp-footer__about">Ο προσωπικός σου σύμβουλος ενέργειας: σύγκριση προγραμμάτων ρεύματος και φυσικού αερίου, φωτοβολταϊκά και ηλεκτροκίνηση.</p>
             </div>
             <div>
@@ -650,6 +556,7 @@ export default function LandingPage() {
             <span>© {new Date().getFullYear()} hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
             <LegalLinks color="#a9bfd3" />
           </div>
+          <StaffAccessLink />
         </div>
       </footer>
     </div>

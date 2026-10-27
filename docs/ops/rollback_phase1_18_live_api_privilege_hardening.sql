@@ -68,7 +68,7 @@ returns void
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 begin
   update public.hlektrismos_leads
   set assigned_to = new_agent_id, assigned_at = now(), assigned_by = auth.uid()
@@ -87,7 +87,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 declare v_id uuid;
 begin
   insert into public.supply_points (
@@ -185,7 +185,7 @@ begin
       execute format('grant execute on function %s to public, anon, authenticated, service_role', to_regprocedure(sig));
     end if;
   end loop;
-end $;
+end $$;
 
 do $$
 begin

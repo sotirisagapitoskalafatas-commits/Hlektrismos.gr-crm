@@ -44,7 +44,7 @@ before(async () => {
     create table public.profiles (
       id uuid primary key, full_name text not null default '', role text not null default 'inside_sales',
       is_active boolean not null default true, phone text, avatar_url text, timezone text default 'Europe/Athens',
-      language text default 'el', updated_at timestamptz default now()
+      language text default 'el', availability_status text not null default 'available', updated_at timestamptz default now()
     );
     create function public.is_staff() returns boolean language sql stable security definer set search_path=public
       as $$ select exists(select 1 from public.profiles p where p.id=auth.uid() and coalesce(p.is_active,true)) $$;
@@ -158,7 +158,7 @@ before(async () => {
       returns table(agent_id uuid, agent_name text, lead_count bigint)
       language sql security definer as $$ select null::uuid, null::text, 0::bigint where false $$;
     create function public.insert_website_lead(p_source text, p_payload jsonb)
-      returns uuid language plpgsql security definer set search_path=public as $
+      returns uuid language plpgsql security definer set search_path=public as $$
       declare v_id uuid; v_age boolean := coalesce((p_payload->>'age_confirmed')::boolean, false);
         v_consent boolean := coalesce((p_payload->>'gdpr_consent')::boolean, false);
       begin
@@ -168,13 +168,13 @@ before(async () => {
           values (coalesce(p_payload->>'client_name','Website test'), v_age, v_consent, p_source)
           returning id into v_id;
         return v_id;
-      end $;
+      end $$;
     create function public.get_active_tariff_prices(p_month text)
       returns table(provider_name text, program_name text, unit_rate_kwh numeric)
-      language sql security definer as $
+      language sql security definer as $$
         select provider_name, program_name, unit_rate_kwh from public.market_tariffs_view
-      $;
-    create function public.test_mutable_definer() returns integer language sql security definer as $ select 1 $;
+      $$;
+    create function public.test_mutable_definer() returns integer language sql security definer as $$ select 1 $$;
 
     grant usage on schema public to anon, authenticated, service_role;
     grant all on all tables in schema public to public, anon, authenticated, service_role;
@@ -207,6 +207,8 @@ before(async () => {
     insert into public.crm_integrations values ('secret', 'Secret integration', true, '{"token":"not-a-real-secret"}');
     insert into public.crm_settings values ('scraper', '{"api_key":"not-a-real-secret"}');
   `);
+  // Apply the staged hardening once, so every test below checks the hardened state (it was never applied before).
+  await db.exec(SQL);
 });
 
 test('anonymous callers lose direct read access to private CRM tables and settings', async () => {

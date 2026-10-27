@@ -445,7 +445,7 @@ returns table(agent_id uuid, agent_name text, lead_count bigint)
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
-as $
+as $$
 begin
   if auth.uid() is null or not public.is_staff()
      or not (public.is_role('admin') or public.is_role('back_office')) then
@@ -463,7 +463,7 @@ begin
   group by cu.id, cu.full_name
   order by lead_count asc;
 end;
-$;
+$$;
 
 -- 10. Pin a safe search_path on SECURITY DEFINER functions that still have the mutable default.
 -- This only sets function configuration; it does not change their body or return shape.

@@ -30,7 +30,7 @@ export default function Cookies() {
       <p>Οι γραμματοσειρές και οι εικόνες φιλοξενούνται στον δικό μας server. Η δημόσια ιστοσελίδα δεν φορτώνει πόρους από τρίτους (π.χ. Google Fonts). Ο σύνδεσμος προς Google Maps στη σελίδα Επικοινωνίας ανοίγει μόνο αν τον πατήσετε.</p>
 
       <h2 style={h2}>5. Επικοινωνία</h2>
-      <p><a href={`mailto:${COMPANY.privacyEmail}`} style={a}>{COMPANY.privacyEmail}</a> · {COMPANY.phone}</p>
+      <p><a href={`mailto:${COMPANY.email}`} style={a}>{COMPANY.email}</a> · {COMPANY.phone}</p>
     </LegalLayout>
   );
 }

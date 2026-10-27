@@ -7,13 +7,13 @@ import { COMPANY } from '@/lib/legal';
    what to include. Do not add deadlines, sworn statements, counter-notice or
    repeat-infringer rules without legal sign-off. */
 export default function CopyrightPolicy() {
-  const mail = `mailto:${COMPANY.copyrightEmail}?subject=${encodeURIComponent('Ειδοποίηση παραβίασης πνευματικών δικαιωμάτων')}`;
+  const mail = `mailto:${COMPANY.email}?subject=${encodeURIComponent('Ειδοποίηση παραβίασης πνευματικών δικαιωμάτων')}`;
   return (
     <LegalLayout title="Πολιτική Πνευματικών Δικαιωμάτων">
       <p>Σεβόμαστε τα πνευματικά δικαιώματα τρίτων και αναμένουμε το ίδιο από όσους ανεβάζουν αρχεία στις υπηρεσίες μας (π.χ. λογαριασμούς ρεύματος, έγγραφα, φωτογραφίες).</p>
 
       <h2 style={h2}>1. Αναφορά παραβίασης</h2>
-      <p>Αν θεωρείτε ότι περιεχόμενο που είναι διαθέσιμο μέσω των υπηρεσιών μας προσβάλλει δικαιώματά σας, στείλτε μας αναφορά στο <a href={mail} style={a}>{COMPANY.copyrightEmail}</a> με:</p>
+      <p>Αν θεωρείτε ότι περιεχόμενο που είναι διαθέσιμο μέσω των υπηρεσιών μας προσβάλλει δικαιώματά σας, στείλτε μας αναφορά στο <a href={mail} style={a}>{COMPANY.email}</a> με:</p>
       <ul style={ul}>
         <li>τα στοιχεία επικοινωνίας σας,</li>
         <li>περιγραφή του έργου ή του δικαιώματος που θεωρείτε ότι προσβάλλεται,</li>
@@ -24,7 +24,7 @@ export default function CopyrightPolicy() {
 
       <h2 style={h2}>2. Επικοινωνία</h2>
       <p>{COMPANY.legalName}, {COMPANY.address}<br />
-        Τηλ.: {COMPANY.phone} · Email: <a href={mail} style={a}>{COMPANY.copyrightEmail}</a></p>
+        Τηλ.: {COMPANY.phone} · Email: <a href={mail} style={a}>{COMPANY.email}</a></p>
     </LegalLayout>
   );
 }

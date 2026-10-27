@@ -35,8 +35,8 @@ const FALLBACK_HTML = `<!DOCTYPE html>
     <img src="{{logo_url}}" class="logo" alt="Hlektrismos.gr" />
     <div class="company-info">
       <strong>Hlektrismos.gr</strong><br>
-      Μαύρη Πέτρα 27, 10435 Αθήνα<br>
-      210 9750816 | info@hlektrismos.gr
+      Ζαλοκώστα 8, Αθήνα, Τ.Κ. 10671<br>
+      +30 210 22 55 000 | info@hlektrismos.gr
     </div>
   </div>
 
@@ -64,7 +64,7 @@ const FALLBACK_HTML = `<!DOCTYPE html>
   {{/if}}
 
   <p>Θα χαρούμε να σας βοηθήσουμε να ολοκληρώσετε την αλλαγή παρόχου. Επικοινωνήστε μαζί μας:</p>
-  <p>📞 210 9750816 | 📧 info@hlektrismos.gr</p>
+  <p>📞 +30 210 22 55 000 | 📧 info@hlektrismos.gr</p>
 
   <div class="footer">
     <p>Με εκτίμηση,<br><strong>Η Ομάδα Hlektrismos.gr</strong></p>

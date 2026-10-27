@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
     <LegalLayout title="Πολιτική Απορρήτου">
       <h2 style={h2}>1. Υπεύθυνος επεξεργασίας</h2>
       <p>{COMPANY.legalName} ({COMPANY.brand}), {COMPANY.address}. {COMPANY.vatId}. {COMPANY.gemi}.<br />
-        Επικοινωνία για προσωπικά δεδομένα: <a href={`mailto:${COMPANY.privacyEmail}`} style={a}>{COMPANY.privacyEmail}</a> · {COMPANY.phone}</p>
+        Επικοινωνία για προσωπικά δεδομένα: <a href={`mailto:${COMPANY.email}`} style={a}>{COMPANY.email}</a> · {COMPANY.phone}</p>
 
       <h2 style={h2}>2. Ποια δεδομένα συλλέγουμε</h2>
       <ul style={ul}>
@@ -47,7 +47,7 @@ export default function PrivacyPolicy() {
       <p>TODO(owner): Αιτήματα που δεν κατέληξαν σε σύμβαση διαγράφονται μετά από [__] μήνες. Φάκελοι πελατών διατηρούνται για [__] έτη, όπως απαιτεί η φορολογική/εμπορική νομοθεσία. Καταγραφές κλήσεων διατηρούνται [__] ημέρες.</p>
 
       <h2 style={h2}>6. Τα δικαιώματά σας</h2>
-      <p>Πρόσβαση, διόρθωση, διαγραφή, περιορισμός, φορητότητα, εναντίωση, και ανάκληση συγκατάθεσης οποτεδήποτε. Γράψτε στο <a href={`mailto:${COMPANY.privacyEmail}`} style={a}>{COMPANY.privacyEmail}</a>. Μπορείτε να υποβάλετε καταγγελία στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (<a href="https://www.dpa.gr" target="_blank" rel="noopener noreferrer" style={a}>www.dpa.gr</a>).</p>
+      <p>Πρόσβαση, διόρθωση, διαγραφή, περιορισμός, φορητότητα, εναντίωση, και ανάκληση συγκατάθεσης οποτεδήποτε. Γράψτε στο <a href={`mailto:${COMPANY.email}`} style={a}>{COMPANY.email}</a>. Μπορείτε να υποβάλετε καταγγελία στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (<a href="https://www.dpa.gr" target="_blank" rel="noopener noreferrer" style={a}>www.dpa.gr</a>).</p>
 
       <h2 style={h2}>7. Cookies</h2>
       <p>Δείτε την <a href="#/cookies" style={a}>Πολιτική Cookies</a>.</p>

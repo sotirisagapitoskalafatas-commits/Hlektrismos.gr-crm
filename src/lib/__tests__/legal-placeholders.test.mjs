@@ -71,3 +71,16 @@ test('the guard itself catches each placeholder form', () => {
   for (const s of ['TODO(owner): ΑΦΜ', 'DMCA-xxxxxxx', 'μετά από [__] μήνες']) assert.notDeepEqual(found(s), [], s);
   assert.deepEqual(found('Ζαλοκώστα 8, 10671 Αθήνα · +30 210 22 55 000'), []);
 });
+
+test('provider identity (owner-supplied 27 Oct 2026) is shown on Privacy and Terms; nothing unsupplied is invented', () => {
+  for (const page of ['PrivacyPolicy', 'TermsOfUse']) {
+    const text = visibleText(M.render[page]());
+    for (const v of ['HLEKTRISMOS.GR ΜΟΝΟΠΡΟΣΩΠΗ Ι.Κ.Ε.', '801198034', '151552422000', 'Ζαλοκώστα 8, Αθήνα, Τ.Κ. 10671', '+30 210 22 55 000', 'info@hlektrismos.gr']) {
+      assert.ok(text.includes(v), `${page}: ${v}`);
+    }
+    assert.doesNotMatch(text, /ΔΟΥ|Δ\.Ο\.Υ\.|DPO|Υπεύθυνος Προστασίας Δεδομένων/, `${page}: no ΔΟΥ/DPO was supplied`);
+  }
+  for (const page of ['PrivacyPolicy', 'Cookies', 'CopyrightPolicy']) {
+    assert.doesNotMatch(M.render[page](), /privacy@|copyright@/, `${page}: unconfirmed mailboxes not published`);
+  }
+});

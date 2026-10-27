@@ -14,16 +14,6 @@ export const COMPANY = {
   copyrightEmail: 'copyright@hlektrismos.gr',
 };
 
-/* Designated copyright agent (US Copyright Office DMCA directory). Fill in
-   after registering at https://dmca.copyright.gov — see the audit notes. */
-export const COPYRIGHT_AGENT = {
-  name: 'TODO(owner): Όνομα / τίτλος υπευθύνου',
-  address: COMPANY.address,
-  phone: COMPANY.phone,
-  email: COMPANY.copyrightEmail,
-  registrationNumber: 'TODO(owner): DMCA-xxxxxxx',
-};
-
 export const POLICY_UPDATED = '1 Οκτωβρίου 2026';
 
 /* Every third party the code sends personal data to, taken from the code

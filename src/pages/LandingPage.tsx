@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent, RefObject } from 'react';
 import {
-  ArrowRight, Phone, Mail, MapPin, FileText, Upload, X, Lock, Camera, Clock,
+  ArrowRight, Phone, Mail, MapPin, FileText, Upload, X, Lock, Camera,
   Zap, Flame, Sun, CarFront, ChevronDown, CheckCircle2, MessageSquareText, Search,
   Compass, Headset, Sparkles, LifeBuoy, Gauge,
 } from 'lucide-react';
@@ -8,10 +8,10 @@ import { supabase } from '@/lib/supabase';
 import { classifyUpload, MAX_FORM_FILES, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
 import { useLenis, scrollToTarget } from '@/hooks/useLenis';
 import { COMPANY } from '@/lib/legal';
-import LegalLinks from '@/components/LegalLinks';
 import EnergyBolt from '@/components/landing/EnergyBolt';
-import PublicHeader, { PublicBrand } from '@/components/public/PublicHeader';
-import StaffAccessLink from '@/components/public/StaffAccessLink';
+import PublicHeader from '@/components/public/PublicHeader';
+import PublicFooter from '@/components/public/PublicFooter';
+import WaveDivider from '@/components/public/WaveDivider';
 import '@/styles/landing.css';
 
 /* ─── Landing page content ─────────────────────────────────── */
@@ -235,7 +235,7 @@ export default function LandingPage() {
 
       <main id="top">
         {/* ── B. Cinematic hero ── */}
-        <section className="lp-hero" aria-labelledby="lp-hero-title">
+        <section className="lp-hero lp-wave-host" aria-labelledby="lp-hero-title">
           <img className="lp-hero__photo" src="/images/landing/hero-coast.jpg" alt="" width={1670} height={942} decoding="async" {...{ fetchpriority: 'high' }} />
           <div className="lp-hero__wash" aria-hidden="true" />
           <div className="lp-wrap lp-hero__grid">
@@ -257,10 +257,11 @@ export default function LandingPage() {
               <span className="lp-chip lp-chip--d"><span className="lp-chip__icon"><CarFront size={16} /></span>Ηλεκτροκίνηση</span>
             </div>
           </div>
+          <WaveDivider fill="#ffffff" edge="bottom" size="lg" />
         </section>
 
         {/* ── C. Energy & tariff comparison (illustrative: no prices, offers or results are shown) ── */}
-        <section id="comparison" className="lp-compare" aria-labelledby="lp-compare-title">
+        <section id="comparison" className="lp-compare lp-wave-host" aria-labelledby="lp-compare-title">
           <div className="lp-wrap lp-compare__grid">
             <div className="lp-compare__copy" data-reveal>
               <span className="lp-eyebrow">ΣΥΓΚΡΙΣΗ ΤΙΜΟΛΟΓΙΩΝ</span>
@@ -302,6 +303,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+          <WaveDivider fill="#f6f9fc" edge="bottom" size="sm" accent="#9fd8f6" />
         </section>
 
         {/* ── D. Integrated energy solutions ── */}
@@ -339,7 +341,8 @@ export default function LandingPage() {
         </section>
 
         {/* ── E. How it works ── */}
-        <section id="how-it-works" className="lp-process" aria-labelledby="lp-process-title">
+        <section id="how-it-works" className="lp-process lp-wave-host" aria-labelledby="lp-process-title">
+          <WaveDivider fill="#f6f9fc" edge="top" size="md" />
           <img className="lp-process__photo" src="/images/landing/process-terrace.jpg" alt="" width={1200} height={677} loading="lazy" decoding="async" />
           <div className="lp-process__glow" aria-hidden="true" />
           <div className="lp-wrap lp-process__grid">
@@ -364,6 +367,7 @@ export default function LandingPage() {
               })}
             </ol>
           </div>
+          <WaveDivider fill="#ffffff" edge="bottom" size="md" />
         </section>
 
         {/* ── F. Personal energy advisor ── */}
@@ -386,7 +390,8 @@ export default function LandingPage() {
         </section>
 
         {/* ── G. Contact ── */}
-        <section id="contact" className="lp-contact" aria-labelledby="lp-contact-title">
+        <section id="contact" className="lp-contact lp-wave-host" aria-labelledby="lp-contact-title">
+          <WaveDivider fill="#f8f5f0" edge="top" size="md" accent="#9fd8f6" />
           <img className="lp-contact__photo" src="/images/landing/contact-terrace.jpg" alt="" width={1400} height={790} loading="lazy" decoding="async" />
           <div className="lp-contact__wash" aria-hidden="true" />
           <div className="lp-wrap lp-contact__grid">
@@ -521,44 +526,8 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* ── H. Footer ── */}
-      <footer className="lp-footer">
-        <div className="lp-wrap">
-          <div className="lp-footer__grid">
-            <div>
-              <a href="#top" className="lp-brand"><PublicBrand alt="Hlektrismos.gr" /></a>
-              <p className="lp-footer__about">Ο προσωπικός σου σύμβουλος ενέργειας: σύγκριση προγραμμάτων ρεύματος και φυσικού αερίου, φωτοβολταϊκά και ηλεκτροκίνηση.</p>
-            </div>
-            <div>
-              <h4>Υπηρεσίες</h4>
-              <ul>{serviceCards.map((s) => <li key={s.title}><a href="#/services">{s.title}</a></li>)}</ul>
-            </div>
-            <div>
-              <h4>Χρήσιμα</h4>
-              <ul>
-                <li><a href="#comparison">Σύγκριση τιμολογίων</a></li>
-                <li><a href="#how-it-works">Πώς λειτουργεί</a></li>
-                <li><a href="#/faq">Συχνές ερωτήσεις</a></li>
-                <li><a href="#/about">Η εταιρεία</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4>Επικοινωνία</h4>
-              <ul className="lp-footer__contact">
-                <li><Phone size={15} aria-hidden="true" /><a href={PHONE_HREF}>{COMPANY.phone}</a></li>
-                <li><Mail size={15} aria-hidden="true" /><a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a></li>
-                <li><MapPin size={15} aria-hidden="true" /><span>{COMPANY.address}</span></li>
-                <li><Clock size={15} aria-hidden="true" /><span>Δευτέρα–Παρασκευή 09:00–17:00</span></li>
-              </ul>
-            </div>
-          </div>
-          <div className="lp-footer__bottom">
-            <span>© {new Date().getFullYear()} hlektrismos.gr. Με την επιφύλαξη παντός δικαιώματος.</span>
-            <LegalLinks color="#a9bfd3" />
-          </div>
-          <StaffAccessLink />
-        </div>
-      </footer>
+      {/* ── H. Footer (shared by every public page) ── */}
+      <PublicFooter />
     </div>
   );
 }

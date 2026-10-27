@@ -10,7 +10,7 @@ export default function Cookies() {
     <LegalLayout title="Πολιτική Cookies">
       <h2 style={h2}>1. Η επιλογή σας</h2>
       <p>Τρέχουσα επιλογή: <strong>{!decided ? 'δεν έχει δοθεί (τίποτα προαιρετικό δεν φορτώνεται)' : choices.analytics ? 'Μέτρηση απόδοσης: ενεργή' : 'Μέτρηση απόδοσης: απενεργοποιημένη'}</strong></p>
-      <p><button type="button" onClick={openConsentSettings} style={{ padding: '10px 18px', borderRadius: 999, border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, cursor: 'pointer' }}>Αλλαγή ή ανάκληση συγκατάθεσης</button></p>
+      <p><button type="button" onClick={openConsentSettings} className="lp-btn lp-btn--ghost">Αλλαγή ή ανάκληση συγκατάθεσης</button></p>
 
       <h2 style={h2}>2. Απολύτως απαραίτητα (χωρίς συγκατάθεση)</h2>
       <p>Δεν χρησιμοποιούμε cookies. Χρησιμοποιούμε την τοπική αποθήκευση του browser (localStorage) μόνο για:</p>

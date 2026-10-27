@@ -1,7 +1,7 @@
 import { ArrowRight, ShieldCheck, TrendingUp, Users, Phone } from 'lucide-react';
-import LegalLinks from '@/components/LegalLinks';
 import PublicHeader from '@/components/public/PublicHeader';
-import StaffAccessLink from '@/components/public/StaffAccessLink';
+import PublicFooter from '@/components/public/PublicFooter';
+import WaveDivider from '@/components/public/WaveDivider';
 
 const values = [
   { icon: Users, title: 'Εξατομικευμένη Φροντίδα', text: 'Κάθε πελάτης έχει τον δικό του ατομικό σύμβουλο ενέργειας, με υπηρεσίες προσαρμοσμένες στις δικές του ανάγκες.' },
@@ -63,8 +63,9 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
+        <WaveDivider variant="lines" accent="#2f86e0" />
 
-        <section style={{ padding: '80px 0', textAlign: 'center' }}>
+        <section style={{ padding: '80px 0 calc(48px + clamp(48px, 6vw, 96px))', textAlign: 'center' }}>
           <div className="container">
             <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12, color: 'var(--text)' }}>Έτοιμος να γνωρίσεις τον σύμβουλό σου;</h2>
             <p style={{ fontSize: 16, color: 'var(--text-muted)', marginBottom: 32 }}>Ξεκίνα σήμερα δωρεάν και ξεκίνα να εξοικονομείς στους λογαριασμούς ενέργειας.</p>
@@ -76,15 +77,7 @@ export default function AboutPage() {
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="container">
-          <div className="footer-bottom">
-            <span>© 2026 hlektrismos.gr</span>
-            <LegalLinks className="footer-legal-links" color="inherit" />
-          </div>
-          <StaffAccessLink />
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

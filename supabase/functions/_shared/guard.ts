@@ -25,7 +25,7 @@ export async function requireStaff(req: Request): Promise<Response | null> {
   if (!token) return deny(401, "Authorization required");
 
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  if (serviceKey && token === serviceKey) return null;
+  if (serviceKey && timingSafeEqual(token, serviceKey)) return null;
 
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const admin = createClient(url, serviceKey);

@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
-import { requireStaff } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, json, requireCapability, serviceClient, type RecordKind } from "../_shared/authz.ts";
+import { isOffice } from "../_shared/access.ts";
+import { buildHeaders, EmailSafetyError, parseRecipient, safeDisplayName, smtpDataBody } from "../_shared/email-safety.ts";
 
 // ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────
 class SmtpClient {
@@ -93,7 +94,8 @@ class SmtpClient {
     const resp = await this.read();
     if (!resp.startsWith("354")) throw new Error(`DATA failed: ${resp}`);
 
-    await this.write(headers + "\r\n" + body + "\r\n.");
+    // Blank line between header block and body; CRLF + dot-stuffing so a "." line cannot end DATA early.
+    await this.write(smtpDataBody(headers + "\r\n\r\n" + body) + "\r\n.");
     const endResp = await this.read();
     if (!endResp.startsWith("250")) throw new Error(`DATA send failed: ${endResp}`);
     return endResp;
@@ -117,54 +119,65 @@ const corsHeaders = {
 // (suppression check, unsubscribe footer, postal address, List-Unsubscribe).
 // Pass `transactional: true` ONLY for pure service messages (e.g. documents
 // the customer asked for, appointment logistics) — never for promotions.
+//
+// Authorization (stage 2b): the caller needs communications.email.send. When the request names a record
+// (lead_id = public.leads, legacy_lead_id = public.hlektrismos_leads, case_id, customer_id) the caller must be
+// allowed to act on that record and the email goes ONLY to the address stored on it. Without a record only
+// office callers (or the service role) may send, to one validated address. `transactional: true` (suppression
+// bypass) is limited to office callers and the service role. The sender address is configuration only.
+const RECORD_FIELDS: [string, RecordKind][] = [
+  ["lead_id", "lead"], ["legacy_lead_id", "legacy_lead"], ["case_id", "case"], ["customer_id", "customer"],
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  const adminClient = serviceClient();
+  const caller = await getCaller(req, adminClient);
+  if (caller instanceof Response) return caller;
+  const noCap = requireCapability(caller, "communications.email.send");
+  if (noCap) return noCap;
 
   try {
-    const { to, subject, html, text, from_name, transactional } = await req.json();
+    const payload = await req.json().catch(() => null);
+    if (!payload || typeof payload !== "object") return json(400, { error: "Invalid JSON body" });
+    const { to, subject, html, text, from_name, transactional } = payload;
 
-    if (!to || !subject || (!html && !text)) {
-      return new Response(JSON.stringify({ error: "Missing required fields: to, subject, and html or text" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!subject || (!html && !text)) {
+      return json(400, { error: "Missing required fields: to, subject, and html or text" });
+    }
+    if (transactional === true && !isOffice(caller)) {
+      return json(403, { error: "Only office staff may send transactional (non-marketing) email" });
     }
 
-    // Auth check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Authorization required" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Recipient: from the referenced record, or (office only) one validated address from the request.
+    const refs = RECORD_FIELDS.filter(([field]) => payload[field] !== undefined && payload[field] !== null && payload[field] !== "");
+    if (refs.length > 1) return json(400, { error: "Reference at most one record" });
+    let recipient: string;
+    if (refs.length === 1) {
+      const [field, kind] = refs[0];
+      const owned = await authorizeRecord(adminClient, caller, kind, payload[field], "communications.email.send");
+      if (owned instanceof Response) return owned;
+      const stored = await loadRecordEmail(adminClient, kind, owned);
+      if (!stored) return json(422, { error: "The record has no valid email address" });
+      if (to !== undefined && to !== null && to !== "") {
+        let requested = "";
+        try { requested = parseRecipient(to); } catch { /* treated as a mismatch */ }
+        if (requested !== stored) return json(400, { error: "Recipient does not match the record's email address" });
+      }
+      recipient = stored;
+    } else {
+      if (!isOffice(caller)) {
+        return json(403, { error: "Reference the lead, case or customer you are emailing" });
+      }
+      if (!to) return json(400, { error: "Missing required fields: to, subject, and html or text" });
+      if (Array.isArray(to)) return json(400, { error: "Send to one recipient at a time" });
+      recipient = parseRecipient(to);
     }
 
     // Load SMTP config from crm_settings (service role query)
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const { data: setting } = await adminClient
       .from("crm_settings")
       .select("setting_value")
@@ -172,10 +185,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!setting?.setting_value?.smtp_host) {
-      return new Response(JSON.stringify({ error: "SMTP not configured. Go to Settings → Email to set up." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json(400, { error: "SMTP not configured. Go to Settings → Email to set up." });
     }
 
     const cfg = setting.setting_value;
@@ -183,33 +193,30 @@ Deno.serve(async (req) => {
     const smtpPort = cfg.smtp_port || 587;
     const smtpUser = cfg.smtp_user || "";
     const smtpPass = cfg.smtp_password || "";
-    const fromEmail = cfg.from_email || smtpUser;
-    const fromLabel = from_name || cfg.from_name || "Hlektrismos.gr";
+    let fromEmail: string;
+    try {
+      fromEmail = parseRecipient(cfg.from_email || smtpUser);
+    } catch {
+      return json(400, { error: "Sender address is not configured correctly. Go to Settings → Email." });
+    }
+    const fromLabel = safeDisplayName(from_name, safeDisplayName(cfg.from_name, "Hlektrismos.gr"));
     const useTls = smtpPort === 465;
 
     // Commercial-email compliance (skipped only for explicit transactional mail).
-    const recipientList: string[] = Array.isArray(to) ? to : [to];
     let outHtml: string | undefined = html;
     let outText: string | undefined = text;
-    const extraHeaders: string[] = [];
+    const extraHeaders: Record<string, string> = {};
     if (transactional !== true) {
-      if (recipientList.length !== 1) {
-        return new Response(JSON.stringify({ error: "Commercial emails must be sent to one recipient at a time (per-recipient unsubscribe link)." }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const prepared = await prepareMarketingEmail(adminClient, recipientList[0], {
+      const prepared = await prepareMarketingEmail(adminClient, recipient, {
         html: html ?? undefined,
         text: text ?? html?.replace(/<[^>]*>/g, "") ?? "",
       });
       if (prepared.suppressed) {
-        return new Response(JSON.stringify({ error: "Recipient has unsubscribed from commercial emails." }), {
-          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json(409, { error: "Recipient has unsubscribed from commercial emails." });
       }
       outHtml = prepared.html;
       outText = prepared.text;
-      for (const [k, v] of Object.entries(prepared.headers)) extraHeaders.push(`${k}: ${v}`);
+      Object.assign(extraHeaders, prepared.headers);
     }
 
     // Build MIME message
@@ -217,16 +224,20 @@ Deno.serve(async (req) => {
     const mimeText = outText || outHtml?.replace(/<[^>]*>/g, "") || "";
     const mimeHtml = outHtml || `<p>${outText}</p>`;
 
-    const headers = [
-      `From: ${fromLabel} <${fromEmail}>`,
-      `To: ${to}`,
-      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-      `MIME-Version: 1.0`,
-      `Date: ${new Date().toUTCString()}`,
-      `X-Mailer: Hlektrismos-CRM/1.0`,
-      ...extraHeaders,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    ].join("\r\n");
+    // Every header value is validated (no CR/LF injection); Subject/From name are RFC 2047 encoded.
+    const headers = buildHeaders({
+      from: fromEmail,
+      fromName: fromLabel,
+      to: recipient,
+      subject: String(subject),
+      extra: {
+        "MIME-Version": "1.0",
+        "Date": new Date().toUTCString(),
+        "X-Mailer": "Hlektrismos-CRM/1.0",
+        ...extraHeaders,
+        "Content-Type": `multipart/alternative; boundary="${boundary}"`,
+      },
+    });
 
     const body = [
       `--${boundary}`,
@@ -263,10 +274,7 @@ Deno.serve(async (req) => {
       }
 
       await client.mail(fromEmail);
-      const recipients = Array.isArray(to) ? to : [to];
-      for (const r of recipients) {
-        await client.rcpt(r);
-      }
+      await client.rcpt(recipient);
       await client.data(headers, body);
     } finally {
       await client.quit();
@@ -276,24 +284,38 @@ Deno.serve(async (req) => {
     await adminClient.from("crm_settings").upsert({
       setting_key: "email_log_last",
       setting_value: {
-        to: Array.isArray(to) ? to : [to],
+        to: [recipient],
         subject,
         sent_at: new Date().toISOString(),
-        sent_by: user.id,
+        sent_by: caller.kind === "user" ? caller.id : "service",
       },
       category: "communications",
       description: "Last email sent log",
     }, { onConflict: "setting_key" });
 
-    return new Response(JSON.stringify({ success: true, message: `Email sent to ${to}` }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(200, { success: true, message: `Email sent to ${recipient}` });
   } catch (err) {
-    console.error("send-email error:", err);
-    return new Response(JSON.stringify({ error: err.message || "Internal error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (err instanceof EmailSafetyError) {
+      return json(400, { error: err.message });
+    }
+    // No recipient / SMTP transcript in logs or responses.
+    console.error("send-email error:", err instanceof Error ? err.name : "unknown");
+    return json(500, { error: "Email could not be sent" });
   }
 });
+
+/** The address stored on the authorised record (normalised), or null when missing/invalid. */
+async function loadRecordEmail(
+  admin: ReturnType<typeof serviceClient>, kind: RecordKind, owned: Record<string, unknown>,
+): Promise<string | null> {
+  const table = { lead: "leads", legacy_lead: "hlektrismos_leads", customer: "customers", case: "customers" }[kind];
+  // A case has no address of its own: use its customer's.
+  const id = kind === "case" ? owned.customer_id : owned.id;
+  if (typeof id !== "string" || !id) return null;
+  const { data } = await admin.from(table).select("email").eq("id", id).maybeSingle();
+  try {
+    return data?.email ? parseRecipient(data.email) : null;
+  } catch {
+    return null;
+  }
+}

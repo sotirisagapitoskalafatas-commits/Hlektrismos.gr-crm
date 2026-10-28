@@ -93,9 +93,10 @@ Deno.serve(async (req: Request) => {
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err: any) {
-    console.error(`[aade-lookup] Error: ${err.message}`);
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err) {
+    // No message/AFM in logs or response (may carry request data or upstream details).
+    console.error(`[aade-lookup] Error: ${(err as Error)?.name ?? "unknown"}`);
+    return new Response(JSON.stringify({ error: "AADE lookup failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

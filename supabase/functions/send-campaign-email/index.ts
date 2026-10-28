@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requirePermission } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { isOffice } from "../_shared/access.ts";
+import { assertHeaderSafe, EmailSafetyError, parseRecipient, safeDisplayName } from "../_shared/email-safety.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
@@ -19,16 +20,28 @@ serve(async (req) => {
   }
 
   // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requirePermission(req, "campaign.send");
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
+  const denied = requireCapability(caller, "campaign.send");
   if (denied) return denied;
 
   try {
     const { campaign_id, leads, subject, html_body, from_name } = await req.json();
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Header safety: the sender address is configuration; only a sanitised display name may be chosen and the
+    // Subject must not contain CR/LF (header injection). Validated once, before any recipient is processed.
+    let fromHeader: string;
+    let safeSubject: string;
+    try {
+      safeSubject = assertHeaderSafe(String(subject ?? ""), "Subject");
+      const fromAddress = parseRecipient(Deno.env.get("MARKETING_FROM_EMAIL") ?? "onboarding@resend.dev");
+      fromHeader = `${safeDisplayName(from_name, "Hlektrismos.gr")} <${fromAddress}>`;
+    } catch (e) {
+      const msg = e instanceof EmailSafetyError ? e.message : "Invalid email headers";
+      return new Response(JSON.stringify({ error: msg }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Fetch Resend API key from crm_settings
     const { data: settings } = await supabase
@@ -53,6 +66,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "leads must be an array" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    // Per-lead targeting: campaign.send is admin-only by default; if an override grants it to a sales role,
+    // that caller may only target leads assigned to them (first refusal returned unchanged, nothing sent).
+    if (!isOffice(caller)) {
+      for (const l of leads) {
+        const owned = await authorizeRecord(supabase, caller, "legacy_lead", l?.id, "campaign.send");
+        if (owned instanceof Response) return owned;
+      }
+    }
     const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), "email", "promotional",
       supabaseLoaders(supabase), outreachConfigFromEnv());
     for (const d of gate.denied) {
@@ -64,13 +85,13 @@ serve(async (req) => {
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;
-        results.errors.push(`${lead.first_name || lead.company_name}: AI paused`);
+        results.errors.push(`${lead.id}: AI paused`);
         continue;
       }
 
       if (!lead.email) {
         results.failed++;
-        results.errors.push(`${lead.first_name || lead.company_name}: no email`);
+        results.errors.push(`${lead.id}: no email`);
         continue;
       }
 
@@ -85,7 +106,7 @@ serve(async (req) => {
         const prepared = await prepareMarketingEmail(supabase, lead.email, { html: personalizedHtml });
         if (prepared.suppressed) {
           results.failed++;
-          results.errors.push(`${lead.email}: unsubscribed (suppression list)`);
+          results.errors.push(`${lead.id}: unsubscribed (suppression list)`);
           continue;
         }
 
@@ -97,9 +118,9 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             // Must be a sender on your own verified domain (accurate header info).
-            from: `${from_name || "Hlektrismos.gr"} <${Deno.env.get("MARKETING_FROM_EMAIL") ?? "onboarding@resend.dev"}>`,
+            from: fromHeader,
             to: [lead.email],
-            subject,
+            subject: safeSubject,
             html: prepared.html,
             headers: prepared.headers,
             tags: [
@@ -132,13 +153,14 @@ serve(async (req) => {
             note_type: "email_campaign",
           });
         } else {
-          const errText = await resendRes.text();
+          await resendRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
           results.failed++;
-          results.errors.push(`${lead.email}: ${errText}`);
+          console.error(`[send-campaign-email] provider HTTP ${resendRes.status} for lead ${lead.id}`);
+          results.errors.push(`${lead.id}: provider error ${resendRes.status}`);
         }
-      } catch (e: any) {
+      } catch {
         results.failed++;
-        results.errors.push(`${lead.email}: ${e.message}`);
+        results.errors.push(`${lead.id}: send failed`);
       }
     }
 
@@ -146,9 +168,10 @@ serve(async (req) => {
       JSON.stringify(results),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
+    console.error("[send-campaign-email] Error:", e instanceof Error ? e.name : "unknown");
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: "Campaign could not be sent" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

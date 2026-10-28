@@ -1,6 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+
+// Everything copied from an inbound email is third-party text: it is stored with this marker so that
+// people and AI tools reading the note/lead treat it as data, never as instructions.
+const UNTRUSTED_PREFIX = "[ΜΗ ΕΠΑΛΗΘΕΥΜΕΝΟ ΕΞΩΤΕΡΙΚΟ ΚΕΙΜΕΝΟ / UNTRUSTED EXTERNAL EMAIL CONTENT]";
 
 // ─── Minimal IMAP Client (Deno-native) ────────────────────────────────────────
 class ImapClient {
@@ -134,38 +137,16 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // This sync auto-creates leads and copies inbound mail into notes: only the service role (cron) or an
+  // admin holding integrations.manage may run it.
+  const adminClient = serviceClient();
+  const caller = await getCaller(req, adminClient);
+  if (caller instanceof Response) return caller;
+  const noCap = requireCapability(caller, "integrations.manage");
+  if (noCap) return noCap;
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Authorization required" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Load IMAP config from crm_settings
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     const { data: setting } = await adminClient
       .from("crm_settings")
@@ -235,7 +216,7 @@ Deno.serve(async (req) => {
             // Add to lead_notes as email_received
             await adminClient.from('lead_notes').insert({
               lead_id: existingLead.id,
-              content: `📧 Email received from ${fromName} (${fromEmail}):\n\nSubject: ${headers.subject}\n\n${bodyRaw.substring(0, 2000)}`,
+              content: `${UNTRUSTED_PREFIX}\n📧 Email received from ${fromName} (${fromEmail}):\n\nSubject: ${headers.subject}\n\n${bodyRaw.substring(0, 2000)}`,
               author: 'Email System',
               note_type: 'email_received',
             });
@@ -254,13 +235,13 @@ Deno.serve(async (req) => {
               status: 'new',
               lawful_basis: 'legitimate-interest',
               customer_category: 'B2C',
-              comments: `Auto-created from inbound email: ${headers.subject}`,
+              comments: `${UNTRUSTED_PREFIX} Auto-created from inbound email: ${headers.subject}`,
               source: 'Email Inbound',
             });
             imported.push({ uid, from: fromEmail, subject: headers.subject, leadMatched: 'NEW LEAD' });
           }
         } catch (e) {
-          console.error(`Failed to process IMAP uid ${uid}:`, e);
+          console.error(`Failed to process IMAP uid ${uid}:`, (e as Error)?.name || "error");
         }
       }
 
@@ -279,8 +260,9 @@ Deno.serve(async (req) => {
       await client.logout();
     }
   } catch (err) {
-    console.error("fetch-emails error:", err);
-    return new Response(JSON.stringify({ error: err.message || "IMAP connection failed" }), {
+    // IMAP server responses and internal details stay out of the response.
+    console.error("fetch-emails error:", (err as Error)?.name || "error");
+    return new Response(JSON.stringify({ error: "IMAP connection failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

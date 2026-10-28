@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { safeFetch, denoResolver, SafeFetchError } from "../_shared/safe-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,42 +21,16 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Paid scraping + tariff price overwrites: service role (cron/internal) or integrations.manage only.
+  const supabaseAdmin = serviceClient();
+  const caller = await getCaller(req, supabaseAdmin);
+  if (caller instanceof Response) return caller;
+  const forbidden = requireCapability(caller, "integrations.manage");
+  if (forbidden) return forbidden;
 
   const startTime = Date.now();
 
   try {
-    // ─── JWT Auth Verification ──────────────────────────────────
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Use service role for DB writes
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiApiKey) {
       return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured" }), {
@@ -114,46 +88,61 @@ Deno.serve(async (req: Request) => {
       try {
         console.log(`[scrape] ${tariff.provider_name} - ${tariff.program_name}`);
 
-        // Fetch HTML with 8s timeout per page
-        const pageRes = await fetch(tariff.official_url, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "el-GR,el;q=0.9,en;q=0.5",
-          },
-          redirect: "follow",
-          signal: AbortSignal.timeout(8000),
-        });
+        // Fetch HTML (DB-stored URL) via safeFetch: https, public addresses only, 3 redirects, 8 s, 3 MB
+        let pageRes;
+        try {
+          pageRes = await safeFetch(tariff.official_url, {
+            resolve: denoResolver(),
+            maxRedirects: 3,
+            timeoutMs: 8000,
+            maxBytes: 3 * 1024 * 1024,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "el-GR,el;q=0.9,en;q=0.5",
+            },
+          });
+        } catch (fetchErr) {
+          if (!(fetchErr instanceof SafeFetchError)) throw fetchErr;
+          console.warn(`[scrape] Blocked/failed fetch (${fetchErr.code}) for ${tariff.official_url}`);
+          failedCount++;
+          errors.push(`${tariff.program_name}: fetch ${fetchErr.code}`);
+          continue;
+        }
 
-        if (!pageRes.ok) {
+        if (pageRes.status < 200 || pageRes.status >= 300) {
           console.warn(`[scrape] HTTP ${pageRes.status} for ${tariff.official_url}`);
           failedCount++;
           errors.push(`${tariff.program_name}: HTTP ${pageRes.status}`);
           continue;
         }
 
-        const htmlText = await pageRes.text();
+        const htmlText = pageRes.text();
 
         // Check for PDF links — if found, try to fetch and extract text
         let contentToAnalyze = htmlText;
         const pdfMatch = htmlText.match(/href=["']([^"']*\.pdf[^"']*)/i);
         if (pdfMatch && pdfMatch[1]) {
-          const pdfUrl = new URL(pdfMatch[1], tariff.official_url).href;
-          console.log(`[scrape] Found PDF: ${pdfUrl}`);
           try {
-            const pdfRes = await fetch(pdfUrl, {
-              signal: AbortSignal.timeout(10000),
+            const pdfUrl = new URL(pdfMatch[1], pageRes.url).href;
+            console.log(`[scrape] Found PDF: ${pdfUrl}`);
+            // Link found on a third-party page: safeFetch (https, public addresses only, 3 redirects, 10 s, 10 MB)
+            const pdfRes = await safeFetch(pdfUrl, {
+              resolve: denoResolver(),
+              maxRedirects: 3,
+              timeoutMs: 10000,
+              maxBytes: 10 * 1024 * 1024,
               headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
               },
             });
-            if (pdfRes.ok) {
+            if (pdfRes.status >= 200 && pdfRes.status < 300) {
               // We can't parse PDF directly in Deno, but we include the URL in the prompt
               // so Gemini can reference it. We still pass the HTML content.
-              console.log(`[scrape] PDF fetched (${pdfRes.headers.get("content-type")})`);
+              console.log(`[scrape] PDF fetched (${pdfRes.contentType})`);
             }
-          } catch (pdfErr: any) {
-            console.warn(`[scrape] PDF fetch failed: ${pdfErr.message}`);
+          } catch (pdfErr) {
+            console.warn(`[scrape] PDF fetch failed: ${pdfErr instanceof SafeFetchError ? pdfErr.code : (pdfErr as Error)?.name}`);
           }
         }
 
@@ -321,10 +310,6 @@ ${cleanText}`
     console.error(`[scrape-program-details] Fatal: ${err.message}`);
 
     try {
-      const supabaseAdmin = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
       await supabaseAdmin.from("scraper_logs").insert({
         provider_name: "scrape-program-details",
         status: "error",
@@ -333,7 +318,7 @@ ${cleanText}`
       });
     } catch { /* swallow */ }
 
-    return new Response(JSON.stringify({ error: err.message, duration_ms: durationMs }), {
+    return new Response(JSON.stringify({ error: "Tariff scrape failed", duration_ms: durationMs }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -1,6 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { requireStaff } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, requireCapability, serviceClient, type Caller } from "../_shared/authz.ts";
+import { callerCan, isOffice } from "../_shared/access.ts";
+import { assertHeaderSafe, buildHeaders, parseRecipient, smtpDataBody } from "../_shared/email-safety.ts";
+
+// Context of the authenticated caller, passed to every tool the model invokes.
+interface ToolContext { caller: Caller; authHeader: string }
+
+// Text from the user or the model that goes into a PostgREST .or()/.ilike filter:
+// drop the characters that are syntax there (, ( ) for the filter list, % * for wildcards, \ for escapes).
+const filterText = (v: unknown, max = 100) => String(v ?? '').replace(/[,()%*\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
+
+// A refusal from authorizeRecord / requireCapability, as text for the model (nothing was done).
+const refusal = (res: Response) =>
+  res.status === 404 ? '❌ Το lead δεν βρέθηκε.'
+    : res.status === 400 ? '❌ Μη έγκυρο lead ID.'
+    : '❌ Δεν επιτρέπεται για τον ρόλο σας ή δεν είναι δικό σας lead.'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -183,17 +199,22 @@ const GEMINI_TOOLS = [
 ]
 
 // Execute a function call from Gemini and return the result
-async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Promise<string> {
+async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any, ctx: ToolContext): Promise<string> {
+  const { caller } = ctx
   try {
     switch (fn) {
       case 'search_leads': {
         let query = supabaseAdmin.from('hlektrismos_leads').select('*')
-        if (args.query) {
-          query = query.or(`first_name.ilike.%${args.query}%,last_name.ilike.%${args.query}%,email.ilike.%${args.query}%,phone.ilike.%${args.query}%`)
+        // Sales see only the leads assigned to them (hlektrismos_leads.assigned_to = auth user id).
+        if (!isOffice(caller) && caller.kind === 'user') query = query.eq('assigned_to', caller.id)
+        const q = filterText(args.query)
+        if (q) {
+          query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
         }
-        if (args.status) query = query.eq('status', args.status)
-        if (args.source) query = query.eq('source', args.source)
-        query = query.order('created_at', { ascending: false }).limit(args.limit || 10)
+        if (args.status) query = query.eq('status', String(args.status))
+        if (args.source) query = query.eq('source', String(args.source))
+        const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 50)
+        query = query.order('created_at', { ascending: false }).limit(limit)
         const { data, error } = await query
         if (error) throw error
         if (!data || data.length === 0) return 'Δεν βρέθηκαν leads με αυτά τα κριτήρια.'
@@ -204,6 +225,8 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'update_lead_status': {
+        const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id, 'case.update.sales')
+        if (allowed instanceof Response) return refusal(allowed)
         const updates: any = { status: args.status }
         if (args.notes) updates.notes = args.notes
         const { error } = await supabaseAdmin.from('hlektrismos_leads').update(updates).eq('id', args.lead_id)
@@ -216,7 +239,11 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'send_email_to_lead': {
-        // Fetch lead for email address
+        // Caller must be allowed to send email AND the lead must be theirs (office: any lead).
+        const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id, 'communications.email.send')
+        if (allowed instanceof Response) return refusal(allowed)
+
+        // Recipient comes from the database record only, never from the model/user.
         const { data: lead, error: leadErr } = await supabaseAdmin.from('hlektrismos_leads').select('email,first_name,last_name').eq('id', args.lead_id).single()
         if (leadErr || !lead) return `❌ Lead ${args.lead_id} not found`
         if (!lead.email) return `❌ Lead has no email address`
@@ -225,15 +252,23 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
         const { data: emailConfig } = await supabaseAdmin.from('crm_settings').select('setting_value').eq('setting_key', 'email_config').single()
         const config = emailConfig?.setting_value || {}
 
-        // Build raw email and send via Deno.connect
-        const rawEmail = `From: ${config.from_name || 'Hlektrismos.gr'} <${config.from_email || 'info@hlektrismos.gr'}>\r\nTo: ${lead.email}\r\nSubject: ${args.subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${args.body}`
+        // Validate every header value (no CR/LF injection, single valid recipient) before queueing.
+        let to: string
+        let subject: string
+        try {
+          to = parseRecipient(lead.email)
+          subject = assertHeaderSafe(String(args.subject ?? ''), 'Subject')
+          buildHeaders({ from: config.from_email || 'info@hlektrismos.gr', fromName: config.from_name || 'Hlektrismos.gr', to, subject })
+        } catch {
+          return '❌ Το email δεν είναι έγκυρο (διεύθυνση ή θέμα). Δεν στάλθηκε τίποτα.'
+        }
 
         // Log to crm_emails
         await supabaseAdmin.from('crm_emails').insert({
           from_address: config.from_email || 'info@hlektrismos.gr',
-          to_addresses: [lead.email],
-          subject: args.subject,
-          body: args.body,
+          to_addresses: [to],
+          subject,
+          body: String(args.body ?? ''),
           direction: 'outbound',
           lead_id: args.lead_id,
           status: 'queued',
@@ -243,12 +278,15 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'trigger_b2b_scraper': {
-        // Trigger the scrape-b2b Edge Function
+        const noCap = requireCapability(caller, 'prospecting.search')
+        if (noCap) return refusal(noCap)
+        // Trigger the scrape-b2b Edge Function with the CALLER's own credentials, so its role check applies
+        // (never the service key on behalf of a user).
         const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-b2b`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Authorization': ctx.authHeader,
           },
           body: JSON.stringify({ region: args.region, category: args.category }),
         })
@@ -269,6 +307,8 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'add_lead_note': {
+        const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id, 'case.update.sales')
+        if (allowed instanceof Response) return refusal(allowed)
         const { error } = await supabaseAdmin.from('lead_notes').insert({
           lead_id: args.lead_id, content: args.content, author: args.author || 'AI Agent', note_type: 'ai_note',
         })
@@ -277,6 +317,8 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'get_lead_details': {
+        const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id, null)
+        if (allowed instanceof Response) return refusal(allowed)
         const { data: lead, error } = await supabaseAdmin.from('hlektrismos_leads').select('*').eq('id', args.lead_id).single()
         if (error || !lead) return `❌ Lead ${args.lead_id} not found`
         return JSON.stringify(lead, null, 0)
@@ -294,6 +336,11 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'schedule_meeting': {
+        // Linking an event to a lead writes to that lead's timeline: same rule as adding a note.
+        if (args.lead_id) {
+          const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id, 'case.update.sales')
+          if (allowed instanceof Response) return refusal(allowed)
+        }
         const eventData: any = {
           title: args.title,
           event_type: args.event_type || 'meeting',
@@ -369,6 +416,16 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
       }
 
       case 'book_appointment': {
+        // 0. Authorize before anything is written: the lead must be the caller's (office: any) and the caller
+        //    may update it; a confirmation email additionally needs the email-send capability.
+        const wantsConfirmation = args.send_confirmation !== false
+        const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id,
+          wantsConfirmation ? 'communications.email.send' : 'case.update.sales')
+        if (allowed instanceof Response) return refusal(allowed)
+        if (wantsConfirmation && !callerCan(caller, 'case.update.sales')) {
+          return '❌ Δεν επιτρέπεται για τον ρόλο σας ή δεν είναι δικό σας lead.'
+        }
+
         // 1. Check availability
         const bookStart = new Date(args.start_time)
         const bookDuration = args.duration_minutes || 30
@@ -419,14 +476,25 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
         // 5. Send confirmation email if requested.
         // TRANSACTIONAL: appointment logistics only. No offers, prices or
         // promotions here; commercial mail must use _shared/email-compliance.ts.
-        if (args.send_confirmation !== false && lead.email) {
+        if (wantsConfirmation && lead.email) {
           try {
             const { data: emailConfig } = await supabaseAdmin.from('crm_settings').select('setting_value').eq('setting_key', 'email_config').single()
             const config = emailConfig?.setting_value || {}
 
             const confirmationBody = `Γεια σας ${lead.first_name},\n\nΤο ραντεβού σας "${args.title}" έχει προγραμματιστεί:\n\n📅 Ημερομηνία: ${bookStart.toLocaleDateString('el-GR')}\n⏰ Ώρα: ${bookStart.toLocaleTimeString('el-GR')}\n⏱️ Διάρκεια: ${bookDuration} λεπτά\n📍 Τοποθεσία: ${args.location || 'Τηλεφωνικά'}\n\nΘα επικοινωνήσουμε μαζί σας σύντομα.\n\nΜε εκτίμηση,\nHlektrismos.gr`
 
-            const rawEmail = `From: ${config.from_name || 'Hlektrismos.gr'} <${config.from_email || 'info@hlektrismos.gr'}>\r\nTo: ${lead.email}\r\nSubject: ✅ Επιβεβαίωση ραντεβού - ${args.title}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${confirmationBody}`
+            // Recipient from the lead record only; every header validated (throws on CR/LF injection);
+            // body dot-stuffed with CRLF endings so it cannot end the DATA phase early.
+            const fromAddress = parseRecipient(config.from_email || 'info@hlektrismos.gr')
+            const toAddress = parseRecipient(lead.email)
+            const headers = buildHeaders({
+              from: fromAddress,
+              fromName: config.from_name || 'Hlektrismos.gr',
+              to: toAddress,
+              subject: `✅ Επιβεβαίωση ραντεβού - ${args.title}`,
+              extra: { 'MIME-Version': '1.0', 'Content-Type': 'text/plain; charset=UTF-8' },
+            })
+            const rawEmail = `${headers}\r\n\r\n${smtpDataBody(confirmationBody)}`
 
             // Send via SMTP using port 465
             const encoder = new TextEncoder()
@@ -458,9 +526,9 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
             await readResponse()
             await writer.write(encoder.encode(btoa(config.smtp_pass || '') + '\r\n'))
             await readResponse()
-            await writer.write(encoder.encode(`MAIL FROM:<${config.from_email || 'info@hlektrismos.gr'}>\r\n`))
+            await writer.write(encoder.encode(`MAIL FROM:<${fromAddress}>\r\n`))
             await readResponse()
-            await writer.write(encoder.encode(`RCPT TO:<${lead.email}>\r\n`))
+            await writer.write(encoder.encode(`RCPT TO:<${toAddress}>\r\n`))
             await readResponse()
             await writer.write(encoder.encode(`DATA\r\n`))
             await readResponse()
@@ -470,7 +538,7 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
             await readResponse()
             conn.close()
           } catch (emailErr) {
-            console.log('Confirmation email failed:', emailErr)
+            console.log('Confirmation email failed:', (emailErr as Error)?.name || 'error')
           }
         }
 
@@ -481,7 +549,9 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any): Prom
         return `❌ Unknown function: ${fn}`
     }
   } catch (err: any) {
-    return `❌ Error executing ${fn}: ${err.message}`
+    // Internal error details stay in the server log; the model (and so the user) gets a generic line.
+    console.error(JSON.stringify({ event: 'orchestrator_tool_error', fn, error: err?.code || err?.name || 'error' }))
+    return `❌ Error executing ${fn}`
   }
 }
 
@@ -490,31 +560,43 @@ serve(async (req: any) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Staff-only, and every tool below is authorized for THIS caller (the service role bypasses RLS).
+  const supabaseAdmin = serviceClient()
+  const caller = await getCaller(req, supabaseAdmin)
+  if (caller instanceof Response) return caller
+  const toolCtx: ToolContext = { caller, authHeader: req.headers.get('Authorization') ?? '' }
+  // Memory and sessions are private to the user who created them (the service role is trusted).
+  const ownerId = caller.kind === 'user' ? caller.id : null
 
   try {
     const url = new URL(req.url)
     const isReport = url.searchParams.get('mode') === 'report' || url.pathname.endsWith('/report')
     const isStream = url.searchParams.get('stream') === 'true' || req.headers.get('accept') === 'text/event-stream'
 
-    const body = await req.json()
-    const { message, agent_id, context_id, mode, report_type, multi_agent, agent_ids } = body
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== 'object') throw new Error('Invalid request body')
+    const { message, agent_id, context_id, mode, report_type, agent_ids } = body
 
-    // User-provided API key (from Agent Hub settings) or fallback to backend secret
-    const userApiKey = body.api_key || ''
+    // Server-side key only: any `api_key` in the request body is ignored.
     const userModel = body.model || ''
-    const geminiApiKey = userApiKey || Deno.env.get('GEMINI_API_KEY') || Deno.env.get('CRM_AI_AGENT') || Deno.env.get('CRM_AI_AGENT_2') || ''
-    if (!geminiApiKey) throw new Error("No Gemini API key available. Please configure your API key in Agent Hub settings (⚙️).")
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('CRM_AI_AGENT') || Deno.env.get('CRM_AI_AGENT_2') || ''
+    if (!geminiApiKey) throw new Error("No Gemini API key available on the server.")
 
     // Validate and resolve model name
     const geminiModel = (userModel && VALID_MODELS.includes(userModel)) ? userModel : DEFAULT_MODEL
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Is context_id one of the caller's own persistent sessions (agent_sessions.user_id)?
+    let ownsSession = false
+    if (typeof context_id === 'string' && UUID_RE.test(context_id)) {
+      if (!ownerId) {
+        ownsSession = true
+      } else {
+        try {
+          const { data: session } = await supabaseAdmin.from('agent_sessions').select('user_id').eq('id', context_id).maybeSingle()
+          ownsSession = !!session && session.user_id === ownerId
+        } catch { /* agent_sessions table may not exist */ }
+      }
+    }
 
     // Fetch all active agents (with soft-delete filter)
     const { data: agents, error: agentsError } = await supabaseAdmin
@@ -530,8 +612,9 @@ serve(async (req: any) => {
     const tariffLines = tariffs?.map((t: any) => `- ${t.provider_name}: ${t.program_name} @ €${t.unit_rate_kwh}/kWh`).join('\n') || ''
 
     // Fetch recent agent conversations for inter-agent context (handle missing table gracefully)
+    // Inter-agent messages are not scoped per user and can quote other users' leads: office callers only.
     let conversationContext = 'No recent inter-agent conversations.'
-    try {
+    if (isOffice(caller)) try {
       const { data: recentConversations, error: convError } = await supabaseAdmin
         .from('agent_conversations')
         .select('*')
@@ -550,19 +633,22 @@ serve(async (req: any) => {
     // Fetch agent memory for context (filter out null context_ids)
     let memoryContext = ''
     if (context_id && context_id !== 'null' && context_id !== 'undefined') {
-      const { data: memory } = await supabaseAdmin
+      let memoryQuery = supabaseAdmin
         .from('agent_memory')
         .select('*')
-        .eq('context_id', context_id)
+        .eq('context_id', String(context_id))
         .not('context_id', 'is', null)
+      // Only the caller's own memory rows (owner recorded in metadata when they were written).
+      if (ownerId) memoryQuery = memoryQuery.eq('metadata->>owner_user_id', ownerId)
+      const { data: memory } = await memoryQuery
         .order('created_at', { ascending: true })
         .limit(30)
 
       memoryContext = memory?.map((m: any) => `[${m.role}]: ${m.content}`).join('\n') || ''
     }
 
-    // Also try to fetch from agent_messages (new persistent sessions)
-    if (!memoryContext && context_id) {
+    // Also try to fetch from agent_messages (new persistent sessions) — only the caller's own session
+    if (!memoryContext && ownsSession) {
       try {
         const { data: sessionMessages } = await supabaseAdmin
           .from('agent_messages')
@@ -625,7 +711,7 @@ Leads: ${targetAgent?.leads_contacted} | Replies: ${targetAgent?.replies} | Meet
       })
 
       const aiData = await geminiResponse.json()
-      if (!geminiResponse.ok) throw new Error(aiData.error?.message || 'Gemini API error')
+      if (!geminiResponse.ok) throw new Error(`Gemini API error: ${geminiResponse.status}`)
 
       const reportContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text
       if (!reportContent) throw new Error('Empty response from Gemini API')
@@ -743,8 +829,8 @@ ${multiAgentContext}
     })
 
     if (!geminiResponse.ok) {
-      const errData = await geminiResponse.json().catch(() => ({}))
-      throw new Error(errData.error?.message || `Gemini API error: ${geminiResponse.status}`)
+      await geminiResponse.body?.cancel().catch(() => {})
+      throw new Error(`Gemini API error: ${geminiResponse.status}`)
     }
 
     let aiData = await geminiResponse.json()
@@ -772,7 +858,7 @@ ${multiAgentContext}
         const fnName = fc.functionCall.name
         const fnArgs = fc.functionCall.args || {}
         console.log(`[Tool Round ${toolRound}] Calling: ${fnName}`, JSON.stringify(fnArgs))
-        const result = await executeFunctionCall(fnName, fnArgs, supabaseAdmin)
+        const result = await executeFunctionCall(fnName, fnArgs, supabaseAdmin, toolCtx)
         functionResponses.push({
           functionResponse: {
             name: fnName,
@@ -800,8 +886,8 @@ ${multiAgentContext}
       })
 
       if (!geminiResponse.ok) {
-        const errData = await geminiResponse.json().catch(() => ({}))
-        throw new Error(errData.error?.message || `Gemini API error after tool call: ${geminiResponse.status}`)
+        await geminiResponse.body?.cancel().catch(() => {})
+        throw new Error(`Gemini API error after tool call: ${geminiResponse.status}`)
       }
 
       aiData = await geminiResponse.json()
@@ -829,17 +915,17 @@ ${multiAgentContext}
         }
       })
 
-      // Save memory async
+      // Save memory async (query builders are thenables without .catch, so errors are dropped via then())
       supabaseAdmin.from('agent_memory').insert([
-        { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message },
-        { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: finalText, metadata: { model: geminiModel, tool_rounds: toolRound } },
-      ]).catch(() => {})
+        { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message, metadata: { owner_user_id: ownerId } },
+        { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: finalText, metadata: { model: geminiModel, tool_rounds: toolRound, owner_user_id: ownerId } },
+      ]).then(undefined, () => {})
 
-      if (context_id) {
+      if (ownsSession) {
         supabaseAdmin.from('agent_messages').insert([
           { session_id: context_id, role: 'user', content: message },
           { session_id: context_id, role: 'assistant', content: finalText, agent_id: targetAgentId, model: geminiModel },
-        ]).catch(() => {})
+        ]).then(undefined, () => {})
       }
 
       return new Response(stream, {
@@ -863,12 +949,12 @@ ${multiAgentContext}
     const targetAgentId = primaryAgent?.id || 'orchestrator-director'
 
     await supabaseAdmin.from('agent_memory').insert([
-      { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message },
-      { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: reply, metadata: { model: geminiModel, tokens: aiData.usageMetadata?.totalTokenCount } },
+      { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message, metadata: { owner_user_id: ownerId } },
+      { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: reply, metadata: { model: geminiModel, tokens: aiData.usageMetadata?.totalTokenCount, owner_user_id: ownerId } },
     ])
 
-    // Also save to agent_messages (persistent sessions)
-    if (context_id) {
+    // Also save to agent_messages (persistent sessions) — only into the caller's own session
+    if (ownsSession) {
       try {
         await supabaseAdmin.from('agent_messages').insert([
           { session_id: context_id, role: 'user', content: message },
@@ -908,7 +994,13 @@ ${multiAgentContext}
       : error.message?.includes('Gemini API error') ? 502
       : error.message?.includes('Empty response') ? 502
       : 400
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Upstream (Gemini) and database messages stay in the log; the client gets a generic text per status.
+    console.error(JSON.stringify({ event: 'orchestrator_error', status, error: error?.code || error?.name || 'error' }))
+    const publicError = error.message?.includes('No Gemini API key') ? 'AI service is not configured'
+      : status === 502 ? 'AI service error'
+      : error.message === 'Invalid request body' ? 'Invalid request body'
+      : 'Request failed'
+    return new Response(JSON.stringify({ error: publicError }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status,
     })

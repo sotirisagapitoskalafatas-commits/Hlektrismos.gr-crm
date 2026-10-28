@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaffOrCron } from "../_shared/guard.ts";
+import { getCaller, requireCapability } from "../_shared/authz.ts";
+import { timingSafeEqual } from "../_shared/signed-link.ts";
+import { safeFetch, denoResolver, SafeFetchError } from "../_shared/safe-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,9 +72,17 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaffOrCron(req);
-  if (denied) return denied;
+  // Writes tariffs from DB-stored URLs: only pg_cron (dedicated CRON_SECRET, see staged phase1/04), the service
+  // role, or a user with integrations.manage.
+  const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+  const presented = req.headers.get("x-cron-secret") ?? "";
+  const isCron = cronSecret.length >= 24 && !!presented && timingSafeEqual(presented, cronSecret);
+  if (!isCron) {
+    const caller = await getCaller(req, supabase);
+    if (caller instanceof Response) return caller;
+    const forbidden = requireCapability(caller, "integrations.manage");
+    if (forbidden) return forbidden;
+  }
 
   const startTime = Date.now();
 
@@ -105,21 +115,28 @@ serve(async (req) => {
         }
 
         console.log(`Fetching: ${endpoint.provider_name} - ${endpoint.endpoint_label}`);
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+        // DB-stored URL: safeFetch (https, public addresses only, 3 redirects, 15 s, 3 MB)
+        let response;
+        try {
+          response = await safeFetch(endpoint.endpoint_url, {
+            resolve: denoResolver(),
+            maxRedirects: 3,
+            timeoutMs: 15000,
+            maxBytes: 3 * 1024 * 1024,
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HlektrismosBot/1.0)' },
+          });
+        } catch (fetchErr) {
+          if (!(fetchErr instanceof SafeFetchError)) throw fetchErr;
+          errors.push(`${endpoint.provider_name}: fetch ${fetchErr.code}`);
+          continue;
+        }
 
-        const response = await fetch(endpoint.endpoint_url, {
-          signal: controller.signal,
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HlektrismosBot/1.0)' },
-        });
-        clearTimeout(timeout);
-
-        if (!response.ok) {
+        if (response.status < 200 || response.status >= 300) {
           errors.push(`${endpoint.provider_name}: HTTP ${response.status}`);
           continue;
         }
 
-        const html = await response.text();
+        const html = response.text();
         const extracted = extractPricesFromHtml(html);
 
         if (extracted.unit_rate_kwh) {

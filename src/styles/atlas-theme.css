@@ -1,0 +1,126 @@
+/* ATLAS UI foundation — design tokens, shell themes and the tactile button effect.
+   Visual direction v2: "calm, futuristic, light" (Apple visionOS + Linear): airy, soft, premium, never loud.
+
+   Scoping rules (so the public landing page, login and legacy screens are NOT restyled by importing this file):
+   * Shell themes are new names (--shell-*) on :root and are only read by the new shell components.
+   * Semantic tokens (--ui-*) live on `.atx-shell, body.atx-app` (body.atx-app covers portaled dialogs), exactly
+     like the existing --atx-* tokens in atlas-ux.css, which stay in place for components not migrated yet.
+   * The font stack is applied only inside that scope (landing/public pages keep theirs). */
+
+/* ───────────── Shell themes (top bar + sidebar). Default: navy. <html data-shell-theme="…"> ───────────── */
+:root {
+  --shell-top: #0b1d3a;
+  --shell-side: #13306a;
+  --shell-accent: #4da3ff;
+  --shell-accent-2: #9a8cff;
+  --shell-muted: #b4c2d8;
+  --shell-text: #ffffff;
+  --shell-on-accent: #071427;
+  --shell-hover: rgba(255, 255, 255, 0.08);
+  --shell-active: rgba(255, 255, 255, 0.14);
+  --shell-chip: rgba(255, 255, 255, 0.16);
+  --shell-field: rgba(255, 255, 255, 0.14);
+  --shell-line: rgba(255, 255, 255, 0.1);
+}
+:root[data-shell-theme='navy'] {
+  --shell-top: #0b1d3a; --shell-side: #13306a; --shell-accent: #4da3ff; --shell-accent-2: #9a8cff; --shell-muted: #b4c2d8;
+}
+:root[data-shell-theme='ocean'] {
+  --shell-top: #08303b; --shell-side: #0e4a57; --shell-accent: #2dd4bf; --shell-accent-2: #5bb8ff; --shell-muted: #b6cdd3;
+}
+:root[data-shell-theme='graphite'] {
+  --shell-top: #17181c; --shell-side: #2a2c34; --shell-accent: #8ab4ff; --shell-accent-2: #c9a8ff; --shell-muted: #bdbdc4;
+}
+:root[data-shell-theme='forest'] {
+  --shell-top: #0c2a20; --shell-side: #14423a; --shell-accent: #5fd39a; --shell-accent-2: #4dd0e1; --shell-muted: #b5cfc2;
+}
+:root[data-shell-theme='plum'] {
+  --shell-top: #2a1033; --shell-side: #4a1f5e; --shell-accent: #d8a6ff; --shell-accent-2: #ff9acb; --shell-muted: #d0bcd8;
+}
+/* Light = frosted white: dark text, white text on the accent. */
+:root[data-shell-theme='light'] {
+  --shell-top: #ffffff; --shell-side: #fbfbfd; --shell-accent: #0066cc; --shell-accent-2: #5e5ce6; --shell-muted: #3a3a3c;
+  --shell-text: #1d1d1f; --shell-on-accent: #ffffff;
+  --shell-hover: rgba(15, 23, 42, 0.05); --shell-active: rgba(0, 102, 204, 0.1);
+  --shell-chip: rgba(0, 102, 204, 0.12); --shell-field: #e8e8ed; --shell-line: rgba(15, 23, 42, 0.08);
+}
+
+/* ───────────── Semantic tokens + type (CRM scope only) ───────────── */
+.atx-shell, body.atx-app {
+  --ui-bg: #f6f7fb;
+  --ui-surface: #ffffff;
+  --ui-surface-2: #f5f5f7;
+  --ui-border: rgba(15, 23, 42, 0.07);
+  --ui-border-strong: #d1d1d6;
+  --ui-text: #1d1d1f;
+  --ui-text-2: #3a3a3c;
+  --ui-muted: #6e6e73; /* ≥ 4.5:1 on --ui-surface and --ui-bg (checked by src/lib/__tests__/ui-foundation.test.mjs) */
+  --ui-field: #e8e8ed;
+  --ui-primary: #0066cc;
+  --ui-primary-hover: #0057b0;
+  --ui-primary-soft: #e8f1fb;
+  --ui-focus: #66b0ff;
+  --ui-radius-card: 18px;
+  --ui-radius-control: 12px;
+  --ui-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.03), 0 18px 40px -24px rgba(30, 41, 90, 0.22);
+  --ui-aurora: radial-gradient(900px 520px at 6% -8%, #e2ecff, transparent 62%),
+    radial-gradient(760px 480px at 100% 0, #efe7ff, transparent 58%), #f6f7fb;
+}
+html .atx-shell, html body.atx-app {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Page background: soft aurora instead of flat grey. Opt-in class used by the new shell. */
+.ui-aurora { background: var(--ui-aurora); }
+
+/* Type helpers (weights stay ≤ 600). */
+.ui-title { font-size: 32px; line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; color: var(--ui-text); }
+.ui-section-title { font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; color: var(--ui-text); }
+.ui-section-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ui-muted); }
+.ui-caption { font-size: 13px; color: var(--ui-muted); }
+
+/* Cards: white, hairline border, soft shadow. */
+.ui-card {
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-card);
+  box-shadow: var(--ui-shadow-card);
+}
+/* Kanban / record cards: lift on hover, press on active (instead of the button effect). */
+.ui-lift { transition: transform 0.16s ease, box-shadow 0.16s ease; }
+.ui-lift:hover { transform: translateY(-3px); }
+.ui-lift:active { transform: translateY(1px); transition-duration: 0.06s; }
+
+/* Status pills. Colours come from src/lib/status-style.ts (PILL_COLORS), the single source; each pair is ≥ 4.5:1. */
+.ui-pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 500; line-height: 1.5; white-space: nowrap; }
+.ui-pill--blue { background: #e8f1fb; color: #0057b0; }
+.ui-pill--purple { background: #f1eafa; color: #5b33a0; }
+.ui-pill--green { background: #e6f4ea; color: #1f7a3d; }
+.ui-pill--teal { background: #e0f3f4; color: #0e6b72; }
+.ui-pill--orange { background: #fdf0dc; color: #8a5000; }
+.ui-pill--red { background: #fce8e6; color: #b3261e; }
+.ui-pill--gray { background: #f0f0f3; color: #3a3a3c; }
+
+/* ───────────── Signature button effect (live 3D, soft). Baked into the shared Btn (src/lib/btn-style.ts). ─────────────
+   NOT for: tabs, segmented-control segments, checkboxes/radios, background-less row actions, kanban cards (see .ui-lift). */
+.b3 {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 6px 16px -5px rgba(15, 35, 80, 0.35);
+  transform: translateY(0);
+}
+.b3:hover:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(-2px) perspective(520px) rotateX(6deg);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 12px 22px -6px rgba(15, 35, 80, 0.42);
+  filter: brightness(1.05);
+}
+.b3:active:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 2px 6px -2px rgba(15, 35, 80, 0.35);
+  filter: none;
+  transition-duration: 0.06s;
+}
+.b3:focus-visible { outline: 3px solid var(--ui-focus, #66b0ff); outline-offset: 2px; }
+.b3:disabled, .b3[aria-disabled='true'] { transform: none; box-shadow: none; filter: none; opacity: 0.5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+  .b3, .b3:hover:not(:disabled), .b3:active:not(:disabled), .ui-lift, .ui-lift:hover, .ui-lift:active {
+    transition: none; transform: none; filter: none;
+  }
+}

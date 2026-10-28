@@ -7,6 +7,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { timingSafeEqual } from "../_shared/signed-link.ts";
 import { LIMITS, allowedQueries, planQueries, toProspect, validateSearch } from "../_shared/b2b-search.ts";
 import type { PlannedQuery } from "../_shared/b2b-search.ts";
 
@@ -39,7 +40,7 @@ Deno.serve(async (req: Request) => {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!token) return json({ success: false, error: "Απαιτείται σύνδεση." }, 401);
   let actorId: string | null = null;
-  if (token !== serviceKey) {
+  if (!(serviceKey && timingSafeEqual(token, serviceKey))) { // constant-time service-key match
     const { data: { user }, error } = await admin.auth.getUser(token);
     if (error || !user) return json({ success: false, error: "Μη έγκυρη συνεδρία." }, 401);
     const { data: prof } = await admin.from("profiles").select("role, is_active").eq("id", user.id).maybeSingle();

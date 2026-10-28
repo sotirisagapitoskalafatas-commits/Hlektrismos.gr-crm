@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -15,14 +14,21 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
+  // Automated outreach (it triggers make-voice-call with the service key): only the service role (pg_cron)
+  // or a caller holding campaign.send (admin-only by default) may start it. Plain staff sessions are refused.
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
+  const denied = requireCapability(caller, "campaign.send");
   if (denied) return denied;
 
   try {
     const body = await req.json().catch(() => ({}));
     const channelFilter = body.channel_filter || null;
-    const maxCalls = body.max_calls || 5;
+    // Hard cap on calls per run (default 5, at most 50) regardless of what the request asks for.
+    const MAX_CALLS_CAP = 50;
+    const requestedCalls = Math.floor(Number(body.max_calls));
+    const maxCalls = Number.isFinite(requestedCalls) && requestedCalls > 0 ? Math.min(requestedCalls, MAX_CALLS_CAP) : 5;
 
     // FAIL CLOSED: unattended outreach stays off unless the owner has explicitly enabled it AND recorded
     // written legal approval (env OUTREACH_ENABLED=on, LEGAL_APPROVAL_RECORDED=yes). Checked before any query.
@@ -33,11 +39,6 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
 
     // 1. Find leads that need outreach (new leads with score > 0, not contacted in 3+ days)
     const { data: leads } = await supabase
@@ -138,9 +139,10 @@ serve(async (req) => {
       JSON.stringify({ message: `Scheduler completed: ${processed} processed, ${errors} errors`, processed, errors }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
+    console.error("[campaign-scheduler] Error:", e instanceof Error ? e.name : "unknown");
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: "Scheduler run failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

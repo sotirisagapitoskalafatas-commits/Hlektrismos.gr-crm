@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requirePermission } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -15,17 +14,15 @@ serve(async (req) => {
   }
 
   // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requirePermission(req, "communications.voice.initiate");
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
+  const denied = requireCapability(caller, "communications.voice.initiate");
   if (denied) return denied;
 
   try {
     // Only the lead id is trusted from the request; the phone number and lead details come from the database.
     const { lead_id } = await req.json();
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
 
     // Central eligibility gate: AI voice prospecting is disabled by default and needs consent evidence,
     // a fresh opt-out register screening, contact hours, frequency limits and recorded legal approval.
@@ -34,6 +31,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "lead_id is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    // Capability (admin-only by default) + record-level access (defence in depth); 400/401/403/404 unchanged.
+    const owned = await authorizeRecord(supabase, caller, "legacy_lead", lead_id, "communications.voice.initiate");
+    if (owned instanceof Response) return owned;
     const gate = await gateRecipients([lead_id], "voice", "promotional", supabaseLoaders(supabase), outreachConfigFromEnv());
     if (gate.allowed.length === 0) {
       return new Response(
@@ -180,13 +180,14 @@ serve(async (req) => {
           .eq("id", voiceCall.id);
       }
       return new Response(
-        JSON.stringify({ error: `Vapi error: ${errText}` }),
+        JSON.stringify({ error: "Voice call could not be started" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    console.error("[make-voice-call] Error:", e instanceof Error ? e.name : "unknown");
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: "Call could not be started" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

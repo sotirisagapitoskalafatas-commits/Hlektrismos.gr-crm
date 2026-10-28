@@ -1,11 +1,20 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import type { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCaller, serviceClient, type Caller } from "../_shared/authz.ts";
+import { isOffice } from "../_shared/access.ts";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "POST, OPTIONS",
   "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Models this function may call (the only one used in the repo); anything else falls back to the default.
+const ALLOWED_MODELS = ["gpt-4o"];
+const DEFAULT_MODEL = "gpt-4o";
+
+// Text that goes into a PostgREST .or()/.ilike filter: drop , ( ) % * and backslash (filter syntax / wildcards).
+const filterText = (v: unknown, max = 100) =>
+  String(v ?? "").replace(/[,()%*\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 const SYSTEM_PROMPT =
   "Είσαι ο AI σύμβουλος της Hlektrismos.gr, μιας ελληνικής εταιρείας ενέργειας. Βοηθάς τους χρήστες με πληροφορίες για leads, τιμολόγια ενέργειας, και τη διαχείριση του CRM. Απαντάς στα ελληνικά.";
@@ -69,15 +78,19 @@ type ToolResult = { name: string; content: string };
 async function executeTool(
   name: string,
   args: Record<string, unknown>,
-  supabase: ReturnType<typeof createClient>
+  supabase: ReturnType<typeof createClient>,
+  caller: Caller
 ): Promise<ToolResult> {
+  // Sales callers only ever see the leads assigned to them (hlektrismos_leads.assigned_to = auth user id).
+  const ownOnly = !isOffice(caller) && caller.kind === "user" ? caller.id : null;
   try {
     switch (name) {
       case "get_pipeline_summary": {
-        const { data, error } = await supabase
+        let summaryQuery = supabase
           .from("hlektrismos_leads")
-          .select("status")
-          .order("status");
+          .select("status");
+        if (ownOnly) summaryQuery = summaryQuery.eq("assigned_to", ownOnly);
+        const { data, error } = await summaryQuery.order("status");
 
         if (error) throw error;
 
@@ -113,19 +126,20 @@ async function executeTool(
       }
 
       case "search_leads": {
-        const { query: q } = args as { query: string };
+        const q = filterText((args as { query?: unknown }).query);
 
         if (!q) {
           return { name, content: JSON.stringify({ error: "Παρακαλώ εισάγετε όρο αναζήτησης" }) };
         }
 
-        const { data, error } = await supabase
+        let leadQuery = supabase
           .from("hlektrismos_leads")
           .select("*")
           .or(
             `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`
-          )
-          .limit(15);
+          );
+        if (ownOnly) leadQuery = leadQuery.eq("assigned_to", ownOnly);
+        const { data, error } = await leadQuery.limit(15);
 
         if (error) throw error;
 
@@ -139,9 +153,11 @@ async function executeTool(
         return { name, content: JSON.stringify({ error: `Άγνωστο tool: ${name}` }) };
     }
   } catch (err) {
+    // Database details stay in the log; the model gets a generic error.
+    console.error(JSON.stringify({ event: "ai_orchestrator_tool_error", name, error: (err as { code?: string })?.code ?? "error" }));
     return {
       name,
-      content: JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      content: JSON.stringify({ error: "Tool failed" }),
     };
   }
 }
@@ -168,8 +184,8 @@ async function callOpenAI(
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`OpenAI API ${res.status}: ${errText}`);
+    await res.body?.cancel().catch(() => {});
+    throw new Error(`OpenAI API ${res.status}`);
   }
 
   return (await res.json()) as Record<string, unknown>;
@@ -180,14 +196,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Staff-only; lead tools below are scoped to this caller (the service role bypasses RLS).
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
 
   try {
-    const { message, api_key, model: reqModel } = (await req.json()) as {
+    // Any `api_key` in the body is ignored: only the server's own key is used.
+    const { message, model: reqModel } = (await req.json()) as {
       message: string;
-      api_key?: string;
       model?: string;
     };
 
@@ -198,7 +215,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const apiKey = api_key || Deno.env.get("OPENAI_API_KEY");
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "OpenAI API key not configured" }),
@@ -206,12 +223,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const model = reqModel || "gpt-4o";
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const model = reqModel && ALLOWED_MODELS.includes(reqModel) ? reqModel : DEFAULT_MODEL;
 
     const messages: unknown[] = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -245,7 +257,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             // empty args
           }
 
-          const result = await executeTool(tc.function.name, parsedArgs, supabase);
+          const result = await executeTool(tc.function.name, parsedArgs, supabase, caller);
 
           messages.push({
             role: "tool",
@@ -270,8 +282,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: msg }), {
+    // Upstream/internal details stay in the log.
+    console.error(JSON.stringify({ event: "ai_orchestrator_error", error: err instanceof Error ? err.message.slice(0, 40) : "error" }));
+    return new Response(JSON.stringify({ error: "AI request failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

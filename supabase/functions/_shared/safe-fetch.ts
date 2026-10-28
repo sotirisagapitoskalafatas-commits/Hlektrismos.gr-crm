@@ -186,8 +186,7 @@ export async function safeFetch(raw: string, o: SafeFetchOptions): Promise<SafeR
 
 /** Deno resolver for production use: all A and AAAA records. */
 export function denoResolver(): SafeFetchOptions["resolve"] {
-  // deno-lint-ignore no-explicit-any
-  const D = (globalThis as any).Deno;
+  const D = (globalThis as unknown as { Deno: { resolveDns(host: string, type: string): Promise<string[]> } }).Deno;
   return async (host: string) => {
     const out: string[] = [];
     for (const type of ["A", "AAAA"]) {

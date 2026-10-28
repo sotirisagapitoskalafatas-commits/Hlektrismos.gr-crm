@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, serviceClient } from "../_shared/authz.ts";
+import { safeFetch, denoResolver } from "../_shared/safe-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,20 +39,26 @@ function extractSocials(html: string): Record<string, string> {
   return socials;
 }
 
+// Every page fetch (the lead's website and any followed contact link) goes through safeFetch: public
+// addresses only (checked after DNS, on every redirect hop), 3 redirects, 8 s, 2 MB.
+// http is allowed ONLY because the existing behaviour falls back to http:// for small-business sites without
+// TLS; the same address/redirect/size rules apply, so this does not open internal destinations.
 async function fetchHtml(url: string): Promise<string | null> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(url, {
-      signal: controller.signal,
+    const res = await safeFetch(url, {
+      resolve: denoResolver(),
+      allowHttp: true,
+      maxRedirects: 3,
+      timeoutMs: 8000,
+      maxBytes: 2 * 1024 * 1024,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
       },
     });
-    clearTimeout(timeout);
-    if (!res.ok) return null;
-    return await res.text();
+    if (res.status < 200 || res.status >= 300) return null;
+    return res.text();
   } catch {
+    // SafeFetchError (blocked / too large / timeout) or network failure => "could not enrich", not a 500.
     return null;
   }
 }
@@ -62,41 +68,22 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Staff (or service role) only, and only for a lead the caller may access.
+  const supabaseAdmin = serviceClient();
+  const caller = await getCaller(req, supabaseAdmin);
+  if (caller instanceof Response) return caller;
 
   try {
-    // ─── JWT Auth Verification ──────────────────────────────────
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { lead_id, website } = await req.json();
-    if (!lead_id || !website) {
+    const { lead_id, website } = await req.json().catch(() => ({}));
+    if (!lead_id || !website || typeof website !== "string") {
       return new Response(JSON.stringify({ error: "Missing lead_id or website" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const lead = await authorizeRecord(supabaseAdmin, caller, "legacy_lead", lead_id, null);
+    if (lead instanceof Response) return lead;
 
     let targetUrl = website.trim();
     if (!targetUrl.startsWith("http")) targetUrl = `https://${targetUrl}`;
@@ -121,7 +108,7 @@ Deno.serve(async (req: Request) => {
       if (contactMatch?.[1]) {
         let contactUrl = contactMatch[1];
         if (contactUrl.startsWith("/")) {
-          contactUrl = new URL(targetUrl).origin + contactUrl;
+          try { contactUrl = new URL(contactUrl, targetUrl).toString(); } catch { contactUrl = ""; }
         }
         if (contactUrl.startsWith("http")) {
           const contactHtml = await fetchHtml(contactUrl);
@@ -129,11 +116,6 @@ Deno.serve(async (req: Request) => {
         }
       }
     }
-
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     const updatePayload: Record<string, any> = {
       enrichment_status: "completed",
@@ -162,9 +144,9 @@ Deno.serve(async (req: Request) => {
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err: any) {
-    console.error(`[enrich-lead] Error: ${err.message}`);
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err) {
+    console.error(`[enrich-lead] Error: ${(err as Error)?.name ?? "unknown"}`);
+    return new Response(JSON.stringify({ error: "Enrichment failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

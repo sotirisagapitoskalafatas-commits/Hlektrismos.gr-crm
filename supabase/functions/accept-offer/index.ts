@@ -8,6 +8,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
+/** Escape database text before it is interpolated into the HTML page (same rules as src/lib/escape-html.ts). */
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"'`]/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;" } as Record<string, string>
+  )[c]);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -28,7 +35,7 @@ Deno.serve(async (req: Request) => {
     }
     if (lead_id && tariff_id && req.method !== "POST") {
       const action = new URL(req.url).pathname + new URL(req.url).search;
-      return html(200, `<h2>Επιβεβαίωση αποδοχής προσφοράς</h2><form method="POST" action="${action.replace(/"/g, "&quot;")}"><button type="submit" style="padding:12px 28px;font-size:16px">Αποδέχομαι την προσφορά</button></form>`);
+      return html(200, `<h2>Επιβεβαίωση αποδοχής προσφοράς</h2><form method="POST" action="${escapeHtml(action)}"><button type="submit" style="padding:12px 28px;font-size:16px">Αποδέχομαι την προσφορά</button></form>`);
     }
 
     if (!lead_id || !tariff_id) {
@@ -103,7 +110,7 @@ Deno.serve(async (req: Request) => {
     <p>
       Η προσφορά αποδέχτηκε επιτυχώς.<br>
       Θα επικοινωνήσουμε μαζί σας σύντομα για την οριστικοποίηση<br>
-      του νέου σας τιμολογίου <strong>${tariff?.provider_name || ''} — ${tariff?.program_name || ''}</strong>.
+      του νέου σας τιμολογίου <strong>${escapeHtml(tariff?.provider_name)} — ${escapeHtml(tariff?.program_name)}</strong>.
     </p>
     <p style="font-size:14px;color:#6b7280">
       Αν έχετε ερωτήσεις, τηλεφωνήστε μας στο <strong>210 123 4567</strong>.

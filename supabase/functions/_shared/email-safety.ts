@@ -11,7 +11,9 @@ export class EmailSafetyError extends Error {
   constructor(public code: string, message: string) { super(message); this.name = "EmailSafetyError"; }
 }
 
+// Matching control characters is the point here (header-injection detection).
 // deno-lint-ignore no-control-regex
+// eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/;
 
 /** Throws if a header value could break out of its header. */
@@ -36,6 +38,7 @@ export function parseRecipient(raw: unknown): string {
 
 /** Display name for From/To: control characters removed, quotes and angle brackets dropped, length-capped. */
 export function safeDisplayName(raw: unknown, fallback: string): string {
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
   const v = typeof raw === "string" ? raw.replace(/[\u0000-\u001f\u007f"<>\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 78) : "";
   return v || fallback;
 }

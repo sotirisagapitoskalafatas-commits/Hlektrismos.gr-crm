@@ -1,28 +1,87 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, serviceClient } from "../_shared/authz.ts";
+import { isOffice } from "../_shared/access.ts";
+import { safeFetch, denoResolver, SafeFetchError } from "../_shared/safe-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Bills are only ever read from this project's Supabase Storage (never from an arbitrary URL).
+const BILL_BUCKETS = ["hlektrismos_docs", "energy-bills"];
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // = MAX_UPLOAD_BYTES in src/lib/upload-files.ts
+
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+/** Chunked base64 (a single spread over a large file overflows the call stack). */
+function toBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+const validStoragePath = (p: unknown): p is string =>
+  typeof p === "string" && p.length > 0 && p.length <= 1024 && !p.startsWith("/") && !p.split("/").includes("..");
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Staff (or service role) only, and only for a lead the caller may access.
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
 
   try {
-    const { lead_id, file_url, file_type } = await req.json();
+    const { lead_id, file_url, file_type, bucket, path } = await req.json().catch(() => ({}));
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const lead = await authorizeRecord(supabase, caller, "legacy_lead", lead_id, null);
+    if (lead instanceof Response) return lead;
+
+    // Where the file comes from: a storage object (bucket + path) or a URL on this project's Supabase host.
+    let fileBytes: Uint8Array;
+    if (bucket !== undefined || path !== undefined) {
+      if (typeof bucket !== "string" || !BILL_BUCKETS.includes(bucket) || !validStoragePath(path)) {
+        return jsonError(400, "Invalid file location");
+      }
+      // Sales users may only read files of THIS (their own) lead: its folder, or a file listed in its bill_files.
+      // Office/service may read any bill file.
+      if (!isOffice(caller) && !path.startsWith(`leads/${lead_id}/`)) {
+        const { data: files } = await supabase.from("hlektrismos_leads").select("bill_files").eq("id", lead_id).maybeSingle();
+        const listed = Array.isArray(files?.bill_files) && files.bill_files.some((f: { path?: unknown }) => f?.path === path);
+        if (!listed) return jsonError(403, "Not your file");
+      }
+      const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(path);
+      if (dlErr || !blob) return jsonError(400, "Failed to fetch file");
+      if (blob.size > MAX_FILE_BYTES) return jsonError(400, "File too large");
+      fileBytes = new Uint8Array(await blob.arrayBuffer());
+    } else {
+      let storageHost = "";
+      try { storageHost = new URL(Deno.env.get("SUPABASE_URL") ?? "").hostname.toLowerCase(); } catch { /* unset */ }
+      let parsed: URL | null = null;
+      try { parsed = typeof file_url === "string" ? new URL(file_url) : null; } catch { parsed = null; }
+      if (!storageHost || !parsed || parsed.hostname.toLowerCase() !== storageHost || !parsed.pathname.startsWith("/storage/v1/object/")) {
+        return jsonError(400, "File must be a Supabase Storage file of this project");
+      }
+      try {
+        const res = await safeFetch(parsed.toString(), {
+          resolve: denoResolver(), allowHosts: [storageHost], maxBytes: MAX_FILE_BYTES, timeoutMs: 20_000, maxRedirects: 0,
+        });
+        if (res.status < 200 || res.status >= 300) return jsonError(400, "Failed to fetch file");
+        fileBytes = res.body;
+      } catch (e) {
+        if (e instanceof SafeFetchError) {
+          return jsonError(400, e.code === "too_large" ? "File too large" : "Failed to fetch file");
+        }
+        throw e;
+      }
+    }
 
     // Fetch Gemini API key from settings or env
     const { data: settings } = await supabase
@@ -40,21 +99,12 @@ serve(async (req) => {
       );
     }
 
-    // Fetch the file content
-    const fileRes = await fetch(file_url);
-    if (!fileRes.ok) {
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch file" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const fileBuffer = await fileRes.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+    const base64Data = toBase64(fileBytes);
 
     // Determine MIME type
     let mimeType = "application/pdf";
-    if (file_type?.includes("image") || file_url?.match(/\.(jpg|jpeg|png)$/i)) {
+    const fileName = typeof path === "string" ? path : typeof file_url === "string" ? new URL(file_url).pathname : "";
+    if (file_type?.includes("image") || fileName.match(/\.(jpg|jpeg|png)$/i)) {
       mimeType = file_type || "image/jpeg";
     }
 
@@ -103,9 +153,9 @@ serve(async (req) => {
     );
 
     if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
+      console.error(`[billing-ocr] Gemini API error: HTTP ${geminiRes.status}`);
       return new Response(
-        JSON.stringify({ error: `Gemini API error: ${errText}` }),
+        JSON.stringify({ error: "Bill analysis failed" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -149,9 +199,10 @@ serve(async (req) => {
       JSON.stringify({ success: true, data: extractedData }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e: any) {
+  } catch (e) {
+    console.error(`[billing-ocr] Error: ${(e as Error)?.name ?? "unknown"}`);
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: "Bill OCR failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

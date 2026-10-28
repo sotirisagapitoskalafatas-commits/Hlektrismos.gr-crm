@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, json, serviceClient } from "../_shared/authz.ts";
+import { isOffice } from "../_shared/access.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,27 +58,43 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Staff-only; memory is private to the caller (the service role bypasses RLS).
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
+  const ownerId = caller.kind === "user" ? caller.id : null;
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-        Deno.env.get("SERVICE_ROLE_KEY") ??
-        ""
-    );
+    const body = await req.json().catch(() => null);
+    const { message, conversationId, agentId } = (body ?? {}) as {
+      message?: unknown; conversationId?: string; agentId?: string;
+    };
+    if (typeof message !== "string" || !message.trim() || message.length > 20000) {
+      return json(400, { error: "message is required (max 20000 characters)", success: false });
+    }
 
-    const { message, conversationId, agentId } = await req.json();
+    // Get agent config for personality/skills — the agent must be the caller's own (office: any).
+    let agentConfig: { personality?: string; skills?: unknown; base_prompt?: string } | null = null;
+    if (agentId) {
+      const { data } = await supabase
+        .from("ai_agents")
+        .select("user_id, personality, skills, base_prompt")
+        .eq("id", agentId)
+        .maybeSingle();
+      if (!data) return json(404, { error: "Record not found", success: false });
+      if (!isOffice(caller) && data.user_id !== ownerId) return json(403, { error: "Not your record", success: false });
+      agentConfig = data;
+    }
 
-    // Get or create conversation memory
+    // Get or create conversation memory — only the caller's own rows
     let memoryContext = "";
     if (agentId) {
-      const { data: memories } = await supabase
+      let memoryQuery = supabase
         .from("agent_memory")
         .select("content, role")
-        .eq("agent_id", agentId)
+        .eq("agent_id", agentId);
+      if (ownerId) memoryQuery = memoryQuery.eq("metadata->>owner_user_id", ownerId);
+      const { data: memories } = await memoryQuery
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -87,17 +103,6 @@ Deno.serve(async (req: Request) => {
           "\n\n**Previous Context:**\n" +
           memories.map((m) => `${m.role}: ${m.content}`).join("\n");
       }
-    }
-
-    // Get agent config for personality/skills
-    let agentConfig = null;
-    if (agentId) {
-      const { data } = await supabase
-        .from("ai_agents")
-        .select("personality, skills, base_prompt")
-        .eq("id", agentId)
-        .single();
-      agentConfig = data;
     }
 
     // Build messages for Gemini
@@ -160,8 +165,9 @@ Deno.serve(async (req: Request) => {
     );
 
     if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      throw new Error(`Gemini API error: ${geminiResponse.status} - ${errText}`);
+      // The upstream error body stays out of the response (and the log).
+      await geminiResponse.body?.cancel().catch(() => {});
+      throw new Error(`Gemini API error: ${geminiResponse.status}`);
     }
 
     const geminiData = await geminiResponse.json();
@@ -177,12 +183,14 @@ Deno.serve(async (req: Request) => {
           context_id: conversationId || "general",
           role: "user",
           content: message,
+          metadata: { owner_user_id: ownerId },
         },
         {
           agent_id: agentId,
           context_id: conversationId || "general",
           role: "assistant",
           content: assistantMessage,
+          metadata: { owner_user_id: ownerId },
         },
       ]);
     }
@@ -209,8 +217,9 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
+    console.error(JSON.stringify({ event: "ai_developer_error", error: error instanceof Error ? error.message.slice(0, 40) : "error" }));
     return new Response(
-      JSON.stringify({ error: String(error), success: false }),
+      JSON.stringify({ error: "AI request failed", success: false }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,

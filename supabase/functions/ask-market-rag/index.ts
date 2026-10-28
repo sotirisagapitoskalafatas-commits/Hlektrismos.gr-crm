@@ -1,33 +1,53 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, json, serviceClient } from "../_shared/authz.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-);
+const supabase = serviceClient();
+
+// Input limits (400 when exceeded): bounded prompt size / paid-API spend.
+const MAX_MESSAGES = 30;
+const MAX_CONTENT_CHARS = 4000;
+const ROLES = ["user", "assistant"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
 
   try {
-    const body = await req.json();
-    const { messages, thread_id } = body;
+    const body = await req.json().catch(() => null);
+    const { messages, thread_id } = (body ?? {}) as { messages?: unknown; thread_id?: unknown };
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      throw new Error("A messages array is required.");
+      return json(400, { error: "A messages array is required." });
+    }
+    if (messages.length > MAX_MESSAGES) {
+      return json(400, { error: `At most ${MAX_MESSAGES} messages are allowed.` });
+    }
+    for (const m of messages) {
+      if (!m || typeof m !== "object" || !ROLES.includes(m.role) || typeof m.content !== "string" || m.content.length > MAX_CONTENT_CHARS) {
+        return json(400, { error: `Each message needs role user|assistant and text content of at most ${MAX_CONTENT_CHARS} characters.` });
+      }
     }
 
     const latestUserMessage = messages[messages.length - 1].content;
+
+    // Persist only into the caller's own thread (chat_threads.user_id); the service role is trusted.
+    let ownsThread = false;
+    if (typeof thread_id === "string" && thread_id) {
+      if (caller.kind === "service") {
+        ownsThread = true;
+      } else {
+        const { data: thread } = await supabase.from("chat_threads").select("user_id").eq("id", thread_id).maybeSingle();
+        ownsThread = !!thread && thread.user_id === caller.id;
+      }
+    }
 
     // Check if OpenAI key is available for embeddings + GPT synthesis
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
@@ -37,7 +57,7 @@ serve(async (req) => {
       const geminiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("CRM_AI_AGENT") || "";
 
       if (!geminiKey) {
-        throw new Error("No AI API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY in Supabase secrets.");
+        throw new Error("No AI API key configured");
       }
 
       // Fetch all tariffs as context
@@ -75,11 +95,11 @@ serve(async (req) => {
       );
 
       const geminiData = await geminiRes.json();
-      if (!geminiRes.ok) throw new Error(geminiData.error?.message || "Gemini API error");
+      if (!geminiRes.ok) throw new Error(`Gemini API error ${geminiRes.status}`);
       const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "Δεν μπόρεσα να δημιουργήσω απάντηση.";
 
       // Persist to chat_threads and chat_messages if thread_id provided
-      if (thread_id) {
+      if (ownsThread) {
         try {
           await supabase.from("chat_messages").insert([
             { thread_id, role: "user", content: latestUserMessage },
@@ -151,7 +171,7 @@ serve(async (req) => {
     const answer = chatData.choices?.[0]?.message?.content || "Δεν μπόρεσα να δημιουργήσω απάντηση.";
 
     // Persist to chat_threads and chat_messages
-    if (thread_id) {
+    if (ownsThread) {
       try {
         await supabase.from("chat_messages").insert([
           { thread_id, role: "user", content: latestUserMessage },
@@ -167,8 +187,8 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("ask-market-rag error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("ask-market-rag error:", error?.message?.slice(0, 60) || "error");
+    return new Response(JSON.stringify({ error: "Market search failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

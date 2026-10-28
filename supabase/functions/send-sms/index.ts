@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requirePermission } from "../_shared/guard.ts";
+import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { isOffice } from "../_shared/access.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -19,16 +19,14 @@ serve(async (req) => {
   }
 
   // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requirePermission(req, "communications.sms.send");
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
+  const denied = requireCapability(caller, "communications.sms.send");
   if (denied) return denied;
 
   try {
     const { campaign_id, leads, message, channel } = await req.json();
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
 
     const { data: settings } = await supabase
       .from("crm_settings")
@@ -57,6 +55,15 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "leads must be an array" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    // Record-level authorization: a sales caller may only message leads assigned to them. Checked for every
+    // lead before anything is sent; the first refusal (400/403/404) is returned unchanged. Office callers and
+    // the service role may message any lead, so their batches go straight to the eligibility gate.
+    if (!isOffice(caller)) {
+      for (const l of leads) {
+        const owned = await authorizeRecord(supabase, caller, "legacy_lead", l?.id, "communications.sms.send");
+        if (owned instanceof Response) return owned;
+      }
+    }
     const gateChannel = channel === "viber" || channel === "whatsapp" ? channel : "sms";
     const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), gateChannel, "promotional",
       supabaseLoaders(supabase), outreachConfigFromEnv());
@@ -69,13 +76,13 @@ serve(async (req) => {
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;
-        results.errors.push(`${lead.phone}: AI paused`);
+        results.errors.push(`${lead.id}: AI paused`);
         continue;
       }
 
       if (!lead.phone) {
         results.failed++;
-        results.errors.push(`${lead.first_name || lead.company_name}: no phone`);
+        results.errors.push(`${lead.id}: no phone`);
         continue;
       }
 
@@ -149,13 +156,14 @@ serve(async (req) => {
             note_type: "sms_campaign",
           });
         } else {
-          const errText = await smsRes.text();
+          await smsRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
           results.failed++;
-          results.errors.push(`${lead.phone}: ${errText}`);
+          console.error(`[send-sms] provider HTTP ${smsRes.status} for lead ${lead.id}`);
+          results.errors.push(`${lead.id}: provider error ${smsRes.status}`);
         }
       } catch (e: any) {
         results.failed++;
-        results.errors.push(`${lead.phone}: ${e.message}`);
+        results.errors.push(`${lead.id}: send failed`);
       }
     }
 
@@ -163,9 +171,10 @@ serve(async (req) => {
       JSON.stringify(results),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
+    console.error("[send-sms] Error:", e instanceof Error ? e.name : "unknown");
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: "Messages could not be sent" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

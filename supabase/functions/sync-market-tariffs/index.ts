@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
 
 // ─── 10 Greek Energy Providers with B2B/B2C URLs ─────────────────────────────
 const PROVIDERS = [
@@ -106,19 +105,18 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Staff (or service role) for the read-only list; tariff writes ('sync') need the service role or integrations.manage.
+  const supabase = serviceClient();
+  const caller = await getCaller(req, supabase);
+  if (caller instanceof Response) return caller;
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const { action } = await req.json().catch(() => ({ action: 'list' }));
 
     if (action === 'sync') {
+      const forbidden = requireCapability(caller, "integrations.manage");
+      if (forbidden) return forbidden;
+
       // Upsert all provider tariffs
       let synced = 0;
       for (const provider of PROVIDERS) {

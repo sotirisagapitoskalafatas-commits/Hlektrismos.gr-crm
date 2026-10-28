@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { checkUrl } from "../_shared/safe-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,47 +45,31 @@ const OFFICIAL_URLS: Record<string, Record<string, string>> = {
   "Eunice Power": { B2C: "https://eunice-power.gr/hlektrikh-energeia/gia-to-spiti/", B2B: "https://eunice-power.gr/hlektrikh-energeia/gia-tin-epixeirhsh/" },
 };
 
+/**
+ * URLs parsed by the model end up in energy_tariffs.official_url and are fetched later by scrape-program-details.
+ * Only store a URL that passes the SSRF rules (https, no credentials, default port, no local/private literal host);
+ * anything else is dropped (the caller then falls back to OFFICIAL_URLS). Fetchers still re-check via safeFetch.
+ */
+function safeStoredUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try { return checkUrl(raw).toString(); } catch { return null; }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Staff-only (audit fix): the public anon key must not be able to trigger this.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Paid scraping + tariff overwrites: service role (cron/internal) or integrations.manage only.
+  const supabaseAdmin = serviceClient();
+  const caller = await getCaller(req, supabaseAdmin);
+  if (caller instanceof Response) return caller;
+  const forbidden = requireCapability(caller, "integrations.manage");
+  if (forbidden) return forbidden;
 
   const startTime = Date.now();
 
   try {
-    // ─── JWT Auth Verification ──────────────────────────────────
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Use service role for DB writes
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const serpApiKey = Deno.env.get("SERPAPI_API_KEY");
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
@@ -217,7 +201,7 @@ Deno.serve(async (req: Request) => {
       tariffs = JSON.parse(cleaned);
     } catch (parseErr) {
       console.error("[gemini] Failed to parse JSON response:", parseErr);
-      console.error("[gemini] Raw text:", rawText);
+      console.error(`[gemini] Raw text length: ${rawText.length}`);
       throw new Error("Gemini returned invalid JSON — cannot parse tariff data");
     }
 
@@ -240,6 +224,9 @@ Deno.serve(async (req: Request) => {
 
     // 3a. Upsert energy_tariffs (product catalog)
     console.log(`[db] Upserting ${tariffs.length} energy_tariffs...`);
+
+    // Model output is untrusted: keep only URLs that pass the SSRF rules.
+    for (const t of tariffs) t.official_url = safeStoredUrl(t.official_url);
 
     const tariffCatalogInserts = tariffs.map((t) => ({
       provider_name: t.provider_name,
@@ -312,7 +299,7 @@ Deno.serve(async (req: Request) => {
       const types = [...new Set(providerTariffs.map((t) => t.customer_type || "B2C"))];
 
       for (const custType of types) {
-        const { error: upsertErr } = await supabase
+        const { error: upsertErr } = await supabaseAdmin
           .from("rag_document_endpoints")
           .upsert({
             provider_name: provider,
@@ -368,10 +355,6 @@ Deno.serve(async (req: Request) => {
     console.error(`[autonomous-tariff-scraper] Fatal error: ${err.message}`, err);
 
     try {
-      const supabaseAdmin = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
       await supabaseAdmin.from("scraper_logs").insert({
         provider_name: "autonomous-scraper",
         status: "error",
@@ -384,7 +367,7 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({
       success: false,
-      error: err.message,
+      error: "Tariff scrape failed",
       duration_ms: durationMs,
       timestamp: new Date().toISOString(),
     }), {

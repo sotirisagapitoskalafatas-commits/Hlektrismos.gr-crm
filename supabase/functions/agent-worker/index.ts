@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { requireStaff } from "../_shared/guard.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,16 +11,15 @@ serve(async (req: any) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Staff-only: this function reads customer data, sends messages or spends paid API quota.
-  const denied = await requireStaff(req);
-  if (denied) return denied;
+  // Batch job over ALL new leads (marks them 'contacted'): only the service role (pg_cron) or an admin
+  // holding integrations.manage may trigger it — not any staff member.
+  const supabaseAdmin = serviceClient()
+  const caller = await getCaller(req, supabaseAdmin)
+  if (caller instanceof Response) return caller
+  const noCap = requireCapability(caller, 'integrations.manage')
+  if (noCap) return noCap
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
     // Kill switch check
     const { data: globalSettings } = await supabaseAdmin
       .from('crm_settings')
@@ -139,10 +137,10 @@ Email: ${lead.email}
       const aiData = await geminiResponse.json();
       const generatedMessage = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "Hello";
 
-      // Save to agent_memory
+      // Save to agent_memory — lead id only, never the lead's email/phone (the prompt itself is not stored).
       const contextId = `lead-${lead.id}-agent-${agent.id}`;
       await supabaseAdmin.from('agent_memory').insert([
-        { agent_id: agent.id, context_id: contextId, role: 'user', content: userPrompt },
+        { agent_id: agent.id, context_id: contextId, role: 'user', content: `Πρώτο outbound μήνυμα για lead ${lead.id}`, metadata: { lead_id: lead.id } },
         { agent_id: agent.id, context_id: contextId, role: 'assistant', content: generatedMessage, metadata: { model: 'gemini-3.6-flash', lead_id: lead.id } },
       ]);
 
@@ -171,7 +169,8 @@ Email: ${lead.email}
       status: 200,
     })
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error(JSON.stringify({ event: 'agent_worker_error', error: error?.code || error?.name || 'error' }))
+    return new Response(JSON.stringify({ error: 'Agent worker failed' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     })

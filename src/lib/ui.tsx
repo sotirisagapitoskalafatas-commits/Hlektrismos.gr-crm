@@ -2,6 +2,8 @@ import { ComponentType, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Zap } from 'lucide-react';
 import { stageLabel } from './roles';
+import { ICON_BTN_BASE, ICON_BTN_RAISED, btnClassName } from './btn-style';
+import type { BtnVariant } from './btn-style';
 
 export type IconType = ComponentType<{ className?: string }>;
 
@@ -64,33 +66,27 @@ export function StagePill({ stage }: { stage: string }) {
 }
 
 /* ---------------- Buttons ---------------- */
-export type BtnVariant = 'primary' | 'outline' | 'ghost' | 'danger' | 'ok' | 'brand';
-const BTN_MAP: Record<BtnVariant, string> = {
-  primary: 'bg-ink text-paper hover:bg-ink/85',
-  outline: 'bg-white text-ink border border-line hover:border-ink/30',
-  ghost: 'text-ink/70 hover:text-ink hover:bg-ink/5',
-  danger: 'bg-bad-600 text-white hover:bg-bad-600/90',
-  ok: 'bg-ok-600 text-white hover:bg-ok-600/90',
-  brand: 'bg-brand-500 text-white hover:bg-brand-600',
-};
+export type { BtnVariant };
 export function Btn({ children, onClick, variant = 'primary', className = '', disabled, type = 'button', title }: {
   children: ReactNode; onClick?: () => void; variant?: BtnVariant;
   className?: string; disabled?: boolean; type?: 'button' | 'submit'; title?: string;
 }) {
   return (
     <button type={type} title={title} disabled={disabled} onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${BTN_MAP[variant]} ${className}`}>
+      className={btnClassName(variant, className)}>
       {children}
     </button>
   );
 }
 
-export function IconBtn({ children, onClick, title, className = '' }: {
+export function IconBtn({ children, onClick, title, className = '', raised = false }: {
   children: ReactNode; onClick?: () => void; title?: string; className?: string;
+  /** A white chip with the raised effect; the default stays background-less (no effect). */
+  raised?: boolean;
 }) {
   return (
-    <button type="button" title={title} onClick={onClick}
-      className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-ink/50 hover:text-ink hover:bg-ink/5 transition-colors ${className}`}>
+    <button type="button" title={title} aria-label={title} onClick={onClick}
+      className={`${raised ? ICON_BTN_RAISED : ICON_BTN_BASE} ${className}`}>
       {children}
     </button>
   );

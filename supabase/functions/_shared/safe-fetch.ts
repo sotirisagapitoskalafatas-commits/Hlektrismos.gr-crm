@@ -159,7 +159,21 @@ export async function safeFetch(raw: string, o: SafeFetchOptions): Promise<SafeR
   const fetchImpl = o.fetchImpl ?? fetch;
   const maxRedirects = o.maxRedirects ?? 3;
   const maxBytes = o.maxBytes ?? 5 * 1024 * 1024;
-  const signal = AbortSignal.timeout(o.timeoutMs ?? 10_000);
+  // An explicit timer (not AbortSignal.timeout) so the deadline also holds where that timer is unref'd, and is
+  // always cleared when the request settles.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("Request timed out", "TimeoutError")), o.timeoutMs ?? 10_000);
+  const signal = controller.signal;
+  try {
+    return await fetchHops(raw, o, fetchImpl, maxRedirects, maxBytes, signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchHops(
+  raw: string, o: SafeFetchOptions, fetchImpl: typeof fetch, maxRedirects: number, maxBytes: number, signal: AbortSignal,
+): Promise<SafeResponse> {
   let u = checkUrl(raw, o);
   for (let hop = 0; ; hop++) {
     await checkResolution(u, o.resolve);

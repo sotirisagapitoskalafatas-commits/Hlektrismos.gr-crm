@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 import { timingSafeEqual } from "../_shared/signed-link.ts";
 
 // Ad-platform / Zapier lead intake → public.leads (the table the CRM lists).
@@ -34,10 +35,8 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey());
 
     const body = await req.json();
     const source = str(req.headers.get("x-source") || body.source || "webhook").toLowerCase();

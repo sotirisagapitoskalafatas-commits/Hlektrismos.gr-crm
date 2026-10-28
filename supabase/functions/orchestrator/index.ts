@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { authorizeRecord, getCaller, requireCapability, serviceClient, type Caller } from "../_shared/authz.ts";
 import { callerCan, isOffice } from "../_shared/access.ts";
+import { internalCallHeaders } from "../_shared/keys.ts";
 import { assertHeaderSafe, buildHeaders, parseRecipient, smtpDataBody } from "../_shared/email-safety.ts";
 
 // Context of the authenticated caller, passed to every tool the model invokes.
@@ -284,10 +285,10 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any, ctx: 
         // (never the service key on behalf of a user).
         const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-b2b`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': ctx.authHeader,
-          },
+          // A user is forwarded as themselves; an internal (secret-key) caller is forwarded with the same key.
+          headers: ctx.caller.kind === 'service'
+            ? internalCallHeaders()
+            : { 'Content-Type': 'application/json', 'Authorization': ctx.authHeader },
           body: JSON.stringify({ region: args.region, category: args.category }),
         })
         const result = await response.json()

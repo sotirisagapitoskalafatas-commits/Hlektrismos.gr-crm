@@ -9,7 +9,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "./cors.ts";
 import { parseOverrides, type Capability } from "./permissions.ts";
-import { timingSafeEqual } from "./signed-link.ts";
+import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "./keys.ts";
 import {
   canAccessCase, canAccessCustomer, canAccessLead, canAccessLegacyLead, categoryOf, decide,
   type Caller, type Decision,
@@ -22,18 +22,25 @@ export const json = (status: number, body: unknown) =>
 
 export const denied = (d: Exclude<Decision, { ok: true }>) => json(d.status, { error: d.error });
 
-const serviceKey = () => Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+// supabase-js throws on an empty key. When the secret key is not configured, build the client with this inert
+// placeholder instead: it is not a credential (no gateway accepts it), and every caller runs getCaller() or
+// requireStaff() first, which returns the redacted 500 before any query is made.
+const KEY_NOT_CONFIGURED = "sb_secret_not_configured";
 
+/** Privileged client with the project's secret API key (keys.ts; never a legacy or custom key). */
 export function serviceClient(): SupabaseClient {
-  return createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey());
+  return createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey() || KEY_NOT_CONFIGURED, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-/** Who is calling: the service role (constant-time key match) or an ACTIVE staff user with a known role. */
+/**
+ * Who is calling: an internal component presenting this project's secret API key (keys.ts), or an ACTIVE
+ * staff user with a known role. A missing secret key fails closed with a redacted 500.
+ */
 export async function getCaller(req: Request, admin: SupabaseClient): Promise<Caller | Response> {
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
+  if (presentsSecretKey(req)) return { kind: "service" };
+  const token = userBearer(req);
   if (!token) return json(401, { error: "Authorization required" });
-  const key = serviceKey();
-  if (key && timingSafeEqual(token, key)) return { kind: "service" };
 
   const { data: { user }, error } = await admin.auth.getUser(token);
   if (error || !user) return json(401, { error: "Invalid session" });

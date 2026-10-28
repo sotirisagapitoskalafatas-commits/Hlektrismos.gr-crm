@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "./cors.ts";
 import { hasCapability, parseOverrides, type Capability } from "./permissions.ts";
+import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "./keys.ts";
 import { timingSafeEqual } from "./signed-link.ts";
 
 /**
@@ -8,7 +9,7 @@ import { timingSafeEqual } from "./signed-link.ts";
  * messages, or spend paid API quota.
  *
  * Allowed callers:
- *   - internal calls / pg_cron that present the service-role key, and
+ *   - internal calls that present this project's secret API key (keys.ts), and
  *   - a signed-in user whose public.profiles row exists and is active.
  *
  * The public anon key is NOT enough: it ships in every browser bundle.
@@ -21,14 +22,13 @@ export async function requireStaff(req: Request): Promise<Response | null> {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
+  if (presentsSecretKey(req)) return null;
+  const token = userBearer(req);
   if (!token) return deny(401, "Authorization required");
 
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  if (serviceKey && timingSafeEqual(token, serviceKey)) return null;
-
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const admin = createClient(url, serviceKey);
+  const admin = createClient(url, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error } = await admin.auth.getUser(token);
   if (error || !user) return deny(401, "Invalid session");
 
@@ -49,19 +49,18 @@ const deny = (status: number, error: string) =>
   });
 
 /**
- * Per-action authorization. Allowed callers: internal calls presenting the service-role key, or an active
+ * Per-action authorization. Allowed callers: internal calls presenting the secret API key, or an active
  * staff user whose role holds `capability` (defaults in permissions.ts, admin-overridable via the
  * crm_settings key `role_permissions`). The role is read from the database, never from the request.
  * Returns null when allowed, otherwise a 401/403 Response.
  */
 export async function requirePermission(req: Request, capability: Capability): Promise<Response | null> {
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
+  if (presentsSecretKey(req)) return null;
+  const token = userBearer(req);
   if (!token) return deny(401, "Authorization required");
 
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  if (serviceKey && timingSafeEqual(token, serviceKey)) return null;
-
-  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey);
+  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error } = await admin.auth.getUser(token);
   if (error || !user) return deny(401, "Invalid session");
 

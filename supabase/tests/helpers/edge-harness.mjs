@@ -10,7 +10,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const FUNCTIONS = fileURLToPath(new URL('../../functions/', import.meta.url));
-export const SERVICE_KEY = 'test-service-role-key-not-real-0000000000';
+// The platform's NEW keys (SUPABASE_SECRET_KEYS / SUPABASE_PUBLISHABLE_KEYS are JSON dictionaries) and a stand-in
+// for the EXPOSED legacy service-role JWT. The legacy variables and the custom SERVICE_ROLE_KEY carry that JWT,
+// so a test can prove it is never used to build a client or accepted as a caller.
+export const SERVICE_KEY = 'sb_secret_test_not_real_00000000000000';
+export const PUBLISHABLE_KEY = 'sb_publishable_test_not_real_0000000000';
+export const LEGACY_SERVICE_JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.legacy-leaked-not-real';
 export const SUPABASE_URL = 'https://project.supabase.test';
 
 // ───────────────────────────── in-memory database ─────────────────────────────
@@ -190,8 +195,17 @@ export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, f
 
   const outbound = [];
   const smtp = [];
-  const environment = { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: SERVICE_KEY, SUPABASE_ANON_KEY: 'anon-key', ...env };
-  globalThis.__edge = { handler: null, createClient: () => fakeClient(db, users) };
+  const environment = {
+    SUPABASE_URL,
+    SUPABASE_SECRET_KEYS: JSON.stringify({ default: SERVICE_KEY }),
+    SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: PUBLISHABLE_KEY }),
+    SUPABASE_SERVICE_ROLE_KEY: LEGACY_SERVICE_JWT, SERVICE_ROLE_KEY: LEGACY_SERVICE_JWT, SUPABASE_ANON_KEY: 'eyJ.legacy-anon.not-real',
+    ...env,
+  };
+  for (const [k, v] of Object.entries(environment)) if (v === undefined) delete environment[k];
+  const clientKeys = []; // every key a function passed to createClient()
+  // Like the real supabase-js: an empty key throws. Record every key a function builds a client with.
+  globalThis.__edge = { handler: null, createClient: (_url, key) => { if (!key) throw new Error('supabaseKey is required.'); clientKeys.push(key); return fakeClient(db, users); } };
   globalThis.Deno = {
     env: { get: (k) => environment[k], toObject: () => ({ ...environment }) },
     serve: (a, b) => { globalThis.__edge.handler = typeof a === 'function' ? a : b; },
@@ -209,7 +223,7 @@ export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, f
   const handler = globalThis.__edge.handler;
   if (!handler) throw new Error(`harness: ${name} registered no handler`);
   return {
-    db, outbound, smtp, restore: () => { globalThis.fetch = realFetch; },
+    db, outbound, smtp, clientKeys, restore: () => { globalThis.fetch = realFetch; },
     async call({ token, body, method = 'POST', headers = {} } = {}) {
       const res = await handler(new Request(`${SUPABASE_URL}/functions/v1/${name}`, {
         method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },

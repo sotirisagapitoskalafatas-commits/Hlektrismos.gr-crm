@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { internalCallHeaders } from "../_shared/keys.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -98,10 +99,7 @@ serve(async (req) => {
           // Trigger voice call
           const voiceRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/make-voice-call`, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              "Content-Type": "application/json",
-            },
+            headers: internalCallHeaders(), // secret API key in the apikey header (keys.ts)
             body: JSON.stringify({
               lead_id: lead.id,
               phone: lead.phone,

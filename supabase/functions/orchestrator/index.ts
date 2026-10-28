@@ -915,17 +915,17 @@ ${multiAgentContext}
         }
       })
 
-      // Save memory async
+      // Save memory async (query builders are thenables without .catch, so errors are dropped via then())
       supabaseAdmin.from('agent_memory').insert([
         { agent_id: targetAgentId, context_id: memContextId, role: 'user', content: message, metadata: { owner_user_id: ownerId } },
         { agent_id: targetAgentId, context_id: memContextId, role: 'assistant', content: finalText, metadata: { model: geminiModel, tool_rounds: toolRound, owner_user_id: ownerId } },
-      ]).catch(() => {})
+      ]).then(undefined, () => {})
 
       if (ownsSession) {
         supabaseAdmin.from('agent_messages').insert([
           { session_id: context_id, role: 'user', content: message },
           { session_id: context_id, role: 'assistant', content: finalText, agent_id: targetAgentId, model: geminiModel },
-        ]).catch(() => {})
+        ]).then(undefined, () => {})
       }
 
       return new Response(stream, {

@@ -158,7 +158,7 @@ serve(async (req) => {
           console.error(`[send-campaign-email] provider HTTP ${resendRes.status} for lead ${lead.id}`);
           results.errors.push(`${lead.id}: provider error ${resendRes.status}`);
         }
-      } catch (e: any) {
+      } catch {
         results.failed++;
         results.errors.push(`${lead.id}: send failed`);
       }

@@ -63,11 +63,13 @@ export async function authorizeRecord(
 ): Promise<Record<string, unknown> | Response> {
   if (typeof id !== "string" || !UUID.test(id)) return json(400, { error: `A valid ${kind} id is required` });
   const src = SOURCES[kind];
-  const { data: row } = await admin.from(src.table).select(src.columns).eq("id", id).maybeSingle();
+  // The column list is chosen at runtime, so supabase-js cannot type the row; a failed query gives null (refused).
+  const { data } = await admin.from(src.table).select(src.columns).eq("id", id).maybeSingle();
+  const row = data as unknown as Record<string, unknown> | null;
   let cases: Record<string, unknown>[] = [];
   if (kind === "customer" && row && caller.kind === "user" && caller.category === "sales") {
-    const { data } = await admin.from("cases").select(SOURCES.case.columns).eq("customer_id", id);
-    cases = data ?? [];
+    const { data: owned } = await admin.from("cases").select(SOURCES.case.columns).eq("customer_id", id);
+    cases = (owned as unknown as Record<string, unknown>[] | null) ?? [];
   }
   const rule = {
     lead: canAccessLead, legacy_lead: canAccessLegacyLead, case: canAccessCase,

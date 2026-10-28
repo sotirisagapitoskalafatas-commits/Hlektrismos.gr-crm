@@ -212,3 +212,27 @@ test('service role: trusted internal callers keep working (cron / function-to-fu
   assert.deepEqual(f.smtp[0].rcptTo, ['<lead.b@example.gr>']);
   f.restore();
 });
+
+// ───────────────────────────── orchestrator ─────────────────────────────
+// Regression (found by deno check): supabase-js query builders are thenables WITHOUT .catch, so the
+// streaming reply's "save memory" step must not call .catch on them; the reply must still arrive and the
+// memory must carry the caller as owner (that is what scopes it to them later).
+test('orchestrator (stream): the reply arrives and memory is saved under the caller as owner', async () => {
+  const gemini = { candidates: [{ content: { parts: [{ text: 'Καλησπέρα, πώς μπορώ να βοηθήσω;' }] } }] };
+  const f = await loadFunction('orchestrator', {
+    db: createDb({ profiles: [{ id: A, role: 'inside_sales', is_active: true }], ai_agents: [], agent_memory: [], crm_settings: [] }),
+    users, env: { GEMINI_API_KEY: 'test-key-not-real' },
+    fetchHandler: (url) => {
+      assert.match(url, /^https:\/\/generativelanguage\.googleapis\.com\//, `unexpected outbound call ${url}`);
+      return new Response(JSON.stringify(gemini), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const r = await f.call({ token: 'tok-a', headers: { accept: 'text/event-stream' }, body: { message: 'Γεια' } });
+  assert.equal(r.status, 200, typeof r.json === 'string' ? r.json.slice(0, 300) : JSON.stringify(r.json));
+  assert.match(String(r.json), /"done":true/);
+  await new Promise((done) => setTimeout(done, 10)); // the memory insert is fire-and-forget
+  const mem = f.db.tables.agent_memory;
+  assert.equal(mem.length, 2, 'user + assistant turns saved');
+  assert.ok(mem.every((m) => m.metadata?.owner_user_id === A), 'memory is owned by the caller');
+  f.restore();
+});

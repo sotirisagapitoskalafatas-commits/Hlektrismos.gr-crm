@@ -161,7 +161,7 @@ serve(async (req) => {
           console.error(`[send-sms] provider HTTP ${smsRes.status} for lead ${lead.id}`);
           results.errors.push(`${lead.id}: provider error ${smsRes.status}`);
         }
-      } catch (e: any) {
+      } catch {
         results.failed++;
         results.errors.push(`${lead.id}: send failed`);
       }

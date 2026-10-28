@@ -2,7 +2,7 @@
 
 **Status:** code in this PR only. **No function is deployed.** No database change, and no production setting is changed.
 **Independent of the staged SQL:** these checks run inside the functions, which use the service role (RLS bypass), so they hold whether or not Stage 1 / 2A SQL has been applied.
-**Prerequisite (separate incident):** the exposed service-role key must be revoked. Until it is, anyone holding it can bypass these checks by calling the functions or the database directly.
+**Prerequisite (separate incident, open):** the exposed service-role key must be revoked. Until it is, anyone holding it can bypass these checks by calling the functions or the database directly. Plan, consumer inventory and verification: `SERVICE_KEY_INCIDENT.md`. Note that the `campaign-scheduler` cron job reads that key from a `crm_settings` row, so rotation must update or move it.
 
 ## What changed
 ### Shared modules (`supabase/functions/_shared/`)
@@ -50,13 +50,35 @@
   - **billing-ocr:** another agent's lead → 403; six SSRF/foreign URLs → 400 with **no outbound request**; foreign paths → 403/400; own bill and Back Office read processed.
   - **enrich-lead:** another agent's lead → 403; private, metadata, IPv6 loopback and DNS-rebinding websites never fetched; a redirect to metadata is not followed.
   - **Service role** keeps working.
+  - **orchestrator (stream):** the reply arrives and the saved memory carries the caller as owner. This is a regression test for the `.catch` bug below.
 - **Mutation check:** with the original `send-email` and `billing-ocr` from `main`, 10 of the 12 handler tests fail.
 - All 28 functions load in the harness; every protected one returns 401 without a token.
-- `npm test`: **423/423 pass**. Typecheck: 15 errors (the same as `main`). Quality gate: 15/15 types and 281/281 lint, the baseline. ESLint `supabase/functions`: **104 → 92 errors** (12 old ones removed, none added). New files are lint-clean. `vite build` OK.
-- **Not run:** `deno check`. Deno is not installed, so the functions were checked by esbuild bundling and the harness only.
+
+### CI: baseline-aware gate (`scripts/ci/diagnostics-gate.mjs`)
+The repository has lint and type errors on `main` (382 ESLint, 15 `tsc`, 27 Deno), so a plain `eslint .` fails every PR and says nothing. CI now checks out the **exact base commit** next to the change and runs ESLint, `tsc` and `deno check` (every function, Deno **v2.5.6**, `--node-modules-dir=none --no-lock`) on both trees with the **same binaries**. It fails on any diagnostic the change **introduces**. Diagnostics are compared as a multiset by file + rule/code + message, so a fixed error cannot hide a new one, and a second copy of an existing error still counts as new. It **fails closed** when a tree cannot be checked: a tool crash, a `tsc` configuration error, or a Deno module-graph or resolution error. All pre-existing diagnostics are printed (`--list-existing`). The build must pass outright. Self-tests: `scripts/ci/__tests__/diagnostics-gate.test.mjs` (7, including real `tsc` runs on temporary trees). Mutation check: a planted unused variable and type error in `send-sms` are both reported as NEW and fail the gate.
+
+### Results on the final head (Node 20, the CI runtime)
+- `npm test`: **431/431 pass**: the 423 from before, plus 7 gate tests and the orchestrator regression.
+- ESLint gate: base 382, head 366, **0 introduced**, 16 fixed. *(Correction: the earlier "none added" was based on counts. The per-diagnostic gate found 2 new `no-unused-vars` in `send-sms` and `send-campaign-email`, both now fixed.)*
+- `tsc` gate: 15 and 15, **0 introduced**.
+- **Deno gate:** base 27, head 23, **0 introduced**, 4 fixed. It first found 2 new errors in `_shared/authz.ts` (row typing for a runtime column list; types only, since the refusal on a `null` row was already correct); now fixed.
+- **Bug found by `deno check` and fixed:** the orchestrator's streaming reply saved memory with `insert(...).catch(...)`. supabase-js query builders have no `.catch`, so this threw a `TypeError` and the streamed reply failed (on `main` too). Now `then(undefined, …)`, with a test.
+- `vite build`: OK.
+- **Pre-existing Deno errors not touched here (23), worth a follow-up:**
+  - **SMTP STARTTLS in `send-email`, `send-lead-confirmation` and `fetch-emails`:** `Deno.connectTls({ transport })` is not a Deno option. On port 587 the "upgrade" opens a new TLS connection to port 443 instead of upgrading. The fix (`Deno.startTls(conn, { hostname })`) needs a real SMTP test in staging.
+  - **`sync-green-tariffs`:** the same `.catch` pattern on a query builder at line 237, on the logging path.
+  - **`ai-orchestrator`, `fetch-emails`, `sync-market-tariffs`:** type-only errors from an untyped client. The logic, including the sales scoping, was checked.
 
 ## Deployment dependencies (do not deploy from this PR without approval)
-1. **Auto-deploy on merge:** GitHub Actions doesn't deploy. The **Supabase GitHub integration is connected** (a "Supabase Preview" check appears on PRs), and the repo docs say it redeploys the functions listed in `supabase/config.toml` on merge: `ai-developer`, `orchestrator`, `agent-worker`, `chat`, `scrape-b2b`, `unsubscribe`. **Before merging, check Dashboard → Project Settings → Integrations → GitHub** ("Deploy to production" / which functions), and decide whether merge = deploy.
+1. **Auto-deploy on merge: NOT verified.**
+   - **What is known:**
+     - GitHub Actions doesn't deploy (no deploy step, no secrets).
+     - Vercel deploys the **frontend** on merge.
+     - The **Supabase GitHub integration is connected** (a "Supabase Preview" check runs on PRs), and the repo docs say it redeploys the functions listed in `supabase/config.toml` on merge: `ai-developer`, `orchestrator`, `agent-worker`, `chat`, `scrape-b2b`, `unsubscribe`.
+   - **Why it couldn't be checked:** the integration's settings are only visible in the live project's dashboard, which the assistant cannot reach.
+   - **Owner check before merging:** Dashboard (project `nonaymiwdayfuulccxrl`) → **Project Settings → Integrations → GitHub**. Read whether **"Deploy to production"** is on, and for which branch.
+   - **If it is on, merging deploys part of Stage 2B to live.** Four of the six listed functions change in this PR. `orchestrator`, `agent-worker` and `ai-developer` import the new `_shared` modules; `scrape-b2b` gets the constant-time key comparison; `chat` and `unsubscribe` are unchanged. A partial deploy would run those four new while the other 18 changed functions stay old. Either turn it off for the merge, or deploy all 22 together to **staging** (`jiencxiapucrexpmzxbo`) first, then to live in one go.
+   - **Cross-check:** Edge Functions → each function's "last deployed" time, compared with past merges to `main` (for example #112 at `f3d804c`).
 2. **Deploy every changed function together, with `_shared`.** Each one imports the new `_shared/authz.ts`, `access.ts`, `safe-fetch.ts` and `email-safety.ts`. Example: `supabase functions deploy send-email send-offer send-sms make-voice-call send-campaign-email campaign-scheduler accept-offer orchestrator ai-orchestrator agent-worker ai-developer ask-market-rag generate-embedding fetch-emails billing-ocr enrich-lead scrape-program-details autonomous-tariff-scraper sync-green-tariffs sync-market-tariffs scrape-b2b aade-lookup`. Staging first.
 3. **Secrets:** no new secrets. `SUPABASE_URL` must be the public https project URL for billing-ocr's URL mode; storage-path mode works everywhere.
 4. **Live app impact:** the only live app code that calls a changed function is `src/lib/b2b.ts` → `scrape-b2b`, whose behaviour is unchanged. The other callers are the legacy screens `DashboardPage`, `SettingsPanel`, `LeadDetailSlideout`, `MarketRagFolders`, `MarketRAGSearch` and `CrmAiAssistantWidget`. **No live file imports them.** If they are ever re-enabled:

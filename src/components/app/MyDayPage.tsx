@@ -21,7 +21,7 @@ import { formatDistance, durationMinutes, distanceKm } from '@/lib/geo/distance'
 import { enqueue, countQueue, isOnline } from '@/lib/offline/queue';
 import { flushQueue } from '@/lib/offline/sync';
 import { useToast } from '@/lib/toast';
-import { fmtTime, todayLabel } from '@/lib/ui';
+import { Btn, fmtTime, todayLabel } from '@/lib/ui';
 import { arrivalCandidate, checkoutNote, checkoutReady, DEFAULT_ARRIVAL_RADIUS_M, groupVisits, nearestCases, OUTCOMES, outcomeByLabel } from '@/lib/field-day';
 import { handoverNewSale, managerFollowUp } from '@/lib/field-handover';
 import { isOpenFollowUpFor } from '@/lib/work';
@@ -285,6 +285,11 @@ export default function MyDayPage() {
   return (
     <div className="atx-page" style={{ maxWidth: 860 }}>
       <div className="atx-head">
+        {can(role, 'check_in') && (
+          <div className="float-right ml-3">
+            <Btn variant="primary" onClick={() => go('field')}><Navigation size={15} strokeWidth={1.6} aria-hidden="true" /> Λειτουργία πεδίου</Btn>
+          </div>
+        )}
         <p className="atx-eyebrow">{todayLabel()}</p>
         <h1 className="atx-title">Η ημέρα μου</h1>
         <p className="atx-sub">{loading ? 'Φόρτωση…' : `${g.today.length} επισκέψεις σήμερα · ${g.doneToday.length} ολοκληρώθηκαν${g.overdue.length ? ` · ${g.overdue.length} εκκρεμούν από προηγούμενες ημέρες` : ''}`}</p>

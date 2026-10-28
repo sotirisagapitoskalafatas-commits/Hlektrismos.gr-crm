@@ -27,7 +27,6 @@
   text-rendering: optimizeLegibility;
 }
 .atx-shell.bg-paper { background: var(--atx-bg); }
-.atx-shell .shell-backdrop { display: none; }
 .atx-shell h1, .atx-shell h2, .atx-shell h3 { font-family: inherit; letter-spacing: -0.012em; }
 
 /* ---- labels: sentence case, no monospace (the mono font has no Greek glyphs) ---- */
@@ -58,41 +57,6 @@
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-
-/* ---- sidebar: dark navy, compact, solid blue active state (matches the approved reference) ---- */
-.atx-shell .glass-nav,
-.atx-shell .glass-drawer {
-  background: var(--atx-navy);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: none;
-}
-.atx-shell .glass-nav [class*="border-white"],
-.atx-shell .glass-drawer [class*="border-white"] { border-color: rgba(255, 255, 255, 0.08) !important; }
-.atx-shell .glass-nav .nav-leaf,
-.atx-shell .glass-drawer .nav-leaf { color: rgba(255, 255, 255, 0.78); border-radius: 10px; padding: 9px 12px; font-size: 14px; font-weight: 500; }
-.atx-shell .glass-nav .nav-leaf:hover,
-.atx-shell .glass-drawer .nav-leaf:hover { background: rgba(255, 255, 255, 0.07); color: #fff; box-shadow: none; }
-.atx-shell .glass-nav .nav-leaf.nav-active,
-.atx-shell .glass-drawer .nav-leaf.nav-active,
-.atx-shell .glass-nav .nav-leaf.nav-atlas-active,
-.atx-shell .glass-drawer .nav-leaf.nav-atlas-active {
-  background: var(--atx-blue) !important;
-  color: #fff !important;
-  box-shadow: none !important;
-  font-weight: 600;
-}
-.atx-shell .glass-nav .nav-leaf.nav-active svg,
-.atx-shell .glass-drawer .nav-leaf.nav-active svg,
-.atx-shell .glass-nav .nav-leaf.nav-atlas-active svg,
-.atx-shell .glass-drawer .nav-leaf.nav-atlas-active svg { color: #fff !important; }
-.atx-shell .nav-atlas, .atx-shell .glass-nav .nav-atlas, .atx-shell .glass-drawer .nav-atlas { color: rgba(255, 255, 255, 0.78); animation: none; }
-.atx-shell .glass-nav .nav-leaf .dot, .atx-shell .glass-drawer .nav-leaf .dot { display: none; } /* maturity dots are noise for staff */
-.atx-shell .glass-nav .nav-leaf .nav-dot, .atx-shell .glass-drawer .nav-leaf .nav-dot { display: none; }
-.atx-shell .nav-badge { background: rgba(255, 255, 255, 0.16) !important; color: #fff !important; font-family: inherit; font-weight: 600; }
-.atx-shell .nav-leaf.nav-active .nav-badge { background: rgba(255, 255, 255, 0.28) !important; }
-.atx-shell .glass-nav nav .nav-section-caption,
-.atx-shell .glass-drawer nav .nav-section-caption { color: rgba(255, 255, 255, 0.45) !important; font-size: 12px; font-weight: 600; padding: 0 12px; margin-bottom: 4px; }
-.atx-shell .glass-nav :focus-visible, .atx-shell .glass-drawer :focus-visible { outline-color: #fff; }
 
 /* ---- header ---- */
 .atx-shell header {

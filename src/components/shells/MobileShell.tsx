@@ -1,16 +1,16 @@
 /* ------------------------------------------------------------------ */
 /*  MobileShell — bottom tab bar + field quick actions (< 768 px).     */
 /*  Renders ONLY fixed overlay chrome; content lives in AppShell.      */
-/*  "Περισσότερα" tab calls onMore → AppShell opens shared drawer.     */
+/*  Every other page is reached through the top bar's module strip and */
+/*  the sidebar strip; «Εγώ» opens the account page.                   */
 /* ------------------------------------------------------------------ */
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { categoryColor } from '@/lib/roles';
 import type { PageKey, Role } from '@/lib/roles';
 import {
-  Briefcase, Compass, Home, Inbox, Map, MonitorCog, MoreHorizontal, Plus, Route,
+  Briefcase, Compass, Home, Map, MonitorCog, Plus, Route, UserCircle,
   UserPlus, X,
 } from 'lucide-react';
 
@@ -18,14 +18,10 @@ type Counts = { leads: number; followups: number; backoffice: number };
 
 type Tab = { page: PageKey; label: string; icon: typeof Home; badge?: keyof Counts };
 
-/* Master-prompt mobile nav: role-aware 5-tab bar. Sales → Leads/Πελάτες;
-   Field → Ημέρα μου/Χάρτης; Back Office → Operations/Follow Ups. */
+/* Role-aware 4-tab bar: Αρχική · two role-specific tabs · Εγώ. Sales → Leads/Cases; Field → Ημέρα μου/Χάρτης;
+   Back Office → Διεκπεραίωση/Cases. Everything else is one tap away in the module strip under the top bar. */
 function tabsForRole(role: Role): Tab[] {
-  // Αρχική + Η εργασία μου are always first; the rest is role-specific. Other pages stay reachable from «Περισσότερα».
-  const tabs: Tab[] = [
-    { page: 'home', label: 'Αρχική', icon: Home },
-    { page: 'mywork', label: 'Εργασία', icon: Inbox },
-  ];
+  const tabs: Tab[] = [{ page: 'home', label: 'Αρχική', icon: Home }];
   if (role === 'admin' || role === 'manager' || role === 'inside_sales') {
     tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
     tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
@@ -36,36 +32,32 @@ function tabsForRole(role: Role): Tab[] {
     tabs.push({ page: 'backoffice', label: 'Διεκπεραίωση', icon: MonitorCog });
     tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
   }
-  return tabs.slice(0, 4);
+  return tabs.slice(0, 3);
 }
 
-function BottomTabBar({ current, counts, onMore }: {
-  current: string; counts: Counts; onMore: () => void;
-}) {
+function BottomTabBar({ current, counts }: { current: string; counts: Counts }) {
   const { role } = useAuth();
   const { go } = useNav();
-  const tabs = tabsForRole(role);
+  const tabs: Tab[] = [...tabsForRole(role), { page: 'account', label: 'Εγώ', icon: UserCircle }];
+  // «Εγώ» also covers the preferences page (its sibling in the settings area).
+  const isActive = (t: Tab) => current === t.page || (t.page === 'account' && current === 'preferences');
 
   return (
     <nav aria-label="Γρήγορη πλοήγηση"
       className="fixed inset-x-0 bottom-0 z-40 bg-white/90 backdrop-blur-xl backdrop-saturate-150 border-t border-ink/[0.08]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-4">
         {tabs.map(t => {
-          const active = current === t.page;
+          const active = isActive(t);
           const b = t.badge ? counts[t.badge] : 0;
-          const c = categoryColor(t.page);
           return (
             <button key={t.page} onClick={() => go(t.page)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium transition-colors ${active ? '' : 'text-ink/45'}`}
-              style={active ? { color: c } : undefined}>
-              {active && <span className="absolute top-0 inset-x-3 h-[2px] rounded-b-full" style={{ background: c }} aria-hidden="true" />}
+              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] transition-colors ${active ? 'font-semibold text-[var(--ui-primary,#0066cc)]' : 'font-medium text-ink/55'}`}>
               <span className="relative">
-                <t.icon className="w-5 h-5" />
+                <t.icon className="w-[22px] h-[22px]" strokeWidth={1.6} aria-hidden="true" />
                 {b > 0 && (
-                  <span className={`absolute -top-1 -right-2.5 min-w-4 h-4 px-1 rounded-full text-white text-[9px] font-semibold flex items-center justify-center ${active ? '' : 'bg-bad-600'}`}
-                    style={active ? { background: c } : undefined}>
+                  <span className="absolute -top-1 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-[var(--ui-primary,#0066cc)] text-white text-[9px] font-semibold flex items-center justify-center">
                     {b > 9 ? '9+' : b}
                   </span>
                 )}
@@ -74,11 +66,6 @@ function BottomTabBar({ current, counts, onMore }: {
             </button>
           );
         })}
-        <button onClick={onMore} aria-label="Περισσότερα"
-          className="flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium text-ink/45 transition-colors">
-          <MoreHorizontal className="w-5 h-5" />
-          Περισσότερα
-        </button>
       </div>
     </nav>
   );
@@ -140,16 +127,15 @@ function FieldQuickActions({ open, onToggle }: { open: boolean; onToggle: () => 
 interface MobileShellProps {
   current: string;
   counts: Counts;
-  onMore: () => void;
 }
 
-export default function MobileShell({ current, counts, onMore }: MobileShellProps) {
+export default function MobileShell({ current, counts }: MobileShellProps) {
   const { role } = useAuth();
   const [sheet, setSheet] = useState(false);
 
   return (
     <>
-      <BottomTabBar current={current} counts={counts} onMore={onMore} />
+      <BottomTabBar current={current} counts={counts} />
       {role === 'field_sales' && (
         <FieldQuickActions open={sheet} onToggle={() => setSheet(s => !s)} />
       )}

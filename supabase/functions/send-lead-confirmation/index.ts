@@ -7,6 +7,7 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 // Any commercial content must go through _shared/email-compliance.ts instead.
 // ════════════════════════════════════════════════════════════════════════════
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 
 // ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────
 class SmtpClient {
@@ -121,10 +122,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, error: "Invalid email" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
+    const adminClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey());
 
     // Guard: only confirm a lead that genuinely submitted the website form in the last 15 min.
     const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();

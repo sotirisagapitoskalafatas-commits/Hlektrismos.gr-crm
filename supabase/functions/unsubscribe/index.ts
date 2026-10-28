@@ -8,6 +8,7 @@
 // The link carries an HMAC-signed address, so nobody can unsubscribe someone
 // else. Suppression is immediate: every commercial send checks the list first.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 import { suppress, verifyUnsubscribeToken } from "../_shared/email-compliance.ts";
 
 Deno.serve(async (req: Request) => {
@@ -21,10 +22,9 @@ Deno.serve(async (req: Request) => {
     return Response.redirect(`${site}/#/unsubscribed?status=invalid`, 302);
   }
 
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "",
-  );
+  // Never report "unsubscribed" without recording it: a missing key is a server error, not a silent success.
+  if (!secretKey()) return missingKeyResponse("secret");
+  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey());
   await suppress(admin, email, req.method === "POST" ? "list-unsubscribe-post" : "footer-link");
 
   if (req.method === "POST") return new Response("unsubscribed", { status: 200 });

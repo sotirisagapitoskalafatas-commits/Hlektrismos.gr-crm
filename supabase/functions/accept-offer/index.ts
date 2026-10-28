@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 import { verifyLink } from "../_shared/signed-link.ts";
 
 const corsHeaders = {
@@ -48,10 +49,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    if (!secretKey()) return missingKeyResponse("secret");
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, secretKey());
 
     // 1. Update lead status
     await supabase.from("hlektrismos_leads").update({

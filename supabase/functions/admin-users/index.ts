@@ -7,6 +7,7 @@
 // the request. Matrix: _shared/staff-admin.ts (mirrors public.staff_admin_can). Every create/delete/refusal is
 // written to public.staff_admin_audit. Requires verify_jwt (default). Never returns secrets or tokens.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "../_shared/keys.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { canManage, decideDelete, decideReset, validateCreate } from "../_shared/staff-admin.ts";
 
@@ -16,11 +17,12 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return errorResponse("Method not allowed", 405);
 
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!secretKey()) return missingKeyResponse("secret");
+  const admin = createClient(url, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (!token || token === serviceKey) return errorResponse("Απαιτείται σύνδεση χρήστη.", 401);
+  // Only a signed-in user may administer staff: an API key (even this project's secret key) is not a user.
+  const token = userBearer(req);
+  if (!token || presentsSecretKey(req)) return errorResponse("Απαιτείται σύνδεση χρήστη.", 401);
   const { data: { user: caller }, error: authErr } = await admin.auth.getUser(token);
   if (authErr || !caller) return errorResponse("Μη έγκυρη συνεδρία.", 401);
   const { data: actor } = await admin.from("profiles").select("id, role, is_active").eq("id", caller.id).maybeSingle();

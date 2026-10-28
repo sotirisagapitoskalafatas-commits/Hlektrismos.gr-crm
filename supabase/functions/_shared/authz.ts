@@ -22,9 +22,14 @@ export const json = (status: number, body: unknown) =>
 
 export const denied = (d: Exclude<Decision, { ok: true }>) => json(d.status, { error: d.error });
 
+// supabase-js throws on an empty key. When the secret key is not configured, build the client with this inert
+// placeholder instead: it is not a credential (no gateway accepts it), and every caller runs getCaller() or
+// requireStaff() first, which returns the redacted 500 before any query is made.
+const KEY_NOT_CONFIGURED = "sb_secret_not_configured";
+
 /** Privileged client with the project's secret API key (keys.ts; never a legacy or custom key). */
 export function serviceClient(): SupabaseClient {
-  return createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey() || KEY_NOT_CONFIGURED, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 /**

@@ -110,6 +110,7 @@ test('missing SUPABASE_SECRET_KEYS fails closed with a redacted 500, without fal
     let r;
     try { r = await f.call({ token: 'tok-office', body: { email: 'x@example.invalid' } }); } catch (e) { assert.fail(`${name} threw instead of failing safely: ${e.message}`); }
     assert.ok(!f.clientKeys.includes(LEGACY_SERVICE_JWT), `${name} fell back to the legacy key`);
+    assert.ok(f.clientKeys.every((k) => k === 'sb_secret_not_configured' || k === PUBLISHABLE_KEY), `${name} built a client with a real key although none is configured`);
     if (r.status === 500) {
       const body = typeof r.json === 'string' ? r.json : JSON.stringify(r.json);
       assert.ok(!body.includes(LEGACY_SERVICE_JWT) && !body.includes('sb_secret_'), `${name}: key material in the error body`);
@@ -161,4 +162,35 @@ test('guard.ts: requireStaffOrCron accepts the cron secret, refuses a wrong one 
   assert.equal((await G.requireStaffOrCron(req({ 'x-cron-secret': 'wrong-wrong-wrong-wrong-wrong' })))?.status, 401);
   assert.equal((await G.requireStaffOrCron(req({ authorization: `Bearer ${LEGACY_SERVICE_JWT}` })))?.status, 401, 'legacy JWT refused');
   assert.equal(await G.requireStaff(req({ apikey: SERVICE_KEY })), null, 'secret key in apikey accepted');
+});
+
+// orchestrator -> scrape-b2b: a service caller that authenticated with the apikey header must be forwarded the same
+// way (the Authorization header is empty for it); a user caller still forwards its OWN token, never an API key.
+async function orchestratorB2bCall(callerHeaders, token) {
+  const toolCall = { candidates: [{ content: { parts: [{ functionCall: { name: 'trigger_b2b_scraper', args: { region: 'Αττική', category: 'energy' } } }] } }] };
+  const answer = { candidates: [{ content: { parts: [{ text: 'ok' }] } }] };
+  let geminiCalls = 0;
+  const f = await loadFunction('orchestrator', {
+    db: createDb({ profiles: [{ id: OFFICE, role: 'admin', is_active: true }], ai_agents: [], agent_memory: [], crm_settings: [] }), users,
+    env: { GEMINI_API_KEY: 'test-key-not-real' },
+    fetchHandler: (url) => {
+      if (url.includes('generativelanguage.googleapis.com')) return new Response(JSON.stringify(geminiCalls++ === 0 ? toolCall : answer), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ leads_found: 0 }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  await f.call({ token, headers: callerHeaders, body: { message: 'start the b2b scraper' } });
+  const scrape = f.outbound.find((o) => o.url.endsWith('/functions/v1/scrape-b2b'));
+  f.restore();
+  return scrape;
+}
+
+test('orchestrator forwards the secret key (apikey) to scrape-b2b for a service caller, and the user\'s own token for a user', async () => {
+  const svc = await orchestratorB2bCall({ apikey: SERVICE_KEY });
+  assert.ok(svc, 'the B2B tool reached scrape-b2b');
+  assert.equal(svc.headers.apikey, SERVICE_KEY, 'secret key forwarded in apikey');
+  assert.ok(!JSON.stringify(svc.headers).includes(LEGACY_SERVICE_JWT), 'legacy JWT never forwarded');
+  const usr = await orchestratorB2bCall({}, 'tok-office');
+  assert.ok(usr, 'user call reached scrape-b2b');
+  assert.equal(usr.headers.Authorization, 'Bearer tok-office', 'the user\'s own token is forwarded');
+  assert.equal(usr.headers.apikey, undefined, 'no API key is forwarded on behalf of a user');
 });

@@ -204,7 +204,8 @@ export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, f
   };
   for (const [k, v] of Object.entries(environment)) if (v === undefined) delete environment[k];
   const clientKeys = []; // every key a function passed to createClient()
-  globalThis.__edge = { handler: null, createClient: (_url, key) => { clientKeys.push(key); return fakeClient(db, users); } };
+  // Like the real supabase-js: an empty key throws. Record every key a function builds a client with.
+  globalThis.__edge = { handler: null, createClient: (_url, key) => { if (!key) throw new Error('supabaseKey is required.'); clientKeys.push(key); return fakeClient(db, users); } };
   globalThis.Deno = {
     env: { get: (k) => environment[k], toObject: () => ({ ...environment }) },
     serve: (a, b) => { globalThis.__edge.handler = typeof a === 'function' ? a : b; },

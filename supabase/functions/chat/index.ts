@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { missingKeyResponse, publishableKey } from "../_shared/keys.ts";
 import { AI_IDENTITY_REPLY, AI_IDENTITY_RULES, isIdentityQuestion } from "../_shared/ai-identity.ts"
 
 const corsHeaders = {
@@ -15,10 +16,9 @@ serve(async (req: any) => {
   try {
     const { messages, visitorInfo, callbackRequest } = await req.json()
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
+    if (!publishableKey()) return missingKeyResponse("publishable", corsHeaders)
+    // Public chatbot: RLS-scoped client with the publishable key (never a privileged key).
+    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', publishableKey())
 
     // Fetch tariffs for RAG context
     const { data: tariffs } = await supabaseClient.rpc('get_active_tariff_prices');

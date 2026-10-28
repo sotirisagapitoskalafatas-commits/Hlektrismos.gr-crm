@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCaller, requireCapability } from "../_shared/authz.ts";
+import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 import { timingSafeEqual } from "../_shared/signed-link.ts";
 import { safeFetch, denoResolver, SafeFetchError } from "../_shared/safe-fetch.ts";
 
@@ -9,10 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-);
+const supabase = serviceClient();
 
 const getCurrentValidityMonth = (): string => {
   const d = new Date();
@@ -71,6 +68,7 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
 
   // Writes tariffs from DB-stored URLs: only pg_cron (dedicated CRON_SECRET, see staged phase1/04), the service
   // role, or a user with integrations.manage.

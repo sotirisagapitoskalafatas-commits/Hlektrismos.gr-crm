@@ -7,7 +7,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { timingSafeEqual } from "../_shared/signed-link.ts";
+import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "../_shared/keys.ts";
 import { LIMITS, allowedQueries, planQueries, toProspect, validateSearch } from "../_shared/b2b-search.ts";
 import type { PlannedQuery } from "../_shared/b2b-search.ts";
 
@@ -33,14 +33,15 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ success: false, error: "Method not allowed" }, 405);
 
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
+  const admin = createClient(url, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
   // ── who is calling (role from the database, never from the request) ──
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (!token) return json({ success: false, error: "Απαιτείται σύνδεση." }, 401);
+  const internal = presentsSecretKey(req); // secret API key in the apikey header (constant-time match)
+  const token = userBearer(req);
+  if (!internal && !token) return json({ success: false, error: "Απαιτείται σύνδεση." }, 401);
   let actorId: string | null = null;
-  if (!(serviceKey && timingSafeEqual(token, serviceKey))) { // constant-time service-key match
+  if (!internal) {
     const { data: { user }, error } = await admin.auth.getUser(token);
     if (error || !user) return json({ success: false, error: "Μη έγκυρη συνεδρία." }, 401);
     const { data: prof } = await admin.from("profiles").select("role, is_active").eq("id", user.id).maybeSingle();

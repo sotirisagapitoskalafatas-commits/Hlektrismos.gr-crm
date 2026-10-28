@@ -7,6 +7,23 @@
 
 Background and history: `SECURITY_HOTFIX_RUNBOOK.md` §A and its key table. The key appears in public Git history (`create-demo.mjs`, commit `8774da7`). Rewriting history does not help; only rotation does.
 
+## 0c. Key migration (PR #119): staging verification, 2026-10-28
+All 28 functions from the PR branch (`2cdcf89`) were deployed to **staging only**, each with its production gateway setting. Production was not touched. Checks were made from inside the platform by a temporary diagnostic function (deleted afterwards, confirmed 404), so no key value was ever handled. A first attempt with a key read from the CLI listing is void: that listing returns a **masked** preview.
+
+| Check | Result |
+|---|---|
+| Secret key in `apikey` only (no `Authorization`) on `agent-worker`, `orchestrator`, `scrape-b2b`, `send-email`, `send-sms`, `send-offer`, `billing-ocr`, `enrich-lead`, `ai-developer` | Accepted by the gateway and by each function's caller check. `agent-worker` did a real read with the secret client: 200 "No new leads to process". The others returned their own validation errors (400). |
+| Secret key as `Authorization: Bearer` (compat) on `agent-worker` | 200 |
+| Gateway crossing: `make-voice-call` (platform login check ON) with `apikey` only, nonexistent lead | The function's own 404 "Record not found". No call placed. This is the `campaign-scheduler` -> `make-voice-call` path. |
+| `admin-users` with the secret key in `apikey` and in `Authorization` | Its own 401: an API key is never a user |
+| supabase-js client built with the secret key | REST read 200, `auth.admin.listUsers` OK, `getUser(garbage)` returns an Auth-server "invalid JWT" error (not "Invalid API key"), so the user-token path reaches Auth correctly |
+| Refusals (forged JWT in Authorization, forged JWT in apikey, publishable key, nothing) on `agent-worker`, `orchestrator`, `scrape-b2b`, `send-email` | All 401 |
+| Public `chat` with the publishable key | Reaches the AI call (staging has no AI key; the provider's error text is passed back, pre-existing) |
+
+**Not yet covered:** (1) a real signed-in user through the deployed functions: `scripts/qa/staging-edge-authz.mjs`, owner-run; (2) the cron refire and the forged-link set after this deployment; (3) the **rehearsal of deactivating the legacy keys on staging**, an owner action, followed by the same checks and a 401 from the old staging `service_role` key on `/rest/v1/`, `/auth/v1/admin/users` and a platform-login-check function (three different gateway surfaces); (4) **production**: confirm `SUPABASE_SECRET_KEYS` and `SUPABASE_PUBLISHABLE_KEYS` hold a `default` key there before any deploy or merge, because a merge auto-deploys `chat`, `unsubscribe`, `scrape-b2b`, `orchestrator`, `agent-worker`, `ai-developer`.
+
+Deactivating the legacy keys also switches off the legacy `anon` key, and re-enabling them re-exposes the leaked key. Before the owner deactivates: check that the WordPress site, any scripts and any old Vercel build don't use the legacy `anon` key.
+
 ## 1. Who uses the service-role key (inventory from the repository)
 | Consumer | How it gets the key | After rotation |
 |---|---|---|

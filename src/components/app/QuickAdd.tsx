@@ -50,9 +50,9 @@ export default function QuickAdd() {
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} aria-haspopup="menu"
         title="Γρήγορη δημιουργία"
-        className="flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] bg-brand-500 text-white text-[13px] font-semibold hover:brightness-110 transition-[filter] shadow-[0_4px_16px_rgba(0,102,204,0.28)]">
-        <Plus className="w-4 h-4" />
-        <span className="hidden md:inline">Νέο</span>
+        className="shell-create b3">
+        <Plus className="w-4 h-4" strokeWidth={1.6} aria-hidden="true" />
+        <span>Δημιουργία</span>
       </button>
 
       {open && (

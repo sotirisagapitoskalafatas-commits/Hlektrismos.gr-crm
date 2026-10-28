@@ -3,6 +3,7 @@
    Authorization is NOT decided here: the lists show whatever the database returns to this user. */
 
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Inbox } from 'lucide-react';
 import { useNav } from '@/lib/nav';
 import { useWorkData } from '@/lib/useWorkData';
@@ -20,7 +21,7 @@ const KIND_LABEL: Record<Kind, string> = { all: 'Όλα', followup: 'Follow-ups'
 const asTab = (v?: string): Tab => (v === 'upcoming' || v === 'all' ? v : 'today');
 const asKind = (v?: string): Kind => (v === 'followup' || v === 'lead' || v === 'case' ? v : 'all');
 
-export default function MyWorkPage() {
+export default function MyWorkPage({ hubTabs }: { hubTabs?: ReactNode } = {}) {
   const { view } = useNav();
   const { loading, error, items, now, reload } = useWorkData();
   const [tab, setTab] = useState<Tab>(() => asTab(view.filters?.tab));
@@ -65,6 +66,7 @@ export default function MyWorkPage() {
         <h1 className="atx-title">Η εργασία μου</h1>
         <p className="atx-sub">Ό,τι χρειάζεται τη δική σας ενέργεια, με σειρά προτεραιότητας.</p>
       </div>
+      {hubTabs && <div className="mt-5">{hubTabs}</div>}
 
       <div className="mt-6 flex flex-wrap items-center gap-3 justify-between">
         <div className="atx-tabs" role="tablist" aria-label="Χρονικό εύρος">

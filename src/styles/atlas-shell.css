@@ -1,0 +1,205 @@
+/* ATLAS shell v2: floating glass top bar, floating sidebar panel, segmented module links.
+   Colours come from the --shell-* variables (atlas-theme.css), so the six themes switch with one attribute.
+   Everything here lives under .shell-*; nothing restyles the public pages. */
+
+.shell-body { display: flex; align-items: flex-start; gap: 22px; margin: 14px 14px 0; }
+.shell-main { flex: 1; min-width: 0; padding: 6px 32px 56px; }
+
+/* ───────────── Top bar ───────────── */
+.atx-shell .shell-topbar {
+  position: sticky; top: 12px; z-index: 40; margin: 12px 14px 0; min-height: 60px; border-radius: 24px;
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  color: var(--shell-text);
+  background:
+    radial-gradient(420px 120px at 12% -40%, color-mix(in srgb, var(--shell-accent) 40%, transparent), transparent),
+    linear-gradient(120deg, var(--shell-top), var(--shell-side));
+  border: 1px solid var(--shell-line);
+  box-shadow: 0 14px 34px -14px rgba(5, 12, 30, 0.55);
+}
+.shell-brand { display: flex; align-items: center; gap: 10px; border-radius: 16px; padding: 2px 6px 2px 2px; color: inherit; }
+.shell-logo {
+  width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; flex: none;
+  color: var(--shell-on-accent);
+  background: linear-gradient(135deg, var(--shell-accent), var(--shell-accent-2));
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--shell-accent) 65%, transparent);
+}
+.shell-wordmark { font-size: 15px; font-weight: 600; letter-spacing: 0.14em; }
+
+.shell-seg {
+  display: flex; gap: 2px; padding: 4px; border-radius: 999px;
+  background: color-mix(in srgb, var(--shell-text) 6%, transparent);
+}
+.shell-seg__link {
+  height: 36px; padding: 0 15px; border-radius: 999px; font-size: 14px; font-weight: 500; white-space: nowrap;
+  color: var(--shell-muted); transition: background-color 0.16s ease, color 0.16s ease;
+}
+.shell-seg__link:hover { color: var(--shell-text); background: var(--shell-hover); }
+.shell-seg__link[aria-current='page'] {
+  color: var(--shell-text); font-weight: 600; background: var(--shell-active);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shell-text) 14%, transparent);
+}
+
+.shell-spacer { flex: 1; min-width: 0; }
+.shell-search {
+  display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px 0 14px; border-radius: 999px;
+  width: 300px; max-width: 26vw; color: var(--shell-muted); font-size: 14px; text-align: left;
+  background: var(--shell-field); border: 1px solid var(--shell-line); transition: background-color 0.16s ease;
+}
+.shell-search:hover { color: var(--shell-text); }
+.shell-kbd {
+  margin-left: auto; font-size: 11.5px; padding: 2px 8px; border-radius: 8px; color: var(--shell-muted);
+  background: color-mix(in srgb, var(--shell-text) 10%, transparent);
+}
+.shell-create {
+  display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 999px;
+  font-size: 14px; font-weight: 600; white-space: nowrap; color: var(--shell-on-accent);
+  background: linear-gradient(120deg, var(--shell-accent), var(--shell-accent-2));
+  box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--shell-accent) 70%, transparent);
+}
+.shell-icon {
+  position: relative; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  color: var(--shell-text); transition: background-color 0.16s ease;
+}
+.shell-icon:hover { background: var(--shell-hover); }
+.shell-dot {
+  position: absolute; top: 9px; right: 10px; width: 9px; height: 9px; border-radius: 50%; background: #ff5a52;
+  box-shadow: 0 0 0 2px var(--shell-top);
+}
+.shell-user { display: flex; align-items: center; gap: 10px; border-radius: 999px; padding: 3px 10px 3px 3px; color: inherit; }
+.shell-user:hover { background: var(--shell-hover); }
+.shell-avatar {
+  width: 40px; height: 40px; border-radius: 50%; flex: none; padding: 2px;
+  background: linear-gradient(135deg, var(--shell-accent), var(--shell-accent-2));
+}
+.shell-avatar > span {
+  width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  background: var(--shell-top); color: var(--shell-text);
+}
+.shell-user__name { font-size: 14px; font-weight: 600; line-height: 1.2; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell-user__role { font-size: 12px; color: var(--shell-muted); line-height: 1.2; }
+
+/* Dropdowns (notifications, avatar): white cards that must not inherit the bar's light text. */
+.shell-menu {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 60; width: 300px; padding: 8px; color: var(--ui-text);
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 20px;
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.35); text-align: left;
+}
+.shell-menu__item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border-radius: 12px;
+  font-size: 13.5px; color: var(--ui-text-2); text-align: left; min-height: 44px;
+}
+.shell-menu__item:hover { background: var(--ui-surface-2); }
+.shell-menu__sep { height: 1px; margin: 6px 4px; background: var(--ui-border); }
+
+.shell-topbar :focus-visible, .shell-sidebar :focus-visible, .shell-menu :focus-visible { outline: 3px solid var(--ui-focus, #66b0ff); outline-offset: 2px; }
+
+/* ───────────── Sidebar (full 232px · compact 58px · strip on phones) ───────────── */
+.shell-sidebar {
+  position: sticky; top: 84px; flex: none; width: 232px; height: calc(100vh - 98px); min-height: 420px;
+  display: flex; flex-direction: column; padding: 16px 12px 12px; border-radius: 26px; color: var(--shell-text);
+  background:
+    radial-gradient(260px 220px at 0 0, color-mix(in srgb, var(--shell-accent) 28%, transparent), transparent),
+    linear-gradient(180deg, var(--shell-side), var(--shell-top));
+  border: 1px solid var(--shell-line);
+  box-shadow: 0 14px 34px -14px rgba(5, 12, 30, 0.55);
+}
+.shell-sidebar__head { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 10px; }
+.shell-label {
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--shell-muted);
+}
+.shell-sidebar__nav { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.shell-group { display: flex; flex-direction: column; gap: 2px; }
+.shell-group + .shell-group { margin-top: 12px; }
+.shell-group .shell-label { padding: 6px 8px 4px; }
+
+.shell-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 7px 10px 7px 8px; border-radius: 16px;
+  font-size: 14px; font-weight: 500; line-height: 1.25; text-align: left; color: var(--shell-muted);
+  transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+.shell-item:hover { background: var(--shell-hover); color: var(--shell-text); transform: translateX(2px); }
+.shell-item:active { transform: scale(0.97); }
+.shell-item[aria-current='page'] {
+  background: var(--shell-active); color: var(--shell-text); font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shell-text) 12%, transparent);
+}
+.shell-item__tile {
+  width: 32px; height: 32px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  background: color-mix(in srgb, var(--shell-text) 7%, transparent);
+}
+.shell-item[aria-current='page'] .shell-item__tile {
+  color: var(--shell-on-accent);
+  background: linear-gradient(135deg, var(--shell-accent), var(--shell-accent-2));
+  box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--shell-accent) 55%, transparent);
+}
+.shell-item__text { flex: 1; min-width: 0; }
+.shell-badge {
+  margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px; display: grid; place-items: center;
+  font-size: 12px; font-weight: 600; background: var(--shell-chip); color: var(--shell-text);
+}
+.shell-sidebar__foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--shell-line); display: flex; flex-direction: column; gap: 8px; }
+.shell-usercard {
+  display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 18px; text-align: left;
+  background: color-mix(in srgb, var(--shell-text) 7%, transparent); box-shadow: inset 0 0 0 1px var(--shell-line);
+}
+.shell-usercard .shell-avatar { width: 36px; height: 36px; }
+.shell-usercard__name { font-size: 14px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell-usercard__sub { font-size: 12px; color: var(--shell-muted); }
+
+/* Compact: icon tiles only. */
+.shell-sidebar[data-mode='compact'] { width: 58px; padding: 12px 6px; align-items: center; }
+.shell-sidebar[data-mode='compact'] .shell-item { width: 46px; min-height: 46px; padding: 7px; justify-content: center; position: relative; }
+.shell-sidebar[data-mode='compact'] .shell-item__text,
+.shell-sidebar[data-mode='compact'] .shell-group .shell-label,
+.shell-sidebar[data-mode='compact'] .shell-sidebar__head .shell-label,
+.shell-sidebar[data-mode='compact'] .shell-usercard > :not(.shell-avatar) { display: none; }
+.shell-sidebar[data-mode='compact'] .shell-sidebar__head { justify-content: center; padding: 0 0 8px; }
+.shell-sidebar[data-mode='compact'] .shell-badge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; font-size: 10.5px; padding: 0 4px; }
+.shell-sidebar[data-mode='compact'] .shell-usercard { padding: 4px; background: none; box-shadow: none; }
+
+/* Phones: a floating horizontal pill strip under the top bar. */
+.shell-sidebar[data-mode='strip'] {
+  position: static; width: auto; height: auto; min-height: 0; flex-direction: row; align-items: center; padding: 6px; border-radius: 22px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.shell-sidebar[data-mode='strip'] .shell-sidebar__head,
+.shell-sidebar[data-mode='strip'] .shell-sidebar__foot,
+.shell-sidebar[data-mode='strip'] .shell-group .shell-label,
+.shell-sidebar[data-mode='strip'] .shell-item__tile { display: none; }
+.shell-sidebar[data-mode='strip'] .shell-sidebar__nav { flex-direction: row; overflow: visible; gap: 6px; }
+.shell-sidebar[data-mode='strip'] .shell-group { flex-direction: row; gap: 6px; }
+.shell-sidebar[data-mode='strip'] .shell-group + .shell-group { margin-top: 0; }
+.shell-sidebar[data-mode='strip'] .shell-item { width: auto; min-height: 44px; padding: 0 14px; border-radius: 999px; white-space: nowrap; }
+
+/* ───────────── Narrower desktops and tablets ───────────── */
+@media (max-width: 1199px) { .shell-user__text { display: none; } .shell-search { width: 200px; } }
+@media (min-width: 768px) and (max-width: 1099px) {
+  .shell-main { padding: 6px 20px 56px; }
+  .shell-search { width: 42px; padding: 0; justify-content: center; }
+  .shell-search > :not(svg) { display: none; }
+  .shell-hide-narrow { display: none; }
+  .shell-wordmark { display: none; }
+  .shell-create { padding: 0 13px; }
+  .shell-create > span { display: none; }
+}
+
+/* ───────────── Phones (< 768px, same threshold as the device context) ───────────── */
+@media (max-width: 767px) {
+  .atx-shell .shell-topbar { margin: 8px 8px 0; top: 8px; flex-wrap: wrap; row-gap: 8px; column-gap: 6px; border-radius: 22px; padding: 8px; }
+  .shell-seg { order: 10; flex: 1 0 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 18px; }
+  .shell-seg__link { height: 40px; flex: none; }
+  .shell-search { width: 42px; max-width: none; padding: 0; justify-content: center; }
+  .shell-search > :not(svg) { display: none; }
+  .shell-create { padding: 0 13px; }
+  .shell-create > span { display: none; }
+  .shell-hide-narrow { display: none; }
+  .shell-body { flex-direction: column; gap: 10px; margin: 10px 8px 0; align-items: stretch; }
+  .shell-main { padding: 6px 8px 24px; }
+  .shell-menu { position: fixed; left: 8px; right: 8px; top: 76px; width: auto; }
+}
+@media (max-width: 479px) { .shell-wordmark { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-item, .shell-item:hover, .shell-item:active { transition: none; transform: none; }
+  .shell-seg__link, .shell-icon, .shell-search { transition: none; }
+}

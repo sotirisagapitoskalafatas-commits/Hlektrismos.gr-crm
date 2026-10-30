@@ -19,7 +19,7 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 
 ---
 
-## 0. `phase1/20_crm_integrations_emergency_hotfix.sql` — EMERGENCY, run FIRST (after the backup gate)
+## 0. `phase1/20_crm_integrations_emergency_hotfix.sql` — EMERGENCY, run FIRST (after the backup gate) — **APPLIED to production 30 Oct 2026; skip it in the rollout (its probe row is true)**
 - **Why:** production `crm_integrations` still has a permissive policy for `public` (`USING true`) and `anon` table grants including the `config` column (integration tokens). Found by a read-only audit on 30 Oct 2026.
 - **Depends on:** only `is_role()` / `is_staff()` (present on production). Does not depend on any other staged file; the later files stay compatible.
 - **After it:** only an active `admin` reads or writes the table; anon and every other role are denied; `service_role` unchanged. No rollback to the open state is provided on purpose.

@@ -1,4 +1,4 @@
--- Phase 1/20 — EMERGENCY HOTFIX: public.crm_integrations (production finding, 30 Oct 2026). NOT applied anywhere yet.
+-- Phase 1/20 — EMERGENCY HOTFIX: public.crm_integrations (production finding, 30 Oct 2026). APPLIED to production on 30 Oct 2026 (this file, unchanged).
 -- Live state before this file (read-only audit): RLS on; permissive policy "authenticated can manage integrations"
 -- (roles = public, USING true, WITH CHECK true); anon holds SELECT/INSERT/UPDATE/DELETE and column access to `config`
 -- (which can hold integration tokens); authenticated holds full table privileges.

@@ -144,16 +144,18 @@ if (process.env.REHEARSE) {
   order.splice(order.findIndex((h) => h.file === 'phase2/05_staff_admin_and_role_preview') + 1, 0, h21); // right after the staff functions exist
   const before = Object.fromEntries((await db.query(`select table_name t from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'`)).rows.map((r) => [r.t, 0]));
   for (const t of Object.keys(before)) before[t] = Number((await db.query(`select count(*)::int n from public.${q(t)}`)).rows[0].n);
-  const failedSteps = [];
+  const failedSteps = []; const applied = [];
   // files whose own probe is already true on the snapshot are LIVE already (the apply-order document is older than the database): skipped, and said so
   const live0 = new Set((await db.query(repo('docs/ops/pending_migrations_check.sql'))).rows.filter((r) => r.applied).map((r) => r.file));
   console.log('\nREHEARSAL apply order: ' + order.map((h) => h.step).join(' -> '));
   console.log('REHEARSAL already live on production (skipped): ' + ([...live0].join(', ') || 'none'));
   for (const h of order) {
     if (live0.has(h.file)) continue;
+    applied.push(`${h.step}	${h.file}.sql`);
     try { await db.exec(adapt(repo(`supabase/staged-migrations/${h.file}.sql`))); }
     catch (e) { failedSteps.push(`${h.step} ${h.file}: ${e.message.split('\n')[0]}`); try { await db.exec('rollback'); } catch { /* none open */ } }
   }
+  console.log('REHEARSAL files applied, in order:' + NL + applied.map((a, i) => `  ${String(i + 1).padStart(2)}. step ${a}`).join(NL));
   check(`rehearsal: all ${order.filter((h) => !live0.has(h.file)).length} not-yet-live staged files applied on the restored production snapshot`, failedSteps.length === 0, failedSteps.join(' | '));
   // the repository's own pending-migrations probe: everything but the two superseded files must now be true
   let pend = [];
@@ -200,6 +202,11 @@ if (process.env.REHEARSE) {
   const polNow = (await db.query(`select tablename || '|' || policyname || '|' || permissive || '|' || cmd || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '') || '|' || array_to_string(roles, ',') k from pg_policies where schemaname = 'public'`)).rows.map((r) => r.k).sort();
   const polSnap = schema.policies.map((p) => `${p.tablename}|${p.policyname}|${p.permissive}|${p.cmd}|${p.qual ?? ''}|${p.with_check ?? ''}|${(Array.isArray(p.roles) ? p.roles : String(p.roles).replace(/[{}]/g, '').split(',')).join(',')}`).sort();
   check(`rollback: all ${schema.policies.length} policies identical to the snapshot`, JSON.stringify(polNow) === JSON.stringify(polSnap), `now ${polNow.length}, snapshot ${polSnap.length}`);
+  const stNow = (await db.query(`select tablename || '|' || policyname || '|' || permissive || '|' || cmd || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '') || '|' || array_to_string(roles, ',') k from pg_policies where schemaname = 'storage'`)).rows.map((r) => r.k).sort();
+  const stSnap = (schema.storage_policies ?? []).map((p) => `${p.tablename}|${p.policyname}|${p.permissive}|${p.cmd}|${p.qual ?? ''}|${p.with_check ?? ''}|${(Array.isArray(p.roles) ? p.roles : String(p.roles).replace(/[{}]/g, '').split(',')).join(',')}`).sort();
+  check(`rollback: all ${stSnap.length} storage.objects policies identical to the snapshot (rollout-added ones removed)`, JSON.stringify(stNow) === JSON.stringify(stSnap), `now ${stNow.length}, snapshot ${stSnap.length}`);
+  const bucketsNow = (await db.query('select id from storage.buckets order by id')).rows.map((r) => r.id);
+  check('rollback: storage buckets identical to the snapshot (rollout-created bucket removed)', JSON.stringify(bucketsNow) === JSON.stringify(lines(join(dir, 'platform', 'storage_buckets.ndjson')).map((l) => JSON.parse(l).id).sort()), bucketsNow.join(','));
   const trgNow = (await db.query(`select c.relname || '|' || g.tgname k from pg_trigger g join pg_class c on c.oid = g.tgrelid where c.relnamespace = 'public'::regnamespace and not g.tgisinternal`)).rows.map((r) => r.k).sort();
   check(`rollback: triggers identical to the snapshot (${schema.triggers.length})`, JSON.stringify(trgNow) === JSON.stringify(schema.triggers.map((t) => `${t.table}|${t.name}`).sort()));
   const colNow = (await db.query(`select c.relname || '.' || a.attname k from pg_attribute a join pg_class c on c.oid = a.attrelid where c.relnamespace = 'public'::regnamespace and c.relkind in ('r','p') and a.attnum > 0 and not a.attisdropped`)).rows.map((r) => r.k).sort();

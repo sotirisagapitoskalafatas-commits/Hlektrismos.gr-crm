@@ -19,6 +19,8 @@ const ALLOWED_CONSOLE = [
 // Network failures that are known and harmless, matched exactly as «STATUS METHOD path».
 const ALLOWED_NET = new Set([
   // signInAs() seeds the session and reloads the page, which cancels the first load's in-flight badge-count requests.
+  // Chrome asks for /favicon.ico on its own; the app ships its icon as an SVG link, so this request is not an app resource.
+  '404 GET /favicon.ico',
   'FAILED HEAD /rest/v1/cases net::ERR_ABORTED',
   'FAILED HEAD /rest/v1/leads net::ERR_ABORTED',
 ]);

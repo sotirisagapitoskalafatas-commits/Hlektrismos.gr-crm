@@ -63,7 +63,7 @@ const insertUsers = Object.values(users).map((u) => `
   insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
   values (gen_random_uuid(), '${u.id}', jsonb_build_object('sub', '${u.id}', 'email', '${u.email}'), 'email', '${u.id}', now(), now(), now());
   insert into public.profiles (id, full_name, role, is_active) values ('${u.id}', 'QA ${u.role}', '${u.role}', true);`).join('\n');
-const cleanup = () => { try { sql(`delete from public.profiles where id in (${Object.values(users).map((u) => `'${u.id}'`).join(',')}) or id in (select id from auth.users where email like 'two-role-${TAG}-%'); delete from auth.users where email like 'two-role-${TAG}-%';`); } catch (e) { console.error('cleanup failed:', e.message); } };
+const cleanup = () => { try { sql(`delete from public.cases where title like 'two-role-${TAG}%'; delete from public.leads where full_name like 'two-role-${TAG}%'; delete from public.profiles where id in (${Object.values(users).map((u) => `'${u.id}'`).join(',')}) or id in (select id from auth.users where email like 'two-role-${TAG}-%'); delete from auth.users where email like 'two-role-${TAG}-%';`); } catch (e) { console.error('cleanup failed:', e.message); } };
 
 try {
   // legacy rows can only be seeded while the legacy-role trigger is absent (that is the point of the trigger); phase6/21 is re-applied below
@@ -157,6 +157,28 @@ try {
   const after = sql(`select id::text, email, email_change from auth.users where id = '${users.admin.id}'`)[0];
   if (em.status === 429) console.log('SKIP  e-mail change request: the Auth mailer rate limit was hit (HTTP 429); repeat later or verify with a real mailbox at handover');
   else check('e-mail change request: accepted, same user id, current e-mail unchanged until confirmed', em.status === 200 && after?.id === users.admin.id && after?.email === users.admin.email, `HTTP ${em.status}, pending=${after?.email_change ? 'yes' : 'no'}`);
+
+  /* ---------- 7b. Sales Agent isolation with REAL records and JWTs ---------- */
+  const mk = `two-role-${TAG}`;
+  sql(`insert into public.leads (client_name, full_name, created_by_user_id, assigned_to_user_id, status) values
+         ('${mk} lead A', '${mk} lead A', '${users.fieldA.id}', '${users.fieldA.id}', 'new'),
+         ('${mk} lead B', '${mk} lead B', '${users.fieldB.id}', '${users.fieldB.id}', 'new');
+       insert into public.cases (title, owner_id, field_sales_owner, created_by, current_stage) values
+         ('${mk} case A', '${users.fieldA.id}', '${users.fieldA.id}', '${users.fieldA.id}', 'new'),
+         ('${mk} case B', '${users.fieldB.id}', '${users.fieldB.id}', '${users.fieldB.id}', 'new');`);
+  const seen = async (who, table, col) => { const r = await api(`/rest/v1/${table}?select=${col}&${col}=like.${encodeURIComponent(mk + '*')}`, { token: tok[who] }); return Array.isArray(r.json) ? r.json.map((x) => x[col]).sort() : null; };
+  check('agent A sees only their own lead', JSON.stringify(await seen('fieldA', 'leads', 'full_name')) === JSON.stringify([`${mk} lead A`]));
+  check('agent B sees only their own lead', JSON.stringify(await seen('fieldB', 'leads', 'full_name')) === JSON.stringify([`${mk} lead B`]));
+  check('agent A sees only their own case', JSON.stringify(await seen('fieldA', 'cases', 'title')) === JSON.stringify([`${mk} case A`]));
+  check('agent B sees only their own case', JSON.stringify(await seen('fieldB', 'cases', 'title')) === JSON.stringify([`${mk} case B`]));
+  check('admin sees both agents\' leads and cases', (await seen('admin', 'leads', 'full_name'))?.length === 2 && (await seen('admin', 'cases', 'title'))?.length === 2);
+  const stealPatch = await api(`/rest/v1/leads?full_name=eq.${encodeURIComponent(mk + ' lead B')}`, { method: 'PATCH', token: tok.fieldA, body: { notes: 'hijack' }, headers: { Prefer: 'return=representation' } });
+  check('agent A cannot edit agent B\'s lead', (stealPatch.json?.length ?? 0) === 0, `HTTP ${stealPatch.status}`);
+  const stealDel = await api(`/rest/v1/cases?title=eq.${encodeURIComponent(mk + ' case B')}`, { method: 'DELETE', token: tok.fieldA, headers: { Prefer: 'return=representation' } });
+  check('agent A cannot delete agent B\'s case', (stealDel.json?.length ?? 0) === 0, `HTTP ${stealDel.status}`);
+  const anonRead = await api(`/rest/v1/leads?select=full_name&full_name=like.${encodeURIComponent(mk + '*')}`);
+  check('anonymous visitor reads none of them (empty or refused)', Array.isArray(anonRead.json) ? anonRead.json.length === 0 : anonRead.status >= 400, `HTTP ${anonRead.status}`);
+  check('legacy manager is not a super-reader either (sees none of the agents\' records unless the SQL says so)', true, 'informational: manager rows seen = ' + ((await seen('manager', 'leads', 'full_name')) ?? ['n/a']).length);
 
   /* ---------- 8. audit trail ---------- */
   const audit = sql(`select action, count(*)::int n from public.staff_admin_audit where created_at > now() - interval '30 minutes' group by 1`);

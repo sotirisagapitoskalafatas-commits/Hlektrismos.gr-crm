@@ -886,8 +886,8 @@ export default function CaseDetailPage({ caseId }: { caseId: string }) {
       <button className="atx-link inline-flex items-center gap-1" onClick={() => go('cases')}><ArrowLeft size={15} /> Επιστροφή στα cases</button>
 
       {/* Identity */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <span className="w-14 h-14 rounded-full grid place-items-center text-[18px] font-bold shrink-0" style={{ background: 'var(--atx-blue-soft)', color: 'var(--atx-blue)' }} aria-hidden="true">
+      <div className="ui-card ui-casehead flex items-center gap-4 flex-wrap">
+        <span className="ui-casehead__avatar" aria-hidden="true">
           {(c.customer?.full_name ?? c.title).split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
         </span>
         <div className="flex-1 min-w-[220px]">

@@ -16,16 +16,16 @@ export type Capability = (typeof CAPABILITIES)[number];
 
 export const DEFAULT_ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
   admin: CAPABILITIES,
-  manager: [
-    "crm.read.team", "case.update.sales", "prospecting.search", "prospecting.import",
-    "campaign.draft", "campaign.approve", "communications.email.send", "communications.sms.send", "audit.read",
-  ],
+  manager: [], // legacy role: no capabilities (see LEGACY_ROLES below)
   inside_sales: [
     "crm.read.assigned", "case.update.sales", "prospecting.search", "campaign.draft", "communications.email.send",
   ],
   field_sales: ["crm.read.assigned", "case.update.sales"],
-  back_office: ["crm.read.assigned", "case.update.operations", "case.documents.verify"],
+  back_office: [], // legacy role: no capabilities (see LEGACY_ROLES below)
 };
+
+/** Preserved profiles that hold no privileges: no default, and no admin override can grant them anything. */
+export const LEGACY_ROLES: readonly string[] = ["manager", "back_office"];
 
 export type Overrides = Partial<Record<Role, Capability[]>>;
 
@@ -49,6 +49,7 @@ export function hasCapability(role: string | null | undefined, cap: Capability, 
   if (!isRole(role) || !isCap(cap)) return false;
   // An admin can never be locked out of administration by a bad override.
   if (role === "admin") return true;
+  if (LEGACY_ROLES.includes(role)) return false; // not even through role_permissions overrides
   const list = overrides[role] ?? DEFAULT_ROLE_CAPABILITIES[role];
   return list.includes(cap);
 }

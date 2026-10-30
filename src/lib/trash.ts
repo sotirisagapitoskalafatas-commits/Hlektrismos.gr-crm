@@ -12,7 +12,7 @@ export interface TrashRow {
   deleted_at: string; deleted_by_name: string | null; deleted_reason: string | null; references_json: Record<string, number>;
 }
 
-export const canTrash = (role: Role | null | undefined) => role === 'admin' || role === 'manager';
+export const canTrash = (role: Role | null | undefined) => role === 'admin';
 export const canPurge = (role: Role | null | undefined) => role === 'admin';
 
 /** Rows in the trash are never part of normal lists (also when the column does not exist yet). */

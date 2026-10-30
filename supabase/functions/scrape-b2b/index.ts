@@ -2,7 +2,7 @@
 // Requires staged migration phase3/08. Flow: validate → quota → job row → searches → upsert prospects (the database
 // screens: keys, duplicates, quality) → job counts. Approval and distribution happen in the CRM (Back Office).
 //
-// Callers: active staff with role admin / manager / inside_sales / back_office, or the service role (AI orchestrator,
+// Callers: active staff with role admin / inside_sales (legacy manager / back_office have no access), or the service role (AI orchestrator,
 // old {category, region} body still accepted). The SerpApi key stays server-side (crm_settings, never returned).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -11,7 +11,7 @@ import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "..
 import { LIMITS, allowedQueries, planQueries, toProspect, validateSearch } from "../_shared/b2b-search.ts";
 import type { PlannedQuery } from "../_shared/b2b-search.ts";
 
-const SEARCH_ROLES = ["admin", "manager", "inside_sales", "back_office"];
+const SEARCH_ROLES = ["admin", "inside_sales"];
 const json = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 

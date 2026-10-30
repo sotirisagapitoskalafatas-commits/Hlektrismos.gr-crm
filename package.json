@@ -12,7 +12,10 @@
     "qa": "playwright test -c qa/playwright.config.ts",
     "qa:install": "playwright install chromium",
     "test": "node --test --test-concurrency=3 src/lib/__tests__/*.test.mjs supabase/functions/_shared/__tests__/*.test.mjs supabase/tests/*.test.mjs scripts/ci/__tests__/*.test.mjs",
-    "qa:ui": "node scripts/qa/ui-smoke.mjs",
+    "qa:ui": "node scripts/qa/redesign-smoke.mjs",
+    "qa:redesign": "node scripts/qa/redesign-smoke.mjs",
+    "qa:ui:legacy": "node scripts/qa/ui-smoke.mjs",
+    "qa:staging-two-role": "node scripts/qa/staging-two-role.mjs",
     "qa:lead-upload": "node scripts/qa/lead-upload-mobile.mjs"
   },
   "dependencies": {

@@ -162,7 +162,8 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   );
 }
 
-const TEAM_ROLE: Record<Team, Role> = { inside_sales: 'inside_sales', field_sales: 'field_sales', back_office: 'back_office' };
+// Who can be handed a case per team: the office team is the shared Admin / Back Office login; both sales roles are one Sales Agent group.
+const TEAM_ROLES: Record<Team, Role[]> = { inside_sales: ['inside_sales', 'field_sales'], field_sales: ['inside_sales', 'field_sales'], back_office: ['admin'] };
 const TEAM_FIELD: Record<Team, 'inside_sales_owner' | 'field_sales_owner' | 'back_office_owner'> = {
   inside_sales: 'inside_sales_owner', field_sales: 'field_sales_owner', back_office: 'back_office_owner',
 };
@@ -175,7 +176,7 @@ export function HandoverDialog({ c, open, staff, role, onClose, onDone }: {
   const [person, setPerson] = useState('');
   const [need, setNeed] = useState('');
   const [busy, setBusy] = useState(false);
-  const people = useMemo(() => staff.filter(s => s.role === TEAM_ROLE[team]), [staff, team]);
+  const people = useMemo(() => staff.filter(s => TEAM_ROLES[team].includes(s.role)), [staff, team]);
   useEffect(() => { setPerson(''); }, [team]);
   useEffect(() => { if (open) { setNeed(''); setPerson(''); } }, [open]);
   if (!open) return null;

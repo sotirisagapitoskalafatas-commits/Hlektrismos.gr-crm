@@ -19,7 +19,7 @@ const out = await build({ entryPoints: [path('../home-widgets.ts')], bundle: tru
 const W = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 
 const ids = (l) => l.map((x) => x.id);
-const ROLES = ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'];
+const ROLES = ['admin', 'inside_sales', 'field_sales']; // the roles that hold access; legacy manager / back_office never reach Home
 
 test('every role has a default layout of only the boxes it may have; team and summary are for admins/managers', () => {
   for (const r of ROLES) {
@@ -29,9 +29,8 @@ test('every role has a default layout of only the boxes it may have; team and su
     for (const it of d) assert.ok(W.widgetMeta(it.id).sizes.includes(it.size), `${r}:${it.id} default size allowed`);
   }
   assert.ok(ids(W.defaultLayout('admin')).includes('summary'));
-  assert.ok(!ids(W.defaultLayout('manager')).includes('summary'), 'summary is admin only');
-  assert.ok(ids(W.defaultLayout('manager')).includes('team'));
-  for (const r of ['inside_sales', 'field_sales', 'back_office']) {
+  assert.ok(ids(W.defaultLayout('admin')).includes('team'));
+  for (const r of ['manager', 'inside_sales', 'field_sales', 'back_office']) {
     assert.ok(!ids(W.defaultLayout(r)).includes('team') && !ids(W.defaultLayout(r)).includes('summary'), r);
   }
   assert.equal(W.defaultLayout('inside_sales').find((x) => x.id === 'ai').size, 'XL', 'no team column: AI fills the row');

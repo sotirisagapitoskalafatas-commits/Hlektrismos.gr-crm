@@ -33,7 +33,7 @@ export const WIDGETS: readonly WidgetMeta[] = [
   { id: 'kpi-new', title: 'Νέα Cases', sizes: KPI_SIZES, defaultSize: 'S' },
   { id: 'tasks', title: 'Σημερινά Tasks', sizes: ['M', 'L', 'XL'], defaultSize: 'M' },
   { id: 'pipeline', title: 'Pipeline', sizes: ['M', 'L', 'XL'], defaultSize: 'M' },
-  { id: 'team', title: 'Η ομάδα', sizes: ['M', 'L', 'XL'], defaultSize: 'M', roles: ['admin', 'manager'] },
+  { id: 'team', title: 'Η ομάδα', sizes: ['M', 'L', 'XL'], defaultSize: 'M', roles: ['admin'] },
   { id: 'ai', title: 'Atlas AI', sizes: ['M', 'L', 'XL'], defaultSize: 'M' },
   { id: 'summary', title: 'Σύνοψη διαχειριστή', sizes: ['L', 'XL'], defaultSize: 'XL', roles: ['admin'] },
 ];
@@ -46,7 +46,7 @@ export function widgetsForRole(role: Role): WidgetMeta[] {
 }
 
 export function defaultLayout(role: Role): LayoutItem[] {
-  const teamView = role === 'admin' || role === 'manager';
+  const teamView = role === 'admin';
   return widgetsForRole(role).map((w) => ({ id: w.id, size: w.id === 'ai' && !teamView ? 'XL' : w.defaultSize }));
 }
 

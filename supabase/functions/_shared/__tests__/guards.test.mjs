@@ -26,10 +26,19 @@ test('conservative defaults: only admin can send campaigns, call, manage integra
       assert.equal(perms.hasCapability(role, c), false, `${role} must not have ${c}`);
     }
   }
-  assert.equal(perms.hasCapability('manager', 'campaign.approve'), true);
   assert.equal(perms.hasCapability('inside_sales', 'campaign.approve'), false);
-  assert.equal(perms.hasCapability('back_office', 'case.documents.verify'), true);
   assert.equal(perms.hasCapability('field_sales', 'case.documents.verify'), false);
+});
+
+test('legacy manager and back_office hold NO capability — not by default and not through role_permissions overrides', () => {
+  const grantEverything = perms.parseOverrides({ manager: [...perms.CAPABILITIES], back_office: [...perms.CAPABILITIES] });
+  for (const role of ['manager', 'back_office']) {
+    for (const c of perms.CAPABILITIES) {
+      assert.equal(perms.hasCapability(role, c), false, `${role} default ${c}`);
+      assert.equal(perms.hasCapability(role, c, grantEverything), false, `${role} override ${c}`);
+    }
+  }
+  assert.equal(perms.hasCapability('admin', 'users.manage_roles', grantEverything), true, 'admin unaffected');
 });
 
 test('overrides: valid ones apply, malformed ones are ignored, admin cannot be locked out', () => {

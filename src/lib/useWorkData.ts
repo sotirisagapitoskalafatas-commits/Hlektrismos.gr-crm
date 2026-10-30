@@ -52,7 +52,7 @@ export function useWorkData() {
     [uid, now, state.cases, state.followUps, state.leads],
   );
 
-  const isTeamView = role === 'admin' || role === 'manager';
+  const isTeamView = role === 'admin';
   const summary: HomeSummary | null = useMemo(
     () => (uid ? buildHomeSummary({ uid, isTeamView, items, cases: state.cases, leads: state.leads, followUps: state.followUps, now }) : null),
     [uid, isTeamView, items, state.cases, state.leads, state.followUps, now],

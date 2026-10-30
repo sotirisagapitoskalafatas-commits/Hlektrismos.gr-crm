@@ -175,14 +175,16 @@ test('billing-ocr: files only from this project\'s storage; SSRF targets and for
   f.restore();
 });
 
-test('billing-ocr: the agent\'s own bill and Back Office reads are processed', async () => {
+test('billing-ocr: the agent\'s own bill and the shared Admin / Back Office login are processed; a legacy back_office profile is refused', async () => {
   const f = await ocr(seed());
   const own = await f.call({ token: 'tok-a', body: { lead_id: LA, bucket: 'hlektrismos_docs', path: 'contact-forms/a.pdf' } });
   assert.notEqual(own.status, 403);
   assert.notEqual(own.status, 400);
   assert.deepEqual(f.db.log.storage.map((s) => s.path), ['contact-forms/a.pdf']);
-  const office = await f.call({ token: 'tok-office', body: { lead_id: LB, bucket: 'hlektrismos_docs', path: 'contact-forms/b.pdf' } });
+  const office = await f.call({ token: 'tok-admin', body: { lead_id: LB, bucket: 'hlektrismos_docs', path: 'contact-forms/b.pdf' } });
   assert.notEqual(office.status, 403);
+  const legacy = await f.call({ token: 'tok-office', body: { lead_id: LB, bucket: 'hlektrismos_docs', path: 'contact-forms/b.pdf' } });
+  assert.equal(legacy.status, 403, 'a legacy back_office profile has no office access any more');
   f.restore();
 });
 

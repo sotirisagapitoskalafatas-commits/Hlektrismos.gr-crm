@@ -22,7 +22,7 @@ type Tab = { page: PageKey; label: string; icon: typeof Home; badge?: keyof Coun
    Back Office → Διεκπεραίωση/Cases. Everything else is one tap away in the module strip under the top bar. */
 function tabsForRole(role: Role): Tab[] {
   const tabs: Tab[] = [{ page: 'home', label: 'Αρχική', icon: Home }];
-  if (role === 'admin' || role === 'manager' || role === 'inside_sales') {
+  if (role === 'admin' || role === 'inside_sales') {
     tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
     tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
   } else if (role === 'field_sales') {

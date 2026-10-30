@@ -68,8 +68,8 @@ export default function AutomationPage() {
   const { role } = useAuth();
   const [tab, setTab] = useState<TabId>('overview');
 
-  const canWrite = role === 'admin' || role === 'manager';
-  const canConsentWrite = canWrite || role === 'back_office';
+  const canWrite = role === 'admin';
+  const canConsentWrite = canWrite;
 
   return (
     <div className="max-w-6xl space-y-4">

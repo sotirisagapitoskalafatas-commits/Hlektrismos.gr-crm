@@ -73,8 +73,9 @@ test('assistant: answers today/overdue/leads from the same work items', () => {
 test('assistant: navigation is limited to the role\'s pages; team summary only for managers/admins', () => {
   assert.equal(A.answer('Άνοιξε Leads', ctx()).results[0].action.page, 'leads');
   assert.match(A.answer('Άνοιξε Έσοδα', ctx()).text, /δεν είναι διαθέσιμη/);
-  assert.match(A.answer('Σύνοψη ομάδας', ctx()).text, /διευθυντές/);
-  assert.match(A.answer('Σύνοψη ομάδας', ctx({ role: 'manager' })).text, /2 νέα leads/);
+  assert.match(A.answer('Σύνοψη ομάδας', ctx()).text, /διαχειριστή/);
+  assert.match(A.answer('Σύνοψη ομάδας', ctx({ role: 'admin' })).text, /2 νέα leads/);
+  for (const role of ['manager', 'back_office']) assert.match(A.answer('Σύνοψη ομάδας', ctx({ role })).text, /διαχειριστή/, `legacy ${role} gets no team summary`);
 });
 test('assistant: unknown requests get an honest answer, never fabricated data', () => {
   const r = A.answer('ποιος είναι ο καιρός', ctx());

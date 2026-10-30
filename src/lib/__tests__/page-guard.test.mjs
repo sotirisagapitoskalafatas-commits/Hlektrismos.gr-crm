@@ -32,7 +32,7 @@ const EXPECTED = {
   account: ['admin', 'inside_sales', 'field_sales'],
   preferences: ['admin', 'inside_sales', 'field_sales'],
   homelayout: ['admin', 'inside_sales', 'field_sales'],
-  leads: ['admin', 'inside_sales'],
+  leads: ['admin', 'inside_sales', 'field_sales'], // field_sales: link-only (not in its sidebar) - work items, map, field assistant link to it
   map: ['admin', 'field_sales'],
   myday: ['admin', 'field_sales'],
   field: ['admin', 'field_sales'],
@@ -69,6 +69,13 @@ test('Labs pages: only the Admin with the Labs switch on; never a Sales Agent, n
   } finally { labs = 'off'; }
 });
 
+test("the sidebar is unchanged by the guard: leads stays out of the field agent's navigation, but the link-only page is allowed", () => {
+  const nav = (r) => R.navForRole(r).flatMap((s) => s.children.map((c) => c.page));
+  assert.ok(!nav('field_sales').includes('leads'));
+  assert.equal(R.canOpenPage('leads', 'field_sales'), true);
+  for (const r of ['manager', 'back_office']) assert.equal(R.canOpenPage('leads', r), false);
+});
+
 test('direct / programmatic navigation: a Sales Agent cannot open any Admin-only page', () => {
   for (const role of ['inside_sales', 'field_sales']) {
     for (const page of ['backoffice', 'reports', 'revenue', 'admin', ...LABS_PAGES]) {
@@ -81,6 +88,7 @@ test('direct / programmatic navigation: a Sales Agent cannot open any Admin-only
   }
   assert.equal(R.canOpenPage('leads', 'inside_sales'), true);
   assert.equal(R.canOpenPage('field', 'field_sales'), true);
+  assert.equal(R.canOpenPage('field', 'inside_sales'), false);
 });
 
 test('unknown pages and unknown / missing roles are refused (nothing falls through to a default)', () => {
@@ -138,4 +146,51 @@ test('navigation helpers only change the route (view); they cannot bypass the sh
   assert.ok(!/canOpenPage|fetch|supabase/.test(nav), 'nav.tsx just holds the view state');
   assert.match(nav, /setView\(\{ page: p/);
   assert.match(nav, /setView\(\{ page: 'case'/);
+});
+
+// In-app links: a control that sends a role to a page that role cannot open would dead-end in the denied state. Every audited
+// link source below is paired with the roles that can SEE the control.
+const LINKS = [
+  ['components/app/MapPage.tsx', 'leads', ['admin', 'field_sales']],
+  ['components/work/WorkRow.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']],
+  ['components/customers/SupplyPointsTab.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']],
+  ['components/dashboards/OperationalStrip.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']],
+  ['components/app/AppShell.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']], // command palette lead hits
+  ['components/dashboards/InsideSalesDashboard.tsx', 'leads', ['inside_sales']],
+  ['components/dashboards/FieldSalesDashboard.tsx', 'myday', ['field_sales']],
+  ['components/dashboards/FieldSalesDashboard.tsx', 'map', ['field_sales']],
+  ['components/shells/MobileShell.tsx', 'myday', ['field_sales']], // rendered only for field_sales
+  ['components/shells/MobileShell.tsx', 'map', ['field_sales']],
+  ['components/app/MyDayPage.tsx', 'field', ['admin', 'field_sales']],
+  ['components/dashboards/AdminDashboard.tsx', 'reports', ['admin']],
+  ['components/dashboards/AdminDashboard.tsx', 'backoffice', ['admin']],
+  ['components/shell/TopBar.tsx', 'admin', ['admin']],
+];
+test('in-app links never send a role that sees the control to a page it cannot open', () => {
+  for (const [file, page, roles] of LINKS) {
+    const src = readFileSync(join(root, file), 'utf8');
+    assert.ok(new RegExp("go\\(\\s*'" + page + "'").test(src), file + ' still links to ' + page + ' (update the audit table)');
+    for (const role of roles) assert.equal(R.canOpenPage(page, role), true, file + ': ' + role + ' sees a link to ' + page + ' it cannot open');
+  }
+});
+
+test('the denied state returns to Home inside the app (go), not to the public website route', () => {
+  const pd = readFileSync(join(root, 'components/app/PageDenied.tsx'), 'utf8');
+  assert.match(pd, /go\('home'\)/);
+  assert.ok(!/href="#\/"/.test(pd), '#/ is the public landing route, not the CRM Home');
+  for (const role of ['admin', 'inside_sales', 'field_sales']) assert.equal(R.canOpenPage('home', role), true, role + ' can open Home, so the way out cannot loop');
+});
+
+test('a signed-in account with no usable profile reaches nothing: the role is not assumed', () => {
+  const app = readFileSync(join(root, 'App.tsx'), 'utf8').replace(/\r\n/g, '\n');
+  const wait = app.indexOf('if (!profileReady) return routeFallback');
+  const gate = app.indexOf('hasAccess(profile?.role) ? <AppShell /> : <NoAccessPage />');
+  assert.ok(wait > 0 && gate > wait, 'App waits for the profile, then admits only a role that holds access');
+  const auth = readFileSync(join(root, 'lib/auth.tsx'), 'utf8');
+  assert.match(auth, /profileReady/);
+  assert.match(auth, /setProfile\(\(data as Profile \| null\) \?\? null\)/, 'a missing row is stored as null, never the previous profile');
+  assert.match(auth, /finally \{\s*setProfileFor\(uid\)/, 'readiness is set even when the read fails (fail closed, not stuck)');
+  // the role used while no profile exists is the least-privileged ACTIVE role, and App never lets it render the shell
+  assert.equal(R.DEFAULT_ROLE, 'inside_sales');
+  for (const r of [undefined, null, '', 'intern', 'manager', 'back_office']) assert.equal(R.hasAccess(r), false, String(r) + ' is not admitted');
 });

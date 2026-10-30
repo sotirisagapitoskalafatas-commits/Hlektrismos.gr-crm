@@ -354,10 +354,20 @@ export function navForRole(role: Role): NavSection[] {
     .filter(s => s.children.length > 0);
 }
 
-/** Direct address / programmatic open: a page may be shown only if the role's own navigation contains it. A case opens for any role with access. */
+/** Pages a role reaches only through an in-app link (a work item, the field assistant, the map), not through its sidebar.
+ *  Before the central page guard these links worked; they are kept explicitly rather than by accident. Record visibility is
+ *  still decided by the database (a field agent sees only the leads RLS returns for them). */
+const LINK_ONLY_PAGES: Partial<Record<Role, readonly PageKey[]>> = {
+  field_sales: ['leads'],
+};
+
+/** The single page-boundary rule (AppShell): a page may be shown only if the role's own navigation contains it (Labs pages
+ *  additionally need the admin's Labs switch), or it is an explicit link-only page above. A case opens for any role with
+ *  access. Unknown pages and legacy / unknown roles are refused. */
 export function canOpenPage(page: PageKey | 'case', role: Role): boolean {
   if (!hasAccess(role)) return false;
   if (page === 'case') return true;
+  if (LINK_ONLY_PAGES[role]?.includes(page)) return true;
   return navForRole(role).some(s => s.children.some(i => i.page === page));
 }
 

@@ -161,7 +161,7 @@ test('no source file grants anything to a legacy role: no role === manager/back_
 
 test('the CRM shell is closed to a legacy profile: App shows the no-access page, AppShell blocks every page', () => {
   const app = readFileSync(join(root, 'App.tsx'), 'utf8');
-  assert.ok(/isLegacyRole\(profile\?\.role\)\s*\?\s*<NoAccessPage\s*\/>\s*:\s*<AppShell\s*\/>/.test(app), 'App: legacy profile → NoAccessPage');
+  assert.ok(/hasAccess\(profile\?\.role\)\s*\?\s*<AppShell\s*\/>\s*:\s*<NoAccessPage\s*\/>/.test(app), 'App: legacy / unknown / missing profile → NoAccessPage');
   const shell = readFileSync(join(root, 'components/app/AppShell.tsx'), 'utf8');
   assert.ok(/canOpenPage\(view\.page, role\)/.test(shell) && /if \(pageDenied\) return <PageDenied \/>/.test(shell), 'AppShell: canOpenPage (false for a role without access) refuses every page; see page-guard.test.mjs');
   const na = readFileSync(join(root, 'components/app/NoAccessPage.tsx'), 'utf8');

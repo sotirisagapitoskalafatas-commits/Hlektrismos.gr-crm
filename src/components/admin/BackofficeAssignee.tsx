@@ -18,7 +18,7 @@ export default function BackofficeAssignee() {
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => { const a = await fetchDefaultBackofficeAssignee(); setCur(a); setPick(a?.id ?? ''); }, []);
   useEffect(() => { void load(); }, [load]);
-  const bo = staff.filter(s => s.role === 'back_office');
+  const bo = staff.filter(s => s.role === 'admin' || s.role === 'back_office'); // the shared Admin / Back Office login (and any legacy back_office row)
   const isAdmin = role === 'admin';
 
   const save = async () => {

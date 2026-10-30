@@ -9,6 +9,8 @@ import { updateProfile } from '@/lib/api';
 import { Btn, Card, CardHeader, Field, Micro, Pill } from '@/lib/ui';
 import { THEMES } from '@/lib/theme';
 import { usePreferences } from '@/lib/preferences';
+import { supabase } from '@/lib/supabase';
+import { looksLikeEmail } from '@/lib/password-rules';
 import { checkAvatarFile, cropToAvatarBlob, forgetAvatar, removeAvatar, uploadAvatar } from '@/lib/avatar';
 import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
 import type { NavigationApp } from '@/lib/navigation/external-maps';
@@ -39,6 +41,38 @@ function SaveNote() {
     : remote === 'unavailable' ? 'Οι επιλογές αποθηκεύονται σε αυτόν τον browser.'
     : 'Οι αλλαγές αποθηκεύονται αυτόματα.';
   return <p className="text-[11px] text-ink/45 mt-3" role="status">{text}</p>;
+}
+
+/* ───────── E-mail handover (Admin / Back Office only) ─────────
+   Uses the supported Supabase Auth e-mail change: the same account (same user id, profile, history) gets a new address once
+   the confirmation link(s) are opened. Nothing is edited in the database directly. */
+function EmailChangeCard({ current }: { current: string }) {
+  const [next, setNext] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  const submit = async () => {
+    setMsg(null);
+    if (!looksLikeEmail(next)) { setMsg({ tone: 'err', text: 'Συμπληρώστε μια έγκυρη διεύθυνση email.' }); return; }
+    if (next.trim().toLowerCase() === current.toLowerCase()) { setMsg({ tone: 'err', text: 'Η νέα διεύθυνση είναι ίδια με την τρέχουσα.' }); return; }
+    if (!supabase) return;
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ email: next.trim() }, { emailRedirectTo: `${window.location.origin}/` });
+    setBusy(false);
+    setMsg(error
+      ? { tone: 'err', text: 'Η αλλαγή δεν ξεκίνησε. Ελέγξτε τη διεύθυνση ή δοκιμάστε αργότερα.' }
+      : { tone: 'ok', text: 'Στείλαμε email επιβεβαίωσης. Ανοίξτε τον σύνδεσμο (ίσως και στην τρέχουσα διεύθυνση) για να ολοκληρωθεί η αλλαγή. Μέχρι τότε συνδέεστε με την τρέχουσα διεύθυνση.' });
+  };
+  return (
+    <Card>
+      <CardHeader micro="Μόνο για τον λογαριασμό Admin / Back Office" title="Αλλαγή email του λογαριασμού" className="mb-3" />
+      <p className="text-xs text-ink/55 mb-3">Για παράδοση στο επίσημο email της εταιρείας. Ο λογαριασμός, το ιστορικό και οι αναθέσεις μένουν ίδια — αλλάζει μόνο η διεύθυνση σύνδεσης.</p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input type="email" className="field flex-1" value={next} onChange={(e) => setNext(e.target.value)} placeholder="νέο.email@εταιρεία.gr" aria-label="Νέο email" autoComplete="off" />
+        <Btn onClick={() => void submit()} disabled={busy || !next.trim()}>{busy ? 'Αποστολή…' : 'Αποστολή επιβεβαίωσης'}</Btn>
+      </div>
+      <p className={`text-xs mt-2 ${msg?.tone === 'err' ? 'text-bad-600' : 'text-ink/60'}`} role="status">{msg?.text ?? ''}</p>
+    </Card>
+  );
 }
 
 /* ───────── Προφίλ ───────── */
@@ -124,6 +158,8 @@ function ProfileSection() {
           </div>
         </div>
       </Card>
+
+      {realRole === 'admin' && user?.email && <EmailChangeCard current={user.email} />}
 
       <Card>
         <CardHeader micro="Στοιχεία προφίλ" title="Επεξεργασία" className="mb-3" />

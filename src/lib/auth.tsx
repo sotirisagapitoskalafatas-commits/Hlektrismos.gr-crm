@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { takeAuthLink } from './auth-link';
 import { Role, DEFAULT_ROLE } from './roles';
 import { fetchUserRoles } from './api';
 import { previewAllowed, ROLE_PREVIEW_HARD_STOP, setPreviewActive } from './role-preview';
@@ -75,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       // The e-mailed reset link signs the person in with a recovery session: send them to the choose-a-new-password page.
       if (event === 'PASSWORD_RECOVERY') window.location.hash = '/reset';
+      // An invitation signs the person in with no password yet: the same page lets them choose one.
+      else if (event === 'SIGNED_IN' && takeAuthLink() === 'invite') window.location.hash = '/reset';
     });
     return () => sub.subscription.unsubscribe();
   }, []);

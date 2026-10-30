@@ -333,3 +333,15 @@ select to_regclass('public.user_preferences') is not null
   as applied;
 ```
 - **Required staging tests:** user A cannot read/write user B's row or avatar; anon denied; admin/Back Office can read (not write) avatars; a non-JPEG or other-path upload is rejected.
+
+## 25. `phase6/21_two_role_model.sql` — exactly two account categories (supersedes phase4/17 and phase4/20)
+- **Depends on:** phase2/05 (staff functions, audit table, `profiles_guard_privileged`). Replace, do not replay, 17/20.
+- **Effect:** only the active `admin` (the shared Admin / Back Office login) can create, edit, (de)activate, reset or delete Sales Agent accounts and read the staff directory / audit; new accounts are `field_sales` only; `manager` / `back_office` can never be assigned again (existing rows stay, can be deactivated); an inactive account can no longer edit even its own profile row.
+- **Rollback:** [`rollback_phase6_21_two_role_model.sql`](rollback_phase6_21_two_role_model.sql).
+- **Check (must be true):**
+```sql
+select exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_office' and not tgisinternal)
+  and pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure) like '%a.role <> ''admin''%' as applied;
+```
+- **Required staging tests:** the 13-point matrix with real JWTs (admin, manager, legacy back office, both sales roles, inactive agent with an old session, anon, API-key-only) through `admin-users`, the `staff_*` RPCs and direct PostgREST; audit rows written for every management action.
+

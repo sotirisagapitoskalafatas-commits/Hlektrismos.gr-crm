@@ -1,5 +1,5 @@
 // Staff accounts: create (invite or temporary password), password reset e-mail and permanent delete, via the Supabase Auth Admin API.
-// Two effective groups: Admin keeps legacy super-admin scope; Back Office and legacy Manager may administer Sales Agent accounts only. Sales users cannot provision or manage accounts.
+// Two-role model: ONLY the active Admin / Back Office account (role `admin`) may create or manage Sales Agent accounts; legacy Manager / Back Office, Sales Agents, inactive users and API-key-only callers are refused.
 // Edits, role changes and (de)activation go through the audited SQL functions staff_update / staff_set_active
 // (staged migration phase2/05), so the same matrix is enforced by the database for every path.
 //
@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
 
     const site = Deno.env.get("SITE_URL") ?? "https://hlektrismos.gr";
     const created = input.mode === "invite"
-      ? await admin.auth.admin.inviteUserByEmail(input.email, { data: { full_name: input.full_name }, redirectTo: `${site}/#/app` })
+      ? await admin.auth.admin.inviteUserByEmail(input.email, { data: { full_name: input.full_name }, redirectTo: `${site}/` })
       : await admin.auth.admin.createUser({ email: input.email, password: input.password, email_confirm: true, user_metadata: { full_name: input.full_name } });
     if (created.error || !created.data?.user) {
       const msg = created.error?.message ?? "";
@@ -111,7 +111,7 @@ Deno.serve(async (req: Request) => {
     }
     // The user receives the recovery e-mail and chooses the password themselves. No link, token or password is ever returned here.
     const site = Deno.env.get("SITE_URL") ?? "https://hlektrismos.gr";
-    const { error: resetErr } = await admin.auth.resetPasswordForEmail(email!, { redirectTo: `${site}/#/app` });
+    const { error: resetErr } = await admin.auth.resetPasswordForEmail(email!, { redirectTo: `${site}/` });
     if (resetErr) return errorResponse("Η αποστολή email επαναφοράς απέτυχε. Ελέγξτε τη ρύθμιση email/Auth.", 502);
     await audit({ action: "password_reset", target_id: targetId, target_email: email, note: "recovery e-mail sent" });
     return jsonResponse({ ok: true });

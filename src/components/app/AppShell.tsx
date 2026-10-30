@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { preferencesStore } from '@/lib/preferences';
 import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import { cacheAppShell } from '@/lib/pwa';
@@ -34,8 +35,7 @@ const RevenuePage = lazy(() => import('./RevenuePage'));
 
 const CustomersPage = lazy(() => import('./CustomersPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
-const AccountPage = lazy(() => import('./AccountPage'));
-const PreferencesPage = lazy(() => import('./PreferencesPage'));
+const CustomizePage = lazy(() => import('./CustomizePage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const AutomationBuilderPage = lazy(() => import('./AutomationBuilderPage'));
 const AIWorkforcePage = lazy(() => import('./AIWorkforcePage'));
@@ -47,7 +47,7 @@ const FieldModePage = lazy(() => import('@/components/field-sales/FieldModePage'
 /* The shell chrome lives in components/shell (TopBar, Sidebar, ModuleMap). This file composes it with the page body
    and the ⌘K palette. Every page draws its own visible title; the ones below draw an H1 themselves, and for the
    rest the shell adds a visually hidden H1 so each screen still has exactly one top-level heading. */
-const OWN_HEADING = new Set<string>(['home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting']);
+const OWN_HEADING = new Set<string>(['account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting']);
 
 /* ---------------- ⌘K palette + global search ---------------- */
 function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -206,7 +206,14 @@ function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
 /* ---------------- Shell ---------------- */
 
 export default function AppShell() {
-  const { signOut, role } = useAuth();
+  const { signOut, role, user } = useAuth();
+  const userId = user?.id;
+  // Load the account's preferences once after login (theme etc. were already applied from the local copy).
+  useEffect(() => {
+    if (!userId) return;
+    void preferencesStore.loadForUser(userId);
+    return () => { void preferencesStore.flush(); preferencesStore.signOut(); };
+  }, [userId]);
   const { view } = useNav();
   const { device } = useDeviceContext();
   const isMobile = device === 'PHONE';
@@ -257,8 +264,9 @@ export default function AppShell() {
       case 'customers': return <CustomersPage />;
       case 'reports': return <ReportsPage />;
       case 'revenue': return <RevenuePage />;
-      case 'account': return <AccountPage />;
-      case 'preferences': return <PreferencesPage />;
+      case 'account': return <CustomizePage section="profile" />;
+      case 'preferences': return <CustomizePage section="appearance" />;
+      case 'homelayout': return <CustomizePage section="home" />;
       case 'admin': return <SettingsPage />;
       case 'automations': return <AutomationBuilderPage />;
       case 'aiworkforce': return <AIWorkforcePage />;

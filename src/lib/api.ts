@@ -265,11 +265,12 @@ export async function ensureProfile(): Promise<{ id: string; full_name: string; 
   return data ?? null;
 }
 
-export async function updateProfile(id: string, patch: { full_name?: string; phone?: string | null }): Promise<boolean> {
+export async function updateProfile(id: string, patch: { full_name?: string; phone?: string | null; avatar_url?: string | null }): Promise<boolean> {
   if (!supabase) return false;
   const upd: Record<string, unknown> = {};
   if (patch.full_name !== undefined) upd.full_name = patch.full_name;
   if (patch.phone !== undefined) upd.phone = patch.phone;
+  if (patch.avatar_url !== undefined) upd.avatar_url = patch.avatar_url;
   if (Object.keys(upd).length === 0) return true;
   const { error } = await supabase.from('profiles').update(upd).eq('id', id);
   if (error) { logError('updateProfile', error); return false; }

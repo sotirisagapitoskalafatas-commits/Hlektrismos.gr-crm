@@ -103,5 +103,5 @@ test('CRM groups and settings groups: labels and admin-only block', () => {
   const s = M.settingsModule('admin');
   assert.deepEqual(s.groups.map((g) => g.label), [undefined, 'Μόνο για διαχειριστές']);
   assert.deepEqual(M.settingsModule('inside_sales').groups.map((g) => g.label), [undefined]);
-  assert.equal(M.settingsModule('inside_sales').groups[0].items.find((i) => i.key === 'account').label, 'Προφίλ & λογαριασμός');
+  assert.equal(M.settingsModule('inside_sales').groups[0].items.find((i) => i.key === 'account').label, 'Προφίλ');
 });

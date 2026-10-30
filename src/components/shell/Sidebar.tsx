@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import type { ShellCounts } from '@/lib/roles';
 import type { AnyPage, ModuleDef, ModuleItem } from './ModuleMap';
+import ShellAvatar from './ShellAvatar';
 
 export type SidebarMode = 'full' | 'compact' | 'strip';
 const STROKE = 1.6;
@@ -35,7 +36,6 @@ export default function Sidebar({ module, page, counts, mode, onToggleCompact }:
   const { profile } = useAuth();
   const { go } = useNav();
   const compact = mode === 'compact';
-  const initial = (profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase();
 
   return (
     <aside className="shell-sidebar" data-mode={mode} aria-label={module ? `Πλοήγηση: ${module.label}` : 'Πλοήγηση'}>
@@ -66,7 +66,7 @@ export default function Sidebar({ module, page, counts, mode, onToggleCompact }:
           <span className="shell-item__text">Προσαρμογή CRM</span>
         </button>
         <div className="shell-usercard">
-          <span className="shell-avatar"><span aria-hidden="true">{initial}</span></span>
+          <ShellAvatar name={profile?.full_name} path={profile?.avatar_url} />
           <span className="min-w-0">
             <span className="shell-usercard__name block">{profile?.full_name ?? 'Χρήστης'}</span>
             <span className="shell-usercard__sub block">Σε σύνδεση</span>

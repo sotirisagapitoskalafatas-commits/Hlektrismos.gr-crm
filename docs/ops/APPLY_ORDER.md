@@ -319,3 +319,17 @@ select
 ```
 - **Required staging tests:** two Sales Agents can save/reopen separate routes with 40–60+ stops; cross-agent route reads/edits are denied; Back Office can reassign only to active Sales Agents; completed visit history cannot be removed; stop replacement preserves IDs/history; duplicate signal exposes only a boolean; queue requests are requester/office scoped; only Back Office can approve/reject; failed checks never create a Lead; anonymous signal/queue access is denied. Test website intake and normal CRM screens in the same window.
 
+
+## 24. `phase6/20_user_preferences.sql` — per-user preferences and private avatar bucket
+- **Depends on:** `is_staff()`, `is_role(text)`, `profiles`, the `storage` schema. Additive; no existing row or policy changes.
+- **Unlocks on screen:** theme, compact sidebar and home layout follow the user across devices; profile photo upload. Until applied the app keeps working from this browser's local storage and the photo button says the feature is not yet available.
+- **Security:** `user_preferences` — select/insert/update own row only, no delete, anon has no access. Bucket `avatars` is private (5 policies, own folder `{user_id}/avatar.jpg`; admin and Back Office may read); the app uses signed URLs.
+- **Rollback:** [`rollback_phase6_20_user_preferences.sql`](rollback_phase6_20_user_preferences.sql) (destructive for saved preferences).
+- **Check (must be true):**
+```sql
+select to_regclass('public.user_preferences') is not null
+  and exists (select 1 from storage.buckets where id = 'avatars' and not public)
+  and (select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'avatars %') = 5
+  as applied;
+```
+- **Required staging tests:** user A cannot read/write user B's row or avatar; anon denied; admin/Back Office can read (not write) avatars; a non-JPEG or other-path upload is rejected.

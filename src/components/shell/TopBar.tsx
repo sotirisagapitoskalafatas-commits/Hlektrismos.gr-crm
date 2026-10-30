@@ -16,6 +16,7 @@ import RoleSwitcher from '@/components/app/RoleSwitcher';
 import { firstPage } from './ModuleMap';
 import type { ModuleDef } from './ModuleMap';
 import { notifMeta, useNotifications } from './useShellData';
+import ShellAvatar from './ShellAvatar';
 
 const STROKE = 1.6;
 
@@ -40,7 +41,6 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
   const menuRef = useRef<HTMLDivElement>(null);
 
   const realRole = profile?.role ?? role;
-  const initial = (profile?.full_name ?? 'Δ').slice(0, 1).toUpperCase();
   const caption = preview.role ? `Προεπισκόπηση: ${accessGroupLabel(preview.role)}` : accessGroupLabel(realRole);
 
   const close = () => {
@@ -156,7 +156,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
       <div className="relative">
         <button ref={acctRef} className="shell-user" onClick={() => setOpen(open === 'acct' ? null : 'acct')}
           aria-haspopup="menu" aria-expanded={open === 'acct'} aria-label="Λογαριασμός">
-          <span className="shell-avatar"><span aria-hidden="true">{initial}</span></span>
+          <ShellAvatar name={profile?.full_name} path={profile?.avatar_url} />
           <span className="shell-user__text text-left">
             <span className="shell-user__name block">{profile?.full_name ?? 'Χρήστης'}</span>
             <span className="shell-user__role block">{caption}</span>
@@ -168,7 +168,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
             <div className="fixed inset-0 z-50" onClick={() => setOpen(null)} />
             <div className="shell-menu" role="menu" aria-label="Λογαριασμός" ref={menuRef} onKeyDown={onMenuKey}>
               <div className="flex items-center gap-3 px-2 py-2">
-                <span className="shell-avatar" style={{ width: 44, height: 44 }}><span aria-hidden="true">{initial}</span></span>
+                <ShellAvatar name={profile?.full_name} path={profile?.avatar_url} size={44} />
                 <span className="min-w-0">
                   <span className="block text-[14px] font-semibold truncate" style={{ color: 'var(--ui-text)' }}>{profile?.full_name ?? 'Χρήστης'}</span>
                   <span className="block text-xs truncate" style={{ color: 'var(--ui-muted)' }}>{user?.email ?? ''}</span>

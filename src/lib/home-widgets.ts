@@ -6,6 +6,9 @@ import type { Role } from './roles';
 import { validateLayout } from './preferences';
 import type { LayoutItem, TileSize } from './preferences';
 
+/** Set by the settings page («Προσαρμογή της αρχικής»); Home reads and clears it to open straight in edit mode. */
+export const HOME_EDIT_FLAG = 'atlas.home.edit';
+
 export type WidgetId = 'kpi-urgent' | 'kpi-followups' | 'kpi-offers' | 'kpi-signatures' | 'kpi-new' | 'tasks' | 'pipeline' | 'team' | 'ai' | 'summary';
 
 export interface WidgetMeta {

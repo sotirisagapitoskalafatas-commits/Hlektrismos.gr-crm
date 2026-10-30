@@ -8,6 +8,7 @@ import { ROLES, accessGroupLabel } from '@/lib/roles';
 import { updateProfile } from '@/lib/api';
 import { Btn, Card, CardHeader, Field, Micro, Pill } from '@/lib/ui';
 import { THEMES } from '@/lib/theme';
+import { HOME_EDIT_FLAG } from '@/lib/home-widgets';
 import { usePreferences } from '@/lib/preferences';
 import { supabase } from '@/lib/supabase';
 import { looksLikeEmail } from '@/lib/password-rules';
@@ -288,8 +289,6 @@ function AppearanceSection() {
 }
 
 /* ───────── Αρχική σελίδα ───────── */
-export const HOME_EDIT_FLAG = 'atlas.home.edit';
-
 function HomeSection() {
   const { dashboard_layout, resetHomeLayout } = usePreferences();
   const { go } = useNav();

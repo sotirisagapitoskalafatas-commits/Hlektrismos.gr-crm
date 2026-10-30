@@ -8,8 +8,9 @@
    Unknown values are «μη διαθέσιμο», never €0; suggestions are rules over loaded records (lib/home-insights).
    Cards are <div role="region">, not <section>: the landing-page CSS pads every <section> on phones. */
 
-import { useMemo, useState } from 'react';
-import { AlarmClock, Briefcase, CalendarCheck, CheckCircle2, ChevronRight, FileText, PenLine, Plus, Sparkles, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { AlarmClock, Briefcase, CalendarCheck, CheckCircle2, ChevronRight, FileText, PenLine, Plus, SlidersHorizontal, Sparkles, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useNav } from '@/lib/nav';
 import { useWorkData } from '@/lib/useWorkData';
@@ -17,6 +18,12 @@ import { fmtMoney, todayLabel, Spinner } from '@/lib/ui';
 import { stageText } from '@/lib/case-flow';
 import { ACTIVE_STAGES } from '@/lib/roles';
 import { dashboardTiles, homeInsights, pipelineStats } from '@/lib/home-insights';
+import { usePreferences } from '@/lib/preferences';
+import type { LayoutItem } from '@/lib/preferences';
+import { addWidget, defaultLayout, hiddenWidgets, layoutToSave, moveBy, moveTo, removeWidget, resolveLayout, setSize, SIZE_LABEL, widgetMeta } from '@/lib/home-widgets';
+import type { WidgetId } from '@/lib/home-widgets';
+import { HOME_EDIT_FLAG } from '@/components/app/CustomizePage';
+import HomeWidgetFrame from '@/components/app/HomeWidgetFrame';
 import TaskQuickAdd from '@/components/work/TaskQuickAdd';
 import type { Insight } from '@/lib/home-insights';
 import { WorkRow } from '@/components/work/WorkRow';
@@ -77,6 +84,34 @@ export default function HomePage() {
     return 'Δεν υπάρχει κάτι επείγον αυτή τη στιγμή.';
   })();
 
+  // ── widget layout + edit mode ──
+  const { dashboard_layout, update } = usePreferences();
+  const saved = useMemo(() => resolveLayout(dashboard_layout, role), [dashboard_layout, role]);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<LayoutItem[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState('');
+  const layout = editing ? draft : saved;
+  const hidden = useMemo(() => hiddenWidgets(layout, role), [layout, role]);
+  const startEdit = () => { setDraft(saved); setEditing(true); setAnnounce('Λειτουργία προσαρμογής ενεργή.'); };
+  const finishEdit = () => { update({ dashboard_layout: layoutToSave(draft, role) }); setEditing(false); setAnnounce('Η διάταξη αποθηκεύτηκε.'); };
+  const cancelEdit = () => { setEditing(false); setAnnounce('Οι αλλαγές ακυρώθηκαν.'); };
+  const resetDraft = () => { setDraft(defaultLayout(role)); setAnnounce('Επαναφορά στην προεπιλογή.'); };
+  const change = (next: LayoutItem[], say: string) => { setDraft(next); setAnnounce(say); };
+  // «Προσαρμογή της αρχικής» in the settings opens Home straight in edit mode.
+  useEffect(() => {
+    let wanted = false;
+    try { wanted = sessionStorage.getItem(HOME_EDIT_FLAG) === '1'; sessionStorage.removeItem(HOME_EDIT_FLAG); } catch { /* ignore */ }
+    if (wanted) startEdit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancelEdit(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editing]);
+
   const runInsight = (x: Insight) => (x.action.kind === 'case' ? openCase(x.action.id) : go(x.action.page as Parameters<typeof go>[0], x.action.filters));
 
   const aiPanel = (
@@ -101,6 +136,113 @@ export default function HomePage() {
     </div>
   );
 
+  const bodies: Record<WidgetId, ReactNode> = {
+    'kpi-urgent': (
+      <Kpi tile="urgent" icon={AlarmClock} tone="#d1342f" alert value={v(summary ? tiles.urgent : undefined)} label="Επείγοντα"
+                  sub={summary ? `${summary.overdue} εκπρόθεσμα follow-ups · ${tiles.urgentCases} υψηλής προτεραιότητας` : undefined} subTone={tiles.urgent ? 'red' : 'gray'}
+                  onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
+    ),
+    'kpi-followups': (
+      <Kpi tile="followups" icon={CalendarCheck} tone="#1677ff" value={v(summary?.today)} label="Follow Up σήμερα" onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
+    ),
+    'kpi-offers': (
+      <Kpi tile="offers" icon={FileText} tone="#0e7490" value={v(loading ? undefined : tiles.offers)} label="Προσφορές" sub="cases στο στάδιο «Προσφορά»" onClick={() => go('cases', { stage: 'offer' })} />
+    ),
+    'kpi-signatures': (
+      <Kpi tile="signatures" icon={PenLine} tone="#7c3aed" value={v(loading ? undefined : tiles.signatures)} label="Υπογραφές" sub="cases στο στάδιο «Υπογραφή»" onClick={() => go('cases', { stage: 'signed' })} />
+    ),
+    'kpi-new': (
+      <Kpi tile="new" icon={Briefcase} tone="#15803d" value={v(loading ? undefined : tiles.newCases)} label="Νέα Cases"
+                  sub={loading ? undefined : `${pipe.active} ενεργά συνολικά`} subTone="green" onClick={() => go('cases', { stage: 'new' })} />
+    ),
+    tasks: (
+      <div role="region" className="atx-panel atx-card home-card" aria-label="Σημερινά Tasks" aria-busy={loading}>
+        <div className="atx-card-head">
+          <h2 className="atx-section-title">Σημερινά Tasks</h2>
+          <span className="flex items-center gap-3">
+            <button className="atx-btn atx-btn-quiet !h-8 inline-flex items-center gap-1" onClick={() => setTaskOpen(true)} data-add-task><Plus size={14} /> Task</button>
+            <button className="atx-link" onClick={() => go('mywork')}>Όλη η εργασία{!loading && attention.length ? ` (${attention.length})` : ''} →</button>
+          </span>
+        </div>
+        <div className="atx-scroll">
+          {loading && [0, 1, 2].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
+          {!loading && attention.length === 0 && (
+            <div className="atx-empty !py-6">
+              <CheckCircle2 className="mx-auto mb-2" size={22} aria-hidden="true" />
+              <strong>Όλα είναι υπό έλεγχο</strong>
+              Δεν υπάρχει εργασία που να περιμένει εσάς αυτή τη στιγμή.
+            </div>
+          )}
+          {!loading && attention.length > 0 && (
+            <ul className="m-0 p-0 list-none">
+              {attention.map(row => <WorkRow key={row.key} item={row} now={now} onChanged={reload} />)}
+            </ul>
+          )}
+        </div>
+      </div>
+    ),
+    pipeline: (
+      <div role="region" className="atx-panel atx-card home-card" aria-label="Pipeline">
+        <div className="atx-card-head">
+          <h2 className="atx-section-title">Pipeline</h2>
+          <button className="atx-link" onClick={() => go('cases', { status: 'active' })}>Προβολή όλων →</button>
+        </div>
+        <div className="px-4 pb-3.5">
+          <div className="atx-pipe-value">
+            <span className={pipe.weighted === null ? 'is-na' : ''}>{loading ? '–' : pipe.weighted === null ? NA : fmtMoney(pipe.weighted)}</span>
+            <small>πιθανολογούμενη αξία (σταθμισμένη){!loading && pipe.withoutValue ? ` · ${pipe.withoutValue} χωρίς αξία εκτός` : ''}</small>
+          </div>
+          <p className="text-[12.5px] text-[var(--atx-muted)] -mt-1 mb-2" data-pipe-value>Καταγεγραμμένη αξία ενεργών cases: <b className="text-[var(--atx-ink,#0f172a)]">{loading ? '–' : pipe.known === null ? NA : fmtMoney(pipe.known)}</b></p>
+          <div className="atx-pipe">
+            {ACTIVE_STAGES.map((s, idx) => {
+              const n = pipe.byStage[s] ?? 0;
+              return (
+                <button key={s} type="button" className={`atx-pipe-stage ${n ? '' : 'is-zero'}`} onClick={() => go('cases', { stage: s })} aria-label={`${stageText(s)}: ${n} cases`}>
+                  <span className="atx-pipe-n">{loading ? '–' : n}</span>
+                  <span className="atx-pipe-l" title={stageText(s)}><b>{idx + 1}</b>{stageText(s)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="atx-pipe-flow">Νέο → Επικοινωνία → Προσφορά → Αίτηση → Υπογραφή → Έγγραφα → Πάροχος → Ενεργοποίηση</p>
+          <dl className="atx-pipe-sum">
+            <div><dt>Ενεργά</dt><dd>{loading ? '–' : pipe.active}</dd></div>
+            <div><dt>Γνωστή αξία</dt><dd className={pipe.known === null ? 'is-na' : ''}>{pipe.known === null ? NA : fmtMoney(pipe.known)}</dd></div>
+          </dl>
+        </div>
+      </div>
+    ),
+    team: (
+      <div role="region" className="atx-panel atx-card home-card" aria-label="Η ομάδα">
+        <div className="atx-card-head"><h2 className="atx-section-title">Η ομάδα</h2></div>
+        {summary?.team && (
+          <ul className="m-0 p-0 list-none">
+            {[
+              { n: summary.team.unassignedNewLeads, label: 'Νέα leads χωρίς ανάθεση', hint: 'Περιμένουν υπεύθυνο', go: () => go('leads') },
+              { n: summary.team.staleCases, label: 'Cases χωρίς κίνηση 7+ ημέρες', hint: 'Ενεργά cases που δεν έχουν ενημερωθεί', go: () => go('cases', { status: 'active' }) },
+              { n: summary.team.overdueFollowUps, label: 'Εκπρόθεσμα follow-ups ομάδας', hint: 'Όλων των υπαλλήλων', go: () => go('followups', { status: 'pending' }) },
+            ].map(r => (
+              <li key={r.label}>
+                <button type="button" className="atx-team-row" onClick={r.go}>
+                  <span className="min-w-0"><span className="atx-team-l">{r.label}</span><span className="atx-team-h">{r.hint}</span></span>
+                  <span className={`atx-team-n ${r.n > 0 ? 'is-alert' : ''}`}>{r.n}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {staffing.length > 0 && (
+          <div className="atx-staff" aria-label="Στελέχωση">
+            <div className="atx-staff-head"><Users size={14} aria-hidden="true" /> Στελέχωση <span>{staff.length}</span></div>
+            {staffing.map(s => <div key={s.r} className="atx-staff-row"><span>{s.label}</span><b>{s.n}</b></div>)}
+          </div>
+        )}
+      </div>
+    ),
+    ai: aiPanel,
+    summary: d ? <AdminSummary d={d} /> : <div className="atx-skeleton" aria-hidden="true" />,
+  };
+
   return (
     <div className="atx-page atx-wide">
       <div className="atx-head">
@@ -116,113 +258,46 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className={`atx-cc ${teamView ? 'has-team' : ''}`}>
-        <div role="region" aria-label="Σύνοψη" className="cc-kpis">
-          <Kpi tile="urgent" icon={AlarmClock} tone="#d1342f" alert value={v(summary ? tiles.urgent : undefined)} label="Επείγοντα"
-            sub={summary ? `${summary.overdue} εκπρόθεσμα follow-ups · ${tiles.urgentCases} υψηλής προτεραιότητας` : undefined} subTone={tiles.urgent ? 'red' : 'gray'}
-            onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
-          <Kpi tile="followups" icon={CalendarCheck} tone="#1677ff" value={v(summary?.today)} label="Follow Up σήμερα" onClick={() => go('mywork', { tab: 'today', kind: 'followup' })} />
-          <Kpi tile="offers" icon={FileText} tone="#0e7490" value={v(loading ? undefined : tiles.offers)} label="Προσφορές" sub="cases στο στάδιο «Προσφορά»" onClick={() => go('cases', { stage: 'offer' })} />
-          <Kpi tile="signatures" icon={PenLine} tone="#7c3aed" value={v(loading ? undefined : tiles.signatures)} label="Υπογραφές" sub="cases στο στάδιο «Υπογραφή»" onClick={() => go('cases', { stage: 'signed' })} />
-          <Kpi tile="new" icon={Briefcase} tone="#15803d" value={v(loading ? undefined : tiles.newCases)} label="Νέα Cases"
-            sub={loading ? undefined : `${pipe.active} ενεργά συνολικά`} subTone="green" onClick={() => go('cases', { stage: 'new' })} />
-        </div>
-
-        {/* Τι να κάνετε τώρα */}
-        <div role="region" className="cc-work atx-panel atx-card" aria-label="Σημερινά Tasks" aria-busy={loading}>
-          <div className="atx-card-head">
-            <h2 className="atx-section-title">Σημερινά Tasks</h2>
-            <span className="flex items-center gap-3">
-              <button className="atx-btn atx-btn-quiet !h-8 inline-flex items-center gap-1" onClick={() => setTaskOpen(true)} data-add-task><Plus size={14} /> Task</button>
-              <button className="atx-link" onClick={() => go('mywork')}>Όλη η εργασία{!loading && attention.length ? ` (${attention.length})` : ''} →</button>
+      <div className="home-toolbar">
+        {editing ? (
+          <>
+            <span className="home-toolbar__hint" id="home-edit-hint">Σύρετε τα κουτιά ή χρησιμοποιήστε τα κουμπιά τους για να τα μετακινήσετε, να αλλάξετε μέγεθος ή να τα αφαιρέσετε.</span>
+            <span className="home-toolbar__actions">
+              <button type="button" className="atx-btn atx-btn-quiet" onClick={resetDraft}>Επαναφορά προεπιλογής</button>
+              <button type="button" className="atx-btn atx-btn-quiet" onClick={cancelEdit}>Ακύρωση</button>
+              <button type="button" className="atx-btn atx-btn-primary" onClick={finishEdit}>Ολοκλήρωση</button>
             </span>
-          </div>
-          <div className="atx-scroll">
-            {loading && [0, 1, 2].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
-            {!loading && attention.length === 0 && (
-              <div className="atx-empty !py-6">
-                <CheckCircle2 className="mx-auto mb-2" size={22} aria-hidden="true" />
-                <strong>Όλα είναι υπό έλεγχο</strong>
-                Δεν υπάρχει εργασία που να περιμένει εσάς αυτή τη στιγμή.
-              </div>
-            )}
-            {!loading && attention.length > 0 && (
-              <ul className="m-0 p-0 list-none">
-                {attention.map(row => <WorkRow key={row.key} item={row} now={now} onChanged={reload} />)}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Pipeline (+ Atlas AI for roles without the team column) */}
-        <div className="cc-pipe atx-stack">
-          <div role="region" className="atx-panel atx-card" aria-label="Pipeline">
-            <div className="atx-card-head">
-              <h2 className="atx-section-title">Pipeline</h2>
-              <button className="atx-link" onClick={() => go('cases', { status: 'active' })}>Προβολή όλων →</button>
-            </div>
-            <div className="px-4 pb-3.5">
-              <div className="atx-pipe-value">
-                <span className={pipe.weighted === null ? 'is-na' : ''}>{loading ? '–' : pipe.weighted === null ? NA : fmtMoney(pipe.weighted)}</span>
-                <small>πιθανολογούμενη αξία (σταθμισμένη){!loading && pipe.withoutValue ? ` · ${pipe.withoutValue} χωρίς αξία εκτός` : ''}</small>
-              </div>
-              <p className="text-[12.5px] text-[var(--atx-muted)] -mt-1 mb-2" data-pipe-value>Καταγεγραμμένη αξία ενεργών cases: <b className="text-[var(--atx-ink,#0f172a)]">{loading ? '–' : pipe.known === null ? NA : fmtMoney(pipe.known)}</b></p>
-              <div className="atx-pipe">
-                {ACTIVE_STAGES.map((s, idx) => {
-                  const n = pipe.byStage[s] ?? 0;
-                  return (
-                    <button key={s} type="button" className={`atx-pipe-stage ${n ? '' : 'is-zero'}`} onClick={() => go('cases', { stage: s })} aria-label={`${stageText(s)}: ${n} cases`}>
-                      <span className="atx-pipe-n">{loading ? '–' : n}</span>
-                      <span className="atx-pipe-l" title={stageText(s)}><b>{idx + 1}</b>{stageText(s)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="atx-pipe-flow">Νέο → Επικοινωνία → Προσφορά → Αίτηση → Υπογραφή → Έγγραφα → Πάροχος → Ενεργοποίηση</p>
-              <dl className="atx-pipe-sum">
-                <div><dt>Ενεργά</dt><dd>{loading ? '–' : pipe.active}</dd></div>
-                <div><dt>Γνωστή αξία</dt><dd className={pipe.known === null ? 'is-na' : ''}>{pipe.known === null ? NA : fmtMoney(pipe.known)}</dd></div>
-              </dl>
-            </div>
-          </div>
-          {!teamView && aiPanel}
-        </div>
-
-        {/* Η ομάδα (admins/managers) + Atlas AI */}
-        {teamView && (
-          <div className="cc-team atx-stack">
-            <div role="region" className="atx-panel atx-card" aria-label="Η ομάδα">
-              <div className="atx-card-head"><h2 className="atx-section-title">Η ομάδα</h2></div>
-              {summary?.team && (
-                <ul className="m-0 p-0 list-none">
-                  {[
-                    { n: summary.team.unassignedNewLeads, label: 'Νέα leads χωρίς ανάθεση', hint: 'Περιμένουν υπεύθυνο', go: () => go('leads') },
-                    { n: summary.team.staleCases, label: 'Cases χωρίς κίνηση 7+ ημέρες', hint: 'Ενεργά cases που δεν έχουν ενημερωθεί', go: () => go('cases', { status: 'active' }) },
-                    { n: summary.team.overdueFollowUps, label: 'Εκπρόθεσμα follow-ups ομάδας', hint: 'Όλων των υπαλλήλων', go: () => go('followups', { status: 'pending' }) },
-                  ].map(r => (
-                    <li key={r.label}>
-                      <button type="button" className="atx-team-row" onClick={r.go}>
-                        <span className="min-w-0"><span className="atx-team-l">{r.label}</span><span className="atx-team-h">{r.hint}</span></span>
-                        <span className={`atx-team-n ${r.n > 0 ? 'is-alert' : ''}`}>{r.n}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {staffing.length > 0 && (
-                <div className="atx-staff" aria-label="Στελέχωση">
-                  <div className="atx-staff-head"><Users size={14} aria-hidden="true" /> Στελέχωση <span>{staff.length}</span></div>
-                  {staffing.map(s => <div key={s.r} className="atx-staff-row"><span>{s.label}</span><b>{s.n}</b></div>)}
-                </div>
-              )}
-            </div>
-            {aiPanel}
-          </div>
+          </>
+        ) : (
+          <button type="button" className="atx-link inline-flex items-center gap-1" onClick={startEdit} data-home-customize><SlidersHorizontal size={14} aria-hidden="true" /> Προσαρμογή της αρχικής</button>
         )}
-
-        {/* Summary metrics (admins) */}
-        {isAdmin && <div className="cc-sum">{d ? <AdminSummary d={d} /> : <div className="atx-skeleton" aria-hidden="true" />}</div>}
       </div>
+      <p className="sr-only" role="status" aria-live="polite">{announce}</p>
+
+      <div className={`home-grid ${editing ? 'is-editing' : ''}`} role="group" aria-label="Κουτιά αρχικής" aria-describedby={editing ? 'home-edit-hint' : undefined}>
+        {layout.map((it, i) => (
+          <HomeWidgetFrame key={it.id} id={it.id} size={it.size} editing={editing} index={i} count={layout.length}
+            canRemove={layout.length > 1} dragging={dragId === it.id}
+            onMove={(delta) => change(moveBy(layout, it.id, delta), `${widgetMeta(it.id)?.title}: θέση ${i + 1 + delta} από ${layout.length}`)}
+            onSize={(sz) => change(setSize(layout, it.id, sz), `${widgetMeta(it.id)?.title}: ${SIZE_LABEL[sz]}`)}
+            onRemove={() => change(removeWidget(layout, it.id), `${widgetMeta(it.id)?.title}: αφαιρέθηκε`)}
+            onDragStart={() => setDragId(it.id)} onDragEnd={() => setDragId(null)}
+            onDropOn={() => { if (dragId) change(moveTo(layout, dragId, it.id), `${widgetMeta(dragId)?.title}: μετακινήθηκε`); setDragId(null); }}>
+            {bodies[it.id as WidgetId]}
+          </HomeWidgetFrame>
+        ))}
+      </div>
+
+      {editing && hidden.length > 0 && (
+        <div className="home-tray" role="group" aria-label="Διαθέσιμα κουτιά">
+          <span className="home-tray__label">Προσθήκη κουτιού</span>
+          {hidden.map((w) => (
+            <button key={w.id} type="button" className="atx-btn atx-btn-quiet inline-flex items-center gap-1" onClick={() => change(addWidget(layout, w.id, role), `${w.title}: προστέθηκε`)}>
+              <Plus size={14} aria-hidden="true" /> {w.title}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Detailed modules */}
       <div role="region" className="mt-4" aria-label="Αναλυτικός πίνακας">

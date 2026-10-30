@@ -20,6 +20,7 @@ import { activeItem, modulesForRole, moduleOfPage, settingsModule } from '@/comp
 import { useCompactPref, useShellCounts } from '@/components/shell/useShellData';
 import '@/styles/atlas-ux.css';
 import '@/styles/atlas-shell.css';
+import '@/styles/atlas-home.css';
 import CrmAssistant from '@/components/assistant/CrmAssistant';
 import { PreviewBanner } from './RoleSwitcher';
 

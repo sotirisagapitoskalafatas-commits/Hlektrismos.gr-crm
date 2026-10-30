@@ -202,29 +202,7 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 .atx-wide .atx-title { font-size: clamp(24px, 2.2vw, 28px); }
 .atx-wide .atx-sub { margin-top: 2px; font-size: 14.5px; }
 
-/* Grid: one column on phones/tablets; 48 columns from 1024px (fine enough for 4 KPIs over 3/4 of the width). */
-.atx-cc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
-.atx-cc > * { min-width: 0; }
-.cc-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 1100px) { .cc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cc-kpis > :nth-child(5) { grid-column: span 2; } }
-@media (max-width: 640px) { .cc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
-@media (min-width: 1024px) {
-  .atx-cc { grid-template-columns: repeat(48, minmax(0, 1fr)); }
-  .cc-kpis, .cc-sum, .cc-team { grid-column: 1 / -1; }
-  .cc-work { grid-column: 1 / span 28; }
-  .cc-pipe { grid-column: 29 / span 20; }
-}
-@media (min-width: 1280px) {
-  /* Admin/manager: KPIs over 3/4, the value card heads the team column; team spans the work row and summary row. */
-  .atx-cc.has-team { grid-template-rows: auto auto 1fr; } /* the tall team column grows the last row, not the work row */
-  .atx-cc.has-team .cc-kpis { display: contents; }
-  .atx-cc.has-team .cc-kpis > * { grid-column: span 9; grid-row: 1; }
-  .atx-cc.has-team .cc-kpis > :nth-child(5) { grid-column: 37 / span 12; }
-  .atx-cc.has-team .cc-work { grid-column: 1 / span 20; grid-row: 2; }
-  .atx-cc.has-team .cc-pipe { grid-column: 21 / span 16; grid-row: 2; }
-  .atx-cc.has-team .cc-team { grid-column: 37 / span 12; grid-row: 2 / span 2; }
-  .atx-cc.has-team .cc-sum { grid-column: 1 / span 36; grid-row: 3; }
-}
+/* The Home grid lives in atlas-home.css. */
 
 .atx-kpi { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; min-width: 0; height: 100%;
   background: var(--atx-surface); border: 1px solid var(--atx-line); border-radius: 14px; padding: 12px 14px; cursor: pointer;
@@ -251,7 +229,6 @@ body.atx-app > .fixed.inset-0 > .card .micro { font-family: inherit; font-size: 
 @media (max-width: 1023px) { .atx-scroll { max-height: none; } }
 .atx-fine { font-size: 12px; color: var(--atx-faint); margin-top: 8px; line-height: 1.4; }
 
-.cc-pipe { container-type: inline-size; }
 .atx-pipe-value { display: flex; flex-direction: column; margin-bottom: 10px; }
 .atx-pipe-value span { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .atx-pipe-value span.is-na { font-size: 17px; color: var(--atx-faint); font-weight: 600; }

@@ -5,8 +5,10 @@
 // (supabase/staged-migrations/phase4/18 + phase4/21) but do not depend on them being applied.
 //
 // Two application categories (src/lib/roles.ts), no new role:
-//   office = «Admin / Back Office» = admin, manager, back_office  -> every record
-//   sales  = «Πωλητής»             = inside_sales, field_sales     -> own records only
+//   office = «Admin / Back Office» = admin only (the one shared office login)  -> every record
+//   sales  = «Πωλητής»             = inside_sales, field_sales                  -> own records only
+// The legacy roles `manager` and `back_office` belong to NEITHER category: their profiles are preserved but they have no
+// access to any record (phase6/23 does the same in the database).
 // The service role (pg_cron / internal calls presenting the service key) is trusted for records; its
 // callers are responsible for having authorised the end user first.
 
@@ -17,7 +19,7 @@ export type Caller =
   | { kind: "service" }
   | { kind: "user"; id: string; role: string; category: Category; overrides?: Overrides };
 
-const OFFICE_ROLES = ["admin", "manager", "back_office"];
+const OFFICE_ROLES = ["admin"];
 const SALES_ROLES = ["inside_sales", "field_sales"];
 
 /** Category of an ACTIVE staff role, or null (inactive, unknown or missing role => no access at all). */

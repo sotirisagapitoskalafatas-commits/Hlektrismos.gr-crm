@@ -18,22 +18,46 @@ jobs:
   validate:
     name: Tests, lint, typecheck and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.6
       - name: Install
         run: npm ci
       - name: Unit and PGlite tests
         run: npm test
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck
-        run: npm run typecheck
+      # Lint, typecheck and deno check compare every diagnostic with the exact base commit, using the same tool
+      # versions (the base tree shares this checkout's node_modules and Deno). A diagnostic this change
+      # introduces fails the job; pre-existing ones are printed but do not. See scripts/ci/diagnostics-gate.mjs.
+      - name: Check out the base commit for comparison
+        if: ${{ !cancelled() }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${BASE_SHA:-$(git merge-base HEAD origin/main)}"
+          git worktree add --detach ../base "$base"
+          ln -s "$PWD/node_modules" ../base/node_modules
+          echo "Comparing against base commit $base"
+      - name: Lint (no new ESLint errors)
+        if: ${{ !cancelled() }}
+        run: node scripts/ci/diagnostics-gate.mjs --tool eslint --base ../base
+      - name: Typecheck (no new TypeScript errors)
+        if: ${{ !cancelled() }}
+        run: node scripts/ci/diagnostics-gate.mjs --tool tsc --base ../base
+      - name: Deno check of every Edge Function (no new errors)
+        if: ${{ !cancelled() }}
+        run: node scripts/ci/diagnostics-gate.mjs --tool deno --base ../base
       - name: Production build
+        if: ${{ !cancelled() }}
         run: npm run build

@@ -350,3 +350,10 @@ select exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_o
 ```
 - **Required staging tests:** the 13-point matrix with real JWTs (admin, manager, legacy back office, both sales roles, inactive agent with an old session, anon, API-key-only) through `admin-users`, the `staff_*` RPCs and direct PostgREST; audit rows written for every management action.
 
+
+## 26. `phase6/22_crm_integrations_status_invoker.sql` — integration status view follows RLS (advisor: SECURITY DEFINER view)
+- **Position:** after step 25 (`phase6/21`). **Depends on:** `phase1/01` (the view and the admin-only policy on `crm_integrations`).
+- **Effect:** `public.crm_integrations_status` becomes `security_invoker`, so it follows the RLS of `crm_integrations` (active admin only). Still no `config` column. No function is added — nothing in the app reads this view.
+- **Rollback:** [`rollback_phase6_22_crm_integrations_status_invoker.sql`](rollback_phase6_22_crm_integrations_status_invoker.sql) — a deliberate no-op that keeps `security_invoker = true` (restoring owner rights would reintroduce the finding).
+- **Check (must be true):** `select coalesce('security_invoker=true' = any (select unnest(reloptions) from pg_class where oid = 'public.crm_integrations_status'::regclass), false) as applied;`
+- **Tests:** `node --test supabase/tests/integrations-status-invoker.test.mjs` — local PGlite evidence on the ordered state (phase1/01 → 18 → phase2/05 → phase6/21 → 22) for admin, active and inactive Sales Agent, legacy back_office, legacy manager and anonymous. Not staging or production evidence.

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 
-export type Route = 'landing' | 'login' | 'app' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies' | 'copyright' | 'unsubscribed';
+export type Route = 'landing' | 'login' | 'reset' | 'app' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies' | 'copyright' | 'unsubscribed';
 
 const PAGE_HASHES: Record<string, Route> = {
   '/login': 'login',
+  '/reset': 'reset',
   '/app': 'app',
   '/dashboard': 'app',
   '/about': 'about',

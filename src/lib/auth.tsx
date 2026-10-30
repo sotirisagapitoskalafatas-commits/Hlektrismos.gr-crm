@@ -71,8 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess);
+      // The e-mailed reset link signs the person in with a recovery session: send them to the choose-a-new-password page.
+      if (event === 'PASSWORD_RECOVERY') window.location.hash = '/reset';
     });
     return () => sub.subscription.unsubscribe();
   }, []);

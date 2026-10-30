@@ -18,6 +18,7 @@ import Cookies from '@/pages/Cookies';
 import CopyrightPolicy from '@/pages/CopyrightPolicy';
 import Unsubscribed from '@/pages/Unsubscribed';
 import ConsentBanner from '@/components/ConsentBanner';
+import ResetPasswordPage from '@/components/auth/ResetPasswordPage';
 
 function AppContent() {
   const [route, navigate] = useRoute();
@@ -46,6 +47,8 @@ function AppContent() {
   switch (route) {
     case 'login':
       return <LoginPage />;
+    case 'reset':
+      return <ResetPasswordPage />;
     case 'app':
       return <AppShell />;
     case 'about':

@@ -1,7 +1,7 @@
 /* Case workflow rules on the client (pure, unit-tested). The database is the authority
    (staged migrations phase2/07a and 07b); these only decide what to OFFER and how to explain a refusal. */
 
-import type { Role } from './roles';
+import { hasAccess, type Role } from './roles';
 
 export const RETURNABLE_STAGES = ['application', 'document_check', 'submitted', 'activation'] as const;
 export type ReturnTeam = 'inside_sales' | 'field_sales';
@@ -10,11 +10,11 @@ export const RETURN_TEAM_LABEL: Record<ReturnTeam, string> = { inside_sales: 'In
 export interface ReturnableCase { current_stage: string; returned_at?: string | null; return_to_team?: string | null; next_action_owner_id?: string | null }
 
 export const canReturn = (role: Role | null | undefined, c: ReturnableCase) =>
-  (role === 'back_office' || role === 'admin' || role === 'manager')
+  role === 'admin'
   && (RETURNABLE_STAGES as readonly string[]).includes(c.current_stage) && !c.returned_at;
 
 export const canResubmit = (role: Role | null | undefined, uid: string | null | undefined, c: ReturnableCase) =>
-  !!c.returned_at && (role === 'admin' || role === 'manager' || role === c.return_to_team || (!!uid && c.next_action_owner_id === uid));
+  !!c.returned_at && hasAccess(role) && (role === 'admin' || role === c.return_to_team || (!!uid && c.next_action_owner_id === uid));
 
 /** Missing signature → Field Sales (in-person step); anything else → Inside Sales (owns the customer contact). */
 export const defaultReturnTeam = (items: string[]): ReturnTeam => (items.some(i => /υπογ/i.test(i)) ? 'field_sales' : 'inside_sales');

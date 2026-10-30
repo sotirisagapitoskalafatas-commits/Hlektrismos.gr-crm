@@ -24,10 +24,10 @@ const keysOf = (m) => M.flatItems(m).map((i) => i.key);
 test('modules per role: hidden when the role has no page in them, labs modules only for an admin with the switch on', () => {
   labs = false;
   assert.deepEqual(ids('admin'), ['home', 'crm', 'field', 'analytics']);
-  assert.deepEqual(ids('manager'), ['home', 'crm', 'field', 'analytics']);
+  assert.deepEqual(ids('manager'), [], 'legacy manager: no modules at all');
   assert.deepEqual(ids('inside_sales'), ['home', 'crm']);
   assert.deepEqual(ids('field_sales'), ['home', 'crm', 'field']);
-  assert.deepEqual(ids('back_office'), ['home', 'crm']);
+  assert.deepEqual(ids('back_office'), [], 'legacy back_office: no modules at all');
   labs = true;
   assert.deepEqual(ids('admin'), ['home', 'crm', 'field', 'analytics', 'ai']);
   const ai = M.modulesForRole('admin').find((m) => m.id === 'ai');
@@ -87,19 +87,19 @@ test('module links open the first allowed page; badges follow the live counts', 
   assert.equal(first('admin', 'home'), 'home');
   assert.equal(first('admin', 'crm'), 'leads');
   assert.equal(first('field_sales', 'crm'), 'customers', 'field sales has no Leads page');
-  assert.equal(first('back_office', 'crm'), 'cases');
+  assert.deepEqual(M.modulesForRole('back_office'), [], 'legacy back_office has no module');
   assert.equal(first('field_sales', 'field'), 'myday');
   const item = (role, key) => M.modulesForRole(role).flatMap(M.flatItems).find((i) => i.key === key);
   assert.equal(item('admin', 'mywork').badge, 'followups', 'follow-ups due are counted on «Η εργασία μου»');
   assert.equal(item('admin', 'leads').badge, 'leads');
-  assert.equal(item('back_office', 'backoffice').badge, 'backoffice');
+  assert.equal(item('admin', 'backoffice').badge, 'backoffice');
   assert.equal(item('admin', 'cases').badge, 'cases');
 });
 
 test('CRM groups and settings groups: labels and admin-only block', () => {
   const crm = M.modulesForRole('admin').find((m) => m.id === 'crm');
   assert.deepEqual(crm.groups.map((g) => g.label), ['Πελάτες', 'Δουλειά', 'Κατάλογος']);
-  assert.deepEqual(M.modulesForRole('back_office').find((m) => m.id === 'crm').groups.map((g) => g.label), ['Δουλειά'], 'empty groups are dropped');
+  assert.deepEqual(M.modulesForRole('inside_sales').find((m) => m.id === 'crm').groups.map((g) => g.label).includes('Κατάλογος'), true, 'a Sales Agent keeps the catalogue group');
   const s = M.settingsModule('admin');
   assert.deepEqual(s.groups.map((g) => g.label), [undefined, 'Μόνο για διαχειριστές']);
   assert.deepEqual(M.settingsModule('inside_sales').groups.map((g) => g.label), [undefined]);

@@ -62,14 +62,14 @@ function fromSeed(stop: RouteStopInput): SavedRouteStopDraft {
 
 export default function RouteWorkspace({ seedStops, currentUserId, currentRole, origin, onPlan, onDiscoveryChange, onRouteStopsChange }: Props) {
   const { toast } = useToast();
-  const canManageTeam = ['admin', 'manager', 'back_office'].includes(currentRole);
+  const canManageTeam = currentRole === 'admin';
   const [routes, setRoutes] = useState<SavedRoute[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [routeName, setRouteName] = useState('Διαδρομή πεδίου');
   const [routeDate, setRouteDate] = useState(localDate());
   const [routeStatus, setRouteStatus] = useState<SavedRouteStatus>('draft');
   const [travelMode, setTravelMode] = useState<SavedRouteTravelMode>('driving');
-  const [routeOwner, setRouteOwner] = useState(['admin', 'manager', 'back_office'].includes(currentRole) ? '' : currentUserId);
+  const [routeOwner, setRouteOwner] = useState(currentRole === 'admin' ? '' : currentUserId);
   const [originLabel, setOriginLabel] = useState('');
   const [originLat, setOriginLat] = useState<number | null>(origin?.lat ?? null);
   const [originLng, setOriginLng] = useState<number | null>(origin?.lng ?? null);

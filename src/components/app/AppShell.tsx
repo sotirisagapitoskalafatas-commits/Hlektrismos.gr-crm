@@ -5,7 +5,7 @@ import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import { cacheAppShell } from '@/lib/pwa';
 import {
-  PAGE_TITLES, can, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, stageLabel,
+  PAGE_TITLES, can, flattenNav, hasAccess, labsPageAllowed, leadStatusInfo, navForRole, stageLabel,
 } from '@/lib/roles';
 import type { PageKey } from '@/lib/roles';
 import { Modal, Spinner, fmtMoney, rgbaOf } from '@/lib/ui';
@@ -245,7 +245,7 @@ export default function AppShell() {
   const onSignOut = () => { signOut(); window.location.hash = '/'; };
 
   // Labs modules (lib/labs.ts): an address typed or linked directly falls back to Αρχική for everyone else.
-  const labsBlocked = !labsPageAllowed(view.page, role);
+  const labsBlocked = !labsPageAllowed(view.page, role) || !hasAccess(role);
   const fieldBlocked = view.page === 'field' && !can(role, 'check_in');
   const body = (() => {
     if (labsBlocked) return <HomePage />;

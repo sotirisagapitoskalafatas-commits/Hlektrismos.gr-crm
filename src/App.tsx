@@ -1,4 +1,6 @@
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { isLegacyRole } from '@/lib/roles';
+import NoAccessPage from '@/components/app/NoAccessPage';
 import { DeviceProvider } from '@/lib/device-context';
 import { useRoute } from '@/lib/router';
 import { NavProvider } from '@/lib/nav';
@@ -28,7 +30,7 @@ const routeFallback = (
 
 function AppContent() {
   const [route, navigate] = useRoute();
-  const { session, loading } = useAuth();
+  const { session, loading, profile } = useAuth();
 
   if (loading) {
     return (
@@ -56,7 +58,8 @@ function AppContent() {
     case 'reset':
       return <ResetPasswordPage />;
     case 'app':
-      return <AppShell />;
+      // A legacy manager / back_office profile holds no access: it never reaches the CRM shell (profile and history are kept).
+      return isLegacyRole(profile?.role) ? <NoAccessPage /> : <AppShell />;
     case 'about':
       return <AboutPage />;
     case 'services':

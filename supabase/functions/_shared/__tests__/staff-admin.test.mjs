@@ -83,9 +83,17 @@ test('no public sign-up anywhere in the app or the edge functions (§2.4): accou
   assert.deepEqual(hits, [], 'files that could create an account by themselves');
 });
 
-test('e-mailed links never default to the public WordPress site: SITE_URL is required for invite and reset', () => {
-  const src = readFileSync(fileURLToPath(new URL('../../admin-users/index.ts', import.meta.url)), 'utf8');
-  assert.doesNotMatch(src, /https:\/\/hlektrismos\.gr/);
-  assert.equal((src.match(/Deno\.env\.get\("SITE_URL"\) \?\? ""/g) || []).length, 2);
-  assert.equal((src.match(/status|errorResponse\("Δεν έχει οριστεί η διεύθυνση του CRM/g) || []).length >= 2, true);
+test('SITE_URL: only a bare https origin that is not the public WordPress site is accepted; no default', () => {
+  const out = buildSync({ entryPoints: [fileURLToPath(new URL('../site-url.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent' });
+  return import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64')).then(({ crmSiteUrl }) => {
+    assert.equal(crmSiteUrl('https://hlektrismos-crm.vercel.app'), 'https://hlektrismos-crm.vercel.app');
+    assert.equal(crmSiteUrl(' https://hlektrismos-crm.vercel.app/ '), 'https://hlektrismos-crm.vercel.app', 'whitespace and a trailing slash are tolerated');
+    for (const bad of [undefined, null, '', 'hlektrismos-crm.vercel.app', 'http://hlektrismos-crm.vercel.app', 'https://hlektrismos-crm.vercel.app/app', 'https://hlektrismos-crm.vercel.app/#/app',
+      'https://hlektrismos-crm.vercel.app?x=1', 'https://user@hlektrismos-crm.vercel.app', 'https://hlektrismos-crm.vercel.app:8443', 'https://hlektrismos.gr', 'https://www.hlektrismos.gr/', 'https://HLEKTRISMOS.GR', 'https://localhost']) {
+      assert.equal(crmSiteUrl(bad), null, String(bad));
+    }
+    const src = readFileSync(fileURLToPath(new URL('../../admin-users/index.ts', import.meta.url)), 'utf8');
+    assert.doesNotMatch(src, /https:\/\/hlektrismos\.gr/);
+    assert.equal((src.match(/crmSiteUrl\(Deno\.env\.get\("SITE_URL"\)\)/g) || []).length, 2, 'invite and reset both use the validated value');
+  });
 });

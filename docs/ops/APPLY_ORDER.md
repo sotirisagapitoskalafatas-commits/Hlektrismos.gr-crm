@@ -3,6 +3,11 @@
 **One list, in the exact order to run them.** 28 files (23 numbered steps, plus 2b, 2c, 2d, 3b and 3c added by the security audit, the live API hardening hotfix, account/visibility work and Field Sales route planning), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
+## Corrections found on 30 Oct 2026 (rehearsal on a restored copy of production)
+- **Already live on production — skip:** `phase1/03_drop_exec_sql`, `phase5/17_customer_supply_points`, `phase5/18_lead_supply_points` (their probes in `pending_migrations_check.sql` are true).
+- **Superseded — skip:** step `3b` (`phase4/17`) and `3c` (`phase4/20`) are replaced by step `25` (`phase6/21_two_role_model`). Apply 25 **immediately after step 3**, not at the end.
+- Rehearsal: the remaining 27 files apply in this order without error on the restored production data; see [`BACKUP_RESTORE.md`](BACKUP_RESTORE.md) and [`PRODUCTION_ROLLOUT_CHECKLIST.md`](PRODUCTION_ROLLOUT_CHECKLIST.md).
+
 ## Before step 1
 1. **Check what is already there.** Run [`pending_migrations_check.sql`](pending_migrations_check.sql) (read-only, catalog only) on the database you are about to change. Skip a step whose check already says `true`; a step is idempotent, but skipping is clearer.
 2. **Staging first.** Staging is being built from a schema dump of live. Run the whole list there, in this order, with the check after each step; only then live.

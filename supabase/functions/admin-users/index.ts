@@ -10,6 +10,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "../_shared/keys.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { canManage, decideDelete, decideReset, validateCreate } from "../_shared/staff-admin.ts";
+import { crmSiteUrl } from "../_shared/site-url.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -44,8 +45,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // The CRM address the e-mailed link must open. No default on purpose: hlektrismos.gr is the public WordPress site, not the CRM.
-    const site = (Deno.env.get("SITE_URL") ?? "").replace(/\/+$/, "");
-    if (input.mode === "invite" && !/^https:\/\/[^\s/]+$/.test(site)) return errorResponse("Δεν έχει οριστεί η διεύθυνση του CRM (SITE_URL) για τους συνδέσμους πρόσκλησης.", 503);
+    const site = crmSiteUrl(Deno.env.get("SITE_URL"));
+    if (input.mode === "invite" && !site) return errorResponse("Δεν έχει οριστεί η διεύθυνση του CRM (SITE_URL) για τους συνδέσμους πρόσκλησης.", 503);
     const created = input.mode === "invite"
       ? await admin.auth.admin.inviteUserByEmail(input.email, { data: { full_name: input.full_name }, redirectTo: `${site}/` })
       : await admin.auth.admin.createUser({ email: input.email, password: input.password, email_confirm: true, user_metadata: { full_name: input.full_name } });
@@ -112,8 +113,8 @@ Deno.serve(async (req: Request) => {
       return errorResponse(decision.error, decision.status);
     }
     // The user receives the recovery e-mail and chooses the password themselves. No link, token or password is ever returned here.
-    const site = (Deno.env.get("SITE_URL") ?? "").replace(/\/+$/, "");
-    if (!/^https:\/\/[^\s/]+$/.test(site)) return errorResponse("Δεν έχει οριστεί η διεύθυνση του CRM (SITE_URL) για τον σύνδεσμο επαναφοράς.", 503);
+    const site = crmSiteUrl(Deno.env.get("SITE_URL"));
+    if (!site) return errorResponse("Δεν έχει οριστεί η διεύθυνση του CRM (SITE_URL) για τον σύνδεσμο επαναφοράς.", 503);
     const { error: resetErr } = await admin.auth.resetPasswordForEmail(email!, { redirectTo: `${site}/` });
     if (resetErr) return errorResponse("Η αποστολή email επαναφοράς απέτυχε. Ελέγξτε τη ρύθμιση email/Auth.", 502);
     await audit({ action: "password_reset", target_id: targetId, target_email: email, note: "recovery e-mail sent" });

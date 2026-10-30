@@ -147,7 +147,7 @@ try {
     check('a Sales Agent cannot trigger a password reset', (await fn(tok.fieldA, { action: 'reset', user_id: createdId })).status === 403);
     check('legacy manager cannot trigger a password reset', (await fn(tok.manager, { action: 'reset', user_id: createdId })).status === 403);
     const rst = await fn(tok.admin, { action: 'reset', user_id: createdId });
-    check('admin reset: authorised (200, or 502 only if the mailer refuses the throwaway address)', rst.status === 200 || rst.status === 502, `HTTP ${rst.status}`);
+    check('admin reset: authorised (200; 502 if the mailer refuses the throwaway address; 503 while SITE_URL is unset) — never 403', [200, 502, 503].includes(rst.status), `HTTP ${rst.status}`);
     const del = await fn(tok.admin, { action: 'delete', user_id: createdId });
     check('admin deletes an account that nothing references', del.status === 200, `HTTP ${del.status}`);
   }

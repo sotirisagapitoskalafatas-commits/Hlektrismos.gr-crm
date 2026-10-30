@@ -82,3 +82,10 @@ test('no public sign-up anywhere in the app or the edge functions (§2.4): accou
     .filter((f) => /signUp\s*\(|auth\/v1\/signup/.test(readFileSync(f, 'utf8')));
   assert.deepEqual(hits, [], 'files that could create an account by themselves');
 });
+
+test('e-mailed links never default to the public WordPress site: SITE_URL is required for invite and reset', () => {
+  const src = readFileSync(fileURLToPath(new URL('../../admin-users/index.ts', import.meta.url)), 'utf8');
+  assert.doesNotMatch(src, /https:\/\/hlektrismos\.gr/);
+  assert.equal((src.match(/Deno\.env\.get\("SITE_URL"\) \?\? ""/g) || []).length, 2);
+  assert.equal((src.match(/status|errorResponse\("Δεν έχει οριστεί η διεύθυνση του CRM/g) || []).length >= 2, true);
+});

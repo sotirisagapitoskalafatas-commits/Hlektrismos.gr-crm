@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Check, RefreshCcw, Upload, X } from 'lucide-react';
-import { Btn, Micro } from '@/lib/ui';
+import { Btn, Micro, useDialogBehavior } from '@/lib/ui';
 import { prepareCaptureFile } from '@/lib/api';
 
 type Mode = 'camera' | 'captured' | 'fallback';
@@ -115,11 +115,14 @@ export default function CaptureModal({ open, title, onClose, onCapture }: {
     }
   };
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogBehavior(open, panelRef, onClose);
+
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-[2px] p-4 sm:p-8" onClick={onClose}>
-      <div className="card w-full max-w-lg p-5 animate-fadein my-4 sm:my-8" onClick={e => e.stopPropagation()}>
+    <div className="ui-modal-overlay" onClick={onClose}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Λήψη φωτογραφίας" tabIndex={-1} className="ui-card ui-modal" style={{ maxWidth: 512 }} onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <Micro className="mb-1">Field capture</Micro>

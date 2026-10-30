@@ -4,9 +4,12 @@ import { useNav } from '@/lib/nav';
 import { ACTIVE_STAGES, SERVICES, serviceLabel, stageLabel } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
 import { Case, createCase, fetchAllCaseStats, fetchCases } from '@/lib/api';
-import { Btn, Card, EmptyState, Field, Micro, Modal, Pill, Spinner, StagePill, fmtDate, fmtMoney } from '@/lib/ui';
-import { Briefcase, Plus, Search } from 'lucide-react';
+import { Btn, EmptyState, Field, Micro, Modal, Spinner, fmtDate, fmtMoney } from '@/lib/ui';
+import { pillClass, toneForStage } from '@/lib/status-style';
+import PipelineBoard from './PipelineBoard';
+import { Briefcase, KanbanSquare, List, Plus, Search } from 'lucide-react';
 
+const VIEW_KEY = 'atlas.cases.view';
 const PROPERTY_TYPES = ['Διαμέρισμα', 'Μονοκατοικία', 'Κατάστημα', 'Γραφείο', 'Άλλο'];
 
 function CreateCaseModal({ open, onClose, onCreated }: {
@@ -109,6 +112,8 @@ export default function CasesPage() {
   const [docPending, setDocPending] = useState<Set<string>>(new Set());
   const [sigPending, setSigPending] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  const [mode, setMode] = useState<'list' | 'board'>(() => { try { return localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'list'; } catch { return 'list'; } });
+  const pickMode = (m: 'list' | 'board') => { setMode(m); try { localStorage.setItem(VIEW_KEY, m); } catch { /* the choice lasts for this page view */ } };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,9 +177,15 @@ export default function CasesPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <Micro tone="brand">CRM</Micro>
-          <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Cases</h2>
+          <h1 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Cases</h1>
         </div>
-        <Btn onClick={() => setCreating(true)}><Plus className="w-4 h-4" /> Νέο Case</Btn>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="ui-seg" role="group" aria-label="Προβολή">
+            <button type="button" aria-pressed={mode === 'list'} onClick={() => pickMode('list')}><List className="w-3.5 h-3.5" aria-hidden="true" /> Λίστα</button>
+            <button type="button" aria-pressed={mode === 'board'} onClick={() => pickMode('board')}><KanbanSquare className="w-3.5 h-3.5" aria-hidden="true" /> Pipeline</button>
+          </div>
+          <Btn onClick={() => setCreating(true)}><Plus className="w-4 h-4" /> Νέο Case</Btn>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -184,48 +195,48 @@ export default function CasesPage() {
         </div>
       </div>
 
-      <div className="flex gap-1.5 flex-wrap">
+      <div className="flex gap-2 flex-wrap" role="group" aria-label="Κατάσταση">
         {((
           [['all', 'Όλα (ενεργά)'], ['active', 'Ενεργά'], ['done', 'Ολοκληρωμένα'], ['lost', 'Χάθηκαν'], ['docs', 'Εκκρεμή έγγραφα'], ['sig', 'Προς υπογραφή']] as const
         )).map(([id, label]) => (
-          <button key={id} onClick={() => { setStatus(id); setStage('all'); setOwnerId(null); setQ(''); }}
-            className={`pill px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${status === id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+          <button key={id} type="button" onClick={() => { setStatus(id); setStage('all'); setOwnerId(null); setQ(''); }} aria-pressed={status === id} className="ui-chip">
             {label}
           </button>
         ))}
       </div>
 
-      <div className="flex gap-1.5 flex-wrap">
-        <button onClick={() => { setStage('all'); setStatus('all'); setOwnerId(null); }}
-          className={`pill px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${stage === 'all' && status === 'all' ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+      {mode === 'list' && <div className="flex gap-2 flex-wrap" role="group" aria-label="Στάδιο">
+        <button type="button" onClick={() => { setStage('all'); setStatus('all'); setOwnerId(null); }} aria-pressed={stage === 'all' && status === 'all'} className="ui-chip">
           Όλα
         </button>
         {ACTIVE_STAGES.map(s => (
-          <button key={s} onClick={() => { setStage(stage === s ? 'all' : s); setStatus('all'); setOwnerId(null); }}
-            className={`pill px-3 py-1.5 text-[11px] rounded-lg border transition-colors ${stage === s ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+          <button key={s} type="button" onClick={() => { setStage(stage === s ? 'all' : s); setStatus('all'); setOwnerId(null); }} aria-pressed={stage === s} className="ui-chip">
             {stageLabel(s)}
           </button>
         ))}
-      </div>
+      </div>}
 
-      <Card className="!p-0" pad={false}>
+      {mode === 'board' && !loading && <PipelineBoard cases={filtered} onOpen={openCase} />}
+      {mode === 'board' && loading && <div className="flex items-center justify-center py-16"><Spinner /></div>}
+
+      {mode === 'list' && <div className="ui-card overflow-hidden">
         {loading && <div className="flex items-center justify-center py-16"><Spinner /></div>}
         {!loading && filtered.length === 0 && (
           <EmptyState icon={Briefcase} title="Δεν βρέθηκαν cases" hint="Δοκιμάστε διαφορετικά φίλτρα ή δημιουργήστε ένα νέο case." />
         )}
         {!loading && filtered.length > 0 && (
-          <div className="divide-y divide-line">
+          <div className="ui-rows">
             {filtered.map(c => (
               <button key={c.id} onClick={() => openCase(c.id)}
-                className="w-full text-left px-5 py-3.5 hover:bg-ink/[0.03] transition-colors flex items-center gap-4 flex-wrap">
+                className="ui-row w-full text-left px-5 py-3.5 flex items-center gap-4 flex-wrap">
                 <span className="font-mono text-[11px] text-ink/35 w-20 shrink-0">{c.case_no}</span>
                 <span className="flex-1 min-w-[160px]">
                   <span className="block text-[13px] font-medium text-ink truncate">{c.customer?.full_name ?? c.title}</span>
                   <span className="block text-xs text-ink/45 truncate">{serviceLabel(c.service_type)} · {c.title}</span>
                 </span>
                 <span className="flex items-center gap-2 shrink-0 flex-wrap">
-                  <StagePill stage={c.current_stage} />
-                  {c.priority === 'high' || c.priority === 'critical' ? <Pill tone="red">{c.priority === 'critical' ? 'κρίσιμο' : 'υψηλή'}</Pill> : null}
+                  <span className={pillClass(toneForStage(c.current_stage))}>{stageLabel(c.current_stage)}</span>
+                  {c.priority === 'high' || c.priority === 'critical' ? <span className={pillClass('red')}>{c.priority === 'critical' ? 'κρίσιμο' : 'υψηλή'}</span> : null}
                   {c.next_follow_up_at && <span className="text-xs text-ink/45">FU: {fmtDate(c.next_follow_up_at)}</span>}
                   <span className="text-[13px] font-semibold text-ink/80 ml-2">{fmtMoney(c.value)}</span>
                 </span>
@@ -233,7 +244,7 @@ export default function CasesPage() {
             ))}
           </div>
         )}
-      </Card>
+      </div>}
 
       <CreateCaseModal open={creating} onClose={() => setCreating(false)} onCreated={id => { load(); openCase(id); }} />
     </div>

@@ -98,6 +98,7 @@ html .atx-shell, html body.atx-app {
 .ui-pill--orange { background: #fdf0dc; color: #8a5000; }
 .ui-pill--red { background: #fce8e6; color: #b3261e; }
 .ui-pill--gray { background: #f0f0f3; color: #3a3a3c; }
+.ui-pill--ink { background: #0f172a; color: #ffffff; }
 
 /* ───────────── Signature button effect (live 3D, soft). Baked into the shared Btn (src/lib/btn-style.ts). ─────────────
    NOT for: tabs, segmented-control segments, checkboxes/radios, background-less row actions, kanban cards (see .ui-lift). */

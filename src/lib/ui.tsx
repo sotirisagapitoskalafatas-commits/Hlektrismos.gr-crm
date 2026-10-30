@@ -23,7 +23,7 @@ export function Micro({ children, className = '', tone = 'muted' }: {
 export function Card({ children, className = '', pad = true }: {
   children: ReactNode; className?: string; pad?: boolean;
 }) {
-  return <div className={`card ${pad ? 'p-5' : ''} ${className}`}>{children}</div>;
+  return <div className={`ui-card ${pad ? 'p-5' : ''} ${className}`}>{children}</div>;
 }
 
 export function CardHeader({ micro, title, action, className = '' }: {
@@ -42,18 +42,19 @@ export function CardHeader({ micro, title, action, className = '' }: {
 
 /* ---------------- Pills ---------------- */
 export type PillTone = 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'ink';
+// Same colours as the status pills everywhere else (ui-pill--*); «amber» is the orange tone, «ink» the dark chip.
 const PILL_MAP: Record<PillTone, string> = {
-  green: 'bg-ok-100 text-ok-600',
-  amber: 'bg-warn-100 text-warn-600',
-  red: 'bg-bad-100 text-bad-600',
-  blue: 'bg-brand-50 text-brand-600',
-  gray: 'bg-ink/[0.06] text-ink/60',
-  ink: 'bg-ink text-paper',
+  green: 'ui-pill ui-pill--green',
+  amber: 'ui-pill ui-pill--orange',
+  red: 'ui-pill ui-pill--red',
+  blue: 'ui-pill ui-pill--blue',
+  gray: 'ui-pill ui-pill--gray',
+  ink: 'ui-pill ui-pill--ink',
 };
 export function Pill({ children, tone = 'gray', className = '' }: {
   children: ReactNode; tone?: PillTone; className?: string;
 }) {
-  return <span className={`pill ${PILL_MAP[tone]} ${className}`}>{children}</span>;
+  return <span className={`${PILL_MAP[tone]} ${className}`}>{children}</span>;
 }
 
 const STAGE_TONE: Record<string, PillTone> = {

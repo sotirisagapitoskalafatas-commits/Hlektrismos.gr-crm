@@ -95,7 +95,7 @@ export default function FollowUpsPage() {
       <div className="flex gap-1.5 flex-wrap">
         {FILTERS.map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium border transition-colors ${filter === f.id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/55 hover:text-ink'}`}>
+            type="button" aria-pressed={filter === f.id} className="ui-chip shrink-0">
             {f.label}
             {counts[f.id] > 0 && (
               <span className={`pill ${f.id === 'overdue' ? 'bg-bad-600 text-white' : f.id === 'all' ? 'bg-white/20 text-inherit' : 'bg-ink/10'}`}>{counts[f.id]}</span>

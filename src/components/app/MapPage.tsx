@@ -666,7 +666,7 @@ export default function MapPage() {
       <div className="flex items-center gap-2 flex-wrap">
         {FILTERS.map(f => (
           <button key={f.id} onClick={() => { setFilter(f.id); setSelectedId(null); setQ(''); }}
-            className={`px-3 py-1.5 text-[11px] font-mono uppercase rounded-lg border transition-colors ${filter === f.id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/50 hover:text-ink'}`}>
+            type="button" aria-pressed={filter === f.id} className="ui-chip shrink-0">
             {f.label}
           </button>
         ))}

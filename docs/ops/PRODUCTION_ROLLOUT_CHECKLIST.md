@@ -21,7 +21,7 @@ Status legend used in the private copy: ✅ completed · ⏳ pending · 🚫 blo
 | G4 | Auth URL configuration + `SITE_URL` + public sign-up disabled (`AUTH_URL_CONFIGURATION.md`, `auth-settings-check.mjs`) | see private copy |
 | G5 | Owner's separate written approval of the rollout | see private copy |
 
-## 2. Exact SQL list (27 files, in this order) — rehearsed on a restored copy of production
+## 2. Exact SQL list (28 files, in this order) — the first 27 were rehearsed on a restored copy of production; the 28th (phase6/22) has only local PGlite tests and must be added to the next rehearsal
 Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) after each; stop on the first failure.
 | # | Step | File (`supabase/staged-migrations/…`) |
 |---|---|---|
@@ -52,6 +52,7 @@ Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) aft
 | 25 | 22b | `phase4/21_sales_isolation_completion.sql` |
 | 26 | 23 | `phase5/19_field_sales_saved_routes.sql` |
 | 27 | 24 | `phase6/20_user_preferences.sql` |
+| 28 | 26 | `phase6/22_crm_integrations_status_invoker.sql` ← after phase6/21 (security_invoker view; advisor finding) |
 **Skipped on purpose:** already live — `phase1/03_drop_exec_sql`, `phase5/17_customer_supply_points`, `phase5/18_lead_supply_points`; superseded — `phase4/17_admin_only_staff_provisioning`, `phase4/20_backoffice_sales_agent_provisioning` (replaced by `phase6/21`).
 **Rehearsal result (local, restored production copy):** all 27 applied without error; only existing-data change = one seed row in `crm_settings` (32→33).
 
@@ -63,8 +64,8 @@ Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) aft
 |---|---|---|
 | A1 | Gates G1–G5 satisfied; screenshot Auth settings (URL config, SMTP, templates) | 🔐 |
 | A2 | Fresh backup (DB + Storage), `restore-verify` 14/14, `REHEARSE=1` 31/31 | ⏳ (repeat on the day) |
-| A3 | `pending_migrations_check.sql` on production = the 27 files + 2 superseded | ⏳ |
-| B | The 27 SQL files (§2), one at a time, check after each | 🔐 |
+| A3 | `pending_migrations_check.sql` on production = the 28 files + 2 superseded | ⏳ |
+| B | The 28 SQL files (§2), one at a time, check after each | 🔐 |
 | C1 | Backup #2; probe: all true except 3b/3c | 🔐 |
 | C2 | Non-mutating smoke: `is_staff()` of the QA accounts; `staff_list()` as QA admin = 6 rows; a QA Sales Agent sees only own records | 🔐 |
 | D1 | Deploy `admin-users` **by hand** (`supabase functions deploy admin-users --project-ref <production ref> --use-api`); needs `SITE_URL` and the project secret key; do **not** add it to `config.toml` | 🔐 |

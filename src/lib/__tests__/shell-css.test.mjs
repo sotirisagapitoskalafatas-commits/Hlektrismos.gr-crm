@@ -49,3 +49,17 @@ test('Leads uses the shared status pills, chips and rows (no ad-hoc tone mapping
   assert.match(page, /className="ui-chip shrink-0"/);
   for (const rule of [".ui-chip[aria-pressed='true']", '.ui-row:hover', '.ui-tile']) assert.ok(theme.includes(rule), rule);
 });
+
+test('dialogs: one shared behaviour (role, Esc, focus trap, scroll lock) used by every overlay, sheet on a phone', () => {
+  const ui = read('../ui.tsx');
+  for (const needle of ['export function useDialogBehavior', "role=\"dialog\" aria-modal=\"true\"", 'aria-labelledby={titleId}', "e.key === 'Escape'", "document.body.style.overflow = 'hidden'", 'before.focus(']) {
+    assert.ok(ui.includes(needle), `ui.tsx: ${needle}`);
+  }
+  for (const f of ['../../components/app/CaptureModal.tsx', '../../components/app/SignaturePad.tsx']) {
+    const src = read(f);
+    assert.match(src, /useDialogBehavior\(open, panelRef, onClose\)/, f);
+    assert.match(src, /role="dialog" aria-modal="true"/, f);
+  }
+  const phone = theme.slice(theme.indexOf('.ui-modal-overlay'));
+  assert.match(phone, /@media \(max-width: 640px\)[\s\S]*align-items: flex-end/, 'bottom sheet on a phone');
+});

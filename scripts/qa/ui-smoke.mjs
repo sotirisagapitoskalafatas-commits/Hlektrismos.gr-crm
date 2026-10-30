@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// LEGACY (pre-redesign navigation: #shell-rail, .cc-* grid, old settings). Superseded for navigation/shell checks by
+// scripts/qa/redesign-smoke.mjs; the remaining page-specific checks need porting before this file can run green again.
 // UI smoke tests for Αρχική / Η εργασία μου against scripts/qa/mock-supabase.mjs (LOCAL, synthetic data).
 // Requires: mock on :54399, `npm run dev -- --port 5199`, Chrome. Run: node scripts/qa/ui-smoke.mjs
 // NOTE: the mock performs no authorization; this verifies rendering/behaviour per role profile, NOT data isolation.

@@ -3,22 +3,28 @@ import { DeviceProvider } from '@/lib/device-context';
 import { useRoute } from '@/lib/router';
 import { NavProvider } from '@/lib/nav';
 import { ToastProvider } from '@/lib/toast';
-import LandingPage from '@/pages/LandingPage';
-import LoginPage from '@/components/LoginPage';
-import AppShell from '@/components/app/AppShell';
+import { lazy, Suspense } from 'react';
 import { JarvisWidget } from '@/components/jarvis/JarvisWidget';
-import AboutPage from '@/pages/AboutPage';
-import ServicesPage from '@/pages/ServicesPage';
-import EnergyPage from '@/pages/EnergyPage';
-import FaqPage from '@/pages/FaqPage';
-import ContactPage from '@/pages/ContactPage';
-import TermsOfUse from '@/pages/TermsOfUse';
-import PrivacyPolicy from '@/pages/PrivacyPolicy';
-import Cookies from '@/pages/Cookies';
-import CopyrightPolicy from '@/pages/CopyrightPolicy';
-import Unsubscribed from '@/pages/Unsubscribed';
 import ConsentBanner from '@/components/ConsentBanner';
-import ResetPasswordPage from '@/components/auth/ResetPasswordPage';
+// Each route is its own chunk: a visitor on the website does not download the CRM, and a signed-in user does not download the website.
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const LoginPage = lazy(() => import('@/components/LoginPage'));
+const ResetPasswordPage = lazy(() => import('@/components/auth/ResetPasswordPage'));
+const AppShell = lazy(() => import('@/components/app/AppShell'));
+const AboutPage = lazy(() => import('@/pages/AboutPage'));
+const ServicesPage = lazy(() => import('@/pages/ServicesPage'));
+const EnergyPage = lazy(() => import('@/pages/EnergyPage'));
+const FaqPage = lazy(() => import('@/pages/FaqPage'));
+const ContactPage = lazy(() => import('@/pages/ContactPage'));
+const TermsOfUse = lazy(() => import('@/pages/TermsOfUse'));
+const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const Cookies = lazy(() => import('@/pages/Cookies'));
+const CopyrightPolicy = lazy(() => import('@/pages/CopyrightPolicy'));
+const Unsubscribed = lazy(() => import('@/pages/Unsubscribed'));
+
+const routeFallback = (
+  <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#5a7090' }} role="status">Φόρτωση...</div>
+);
 
 function AppContent() {
   const [route, navigate] = useRoute();
@@ -84,7 +90,7 @@ export default function App() {
       <AuthProvider>
         <NavProvider>
           <ToastProvider>
-            <AppContent />
+            <Suspense fallback={routeFallback}><AppContent /></Suspense>
             {route !== 'app' && <JarvisWidget />}
           </ToastProvider>
         </NavProvider>

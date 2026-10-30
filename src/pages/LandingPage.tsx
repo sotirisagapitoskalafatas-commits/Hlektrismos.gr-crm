@@ -13,6 +13,7 @@ import PublicHeader from '@/components/public/PublicHeader';
 import PublicFooter from '@/components/public/PublicFooter';
 import WaveDivider from '@/components/public/WaveDivider';
 import '@/styles/landing.css';
+import { uploadDocument } from '@/lib/storage';
 
 /* ─── Landing page content ─────────────────────────────────── */
 const PHONE_HREF = `tel:${COMPANY.phone.replace(/\s+/g, '')}`;
@@ -162,7 +163,6 @@ export default function LandingPage() {
     const uploadedFiles: Array<{ path: string; name: string; type: string; size: number }> = [];
     const failed: string[] = [];
     if (form.billFiles.length > 0) {
-      const { uploadDocument } = await import('@/lib/storage');
       for (let i = 0; i < form.billFiles.length; i++) {
         const file = form.billFiles[i];
         const done = uploadedRef.current.get(file);

@@ -87,5 +87,5 @@ export function convertedNotice(convertedAt?: string | null): string {
 }
 
 /** The roles that have the Πελάτες page (the folder); Back Office reaches a customer through the case. */
-const OPENS_FOLDER = ['admin', 'manager', 'inside_sales', 'field_sales'];
+const OPENS_FOLDER = ['admin', 'inside_sales', 'field_sales'];
 export const canOpenFolder = (role: string) => OPENS_FOLDER.includes(role);

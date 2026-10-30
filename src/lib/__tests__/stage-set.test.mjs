@@ -12,24 +12,26 @@ const js = buildSync({
 const A = await import('data:text/javascript;base64,' + Buffer.from(js.outputFiles[0].text).toString('base64'));
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
-test('who and where: only Back Office / admin / manager; never to the same stage; a completed case is final; completed only from activation', () => {
-  for (const r of ['admin', 'manager', 'back_office']) assert.equal(A.canUseStageSet(r), true, r);
-  for (const r of ['inside_sales', 'field_sales', null, undefined]) assert.equal(A.canUseStageSet(r), false, String(r));
-  assert.equal(A.canSetStage('back_office', 'new', 'submitted'), true, 'jump over stages');
-  assert.equal(A.canSetStage('back_office', 'submitted', 'application'), true, 'back');
-  assert.equal(A.canSetStage('back_office', 'lost', 'application'), true, 'resume a lost case where the work really is');
-  assert.equal(A.canSetStage('back_office', 'submitted', 'submitted'), false);
-  assert.equal(A.canSetStage('back_office', 'completed', 'activation'), false, 'final');
-  assert.equal(A.canSetStage('back_office', 'submitted', 'completed'), false, 'completed only from activation');
-  assert.equal(A.canSetStage('back_office', 'activation', 'completed'), true);
+test('who and where: only the shared Admin / Back Office login (legacy manager / back_office denied); never to the same stage; a completed case is final; completed only from activation', () => {
+  assert.equal(A.canUseStageSet('admin'), true);
+  for (const r of ['manager', 'back_office', 'inside_sales', 'field_sales', null, undefined]) assert.equal(A.canUseStageSet(r), false, String(r));
+  assert.equal(A.canSetStage('admin', 'new', 'submitted'), true, 'jump over stages');
+  assert.equal(A.canSetStage('admin', 'submitted', 'application'), true, 'back');
+  assert.equal(A.canSetStage('admin', 'lost', 'application'), true, 'resume a lost case where the work really is');
+  assert.equal(A.canSetStage('admin', 'submitted', 'submitted'), false);
+  assert.equal(A.canSetStage('admin', 'completed', 'activation'), false, 'final');
+  assert.equal(A.canSetStage('admin', 'submitted', 'completed'), false, 'completed only from activation');
+  assert.equal(A.canSetStage('admin', 'activation', 'completed'), true);
+  assert.equal(A.canSetStage('back_office', 'new', 'submitted'), false, 'legacy back_office');
+  assert.equal(A.canSetStage('manager', 'new', 'submitted'), false, 'legacy manager');
   assert.equal(A.canSetStage('inside_sales', 'new', 'offer'), false);
   assert.equal(A.canSetStage('admin', 'new', 'nonsense'), false);
 });
 
 test('the control offers exactly what the rule allows, in journey order', () => {
-  assert.deepEqual(A.stageSetTargets('back_office', 'application'), ['new', 'contacted', 'offer', 'signed', 'document_check', 'submitted', 'activation', 'lost', 'cancelled']);
-  assert.equal(A.stageSetTargets('back_office', 'activation').includes('completed'), true);
-  assert.deepEqual(A.stageSetTargets('back_office', 'completed'), []);
+  assert.deepEqual(A.stageSetTargets('admin', 'application'), ['new', 'contacted', 'offer', 'signed', 'document_check', 'submitted', 'activation', 'lost', 'cancelled']);
+  assert.equal(A.stageSetTargets('admin', 'activation').includes('completed'), true);
+  assert.deepEqual(A.stageSetTargets('admin', 'completed'), []);
   assert.deepEqual(A.stageSetTargets('inside_sales', 'application'), []);
   assert.ok(A.stageSetTargets('admin', 'lost').includes('application') && !A.stageSetTargets('admin', 'lost').includes('lost'));
 });

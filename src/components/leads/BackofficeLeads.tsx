@@ -17,7 +17,7 @@ export default function BackofficeLeads() {
   const [rows, setRows] = useState<Lead[] | null>(null);
   useEffect(() => {
     if (!user) return;
-    void fetchBackofficeLeads(role === 'back_office' ? user.id : null).then(r => setRows(role === 'back_office' ? r : r.filter(l => l.assigned_to_user_id && l.assigned_to_user_id !== l.created_by_user_id)));
+    void fetchBackofficeLeads(null).then(r => setRows(r.filter(l => l.assigned_to_user_id && l.assigned_to_user_id !== l.created_by_user_id)));
   }, [role, user]);
   if (!rows || rows.length === 0) return null;
   return (
@@ -28,7 +28,7 @@ export default function BackofficeLeads() {
           <li key={l.id} className="atx-row">
             <button className="atx-row-main" onClick={() => go('leads', { lead: l.id })}>
               <span className="atx-row-title">{leadName(l)}</span>
-              <span className="atx-row-sub">{leadFiles(l.attached_files).length} έγγραφα · από {l.created_by?.full_name ?? '—'} · {fmtDateTime(l.created_at)}{role !== 'back_office' && l.assigned_to?.full_name ? ` · σε ${l.assigned_to.full_name}` : ''}</span>
+              <span className="atx-row-sub">{leadFiles(l.attached_files).length} έγγραφα · από {l.created_by?.full_name ?? '—'} · {fmtDateTime(l.created_at)}{l.assigned_to?.full_name ? ` · σε ${l.assigned_to.full_name}` : ''}</span>
             </button>
             <span className="atx-row-act"><button className="atx-btn atx-btn-quiet" onClick={() => go('leads', { lead: l.id })}>Άνοιγμα</button></span>
           </li>

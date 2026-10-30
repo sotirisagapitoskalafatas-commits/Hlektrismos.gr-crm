@@ -1,4 +1,6 @@
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { hasAccess } from '@/lib/roles';
+import NoAccessPage from '@/components/app/NoAccessPage';
 import { DeviceProvider } from '@/lib/device-context';
 import { useRoute } from '@/lib/router';
 import { NavProvider } from '@/lib/nav';
@@ -28,7 +30,7 @@ const routeFallback = (
 
 function AppContent() {
   const [route, navigate] = useRoute();
-  const { session, loading } = useAuth();
+  const { session, loading, profile, profileReady } = useAuth();
 
   if (loading) {
     return (
@@ -56,7 +58,11 @@ function AppContent() {
     case 'reset':
       return <ResetPasswordPage />;
     case 'app':
-      return <AppShell />;
+      // The role is unknown until the profile lookup finishes: show nothing of the CRM meanwhile (no default role is assumed).
+      if (!profileReady) return routeFallback;
+      // Only an Admin / Back Office or Sales Agent profile reaches the CRM shell. A legacy manager / back_office profile, an
+      // unknown role or an account with no profile row holds no access (profile and history are kept, nothing is converted).
+      return hasAccess(profile?.role) ? <AppShell /> : <NoAccessPage />;
     case 'about':
       return <AboutPage />;
     case 'services':

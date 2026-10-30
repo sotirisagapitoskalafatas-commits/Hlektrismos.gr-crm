@@ -73,7 +73,7 @@ export const SOURCE_TEXT: Record<string, string> = {
 };
 
 /** Recording an objection or a withdrawal: anyone on staff. Consent / register screening: these roles. Lift: admin. */
-export const canRecordEvidence = (r: Role | null | undefined) => r === 'admin' || r === 'manager' || r === 'back_office';
+export const canRecordEvidence = (r: Role | null | undefined) => r === 'admin';
 export const canLiftObjection = (r: Role | null | undefined) => r === 'admin';
 
 // The global switches are shown once as a separate notice, so per-channel rows carry only the reasons about THIS person.

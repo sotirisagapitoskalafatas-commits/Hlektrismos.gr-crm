@@ -74,8 +74,8 @@ test('lead → folder: a converted lead redirects; the notice reads «Το lead 
 });
 
 test('folder link: only the roles that have the Πελάτες page; the old lead buttons are gone', async () => {
-  for (const r of ['admin', 'manager', 'inside_sales', 'field_sales']) assert.equal(F.canOpenFolder(r), true, r);
-  assert.equal(F.canOpenFolder('back_office'), false);
+  for (const r of ['admin', 'inside_sales', 'field_sales']) assert.equal(F.canOpenFolder(r), true, r);
+  for (const r of ['manager', 'back_office']) assert.equal(F.canOpenFolder(r), false, `legacy ${r}`);
   const { readFileSync } = await import('node:fs');
   const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
   const cust = read('../../components/customers/CustomerDetail.tsx');

@@ -81,7 +81,7 @@ export function OperationalStrip({ d, pipeline = true, omit = [] }: { d: Dashboa
         {show('active') && <MetricCard icon={Briefcase} label="Ενεργά Cases" value={String(active.length)}
           sub={`${d.cases.filter(c => c.current_stage === 'offer').length} σε προσφορά`} hue="#7c3aed" onClick={() => go('cases', { status: 'active' })} />}
         {show('pipeline') && <MetricCard icon={Wallet} label="Pipeline (σταθμισμένο)" value={pipe.weighted === null ? 'μη διαθέσιμο' : fmtMoney(pipe.weighted)}
-          sub={pipe.withoutValue ? `${pipe.withoutValue} cases χωρίς αξία εκτός` : 'πιθανολογούμενη αξία'} hue="#15803d" onClick={() => go(role === 'admin' || role === 'manager' ? 'reports' : 'cases')} />}
+          sub={pipe.withoutValue ? `${pipe.withoutValue} cases χωρίς αξία εκτός` : 'πιθανολογούμενη αξία'} hue="#15803d" onClick={() => go(role === 'admin' ? 'reports' : 'cases')} />}
       </div>
 
       {/* Pipeline (8 stages) */}

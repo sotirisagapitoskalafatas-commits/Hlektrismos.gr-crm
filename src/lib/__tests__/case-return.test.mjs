@@ -8,15 +8,18 @@ const R = await import('data:text/javascript;base64,' + Buffer.from(out.outputFi
 
 test('who may return / resubmit', () => {
   const c = { current_stage: 'document_check', returned_at: null };
-  assert.deepEqual(['back_office', 'admin', 'manager', 'inside_sales', 'field_sales'].map((r) => R.canReturn(r, c)), [true, true, true, false, false]);
-  assert.equal(R.canReturn('back_office', { current_stage: 'offer' }), false, 'only Back Office stages');
-  assert.equal(R.canReturn('back_office', { ...c, returned_at: '2026-10-14' }), false, 'not twice');
+  assert.deepEqual(['back_office', 'admin', 'manager', 'inside_sales', 'field_sales'].map((r) => R.canReturn(r, c)), [false, true, false, false, false], 'only the shared Admin / Back Office login; legacy roles cannot');
+  assert.equal(R.canReturn('admin', { current_stage: 'offer' }), false, 'only Back Office stages');
+  assert.equal(R.canReturn('admin', { ...c, returned_at: '2026-10-14' }), false, 'not twice');
   const ret = { current_stage: 'document_check', returned_at: '2026-10-14', return_to_team: 'inside_sales', next_action_owner_id: 'u1' };
   assert.equal(R.canResubmit('inside_sales', 'x', ret), true);
   assert.equal(R.canResubmit('field_sales', 'u1', ret), true, 'the person it was assigned to');
   assert.equal(R.canResubmit('field_sales', 'x', ret), false);
   assert.equal(R.canResubmit('back_office', 'x', ret), false);
-  assert.equal(R.canResubmit('manager', 'x', ret), true);
+  assert.equal(R.canResubmit('admin', 'x', ret), true);
+  assert.equal(R.canResubmit('manager', 'x', ret), false, 'legacy manager has no access');
+  assert.equal(R.canResubmit('manager', 'u1', ret), false, 'not even as the assigned person');
+  assert.equal(R.canResubmit('back_office', 'u1', { ...ret, return_to_team: 'back_office' }), false, 'nor as the team a case was returned to');
   assert.equal(R.defaultReturnTeam(['Υπογεγραμμένη σύμβαση / αίτηση']), 'field_sales');
   assert.equal(R.defaultReturnTeam(['Λογαριασμός ρεύματος']), 'inside_sales');
 });

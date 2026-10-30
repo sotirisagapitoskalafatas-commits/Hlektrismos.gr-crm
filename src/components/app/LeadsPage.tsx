@@ -5,6 +5,7 @@ import LeadDetail from '@/components/leads/LeadDetail';
 import { TrashButton } from '@/components/trash/TrashControls';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo, propertyLabel, serviceLabel } from '@/lib/roles';
 import { leadStatusDisplay } from '@/lib/lead-status';
+import { pillClass, toneForLeadStatus } from '@/lib/status-style';
 import { Lead, convertLeadToCase, createLead, createLeadSupplyPoint, fetchLeads, fetchTariffCategories, getPosition, leadSupplyAvailable, updateLeadChecked, updateLeadStage } from '@/lib/api';
 import LeadSupplySection from '@/components/leads/LeadSupplySection';
 import { leadSupplyBlocking, supplyPointTitle } from '@/lib/supply-points';
@@ -12,7 +13,7 @@ import type { SupplyPointDraft, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
 import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
 import { classifyUpload, MAX_FORM_FILES, PUBLIC_FORM_ACCEPT } from '@/lib/upload-files';
-import { Btn, Card, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
+import { Btn, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
 import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Users } from 'lucide-react';
 
@@ -200,7 +201,7 @@ export default function LeadsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <Micro tone="brand">CRM</Micro>
-          <h2 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Leads</h2>
+          <h1 className="text-lg font-semibold text-ink tracking-tight mt-0.5">Leads</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Pill tone="gray">{items.length} εγγραφές</Pill>
@@ -213,20 +214,19 @@ export default function LeadsPage() {
       {err && <div className="rounded-xl bg-bad-100 text-bad-600 text-[13px] px-4 py-2.5">{err}</div>}
 
       {/* Pipeline tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" role="group" aria-label="Στάδιο lead">
         {tabs.map(t => {
           const count = t.id === 'all' ? items.length : (counts.get(t.id) ?? 0);
           return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${tab === t.id ? 'bg-ink text-paper' : 'bg-white border border-line text-ink/55 hover:text-ink'}`}>
+            <button key={t.id} type="button" onClick={() => setTab(t.id)} aria-pressed={tab === t.id} className="ui-chip shrink-0">
               <span aria-hidden="true">{t.emoji}</span> {t.id === 'all' ? t.label : leadStatusDisplay(t.id).label}{t.id !== 'all' && leadStatusDisplay(t.id).detail ? ` · ${leadStatusDisplay(t.id).detail}` : ''}
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${tab === t.id ? 'bg-paper/15' : 'bg-ink/5 text-ink/50'}`}>{count}</span>
+              <span className="ui-chip__n">{count}</span>
             </button>
           );
         })}
       </div>
 
-      <Card className="!p-0" pad={false}>
+      <div className="ui-card overflow-hidden">
         <CardHeader micro="Πορεία leads" title={`${tab === 'all' ? 'Όλα τα leads' : leadStatusInfo(tab).label}`}
           className="px-5 pt-5" action={<Pill tone="gray">{visible.length}</Pill>} />
         {loading && <div className="flex items-center justify-center py-16"><Spinner /></div>}
@@ -235,7 +235,7 @@ export default function LeadsPage() {
             hint="Τα leads φθάνουν από την ιστοσελίδα hlektrismos.gr ή δημιουργούνται χειροκίνητα." />
         )}
         {!loading && visible.length > 0 && (
-          <div className="divide-y divide-line">
+          <div className="ui-rows">
             {visible.map(l => {
               const info = leadStatusInfo(l.status);
               const src = leadSourceInfo(l.source);
@@ -243,16 +243,14 @@ export default function LeadsPage() {
               const converted = l.status === 'converted';
               const isStaff = can(role, 'create_case');
               return (
-                <div key={l.id} className="px-5 py-3 flex items-center gap-3 flex-wrap">
-                  <span className="w-8 h-8 rounded-lg bg-ink/5 flex items-center justify-center shrink-0 text-sm" title={src.label}>
+                <div key={l.id} className="ui-row px-5 py-3 flex items-center gap-3 flex-wrap">
+                  <span className="ui-tile shrink-0" title={src.label}>
                     {src.emoji}
                   </span>
                   <div className="flex-1 min-w-[180px]">
                     <div className="flex items-center gap-2 flex-wrap">
                       <button type="button" onClick={() => go('leads', { lead: l.id })} className="text-[13px] font-medium text-ink hover:text-brand-600 hover:underline text-left">{name}</button>
-                      <Pill tone={info.id === 'new' ? 'blue' : info.id === 'converted' ? 'green' : info.id === 'lost' || info.id === 'unqualified' ? 'red' : info.id === 'duplicate' ? 'amber' : 'gray'}>
-                        {info.emoji} {info.label}
-                      </Pill>
+                      <span className={pillClass(toneForLeadStatus(info.id))}>{info.emoji} {info.label}</span>
                     </div>
                     <div className="text-xs text-ink/45 mt-0.5">
                       {l.phone || 'χωρίς τηλέφωνο'}
@@ -313,7 +311,7 @@ export default function LeadsPage() {
             })}
           </div>
         )}
-      </Card>
+      </div>
 
       </>)}
 

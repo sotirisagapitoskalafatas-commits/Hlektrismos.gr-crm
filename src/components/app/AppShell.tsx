@@ -48,7 +48,7 @@ const FieldModePage = lazy(() => import('@/components/field-sales/FieldModePage'
 /* The shell chrome lives in components/shell (TopBar, Sidebar, ModuleMap). This file composes it with the page body
    and the ⌘K palette. Every page draws its own visible title; the ones below draw an H1 themselves, and for the
    rest the shell adds a visually hidden H1 so each screen still has exactly one top-level heading. */
-const OWN_HEADING = new Set<string>(['account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting']);
+const OWN_HEADING = new Set<string>(['leads', 'account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting']);
 
 /* ---------------- ⌘K palette + global search ---------------- */
 function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {

@@ -80,7 +80,7 @@ export default function StaffAdmin() {
       )}
       {error && <div className="atx-notice" role="alert">{error}</div>}
       {source === 'server' && allowedRoles.length === 0 && (
-        <div className="atx-notice" role="status" data-testid="admin-only-note">Το Back Office μπορεί να διαχειρίζεται λογαριασμούς Sales Agent. Οι Sales Agents δεν μπορούν να δημιουργούν ή να διαχειρίζονται λογαριασμούς.</div>
+        <div className="atx-notice" role="status" data-testid="admin-only-note">Μόνο ο κοινός λογαριασμός Admin / Back Office διαχειρίζεται λογαριασμούς Sales Agent. Οι Sales Agents δεν μπορούν να δημιουργούν ή να διαχειρίζονται λογαριασμούς.</div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">

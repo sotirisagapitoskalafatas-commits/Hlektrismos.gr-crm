@@ -14,11 +14,11 @@ export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_
 export const DEFAULT_ROLE: Role = 'inside_sales';
 
 export const ROLES: { id: Role; label: string; short: string; hint: string }[] = [
-  { id: 'admin', label: 'Διαχειριστής', short: 'ΑΔΜ', hint: 'Πλήρης πρόσβαση' },
-  { id: 'manager', label: 'Διευθυντής', short: 'ΔΝΣ', hint: 'Εποπτεία & reporting' },
-  { id: 'inside_sales', label: 'Inside Sales', short: 'INS', hint: 'Εξ αποστάσεως πωλήσεις' },
-  { id: 'field_sales', label: 'Field Sales', short: 'FLD', hint: 'Πωλήσεις πεδίου & επισκέψεις' },
-  { id: 'back_office', label: 'Back Office', short: 'BO', hint: 'Λειτουργική ολοκλήρωση' },
+  { id: 'admin', label: 'Admin / Back Office', short: 'ΑΔΜ', hint: 'Κοινός λογαριασμός γραφείου · πλήρης πρόσβαση' },
+  { id: 'manager', label: 'Διευθυντής (παλαιός ρόλος)', short: 'ΔΝΣ', hint: 'Παλαιός ρόλος · χωρίς διαχείριση λογαριασμών' },
+  { id: 'inside_sales', label: 'Sales Agent (παλαιό Inside)', short: 'INS', hint: 'Παλαιός ρόλος · ίδια ομάδα Sales Agent' },
+  { id: 'field_sales', label: 'Sales Agent', short: 'FLD', hint: 'Πωλήσεις, επισκέψεις και διαδρομές' },
+  { id: 'back_office', label: 'Back Office (παλαιός ρόλος)', short: 'BO', hint: 'Παλαιός ρόλος · χωρίς διαχείριση λογαριασμών' },
 ];
 
 export function roleLabel(r: Role) {
@@ -327,7 +327,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
       { key: 'homelayout', label: 'Αρχική σελίδα', icon: LayoutDashboard, page: 'homelayout', roles: ALL, maturity: 'live' },
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
-      { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager', 'back_office'], maturity: 'live' },
+      { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin'], maturity: 'live' },
     ],
   },
 ];

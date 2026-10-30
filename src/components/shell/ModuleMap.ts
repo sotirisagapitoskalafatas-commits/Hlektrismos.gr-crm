@@ -43,7 +43,7 @@ const LAYOUT: LayoutModule[] = [
 
 const SETTINGS_LAYOUT: LayoutModule = {
   id: 'settings', label: 'Ο λογαριασμός μου', groups: [
-    { keys: ['account', 'preferences'] },
+    { keys: ['account', 'preferences', 'homelayout'] },
     { label: 'Μόνο για διαχειριστές', keys: ['settings'] },
   ],
 };
@@ -51,7 +51,7 @@ const SETTINGS_LAYOUT: LayoutModule = {
 /** Leaves that are not sidebar items, and the item that hosts them (the page must stay reachable through it). */
 export const HOSTED: Record<string, string> = { followups: 'mywork', fieldmode: 'myday' };
 
-const LABEL_OVERRIDE: Record<string, string> = { account: 'Προφίλ & λογαριασμός', preferences: 'Εμφάνιση & προτιμήσεις', settings: 'Διαχείριση' };
+const LABEL_OVERRIDE: Record<string, string> = { account: 'Προφίλ', preferences: 'Εμφάνιση', homelayout: 'Αρχική σελίδα', settings: 'Διαχείριση' };
 const BADGE_OVERRIDE: Record<string, NavBadge> = { mywork: 'followups' }; // Η εργασία μου: follow-ups due
 const EXTRA_PAGES: Record<string, AnyPage[]> = {
   mywork: ['followups'], myday: ['field'], cases: ['case'],

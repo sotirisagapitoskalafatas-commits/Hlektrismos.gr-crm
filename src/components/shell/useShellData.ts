@@ -1,6 +1,7 @@
 // Data feeds shared by the top bar and the sidebar: nav badge counts and notifications.
 // Moved unchanged from AppShell.tsx (same queries, same filters).
 import { useCallback, useEffect, useState } from 'react';
+import { preferencesStore, usePreferences } from '@/lib/preferences';
 import { useAuth } from '@/lib/auth';
 import { ACTIVE_STAGES, BACK_OFFICE_STAGES } from '@/lib/roles';
 import type { ShellCounts, Stage } from '@/lib/roles';
@@ -64,22 +65,9 @@ export function notifMeta(type: string) {
   return NOTIF_TYPE[type] ?? { label: 'Σύστημα', color: '#0e7490' };
 }
 
-/** Compact sidebar preference. Same storage key and event as the preferences page (until it moves to the server). */
-const COMPACT_KEY = 'atlas.nav.collapsed';
-const readCompact = (): boolean => { try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; } };
-
+/** Compact sidebar preference: lives in the user's preferences (saved to the account, mirrored in this browser). */
 export function useCompactPref() {
-  const [compact, setCompact] = useState(readCompact);
-  useEffect(() => {
-    const sync = () => setCompact(readCompact());
-    window.addEventListener('atlas:prefs', sync);
-    return () => window.removeEventListener('atlas:prefs', sync);
-  }, []);
-  const toggle = useCallback(() => {
-    const next = !readCompact();
-    try { localStorage.setItem(COMPACT_KEY, next ? '1' : '0'); } catch { /* storage blocked: the choice lasts for this page view */ }
-    setCompact(next);
-    window.dispatchEvent(new Event('atlas:prefs'));
-  }, []);
-  return { compact, toggle };
+  const { sidebar_compact, update } = usePreferences();
+  const toggle = useCallback(() => update({ sidebar_compact: !preferencesStore.getState().prefs.sidebar_compact }), [update]);
+  return { compact: sidebar_compact, toggle };
 }

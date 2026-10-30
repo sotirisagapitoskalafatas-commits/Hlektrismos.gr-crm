@@ -126,6 +126,7 @@
 .atx-btn:disabled { opacity: .5; cursor: default; }
 
 .atx-tag { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.05); color: var(--atx-muted); white-space: nowrap; }
+@media (max-width: 767px) { .atx-tag { white-space: normal; max-width: 100%; } } /* a long notice must wrap on a phone, not run off the screen */
 .atx-tag.t-danger { background: rgba(201, 48, 44, 0.1); color: var(--atx-red); }
 .atx-tag.t-warning { background: rgba(178, 94, 9, 0.1); color: var(--atx-amber); }
 .atx-tag.t-success { background: rgba(31, 122, 61, 0.1); color: var(--atx-green); }

@@ -115,7 +115,7 @@ function TimelineTab({ caseId, load }: { caseId: string; load: () => void }) {
       <div className="flex gap-1.5 flex-wrap mb-4">
         {TEAM_FILTERS.map(t => (
           <button key={t.id} onClick={() => setTeam(t.id)}
-            className={`pill px-2.5 py-1 rounded-lg text-[10px] border transition-colors ${team === t.id ? 'bg-ink text-paper border-ink' : 'bg-white border-line text-ink/45 hover:text-ink'}`}>
+            type="button" aria-pressed={team === t.id} className="ui-chip shrink-0">
             {t.label}
           </button>
         ))}

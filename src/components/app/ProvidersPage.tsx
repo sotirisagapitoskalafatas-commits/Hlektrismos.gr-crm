@@ -100,7 +100,7 @@ export default function ProvidersPage() {
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {serviceTabs.map(t => (
             <button key={t.id} onClick={() => setService(t.id)}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${service === t.id ? 'bg-ink text-paper' : 'bg-white border border-line text-ink/55 hover:text-ink'}`}>
+              type="button" aria-pressed={service === t.id} className="ui-chip shrink-0">
               {t.label}
             </button>
           ))}

@@ -41,3 +41,11 @@ test('the old rail/drawer styles are gone', () => {
   const index = read('../../index.css');
   for (const css of [index, ux]) assert.doesNotMatch(css, /\.(glass-nav|glass-drawer|nav-leaf|nav-atlas|shell-backdrop)\b/);
 });
+
+test('Leads uses the shared status pills, chips and rows (no ad-hoc tone mapping)', () => {
+  const page = read('../../components/app/LeadsPage.tsx');
+  assert.match(page, /pillClass\(toneForLeadStatus\(/);
+  assert.doesNotMatch(page, /info\.id === 'new' \? 'blue'/, 'the old inline tone chain is gone');
+  assert.match(page, /className="ui-chip shrink-0"/);
+  for (const rule of [".ui-chip[aria-pressed='true']", '.ui-row:hover', '.ui-tile']) assert.ok(theme.includes(rule), rule);
+});

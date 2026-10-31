@@ -14,7 +14,7 @@ import { activeCases, lastActionDays, overdueFUs, wonCases, wonValue, ServiceLab
 import { isOpenLead, pipelineStats } from '@/lib/home-insights';
 import { BarRow, EmptyNote, KpiCard } from './shared';
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Διαχειριστές', manager: 'Διευθυντές', inside_sales: 'Inside Sales', field_sales: 'Field Sales', back_office: 'Back Office' };
+const ROLE_LABEL: Record<string, string> = { admin: 'Admin / Back Office', sales_agent: 'Sales Agents' };
 
 export function AdminSummary({ d }: { d: DashboardData }) {
   const { go } = useNav();

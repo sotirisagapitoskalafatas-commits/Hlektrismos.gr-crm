@@ -110,8 +110,10 @@ test('outreach_decisions is append-only and not writable by staff', async () => 
   assert.ok(!upd.ok && /append-only/.test(upd.err), 'owner update blocked by trigger');
   const del = await can('delete from public.outreach_decisions');
   assert.ok(!del.ok, 'delete blocked');
+  await as('authenticated', ADMIN);
+  assert.equal((await can('select * from public.outreach_decisions')).rows.length, 1, 'Admin can read audit');
   await as('authenticated', MANAGER);
-  assert.equal((await can('select * from public.outreach_decisions')).rows.length, 1, 'manager can read audit');
+  assert.equal((await can('select * from public.outreach_decisions')).rows.length, 0, 'a legacy role reads nothing');
   assert.ok(!(await can(`insert into public.outreach_decisions (lead_id, channel, purpose, allowed) values ('${LEAD}','email','x',true)`)).ok, 'staff cannot insert');
   await as('authenticated', AGENT);
   assert.equal((await can('select * from public.outreach_decisions')).rows.length, 0, 'agent cannot read audit');

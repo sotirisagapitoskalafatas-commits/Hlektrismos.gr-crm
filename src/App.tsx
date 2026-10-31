@@ -23,6 +23,7 @@ const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const Cookies = lazy(() => import('@/pages/Cookies'));
 const CopyrightPolicy = lazy(() => import('@/pages/CopyrightPolicy'));
 const Unsubscribed = lazy(() => import('@/pages/Unsubscribed'));
+const OfferAccept = lazy(() => import('@/pages/OfferAccept'));
 
 const routeFallback = (
   <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#5a7090' }} role="status">Φόρτωση...</div>
@@ -83,6 +84,8 @@ function AppContent() {
       return <CopyrightPolicy />;
     case 'unsubscribed':
       return <Unsubscribed />;
+    case 'offer':
+      return <OfferAccept />;
     default:
       return <LandingPage />;
   }

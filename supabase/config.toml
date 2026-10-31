@@ -16,3 +16,15 @@ verify_jwt = false
 # Public one-click unsubscribe link in marketing emails (HMAC-signed, no login).
 [functions.unsubscribe]
 verify_jwt = false
+
+# Called by an external system that cannot send a Supabase JWT. Each of these authenticates the caller INSIDE the function
+# (shared secret header or signed link), so the gateway JWT check is switched off for them and only for them.
+# supabase/functions/_shared/__tests__/function-gateway-config.test.mjs keeps this list and the code in step.
+[functions.vapi-webhook]
+verify_jwt = false
+
+[functions.accept-offer]
+verify_jwt = false
+
+[functions.receive-lead-webhook]
+verify_jwt = false

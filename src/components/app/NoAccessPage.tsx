@@ -1,12 +1,12 @@
 import { useAuth } from '@/lib/auth';
-import { LEGACY_ROLE_LABEL, isLegacyRole } from '@/lib/roles';
+import { LEGACY_ROLE_LABEL, hasAccess } from '@/lib/roles';
 
 /* Shown instead of the CRM to an account that holds no access: a LEGACY role identifier (manager / back_office), an unknown
    role, or no profile row yet. The profile and its history are preserved. Nothing is converted or promoted here; an Admin
    decides that through staff administration. */
 export default function NoAccessPage() {
   const { signOut, profile, refreshProfile } = useAuth();
-  const legacy = isLegacyRole(profile?.role);
+  const legacy = !!profile?.role && !hasAccess(profile.role);
   const onSignOut = () => { void signOut(); window.location.hash = '/'; };
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f7fa', color: '#1a2a40', padding: 24 }}>

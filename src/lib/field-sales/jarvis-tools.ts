@@ -348,7 +348,7 @@ async function noteResult(o: PickOption, note: string, ctx: FieldSalesCtx): Prom
     return { type: 'done', text: 'Η σημείωση καταχωρείται σε υπόθεση (case). Δοκιμάστε με τον αριθμό ή το όνομα της υπόθεσης.' };
   }
   await addActivity(t.id, {
-    role: ctx.role ?? 'field_sales',
+    role: ctx.role ?? 'sales_agent',
     activity_type: 'note',
     title: 'Σημείωση (JARVIS)',
     description: note,

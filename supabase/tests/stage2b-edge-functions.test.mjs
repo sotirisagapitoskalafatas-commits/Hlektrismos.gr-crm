@@ -39,13 +39,15 @@ async function sendEmail(db) {
 }
 const mail = { subject: 'Η προσφορά σας', text: 'Καλησπέρα σας' };
 
-test('send-email: no session 401, inactive 403, role without communications.email.send 403', async () => {
-  const f = await sendEmail(seed());
+test('send-email: no session 401, inactive 403, revoked communications.email.send 403', async () => {
+  const db = seed();
+  db.rows('crm_settings').push({ setting_key: 'role_permissions', setting_value: { sales_agent: ['crm.read.assigned'] } });
+  const f = await sendEmail(db);
   assert.equal((await f.call({ body: { ...mail, legacy_lead_id: LA } })).status, 401);
   assert.equal((await f.call({ token: 'tok-bogus', body: { ...mail, legacy_lead_id: LA } })).status, 401);
   assert.equal((await f.call({ token: 'tok-inactive', body: { ...mail, legacy_lead_id: LA } })).status, 403);
   const field = await f.call({ token: 'tok-b', body: { ...mail, legacy_lead_id: LB } });
-  assert.equal(field.status, 403, 'field_sales has no email capability by default');
+  assert.equal(field.status, 403, 'an Admin revoked it');
   assert.equal(f.smtp.length, 0, 'nothing was sent');
   f.restore();
 });
@@ -128,7 +130,7 @@ test('send-sms: capability first (inside_sales has none by default), then the le
   // An admin override grants SMS to inside_sales: records are still limited to the agent's own leads.
   const override = { setting_key: 'role_permissions', setting_value: { inside_sales: ['crm.read.assigned', 'communications.sms.send'] } };
   f = await loadFunction('send-sms', { db: seed({ crm_settings: [...smsSettings, override] }), users });
-  const other = await f.call({ token: 'tok-a', body: { leads: [{ id: LA }, { id: LB }], message: 'Γεια' } });
+  const other = await f.call({ token: 'tok-a', body: { campaign_id: 'dddddddd-0000-4000-8000-0000000000a1', leads: [{ id: LA }, { id: LB }], message: 'Γεια' } });
   assert.equal(other.status, 403);
   assert.equal(other.json.error, 'Not your record');
   assert.equal(f.outbound.filter((o) => o.url.includes('infobip')).length, 0, 'nothing sent when one lead is not theirs');

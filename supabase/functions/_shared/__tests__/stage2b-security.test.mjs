@@ -80,7 +80,8 @@ test('a Sales Agent may act on their own records only (assignment, creation, cas
 
 test('decide(): 401 without caller, 403 without capability, 404 when missing, 403 for another agent, ok otherwise', () => {
   assert.equal(A.decide(null, null, leadOfA, A.canAccessLead).status, 401);
-  assert.deepEqual(A.decide(field, 'communications.email.send', leadOfA, A.canAccessLead), { ok: false, status: 403, error: 'Not permitted for your role' }, 'field_sales lacks email');
+  const revoked = { ...field, overrides: { sales_agent: ['crm.read.assigned'] } };
+  assert.deepEqual(A.decide(revoked, 'communications.email.send', leadOfA, A.canAccessLead), { ok: false, status: 403, error: 'Not permitted for your role' }, 'a revoked capability');
   assert.equal(A.decide(inside, 'communications.voice.initiate', leadOfA, A.canAccessLead).status, 403, 'voice is admin-only');
   assert.equal(A.decide(inside, 'communications.email.send', null, A.canAccessLead).status, 404);
   assert.deepEqual(A.decide(inside, 'communications.email.send', leadOfB, A.canAccessLead), { ok: false, status: 403, error: 'Not your record' });
@@ -93,7 +94,7 @@ test('decide(): 401 without caller, 403 without capability, 404 when missing, 40
   assert.equal(A.decide(inside, 'case.documents.verify', caseOfA, A.canAccessCase).status, 403, 'sales cannot verify');
   assert.deepEqual(A.decide(service, 'campaign.send', leadOfB, A.canAccessLead), { ok: true });
   // admin-editable overrides can grant or remove a capability for non-admin roles, never lock out admin
-  const fieldWithEmail = { ...field, overrides: { field_sales: ['crm.read.assigned', 'case.update.sales', 'communications.email.send'] } };
+  const fieldWithEmail = { ...field, overrides: { sales_agent: ['crm.read.assigned', 'case.update.sales', 'communications.email.send'] } };
   assert.deepEqual(A.decide(fieldWithEmail, 'communications.email.send', leadOfA, A.canAccessLead), { ok: true });
   assert.equal(A.decide(fieldWithEmail, 'communications.email.send', leadOfB, A.canAccessLead).status, 403, 'override never widens records');
 });

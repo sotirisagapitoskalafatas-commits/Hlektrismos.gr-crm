@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { classifyUpload, MAX_FORM_FILES, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
-import { useLenis, scrollToTarget } from '@/hooks/useLenis';
+import { useLenis, scrollToTarget, refreshScrollLayout } from '@/hooks/useLenis';
 import { COMPANY } from '@/lib/legal';
 import EnergyBolt from '@/components/landing/EnergyBolt';
 import PublicHeader from '@/components/public/PublicHeader';
@@ -107,6 +107,8 @@ export default function LandingPage() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useLenis();
+  // Files added to or removed from the list change the page height without a window resize.
+  useEffect(() => { refreshScrollLayout(); }, [form.billFiles.length]);
   useReveal(rootRef);
 
   // Landed on a plain in-page anchor from another page (e.g. #/services → #about).
@@ -460,7 +462,7 @@ export default function LandingPage() {
                       </select>
                     </label>
 
-                    <details className="lp-optional">
+                    <details className="lp-optional" onToggle={refreshScrollLayout}>
                       <summary>Σχόλια ή λογαριασμός ενέργειας (προαιρετικό) <ChevronDown size={16} aria-hidden="true" /></summary>
                       <div className="lp-optional__body">
                         <label className="lp-field"><span>Σχόλια <small>(προαιρετικά)</small></span>

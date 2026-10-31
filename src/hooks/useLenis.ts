@@ -27,6 +27,18 @@ export function scrollToTarget(target: string | number | HTMLElement, immediate 
   }
 }
 
+/**
+ * Call after the page height changed without a window resize (a native <details> opened, files were added to a list). Waits for the browser to
+ * finish the layout change, then lets Lenis re-measure and ScrollTrigger recompute its positions. Does nothing without Lenis (CRM routes).
+ */
+export function refreshScrollLayout(): void {
+  if (typeof window === 'undefined') return;
+  window.requestAnimationFrame(() => {
+    lenis?.resize();
+    ScrollTrigger.refresh();
+  });
+}
+
 const HEADER_OFFSET = -76;
 
 /**

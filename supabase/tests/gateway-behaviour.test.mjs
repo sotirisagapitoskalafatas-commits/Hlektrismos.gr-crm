@@ -84,7 +84,10 @@ for (const name of staff) {
       const f = await loadFunction(name, { db: world(), users, env: { LINK_SIGNING_SECRET: 'link-signing-secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa', CRON_SECRET: 'cron-secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa' } });
       const signedIn = !!req.token && req.token !== PUBLISHABLE_KEY;
       const r = await f.call({ ...req, body: signedIn ? (ACTION_BODY[name] ?? {}) : {} });
-      assert.ok([401, 403].includes(r.status), `${name} / ${label}: ${r.status} ${JSON.stringify(r.json).slice(0, 80)}`);
+      // Exact, not "either": who is refused and why matters. No session (or only the public key) is "not authenticated" = 401; a real session that has no
+      // staff access is "not allowed" = 403. Accepting both would let a removed first check hide behind a second one that happens to refuse with the other code.
+      const expected = signedIn ? 403 : 401;
+      assert.equal(r.status, expected, `${name} / ${label}: ${r.status} ${JSON.stringify(r.json).slice(0, 80)}`);
       untouched(f, `${name} / ${label}`, signedIn ? DENIAL_AUDIT[name] : undefined);
       f.restore();
     }

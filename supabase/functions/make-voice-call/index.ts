@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { callerKey, rateLimited } from "../_shared/limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -19,6 +20,7 @@ serve(async (req) => {
   if (caller instanceof Response) return caller;
   const denied = requireCapability(caller, "communications.voice.initiate");
   if (denied) return denied;
+  if (rateLimited(`make-voice-call:${callerKey(caller)}`, 10, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
 
   try {
     // Only the lead id is trusted from the request; the phone number and lead details come from the database.

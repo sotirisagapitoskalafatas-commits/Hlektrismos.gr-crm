@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient, type RecordKind } from "../_shared/authz.ts";
+import { callerKey, rateLimited } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { buildHeaders, EmailSafetyError, parseRecipient, safeDisplayName, smtpDataBody } from "../_shared/email-safety.ts";
 
@@ -139,6 +140,7 @@ Deno.serve(async (req) => {
   if (caller instanceof Response) return caller;
   const noCap = requireCapability(caller, "communications.email.send");
   if (noCap) return noCap;
+  if (rateLimited(`send-email:${callerKey(caller)}`, 30, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
 
   try {
     const payload = await req.json().catch(() => null);

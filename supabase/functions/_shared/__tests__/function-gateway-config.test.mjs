@@ -14,13 +14,13 @@ const fns = readdirSync(fnDir, { withFileTypes: true }).filter((d) => d.isDirect
 const src = (f) => readFileSync(join(fnDir, f, 'index.ts'), 'utf8');
 
 // the guard each function uses when the gateway does not check a JWT
-const OWN_GUARD = /getCaller\(|presentsSecretKey\(|x-vapi-secret|x-webhook-secret|verifyLink\(|verifyUnsubscribe|createHmac|timingSafeEqual/;
+const OWN_GUARD = /getCaller\(|presentsSecretKey\(|x-vapi-secret|x-webhook-secret|verifyLink\(|verifyExpiringLink\(|verifyUnsubscribe|createHmac|timingSafeEqual/;
 const PUBLIC_BY_DESIGN = new Set(['chat']); // public chatbot: no login, bounded elsewhere
 
 // callers that cannot send a Supabase JWT: provider webhook, e-mailed link, ad-platform webhook
 const EXTERNAL = {
   'vapi-webhook': /x-vapi-secret/,
-  'accept-offer': /verifyLink\(/,
+  'accept-offer': /verifyExpiringLink\(/,
   'receive-lead-webhook': /x-webhook-secret/,
 };
 

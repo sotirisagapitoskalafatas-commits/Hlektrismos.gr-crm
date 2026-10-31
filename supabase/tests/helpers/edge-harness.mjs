@@ -224,8 +224,8 @@ export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, f
   if (!handler) throw new Error(`harness: ${name} registered no handler`);
   return {
     db, outbound, smtp, clientKeys, restore: () => { globalThis.fetch = realFetch; },
-    async call({ token, body, method = 'POST', headers = {} } = {}) {
-      const res = await handler(new Request(`${SUPABASE_URL}/functions/v1/${name}`, {
+    async call({ token, body, method = 'POST', headers = {}, query = '' } = {}) {
+      const res = await handler(new Request(`${SUPABASE_URL}/functions/v1/${name}${query}`, {
         method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
         body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
       }));

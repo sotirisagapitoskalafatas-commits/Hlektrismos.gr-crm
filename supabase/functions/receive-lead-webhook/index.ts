@@ -28,7 +28,8 @@ serve(async (req) => {
   //   x-webhook-secret: <LEAD_WEBHOOK_SECRET>
   // Fails closed when the secret is not configured.
   const expected = Deno.env.get("LEAD_WEBHOOK_SECRET") ?? "";
-  if (!expected || !timingSafeEqual(req.headers.get("x-webhook-secret") ?? "", expected)) {
+  // A configured secret shorter than 16 characters is treated as not configured (same rule as vapi-webhook).
+  if (expected.length < 16 || !timingSafeEqual(req.headers.get("x-webhook-secret") ?? "", expected)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -38,7 +39,12 @@ serve(async (req) => {
     if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey());
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: "A JSON object is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const source = str(req.headers.get("x-source") || body.source || "webhook").toLowerCase();
     const q = (body.custom_questions ?? {}) as Record<string, unknown>;
 
@@ -89,6 +95,16 @@ serve(async (req) => {
       consent_granted_at: consent ? new Date().toISOString() : null,
       consent_source: consent ? source : null,
     };
+
+    // Idempotency: senders retry deliveries. The same contact from the same source inside ten minutes is the same lead.
+    const { data: recent } = await supabase.from("leads").select("id")
+      .eq(email ? "email" : "phone", email || phone).eq("source_label", label)
+      .gte("created_at", new Date(Date.now() - 10 * 60 * 1000).toISOString()).limit(1);
+    if (recent && recent.length > 0) {
+      return new Response(JSON.stringify({ success: true, lead_id: recent[0].id, duplicate: true }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: lead, error: insertError } = await supabase.from("leads").insert(row).select("id").single();
     if (insertError) {

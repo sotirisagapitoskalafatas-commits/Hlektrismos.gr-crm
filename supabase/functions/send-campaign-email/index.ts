@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { badBatch, callerKey, cleanText, rateLimited } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { assertHeaderSafe, EmailSafetyError, parseRecipient, safeDisplayName } from "../_shared/email-safety.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
@@ -25,9 +26,17 @@ serve(async (req) => {
   if (caller instanceof Response) return caller;
   const denied = requireCapability(caller, "campaign.send");
   if (denied) return denied;
+  if (rateLimited(`send-campaign-email:${callerKey(caller)}`, 5, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
 
   try {
-    const { campaign_id, leads, subject, html_body, from_name } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json(400, { error: "A JSON body is required" });
+    const { campaign_id, leads, subject, from_name } = body as { campaign_id?: string; leads?: unknown; subject?: unknown; from_name?: unknown };
+    const html_body = cleanText((body as { html_body?: unknown }).html_body, 1, 200_000);
+    if (!html_body) return json(400, { error: "html_body must be 1-200000 characters" });
+    if (!cleanText(subject, 1, 200)) return json(400, { error: "subject must be 1-200 characters" });
+    const bad = badBatch(leads);
+    if (bad) return json(bad.status, { error: bad.error });
 
     // Header safety: the sender address is configuration; only a sanitised display name may be chosen and the
     // Subject must not contain CR/LF (header injection). Validated once, before any recipient is processed.
@@ -58,7 +67,7 @@ serve(async (req) => {
       );
     }
 
-    const results = { sent: 0, failed: 0, errors: [] as string[] };
+    const results = { sent: 0, failed: 0, skipped: 0, errors: [] as string[] };
 
     // Recipients are selected server-side: only lead IDs are read from the request; addresses and every other
     // attribute come from the database, and each recipient must pass the central eligibility gate.
@@ -81,7 +90,16 @@ serve(async (req) => {
       results.errors.push(`${d.id}: not eligible (${d.reasons.join(",")})`);
     }
 
+    // Idempotency: a lead that already has a "sent" row for this campaign is never messaged twice, so a repeated request
+    // (double click, retry, replay) cannot send duplicates.
+    const alreadySent = new Set<string>();
+    if (campaign_id) {
+      const { data: prior } = await supabase.from("campaign_sends").select("lead_id").eq("campaign_id", campaign_id).eq("status", "sent");
+      for (const p of (prior ?? []) as { lead_id: string }[]) alreadySent.add(p.lead_id);
+    }
+
     for (const lead of gate.allowed) {
+      if (alreadySent.has(lead.id)) { results.skipped++; continue; }
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;

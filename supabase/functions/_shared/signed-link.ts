@@ -30,3 +30,29 @@ export async function verifyLink(token: string | null, purpose: string, ...parts
   if (!token) return false;
   try { return timingSafeEqual(await signLink(purpose, ...parts), token); } catch { return false; }
 }
+
+/** Longest lifetime an expiring token may claim; anything further out is refused even with a valid signature. */
+export const MAX_LINK_TTL_SECONDS = 60 * 24 * 60 * 60;
+
+/** Expiring token `<exp>.<sig>`: the signature covers the purpose, the expiry and the parts, so the expiry cannot be edited. */
+export async function signExpiringLink(purpose: string, ttlSeconds: number, ...parts: string[]): Promise<string> {
+  const exp = Math.floor(Date.now() / 1000) + Math.min(Math.max(1, Math.floor(ttlSeconds)), MAX_LINK_TTL_SECONDS);
+  return `${exp}.${await signLink(purpose, String(exp), ...parts)}`;
+}
+
+export type LinkCheck = "ok" | "expired" | "invalid";
+
+/** Verifies an expiring token. "expired" is only reported for a token whose signature is otherwise valid. */
+export async function verifyExpiringLink(token: string | null, purpose: string, ...parts: string[]): Promise<LinkCheck> {
+  if (!token) return "invalid";
+  const dot = token.indexOf(".");
+  if (dot < 1) return "invalid";
+  const exp = Number(token.slice(0, dot));
+  const sig = token.slice(dot + 1);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isInteger(exp) || exp - now > MAX_LINK_TTL_SECONDS) return "invalid";
+  let expected: string;
+  try { expected = await signLink(purpose, String(exp), ...parts); } catch { return "invalid"; }
+  if (!timingSafeEqual(expected, sig)) return "invalid";
+  return exp < now ? "expired" : "ok";
+}

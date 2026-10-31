@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
-import { verifyLink } from "../_shared/signed-link.ts";
+import { verifyExpiringLink } from "../_shared/signed-link.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +31,11 @@ Deno.serve(async (req: Request) => {
 
     // Audit fix: the link must be HMAC-signed (see send-offer) and acceptance needs an
     // explicit POST, so mail scanners / link previews that GET the URL cannot convert a lead.
-    if (lead_id && tariff_id && !(await verifyLink(token, "accept-offer", lead_id, tariff_id))) {
+    const linkCheck = lead_id && tariff_id ? await verifyExpiringLink(token, "accept-offer", lead_id, tariff_id) : "invalid";
+    if (lead_id && tariff_id && linkCheck === "expired") {
+      return html(410, "<h2>⌛ Ο σύνδεσμος έχει λήξει</h2><p>Παρακαλώ ζητήστε νέα προσφορά από τον υπάλληλό σας.</p>");
+    }
+    if (lead_id && tariff_id && linkCheck !== "ok") {
       return html(403, "<h2>❌ Μη έγκυρος ή ληγμένος σύνδεσμος</h2><p>Παρακαλώ ζητήστε νέα προσφορά από τον σύμβουλό σας.</p>");
     }
     if (lead_id && tariff_id && req.method !== "POST") {
@@ -52,11 +56,25 @@ Deno.serve(async (req: Request) => {
     if (!secretKey()) return missingKeyResponse("secret");
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, secretKey());
 
-    // 1. Update lead status
-    await supabase.from("hlektrismos_leads").update({
+    // 0. Current state, checked server-side (the signed link only proves the offer was issued, not that it may still be accepted):
+    //    the lead exists and is not deleted or closed, and an offer for exactly this lead + tariff was really sent.
+    const done = () => html(200, "<h2>✅ Η προσφορά έχει ήδη γίνει αποδεκτή</h2><p>Ευχαριστούμε! Θα επικοινωνήσουμε μαζί σας σύντομα.</p>");
+    const { data: lead } = await supabase.from("hlektrismos_leads").select("id, status, deleted_at").eq("id", lead_id).maybeSingle();
+    if (!lead || lead.deleted_at) return html(404, "<h2>❌ Η προσφορά δεν βρέθηκε</h2><p>Παρακαλώ ζητήστε νέα προσφορά από τον υπάλληλό σας.</p>");
+    if (lead.status === "customer") return done(); // replay: already accepted, nothing is written again
+    if (["lost", "unsubscribed", "do_not_contact"].includes(String(lead.status))) {
+      return html(409, "<h2>❌ Η προσφορά δεν είναι πλέον διαθέσιμη</h2><p>Παρακαλώ επικοινωνήστε με τον υπάλληλό σας.</p>");
+    }
+    const { data: offered } = await supabase.from("crm_tasks").select("id").eq("lead_id", lead_id).eq("tariff_id", tariff_id)
+      .ilike("title", "Προσφορά στάλθηκε%").limit(1);
+    if (!offered || offered.length === 0) return html(404, "<h2>❌ Η προσφορά δεν βρέθηκε</h2><p>Παρακαλώ ζητήστε νέα προσφορά από τον υπάλληλό σας.</p>");
+
+    // 1. One transition only: compare-and-set on the status read above, so two simultaneous requests cannot both convert.
+    const { data: changed } = await supabase.from("hlektrismos_leads").update({
       status: "customer",
       converted_at: new Date().toISOString(),
-    }).eq("id", lead_id);
+    }).eq("id", lead_id).eq("status", lead.status).select("id");
+    if (!changed || changed.length === 0) return done();
 
     // 2. Fetch tariff details for the thank-you page
     const { data: tariff } = await supabase

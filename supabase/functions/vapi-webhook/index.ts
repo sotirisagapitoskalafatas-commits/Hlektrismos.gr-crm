@@ -25,6 +25,9 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { message } = payload;
 
     if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
@@ -47,6 +50,12 @@ serve(async (req) => {
 
     if (!voiceCall) {
       return new Response(JSON.stringify({ ok: true, note: "no matching voice_call" }), { headers: corsHeaders });
+    }
+
+    // Replay safety: a call that is already completed is final. A replayed or duplicated end-of-call event changes nothing
+    // (no second status change, no duplicate transcript note), and a late partial transcript cannot overwrite the final one.
+    if (voiceCall.status === "completed") {
+      return new Response(JSON.stringify({ ok: true, note: "already completed" }), { headers: corsHeaders });
     }
 
     if (eventType === "call-ended") {

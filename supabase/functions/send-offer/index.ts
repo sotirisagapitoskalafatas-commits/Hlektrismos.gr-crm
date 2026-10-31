@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
-import { signLink } from "../_shared/signed-link.ts";
+import { signExpiringLink } from "../_shared/signed-link.ts";
+import { callerKey, rateLimited } from "../_shared/limits.ts";
+
+/** The acceptance link stops working after this long (the offer must be re-sent). */
+const OFFER_LINK_TTL_SECONDS = 14 * 24 * 60 * 60;
 import { authorizeRecord, getCaller, json, serviceClient } from "../_shared/authz.ts";
 import { callerCan } from "../_shared/access.ts";
 import { assertHeaderSafe, parseRecipient } from "../_shared/email-safety.ts";
@@ -33,6 +37,7 @@ Deno.serve(async (req: Request) => {
   const supabase = serviceClient();
   const caller = await getCaller(req, supabase);
   if (caller instanceof Response) return caller;
+  if (rateLimited(`send-offer:${callerKey(caller)}`, 20, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
 
   try {
     const body = await req.json().catch(() => null);
@@ -74,8 +79,13 @@ Deno.serve(async (req: Request) => {
     const mayMessagePhone = callerCan(caller, "communications.sms.send");
     const savingsTxt = savings !== null ? savings.toFixed(2) : "0";
 
-    // 1. Generate acceptance link
-    const acceptToken = await signLink("accept-offer", String(lead_id), String(tariff_id));
+    // Idempotency: the same offer is not sent twice within ten minutes (double click, retry, replay).
+    const recent = await supabase.from("crm_tasks").select("id").eq("lead_id", lead_id).eq("tariff_id", tariff_id)
+      .ilike("title", "Προσφορά στάλθηκε%").gte("created_at", new Date(Date.now() - 10 * 60 * 1000).toISOString()).limit(1);
+    if ((recent.data ?? []).length > 0) return json(409, { error: "This offer was just sent. Wait a few minutes before sending it again." });
+
+    // 1. Generate acceptance link (signed and expiring)
+    const acceptToken = await signExpiringLink("accept-offer", OFFER_LINK_TTL_SECONDS, String(lead_id), String(tariff_id));
     const acceptUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/accept-offer?lead_id=${lead_id}&tariff_id=${tariff_id}&t=${acceptToken}`;
 
     // 2. Compose Greek savings message

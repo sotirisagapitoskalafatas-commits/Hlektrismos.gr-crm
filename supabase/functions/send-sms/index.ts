@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { badBatch, callerKey, cleanText, rateLimited } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
@@ -24,9 +25,17 @@ serve(async (req) => {
   if (caller instanceof Response) return caller;
   const denied = requireCapability(caller, "communications.sms.send");
   if (denied) return denied;
+  // Best-effort per-caller throttle (limits.ts): slows a runaway or compromised staff account.
+  if (rateLimited(`send-sms:${callerKey(caller)}`, 10, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
 
   try {
-    const { campaign_id, leads, message, channel } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json(400, { error: "A JSON body is required" });
+    const { campaign_id, leads, channel } = body as { campaign_id?: string; leads?: unknown; channel?: string };
+    const text = cleanText((body as { message?: unknown }).message, 1, 1000);
+    if (!text) return json(400, { error: "message must be 1-1000 characters" });
+    const bad = badBatch(leads);
+    if (bad) return json(bad.status, { error: bad.error });
 
     const { data: settings } = await supabase
       .from("crm_settings")
@@ -48,7 +57,7 @@ serve(async (req) => {
       );
     }
 
-    const results = { sent: 0, failed: 0, errors: [] as string[] };
+    const results = { sent: 0, failed: 0, skipped: 0, errors: [] as string[] };
 
     // Server-selected recipients + central eligibility gate (see send-campaign-email).
     if (!Array.isArray(leads)) {
@@ -72,7 +81,16 @@ serve(async (req) => {
       results.errors.push(`${d.id}: not eligible (${d.reasons.join(",")})`);
     }
 
+    // Idempotency: a lead that already has a "sent" row for this campaign is never messaged twice, so a repeated request
+    // (double click, retry, replay) cannot send duplicates.
+    const alreadySent = new Set<string>();
+    if (campaign_id) {
+      const { data: prior } = await supabase.from("campaign_sends").select("lead_id").eq("campaign_id", campaign_id).eq("status", "sent");
+      for (const p of (prior ?? []) as { lead_id: string }[]) alreadySent.add(p.lead_id);
+    }
+
     for (const lead of gate.allowed) {
+      if (alreadySent.has(lead.id)) { results.skipped++; continue; }
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;
@@ -87,7 +105,7 @@ serve(async (req) => {
       }
 
       try {
-        const personalizedMessage = message
+        const personalizedMessage = text
           .replace(/\{\{first_name\}\}/g, lead.first_name || "")
           .replace(/\{\{last_name\}\}/g, lead.last_name || "")
           .replace(/\{\{company_name\}\}/g, lead.company_name || "")

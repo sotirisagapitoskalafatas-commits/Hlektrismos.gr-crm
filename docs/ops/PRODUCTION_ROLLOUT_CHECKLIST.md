@@ -74,7 +74,9 @@ Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) aft
 | E2 | Claude verifies the Auth user, then runs `docs/ops/sql/provision_profile.sql` (`admin`) | ⏳ after E1 |
 | E3 | Recovery e-mail to the Sales Agent (public Auth API; no secret) | 🚫 needs G4, SQL step 24–25 installed **and verified** (C2) |
 | E4 | `provision_profile.sql` (`field_sales`) after the owner controls the password | ⏳ after E3 |
+| E1b | `admin_identity_report.sql` before E2: exactly one Auth user, an identity row, signed in | ⏳ after E1 |
 | E5 | `deactivate_qa_accounts.sql` (the script refuses unless the real admin has signed in) | ⏳ after E2 + successful sign-in |
+| E5b | `deactivate_probe_accounts.sql` (the two verification probe logins; same guard) | ⏳ after E5 |
 
 Deployment-integration facts: production has **27 Edge Functions and no `admin-users`**; the GitHub integration deploys only the 6 functions declared in `supabase/config.toml` (`agent-worker`, `ai-developer`, `chat`, `orchestrator`, `scrape-b2b`, `unsubscribe`). Merging #130 deploys the **frontend** to production at once — so it follows the SQL.
 

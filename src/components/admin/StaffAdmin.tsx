@@ -80,7 +80,7 @@ export default function StaffAdmin() {
       )}
       {error && <div className="atx-notice" role="alert">{error}</div>}
       {source === 'server' && allowedRoles.length === 0 && (
-        <div className="atx-notice" role="status" data-testid="admin-only-note">Το Back Office μπορεί να διαχειρίζεται λογαριασμούς Sales Agent. Οι Sales Agents δεν μπορούν να δημιουργούν ή να διαχειρίζονται λογαριασμούς.</div>
+        <div className="atx-notice" role="status" data-testid="admin-only-note">Μόνο ο κοινός λογαριασμός Admin / Back Office διαχειρίζεται λογαριασμούς Sales Agent. Οι Sales Agents δεν μπορούν να δημιουργούν ή να διαχειρίζονται λογαριασμούς.</div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -224,7 +224,7 @@ function CreateDialog({ roles, onClose, onDone }: { roles: Role[]; onClose: () =
   const [full_name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<Role>(roles.includes('inside_sales') ? 'inside_sales' : roles[0]);
+  const [role, setRole] = useState<Role>(roles[0]);
   const [mode, setMode] = useState<'invite' | 'password'>('invite');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);

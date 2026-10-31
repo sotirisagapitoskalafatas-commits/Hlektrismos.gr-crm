@@ -8,11 +8,45 @@ import { launch, signInAs, sleep } from './ui-session.mjs';
 
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`); };
-const text = (page, sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.trim()));
-const click = (page, label, scope = 'button') => page.evaluate((l, sc) => {
+// ---- navigation shim: the checks below were written for the old left rail (#shell-rail). The redesigned shell has five top-bar
+// modules, each with its own sidebar, plus the settings pages behind the avatar menu. These helpers keep the old call sites working.
+const OLD_NAV = '#shell-rail nav button';
+const RENAMED = { 'Προτιμήσεις': 'Εμφάνιση', 'Λογαριασμός': 'Προφίλ' }; // settings pages were renamed in the redesign
+const sidebarItems = (page) => page.$$eval('.shell-sidebar__nav .shell-item', (els) => els.map((e) => (e.querySelector('.shell-item__text')?.textContent ?? '').trim()));
+async function allNavLabels(page) {
+  const labels = new Set();
+  const mods = await page.$$eval('.shell-seg__link', (els) => els.map((e) => e.textContent.trim()));
+  for (const m of mods) {
+    await page.evaluate((l) => [...document.querySelectorAll('.shell-seg__link')].find((b) => b.textContent.trim() === l)?.click(), m); await sleep(250);
+    for (const x of await sidebarItems(page)) labels.add(x);
+  }
+  await page.click('.shell-user').catch(() => undefined); await sleep(250);
+  for (const x of await page.$$eval('[role="menuitem"]', (els) => els.map((e) => e.textContent.trim()))) labels.add(x.replace(/\s+/g, ' '));
+  await page.keyboard.press('Escape'); await sleep(150);
+  if (labels.has('Προφίλ') || labels.has('Προσαρμογή CRM')) { labels.add('Προτιμήσεις'); labels.add('Λογαριασμός'); }
+  return [...labels];
+}
+async function gotoLabel(page, label) {
+  const want = RENAMED[label] ?? label;
+  const tryItem = () => page.evaluate((l) => { const el = [...document.querySelectorAll('.shell-sidebar__nav .shell-item')].find((b) => (b.querySelector('.shell-item__text')?.textContent ?? '').trim().startsWith(l) && b.offsetParent); if (el) { el.click(); return true; } return false; }, want);
+  if (await tryItem()) return true;
+  const mods = await page.$$eval('.shell-seg__link', (els) => els.map((e) => e.textContent.trim()));
+  for (const m of mods) {
+    await page.evaluate((l) => [...document.querySelectorAll('.shell-seg__link')].find((b) => b.textContent.trim() === l)?.click(), m); await sleep(250);
+    if (await tryItem()) return true;
+  }
+  // settings pages live behind the avatar menu
+  await page.click('.shell-user').catch(() => undefined); await sleep(250);
+  const viaMenu = await page.evaluate((l) => { const el = [...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent.trim().startsWith(l)); if (el) { el.click(); return true; } return false; }, ['Εμφάνιση', 'Προφίλ', 'Αρχική σελίδα'].includes(want) ? 'Προσαρμογή CRM' : want === 'Διαχείριση' ? 'Διαχείριση' : want);
+  if (viaMenu) { await sleep(500); if (['Προφίλ', 'Αρχική σελίδα', 'Εμφάνιση'].includes(want)) await tryItem(); return true; }
+  await page.keyboard.press('Escape');
+  return false;
+}
+const text = (page, sel) => (sel === OLD_NAV ? allNavLabels(page) : page.$$eval(sel, (els) => els.map((e) => e.textContent.trim())));
+const click = (page, label, scope = 'button') => (scope === OLD_NAV ? gotoLabel(page, label) : page.evaluate((l, sc) => {
   const el = [...document.querySelectorAll(sc)].find((b) => b.textContent.trim().startsWith(l) && b.offsetParent);
   if (el) { el.click(); return true; } return false;
-}, label, scope);
+}, label, scope));
 
 // The role preview has a built-in hard stop (ROLE_PREVIEW_HARD_STOP in src/lib/role-preview.ts); after it the selector is gone by design.
 const PREVIEW_LIVE = Date.now() < Date.parse('2026-10-16T00:00:00+03:00');
@@ -21,11 +55,12 @@ const ADMIN_ONLY = ['Αυτοματισμοί', 'AI Εργατικό Δυναμ�
 const LABS = ['Αυτοματισμοί', 'AI Εργατικό Δυναμικό', 'B2B Prospecting'];
 const EXPECT = {
   admin: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Ρυθμίσεις'.length && 'Προτιμήσεις', 'Διαχείριση'], mustNot: LABS },
-  manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Διαχείριση'], mustNot: LABS },
+  // two-role model: only the shared Admin / Back Office (admin) has «Διαχείριση»; legacy manager / back_office do not
+  manager: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases'], mustNot: [...LABS, 'Διαχείριση'] },
   inside_sales: { must: ['Αρχική', 'Η εργασία μου', 'Leads', 'Cases', 'Πελάτες'], mustNot: [...ADMIN_ONLY, 'B2B Prospecting', 'Διεκπεραίωση', 'Χάρτης'] },
   field_sales: { must: ['Αρχική', 'Η εργασία μου', 'Ημέρα μου', 'Χάρτης', 'Cases'], mustNot: [...ADMIN_ONLY, 'Leads', 'Διεκπεραίωση', 'B2B Prospecting'] },
   // B2B Prospecting is a labs module until phase3/08 and the legal review are done: hidden for Back Office too.
-  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Διεκπεραίωση', 'Cases', 'Διαχείριση'], mustNot: [...LABS, 'Leads', 'Χάρτης'] },
+  back_office: { must: ['Αρχική', 'Η εργασία μου', 'Διεκπεραίωση', 'Cases'], mustNot: [...LABS, 'Leads', 'Χάρτης', 'Διαχείριση'] },
 };
 
 /* ---- 1. per-role navigation + role simulator ---- */
@@ -37,13 +72,13 @@ for (const role of Object.keys(EXPECT)) {
   for (const m of EXPECT[role].must) check(`${role}: nav shows «${m}»`, label(m));
   for (const m of EXPECT[role].mustNot) check(`${role}: nav hides «${m}»`, !label(m));
   // The demo selector exists only in the account menu, only for the server-allowlisted admin (mock: admin).
-  await page.evaluate(() => document.querySelector('[aria-label="Λογαριασμός"]')?.click());
+  await page.evaluate(() => document.querySelector('.shell-user')?.click());
   await sleep(500);
   const menu = await page.evaluate(() => document.querySelector('[role="menu"]')?.innerText ?? '');
-  check(`${role}: account menu = identity, real role, Λογαριασμός, Προτιμήσεις, Κέντρο βοήθειας, Αποσύνδεση`,
-    ['Λογαριασμός', 'Προτιμήσεις', 'Κέντρο βοήθειας', 'Αποσύνδεση', 'Ρόλος'].every((t) => menu.includes(t)) && !/\bsim\b|πραγματικός/.test(menu));
+  check(`${role}: account menu = identity, real role, Προφίλ, Προσαρμογή CRM, Κέντρο βοήθειας, Αποσύνδεση`,
+    ['Προφίλ', 'Προσαρμογή CRM', 'Κέντρο βοήθειας', 'Αποσύνδεση', 'Ρόλος'].every((t) => menu.includes(t)) && !/\bsim\b|πραγματικός/.test(menu));
   check(`${role}: demo role selector ${role === 'admin' && PREVIEW_LIVE ? 'shown (allowed)' : 'absent'}`, (role === 'admin' && PREVIEW_LIVE) === menu.includes('Επίδειξη ρόλου'));
-  await page.evaluate(() => document.querySelector('.fixed.inset-0.z-40')?.click());
+  await page.keyboard.press('Escape');
   await click(page, 'Προτιμήσεις');
   await sleep(700);
   check(`${role}: no role simulator on Preferences`, !(await page.evaluate(() => document.body.innerText.includes('Προσομοίωση ρόλου'))));
@@ -80,7 +115,7 @@ if (!PREVIEW_LIVE) {
   const { browser, page } = await launch(1440, 900);
   await signInAs(page, 'admin');
   await sleep(1200);
-  await page.evaluate(() => document.querySelector('[aria-label="Λογαριασμός"]')?.click());
+  await page.evaluate(() => document.querySelector('.shell-user')?.click());
   await sleep(400);
   await page.evaluate(() => [...document.querySelectorAll('[role="menu"] [role="radio"]')].find((b) => b.textContent.includes('Back Office'))?.click());
   await sleep(1500);
@@ -111,7 +146,7 @@ if (!PREVIEW_LIVE) {
   await fetch('http://127.0.0.1:54399/__preview?state=expired');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await sleep(2500);
-  await page.evaluate(() => document.querySelector('[aria-label="Λογαριασμός"]')?.click());
+  await page.evaluate(() => document.querySelector('.shell-user')?.click());
   await sleep(400);
   check('Preview expired: selector gone and stored preview ignored', !(await body()).includes('Επίδειξη ρόλου') && !(await body()).includes('ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΡΟΛΟΥ'));
   await fetch('http://127.0.0.1:54399/__preview?state=on');
@@ -175,7 +210,7 @@ if (!PREVIEW_LIVE) {
   check('Security: the profile self-promotion finding is flagged', await page.evaluate(() => document.querySelector('[data-check="profiles-self-promotion"]')?.getAttribute('data-status') === 'action'));
   await click(page, 'Χρήστες & Ρόλοι', '[role="tab"]');
   await sleep(1200);
-  check('Users: roles are grouped «Back Office / Admin» and «Πωλητής»', await page.evaluate(() => { const g = [...document.querySelectorAll('[data-staff] [data-group]')].map((x) => x.textContent); return g.includes('Back Office / Admin') && g.includes('Πωλητής') && [...document.querySelectorAll('select[aria-label="Ρόλος"] optgroup')].map((o) => o.label).join('|') === 'Back Office / Admin|Πωλητής'; }));
+  check('Users: roles are grouped «Admin / Back Office» and «Sales Agent»', await page.evaluate(() => { const g = [...document.querySelectorAll('[data-staff] [data-group]')].map((x) => x.textContent); return g.includes('Admin / Back Office') && g.includes('Sales Agent') && [...document.querySelectorAll('select[aria-label="Ρόλος"] optgroup')].map((o) => o.label).join('|') === 'Back Office / Admin|Πωλητής'; }));
   check('Users: directory with e-mail and status; no actions on your own row', await page.evaluate(() => !!document.querySelector('[data-staff="manager@example.invalid"]') && !document.querySelector('[data-staff="admin@example.invalid"] button[title="Διαγραφή"]')));
   // create (invite)
   await click(page, 'Νέος χρήστης');
@@ -184,7 +219,7 @@ if (!PREVIEW_LIVE) {
     const set = (el, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); };
     const ins = [...document.querySelectorAll('input.field')];
     set(ins[0], 'Δοκιμαστικός Χρήστης'); set(ins[1], 'new.staff@example.invalid');
-    [...document.querySelectorAll('[role="radiogroup"][aria-label="Ρόλος"] [role="radio"]')].find((b) => b.querySelector('span')?.textContent.trim() === 'Field Sales')?.click();
+    [...document.querySelectorAll('[role="radiogroup"][aria-label="Ρόλος"] [role="radio"]')].find((b) => b.querySelector('span')?.textContent.trim() === 'Sales Agent')?.click();
   });
   await sleep(200);
   await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Δημιουργία')?.click());

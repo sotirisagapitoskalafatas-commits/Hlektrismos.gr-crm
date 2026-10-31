@@ -5,7 +5,7 @@
 
 import { supabase } from './supabase';
 import { manageableRoles, canManage, isStaffRole, isSalesAgentRole, CREATEABLE_SALES_ROLES, STAFF_ROLES } from '../../supabase/functions/_shared/staff-admin';
-import type { Role } from './roles';
+import { canonicalRole, type Role } from './roles';
 
 export { manageableRoles, canManage, isStaffRole, isSalesAgentRole, CREATEABLE_SALES_ROLES, STAFF_ROLES };
 
@@ -17,10 +17,7 @@ export interface StaffMember {
 /** What each role is for — shown when choosing a role. */
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   admin: 'Πλήρης διαχείριση: χρήστες, ρόλοι, ρυθμίσεις, ενσωματώσεις, ασφάλεια και audit.',
-  manager: 'Ομάδα, pipeline, φόρτος εργασίας, αναθέσεις και αναφορές. Διαχειρίζεται Inside Sales, Field Sales, Back Office.',
-  inside_sales: 'Νέα leads, πρώτη επικοινωνία, κλήσεις, προσφορές και follow-ups.',
-  field_sales: 'Επισκέψεις, ραντεβού, υπογραφές και follow-ups πεδίου.',
-  back_office: 'Back Office / Admin: διαχείριση ομάδας, αναθέσεις και ολοκλήρωση αιτήσεων.',
+  sales_agent: 'Προσωπικά leads και πελάτες, έγγραφα, επισκέψεις, χάρτης και διαδρομές, follow-ups, πωλήσεις και προσφορές.',
 };
 
 export type StaffSource = 'server' | 'fallback';
@@ -29,11 +26,11 @@ export type StaffSource = 'server' | 'fallback';
  *  (read-only) when the staged SQL is not applied yet — the UI then says so instead of pretending. */
 export async function listStaff(): Promise<{ rows: StaffMember[]; source: StaffSource; error: string | null }> {
   const { data, error } = await supabase.rpc('staff_list');
-  if (!error && Array.isArray(data)) return { rows: data as StaffMember[], source: 'server', error: null };
+  if (!error && Array.isArray(data)) return { rows: (data as StaffMember[]).map(m => ({ ...m, role: canonicalRole(m.role) })), source: 'server', error: null };
   const fb = await supabase.from('profiles').select('id, full_name, role, phone, created_at, is_active').order('created_at', { ascending: true });
   if (fb.error) return { rows: [], source: 'fallback', error: 'Δεν ήταν δυνατή η φόρτωση των χρηστών.' };
   const rows = (fb.data ?? []).map(p => ({
-    id: p.id, full_name: p.full_name, email: null, phone: p.phone ?? null, role: p.role as Role, is_active: p.is_active !== false,
+    id: p.id, full_name: p.full_name, email: null, phone: p.phone ?? null, role: canonicalRole(p.role), is_active: p.is_active !== false,
     created_at: p.created_at ?? null, last_sign_in_at: null, can_manage: false,
   }));
   return { rows, source: 'fallback', error: null };

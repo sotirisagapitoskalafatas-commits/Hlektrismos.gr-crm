@@ -39,3 +39,30 @@ test('sign-in and forgot-password never reveal whether an account exists', () =>
   assert.match(login, /try \{ await supabase\?\.auth\.resetPasswordForEmail[^\n]*catch \{[^}]*\}\s*\n\s*setBusy\(false\); setSent\(true\);/);
   assert.match(login, /Αν υπάρχει λογαριασμός/);
 });
+
+const L = await (async () => {
+  const o = buildSync({ entryPoints: [path('../auth-link.ts')], bundle: true, write: false, format: 'esm', logLevel: 'silent' });
+  return import('data:text/javascript;base64,' + Buffer.from(o.outputFiles[0].text).toString('base64'));
+})();
+const mem = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k), m }; };
+
+test('e-mailed links: the type is noted (never the tokens); app routes and error fragments are ignored; read once', () => {
+  assert.equal(L.parseAuthLinkType('#access_token=abc&refresh_token=def&type=invite'), 'invite');
+  assert.equal(L.parseAuthLinkType('#access_token=abc&type=recovery'), 'recovery');
+  assert.equal(L.parseAuthLinkType('#access_token=abc&type=email_change'), 'email_change');
+  for (const h of ['', '#', '#/app', '#/reset', '#/dashboard', '#error=access_denied&type=invite', '#access_token=abc&type=weird', '#access_token=abc']) assert.equal(L.parseAuthLinkType(h), null, h);
+  const s = mem();
+  assert.equal(L.captureAuthLink('#access_token=SECRET&refresh_token=SECRET2&type=invite', s), 'invite');
+  assert.ok(![...s.m.values()].some((v) => /SECRET/.test(v)), 'no token is stored');
+  assert.equal(L.takeAuthLink(s), 'invite'); assert.equal(L.takeAuthLink(s), null, 'consumed once');
+  assert.equal(L.takeAuthLink({ getItem() { throw new Error('x'); }, removeItem() {}, setItem() {} }), null, 'blocked storage never throws');
+});
+
+test('invite and recovery links land on the site root and are routed to «choose a password»; boot capture runs first', () => {
+  assert.match(read('../auth.tsx'), /event === 'SIGNED_IN' && takeAuthLink\(\) === 'invite'\) window\.location\.hash = '\/reset'/);
+  const edge = read('../../../supabase/functions/admin-users/index.ts');
+  assert.equal((edge.match(/redirectTo: `\$\{site\}\/`/g) || []).length, 2, 'invite and reset use the site root (a #/route would collide with the token fragment)');
+  assert.doesNotMatch(edge, /redirectTo: `\$\{site\}\/#/);
+  const main = read('../../main.tsx');
+  assert.ok(main.indexOf("./lib/auth-link-boot") < main.indexOf("./App.tsx"), 'captured before the Supabase client exists');
+});

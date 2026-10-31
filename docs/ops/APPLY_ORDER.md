@@ -3,12 +3,28 @@
 **One list, in the exact order to run them.** 28 files (23 numbered steps, plus 2b, 2c, 2d, 3b and 3c added by the security audit, the live API hardening hotfix, account/visibility work and Field Sales route planning), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
+## Corrections found on 30 Oct 2026 (rehearsal on a restored copy of production)
+- **Already live on production — skip:** `phase1/03_drop_exec_sql`, `phase5/17_customer_supply_points`, `phase5/18_lead_supply_points` (their probes in `pending_migrations_check.sql` are true).
+- **Superseded — skip:** step `3b` (`phase4/17`) and `3c` (`phase4/20`) are replaced by step `25` (`phase6/21_two_role_model`). Apply 25 **immediately after step 3**, not at the end.
+- Rehearsal: the remaining 27 files apply in this order without error on the restored production data; see [`BACKUP_RESTORE.md`](BACKUP_RESTORE.md) and [`PRODUCTION_ROLLOUT_CHECKLIST.md`](PRODUCTION_ROLLOUT_CHECKLIST.md).
+
 ## Before step 1
 1. **Check what is already there.** Run [`pending_migrations_check.sql`](pending_migrations_check.sql) (read-only, catalog only) on the database you are about to change. Skip a step whose check already says `true`; a step is idempotent, but skipping is clearer.
 2. **Staging first.** Staging is being built from a schema dump of live. Run the whole list there, in this order, with the check after each step; only then live.
 3. **Live needs a backup or a PITR checkpoint first**, and your approval of each step.
 4. **One file at a time. After each file run its check query (below). If it is not `true`, stop and tell Claude** — do not continue down the list.
 5. The checks below are the quick one-liners. `pending_migrations_check.sql` runs all of them at once.
+
+## Deployment sequence: read before merging anything to `main`
+**A merge to `main` may itself deploy functions.** The rollout checklist records that the GitHub integration deploys the functions declared in `supabase/config.toml`. PR #137 adds `vapi-webhook`, `accept-offer` and `receive-lead-webhook` to that file, so merging it to `main` could ship them before their SQL exists. Then every ad lead would answer 500 and every offer acceptance would fail. Confirm the integration's behaviour first, and pause it or apply the SQL before that merge.
+
+Required before the hardened functions run, in this order:
+1. `phase2/06` (step 8): `deleted_at` on `leads` and `customers`. Without it every lead, customer and case reference is refused for everyone, Admin included, and `send-lead-confirmation` answers 500.
+2. `phase1/21b` (0b), `phase1/21c` (0c).
+3. `phase1/02` (step 5), `phase3/09` (step 18). Without `phase3/09` staff email answers 503 and confirmations are skipped.
+4. `phase3/10`, `phase3/11` (18b, 18c, PR #139).
+5. Secrets: `OUTREACH_LIMITS`, `LINK_SIGNING_SECRET`, `VAPI_WEBHOOK_SECRET`, `LEAD_WEBHOOK_SECRET`, `UNSUBSCRIBE_SECRET`, `SITE_URL`.
+6. Only then deploy the functions.
 
 ## Not SQL, but part of the same window
 - **Rotate the leaked service-role key** with steps 1–2 ([`SECURITY_HOTFIX_RUNBOOK.md`](SECURITY_HOTFIX_RUNBOOK.md)). Until then it bypasses every policy below.
@@ -25,6 +41,20 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 - **After it:** only an active `admin` reads or writes the table; anon and every other role are denied; `service_role` unchanged. No rollback to the open state is provided on purpose.
 - **Check:** `select exists (select 1 from pg_policies where schemaname='public' and tablename='crm_integrations' and policyname='phase1/20 anon denied') and not has_table_privilege('anon','public.crm_integrations','SELECT') as applied;`
 - **Credentials:** treat `crm_integrations.config` values as potentially exposed until the access logs are reviewed; rotation decision is in the private rollout report.
+
+## 0b. `phase1/21b_function_rate_limits.sql` — required BEFORE the hardened outbound Edge Functions are deployed
+- **Why:** a shared, database-backed rate limit for functions that send messages, place calls or spend paid quota, and the insert-only `communication_log`.
+- **Depends on:** `is_role()` (present on production). The functions that use it also need `phase2/06`: see the sequence above.
+- **After it:** no visible change. Only `service_role` can call the counters; an active Admin can read the log.
+- **Order matters:** the hardened `send-sms`, `send-campaign-email`, `make-voice-call`, `send-offer` and `send-email` answer 503 and send nothing while this file is missing. They also refuse without the secret `OUTREACH_LIMITS` ([`OUTREACH_LIMITS.md`](OUTREACH_LIMITS.md)).
+- **Check:** see `pending_migrations_check.sql` row `phase1/21b_function_rate_limits`. Rollback: `rollback_phase1_21b_function_rate_limits.sql`.
+
+## 0c. `phase1/21c_lead_webhook_idempotency.sql` — required BEFORE the hardened `receive-lead-webhook` is deployed
+- **Why:** one delivery creates one lead, even when two arrive at once; lead, event and audit row are one transaction.
+- **Depends on:** `leads`, `activity_log` (present on production).
+- **After it:** no visible change. Only `service_role` can call `ingest_webhook_lead`.
+- **Order matters:** the hardened function answers 500 and stores nothing while this file is missing.
+- **Check:** see `pending_migrations_check.sql` row `phase1/21c_lead_webhook_idempotency`. Rollback: `rollback_phase1_21c_lead_webhook_idempotency.sql`.
 
 ## 1. `phase1/16_storage_docs_lockdown.sql` — security
 - **Depends on:** nothing.
@@ -246,11 +276,23 @@ select to_regclass('public.b2b_prospects') is not null as applied;
 ## 18. `phase3/09_contact_eligibility.sql` — compliance
 - **Depends on:** steps 1–6 and step 17 (08). Must come before any outreach.
 - **Unlocks on screen:** «Επικοινωνία & συγκαταθέσεις» works (today it shows a developer sentence); the «μπορώ να καλέσω;» answer; outreach functions fail closed until it exists.
-- **Rollback:** end of the file; it drops the recorded objections, consents and screenings, so **export them first**.
+- **Rollback:** [`rollback_phase3_09_contact_eligibility.sql`](rollback_phase3_09_contact_eligibility.sql), after `rollback_phase3_11_contact_service_requests.sql`. It drops the recorded objections, consents and screenings, so **export them first**; while it is applied the hardened senders refuse to send.
 - **Check:**
 ```sql
 select to_regclass('public.contact_objections') is not null as applied;
 ```
+
+## 18b. `phase3/10_offer_lifecycle.sql` — required BEFORE the hardened `send-offer` and `accept-offer` are deployed
+- **Why:** one record per offer, a link bound to that offer and lead, acceptance and its audit as one transaction.
+- **Depends on:** `hlektrismos_leads`, `energy_tariffs`, `crm_tasks`, `lead_notes`, `is_role()`.
+- **Order matters:** without it `send-offer` answers 503 and sends nothing, and `accept-offer` answers 500 and changes nothing.
+- **Old links:** read [`OFFER_LINKS.md`](OFFER_LINKS.md) before deploying.
+- **Rollback:** `rollback_phase3_10_offer_lifecycle.sql` (export the offer tables first).
+
+## 18c. `phase3/11_contact_service_requests.sql` — separates a customer's request from marketing consent
+- **Depends on:** step 18 (`contact_role`, `contact_log`).
+- **After it:** nothing changes until the owner sets `SERVICE_COMMS_APPROVED`. Do not set it without counsel's advice.
+- **Rollback:** [`rollback_phase3_11_contact_service_requests.sql`](rollback_phase3_11_contact_service_requests.sql) (export the table first; offers then go through the full promotional gate).
 
 ## 19. `phase5/17_customer_supply_points.sql`
 - **Depends on:** nothing new (uses `customers`, `cases`, `case_documents`, `profiles`, `is_staff()`, `is_role()`, `activity_log`). The legacy `supply_points` / `customer_meters` are not touched.
@@ -340,3 +382,34 @@ select to_regclass('public.user_preferences') is not null
   as applied;
 ```
 - **Required staging tests:** user A cannot read/write user B's row or avatar; anon denied; admin/Back Office can read (not write) avatars; a non-JPEG or other-path upload is rejected.
+
+## 25. `phase6/21_two_role_model.sql` — exactly two account categories (supersedes phase4/17 and phase4/20)
+- **Depends on:** phase2/05 (staff functions, audit table, `profiles_guard_privileged`). Replace, do not replay, 17/20.
+- **Effect:** only the active `admin` (the shared Admin / Back Office login) can create, edit, (de)activate, reset or delete Sales Agent accounts and read the staff directory / audit; new accounts are `field_sales` only; `manager` / `back_office` can never be assigned again (existing rows stay, can be deactivated); an inactive account can no longer edit even its own profile row.
+- **Rollback:** [`rollback_phase6_21_two_role_model.sql`](rollback_phase6_21_two_role_model.sql).
+- **Check (must be true):**
+```sql
+select exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_office' and not tgisinternal)
+  and pg_get_functiondef('public.staff_admin_can(uuid,text,text)'::regprocedure) like '%a.role <> ''admin''%' as applied;
+```
+- **Required staging tests:** the 13-point matrix with real JWTs (admin, manager, legacy back office, both sales roles, inactive agent with an old session, anon, API-key-only) through `admin-users`, the `staff_*` RPCs and direct PostgREST; audit rows written for every management action.
+
+
+## 26. `phase6/22_crm_integrations_status_invoker.sql` — integration status view follows RLS (advisor: SECURITY DEFINER view)
+- **Position:** after step 25 (`phase6/21`). **Depends on:** `phase1/01` (the view and the admin-only policy on `crm_integrations`).
+- **Effect:** `public.crm_integrations_status` becomes `security_invoker`, so it follows the RLS of `crm_integrations` (active admin only). Still no `config` column. No function is added — nothing in the app reads this view.
+- **Rollback:** [`rollback_phase6_22_crm_integrations_status_invoker.sql`](rollback_phase6_22_crm_integrations_status_invoker.sql) — a deliberate no-op that keeps `security_invoker = true` (restoring owner rights would reintroduce the finding).
+- **Check (must be true):** `select coalesce('security_invoker=true' = any (select unnest(reloptions) from pg_class where oid = 'public.crm_integrations_status'::regclass), false) as applied;`
+- **Tests:** `node --test supabase/tests/integrations-status-invoker.test.mjs` — local PGlite evidence on the ordered state (phase1/01 → 18 → phase2/05 → phase6/21 → 22) for admin, active and inactive Sales Agent, legacy back_office, legacy manager and anonymous. Not staging or production evidence.
+
+## 27. `phase6/25_exact_two_roles.sql` — exactly two account types: `admin` and `sales_agent`
+- **Depends on:** phase6/21, phase3/08, phase3/09 (the file checks this and stops otherwise).
+- **Order matters:** merge and deploy the code that reads `sales_agent` FIRST. That code accepts both spellings. Code from before this release refuses `sales_agent`, so applying this while it runs locks Sales Agents out. Creating a new Sales Agent needs this file applied.
+- **Changes:** Sales Agents (`field_sales`, `inside_sales`) become `sales_agent` with their active flag kept. `manager` and `back_office` rows become inactive `sales_agent`, which grants nothing. Their `user_roles` grants are removed and the old role keys leave the catalogue. No Auth user, lead, customer, case, assignment or audit row is touched. Every change is recorded in `role_normalization_audit`. It stops if an active manager/back_office account is not a known QA login.
+- **Rollback:** [`rollback_phase6_25_exact_two_roles.sql`](rollback_phase6_25_exact_two_roles.sql).
+- **Check:** see `pending_migrations_check.sql` row `phase6/25_exact_two_roles`.
+
+## 28. `phase6/26_single_active_admin.sql` — one active Admin, enforced — **after** the real Admin has signed in and the QA admins are switched off
+- **Depends on:** step 27, [`sql/deactivate_qa_accounts.sql`](sql/deactivate_qa_accounts.sql). It names no account and refuses unless exactly one active admin exists and can really sign in.
+- **Note:** the shared login is one identity. Audit rows name that account, not the employee using it.
+- **Rollback:** [`rollback_phase6_26_single_active_admin.sql`](rollback_phase6_26_single_active_admin.sql).

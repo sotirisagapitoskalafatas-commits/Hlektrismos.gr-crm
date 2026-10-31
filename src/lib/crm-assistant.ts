@@ -9,7 +9,7 @@
 
 import type { HomeSummary, WorkItem } from './work';
 
-export type AssistantRole = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
+export type AssistantRole = 'admin' | 'sales_agent';
 
 export type AssistantAction =
   | { type: 'case'; id: string }
@@ -63,9 +63,8 @@ const leadName = (l: AssistantCtx['leads'][number]) =>
 
 export function suggestionsFor(role: AssistantRole): string[] {
   const base = ['Τι έχω σήμερα;', 'Εκπρόθεσμα follow-ups', 'Βρες πελάτη…'];
-  if (role === 'admin' || role === 'manager') return [...base, 'Σύνοψη ομάδας', 'Άνοιξε Cases'];
-  if (role === 'field_sales') return [...base, 'Άνοιξε Ημέρα μου'];
-  if (role === 'back_office') return [...base, 'Άνοιξε Διεκπεραίωση'];
+  if (role === 'admin') return [...base, 'Σύνοψη ομάδας', 'Άνοιξε Cases'];
+  if (role === 'sales_agent') return [...base, 'Άνοιξε Ημέρα μου'];
   return [...base, 'Leads για επικοινωνία', 'Άνοιξε Leads'];
 }
 
@@ -116,7 +115,7 @@ export function answer(input: string, ctx: AssistantCtx): AssistantReply {
   }
 
   if (/(ομαδ|team)/.test(q)) {
-    if (ctx.role !== 'admin' && ctx.role !== 'manager') return { text: 'Η σύνοψη ομάδας είναι διαθέσιμη σε διευθυντές και διαχειριστές.', suggestions: sugg };
+    if (ctx.role !== 'admin') return { text: 'Η σύνοψη ομάδας είναι διαθέσιμη στον διαχειριστή του γραφείου.', suggestions: sugg };
     const t = ctx.summary?.team;
     if (!t) return { text: 'Τα στοιχεία ομάδας δεν είναι διαθέσιμα αυτή τη στιγμή.', suggestions: sugg };
     return {

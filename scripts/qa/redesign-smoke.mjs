@@ -10,7 +10,20 @@ const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`); };
 const clickText = (page, sel, label) => page.evaluate((s, l) => { const el = [...document.querySelectorAll(s)].find((b) => b.textContent.trim().includes(l)); if (el) { el.click(); return true; } return false; }, sel, label);
 const texts = (page, sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')));
-const IGNORED = /favicon|ResizeObserver|CARTO basemap key|\[map\]|Failed to load resource/; // map tiles need a build-time key; 404s are static-file probes
+// Console messages that are known and harmless, matched EXACTLY. Anything else — a failed request, a 404, an application error — is reported.
+// The browser's «Failed to load resource» console line carries no URL, so failed requests are checked through the network events below instead.
+const ALLOWED_CONSOLE = [
+  /^Failed to load resource: the server responded with a status of \d+ \([A-Za-z ]*\)\s*$/, // always accompanied by a NET entry, which is what gets judged
+  /^\[map\] init failed Error: CARTO basemap key missing: set CRM_VITE_CARTO_API_KEY \(or VITE_CARTO_API_KEY\) at build time\. Unauthenticated \(watermarked\) CARTO tiles are never used\.( \[map\] init failed \[object Object\])?\s*$/, // the local build has no map key by design
+];
+// Network failures that are known and harmless, matched exactly as «STATUS METHOD path».
+const ALLOWED_NET = new Set([
+  // signInAs() seeds the session and reloads the page, which cancels the first load's in-flight badge-count requests.
+  // Chrome asks for /favicon.ico on its own; the app ships its icon as an SVG link, so this request is not an app resource.
+  '404 GET /favicon.ico',
+  'FAILED HEAD /rest/v1/cases net::ERR_ABORTED',
+  'FAILED HEAD /rest/v1/leads net::ERR_ABORTED',
+]);
 
 // What each role may see (module links in the top bar; derived from navForRole, never granted by the shell).
 const MODULES = {
@@ -23,6 +36,8 @@ const NO_LEADS = ['field_sales', 'back_office']; // neither role has a Leads pag
 async function session(role, w, h, dpr, steps) {
   const { browser, page, errors } = await launch(w, h, dpr);
   page.on('pageerror', (e) => errors.push('PAGEERROR ' + String(e).slice(0, 160)));
+  page.on('response', (r) => { if (r.status() >= 400) errors.push(`NET ${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`); });
+  page.on('requestfailed', (r) => errors.push(`NET FAILED ${r.method()} ${new URL(r.url()).pathname} ${r.failure()?.errorText ?? ''}`.trim()));
   try {
     await signInAs(page, role);
     await page.waitForSelector('.shell-topbar', { timeout: 30000 });
@@ -59,8 +74,8 @@ for (const [role, w, h, dpr] of [['admin', 1440, 900, 1], ['back_office', 1440, 
       await visit(`menu/${label}`);
     }
     check(`${role}@${w}: every page has one h1 and no horizontal overflow`, bad.length === 0, bad.join('; '));
-    const errs = [...new Set(errors.filter((e) => !IGNORED.test(e)))];
-    check(`${role}@${w}: no app errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    const errs = [...new Set(errors.filter((e) => !(ALLOWED_NET.has(e.replace(/^NET /, '')) || ALLOWED_CONSOLE.some((re) => re.test(e)))))];
+    check(`${role}@${w}: no unexpected errors or failed requests`, errs.length === 0, errs.slice(0, 6).join(" | "));
   });
 }
 

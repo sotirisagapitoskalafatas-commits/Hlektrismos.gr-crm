@@ -1,0 +1,20 @@
+{
+  "message": {
+    "type": "end-of-call-report",
+    "timestamp": 1793440000000,
+    "endedReason": "customer-ended-call",
+    "startedAt": "2026-10-30T10:00:00.000Z",
+    "endedAt": "2026-10-30T10:01:32.400Z",
+    "durationSeconds": 92.4,
+    "call": { "id": "call-synthetic-0001", "status": "ended", "startedAt": "2026-10-30T10:00:00.000Z", "endedAt": "2026-10-30T10:01:32.400Z" },
+    "artifact": {
+      "recording": { "stereoUrl": "https://storage.example.test/call-synthetic-0001-stereo.wav", "mono": { "combinedUrl": "https://storage.example.test/call-synthetic-0001-mono.wav" } },
+      "transcript": "AI: Γεια σας, είμαι ο Αλέξης, ψηφιακός βοηθός. Θέλετε να σας στείλω προσφορά στο email; User: Ναι, έχω ενδιαφέρον. AI: Ευχαριστώ.",
+      "messages": [
+        { "role": "assistant", "message": "Γεια σας, είμαι ο Αλέξης, ψηφιακός βοηθός. Θέλετε να σας στείλω προσφορά στο email;" },
+        { "role": "user", "message": "Ναι, έχω ενδιαφέρον." },
+        { "role": "assistant", "message": "Ευχαριστώ." }
+      ]
+    }
+  }
+}

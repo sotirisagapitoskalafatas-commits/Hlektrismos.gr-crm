@@ -5,7 +5,7 @@ import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
 import { cacheAppShell } from '@/lib/pwa';
 import {
-  PAGE_TITLES, can, flattenNav, labsPageAllowed, leadStatusInfo, navForRole, stageLabel,
+  PAGE_TITLES, can, canOpenPage, flattenNav, leadStatusInfo, navForRole, stageLabel,
 } from '@/lib/roles';
 import type { PageKey } from '@/lib/roles';
 import { Modal, Spinner, fmtMoney, rgbaOf } from '@/lib/ui';
@@ -25,6 +25,7 @@ import CrmAssistant from '@/components/assistant/CrmAssistant';
 import { PreviewBanner } from './RoleSwitcher';
 
 import HomePage from './HomePage';
+import PageDenied from './PageDenied';
 import CasesPage from './CasesPage';
 import CaseDetailPage from './CaseDetailPage';
 import LeadsPage from './LeadsPage';
@@ -245,10 +246,13 @@ export default function AppShell() {
   const onSignOut = () => { signOut(); window.location.hash = '/'; };
 
   // Labs modules (lib/labs.ts): an address typed or linked directly falls back to Αρχική for everyone else.
-  const labsBlocked = !labsPageAllowed(view.page, role);
+  // canOpenPage is the single page-boundary check (role access + labs, via the role's own navigation); the denied branch
+  // returns before the switch below, so a protected page is never mounted and never fetches.
+  const pageDenied = !canOpenPage(view.page, role);
+  const labsBlocked = pageDenied;
   const fieldBlocked = view.page === 'field' && !can(role, 'check_in');
   const body = (() => {
-    if (labsBlocked) return <HomePage />;
+    if (pageDenied) return <PageDenied />;
     switch (view.page) {
       case 'home': return <HomePage />;
       case 'mywork': return <WorkHub tab="tasks" />;

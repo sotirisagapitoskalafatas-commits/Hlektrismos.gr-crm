@@ -75,8 +75,10 @@ test('who may call it: exactly the roles that hold «create_application» in the
   const m = /v_role not in \(([^)]*)\)/.exec(sql.slice(sql.indexOf('function public.set_case_stage')));
   const inSql = m[1].split(',').map((x) => x.trim().replace(/'/g, '')).sort();
   const inApp = A.ROLES.map((r) => r.id).filter((r) => A.can(r, 'create_application')).sort();
-  assert.deepEqual(inSql, inApp, 'SQL role list = app create_application holders');
-  assert.deepEqual(inApp, [...ALLOWED_ROLES].sort());
+  // The DATABASE list still names the legacy roles until phase6/23 closes them; the APP offers the control to admin only (stricter).
+  assert.ok(inApp.every((r) => inSql.includes(r)), 'every app create_application holder is accepted by the SQL');
+  assert.deepEqual(inApp, ['admin']);
+  assert.deepEqual(inSql, [...ALLOWED_ROLES].sort(), 'SQL role list (legacy roles are removed by phase6/23, not by this file)');
 });
 
 test('matrix: role × from × to — the database agrees with the rule, for set_case_stage', async () => {
@@ -88,7 +90,8 @@ test('matrix: role × from × to — the database agrees with the rule, for set_
         await T.su(); await main.query('update public.cases set current_stage = $2, status = $3, activation_status = null where id = $1', [id, from, 'open']);
         const r = await T.set(U[role], id, to);
         assert.equal(r.ok, oracleSet(role, from, to), `${role}: ${from} → ${to}`);
-        assert.equal(A.canSetStage(role, from, to), r.ok, `${role}: ${from} → ${to}: the APP rule (canSetStage) = the database`);
+        const legacy = role === 'manager' || role === 'back_office';
+        assert.equal(A.canSetStage(role, from, to), legacy ? false : r.ok, `${role}: ${from} → ${to}: the APP rule (canSetStage) = the database (legacy roles: the app denies, the database until phase6/23)`);
         if (!r.ok) assert.equal((await T.row(id)).current_stage, from, 'a refusal changes nothing');
         checked++;
       }
@@ -106,7 +109,8 @@ test('the control offers exactly the stages the database accepts, for every role
         await T.su(); await main.query('update public.cases set current_stage = $2, status = $3 where id = $1', [id, from, 'open']);
         if ((await T.set(U[role], id, to)).ok) accepted.push(to);
       }
-      assert.deepEqual(A.stageSetTargets(role, from).sort(), accepted.sort(), `${role} from ${from}`);
+      if (role === 'manager' || role === 'back_office') assert.deepEqual(A.stageSetTargets(role, from), [], `legacy ${role} is offered nothing by the app`);
+      else assert.deepEqual(A.stageSetTargets(role, from).sort(), accepted.sort(), `${role} from ${from}`);
     }
   }
 });

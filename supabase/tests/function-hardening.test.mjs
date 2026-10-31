@@ -27,7 +27,7 @@ const bundle = (entry) => {
   const out = buildSync({ stdin: { contents: entry, resolveDir: fnDir + '_shared', loader: 'ts' }, bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent' });
   return import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 };
-const L = await bundle(`export * from './signed-link.ts'; export * from './limits.ts';`);
+const L = await bundle(`export * from './signed-link.ts'; export * from './limits.ts'; export * from './webhook-auth.ts';`);
 // Runs fn with ONLY the link secret in Deno.env, then restores whatever Deno was there (the harness installs the function's own).
 const withSecret = async (fn) => {
   const prev = globalThis.Deno;
@@ -166,7 +166,7 @@ test('accept-offer: without LINK_SIGNING_SECRET every link is refused', async ()
 });
 
 // ───────────────────────────── vapi-webhook ─────────────────────────────
-const VAPI = 'vapi-secret-not-real-0000000000';
+const VAPI = 'vapi-secret-not-real-000000000000';
 const callDb = () => createDb({
   voice_calls: [{ id: 'vc1', vapi_call_id: 'call-1', lead_id: LEAD, status: 'initiated' }],
   hlektrismos_leads: [{ id: LEAD, pipeline_status: 'new' }],
@@ -427,4 +427,111 @@ test('capability-gated senders: Sales Agents without the capability, legacy mana
       f.restore();
     }
   }
+});
+
+// ───────────────────────────── webhook secrets: strength, rotation, Vapi HMAC ─────────────────────────────
+test('isStrongSecret: short, single-character and low-variety values are refused; a normal random-looking value passes', () => {
+  for (const bad of [undefined, null, '', 'short', 'x'.repeat(40), 'ab'.repeat(30), '0123456789'.repeat(4), 'a'.repeat(31) + 'b']) assert.equal(L.isStrongSecret(bad), false, String(bad).slice(0, 12));
+  assert.equal(L.isStrongSecret('k3Jx9Qw2LmZp7VdR4tYh8NcB5sGa1UfE'), true);
+  assert.equal(L.isStrongSecret('k3Jx9Qw2LmZp7VdR4tYh8NcB5sGa1Uf'), false, '31 characters');
+});
+
+test('vapi-webhook: weak or repetitive configured secrets are treated as not configured, even when the caller sends the same value', async () => {
+  for (const weak of ['x'.repeat(40), 'ab'.repeat(30), 'vapi-secret-not-real-0000000000' /* 31 chars */]) {
+    const f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: weak } });
+    assert.equal((await f.call({ body: ended, headers: { 'x-vapi-secret': weak } })).status, 401, weak.slice(0, 14));
+    assert.equal(writes(f), 0);
+    f.restore();
+  }
+});
+
+test('secret rotation: the previous secret keeps working while it is configured, and stops the moment it is removed (vapi-webhook and receive-lead-webhook)', async () => {
+  const NEW = 'nEw-vapi-secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa';
+  const OLD = 'old-vapi-secret-K3j9x2Qw7LmZp4VdR1tYh8Nc';
+  let f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: NEW, VAPI_WEBHOOK_SECRET_PREVIOUS: OLD } });
+  assert.equal((await f.call({ body: ended, headers: { 'x-vapi-secret': OLD } })).status, 200, 'previous secret accepted during rotation');
+  f.restore();
+  f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: NEW, VAPI_WEBHOOK_SECRET_PREVIOUS: OLD } });
+  assert.equal((await f.call({ body: ended, headers: { 'x-vapi-secret': NEW } })).status, 200, 'new secret accepted');
+  assert.equal((await f.call({ body: ended, headers: { 'x-vapi-secret': 'a-third-value-a-third-value-a-third-value' } })).status, 401);
+  f.restore();
+  f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: NEW } });
+  assert.equal((await f.call({ body: ended, headers: { 'x-vapi-secret': OLD } })).status, 401, 'old secret refused once the rotation is finished');
+  f.restore();
+  const HNEW = 'nEw-lead-secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa';
+  const HOLD = 'old-lead-secret-K3j9x2Qw7LmZp4VdR1tYh8Nc';
+  let g = await loadFunction('receive-lead-webhook', { db: hookDb(), env: { LEAD_WEBHOOK_SECRET: HNEW, LEAD_WEBHOOK_SECRET_PREVIOUS: HOLD } });
+  assert.equal((await g.call({ body: hookBody, headers: { 'x-webhook-secret': HOLD } })).status, 200);
+  assert.equal((await g.call({ body: hookBody, headers: { 'x-webhook-secret': 'unrelated-secret-unrelated-secret-0123' } })).status, 401);
+  g.restore();
+  g = await loadFunction('receive-lead-webhook', { db: hookDb(), env: { LEAD_WEBHOOK_SECRET: HNEW } });
+  assert.equal((await g.call({ body: hookBody, headers: { 'x-webhook-secret': HOLD } })).status, 401);
+  g.restore();
+  // a weak lead-webhook secret is not accepted either
+  g = await loadFunction('receive-lead-webhook', { db: hookDb(), env: { LEAD_WEBHOOK_SECRET: 'z'.repeat(40) } });
+  assert.equal((await g.call({ body: hookBody, headers: { 'x-webhook-secret': 'z'.repeat(40) } })).status, 401);
+  g.restore();
+});
+
+// Vapi HMAC credential (docs.vapi.ai/server-url/server-authentication): signature over "{timestamp}.{body}", SHA-256, hex, with a timestamp header.
+const HMAC_SECRET = 'hm4c-Secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa-0001';
+const sendSigned = async (f, { secret = HMAC_SECRET, timestamp = String(Math.floor(Date.now() / 1000)), body = ended, tamper = false, sigHeader = 'x-signature', tsHeader = 'x-timestamp', omit = [] } = {}) => {
+  const raw = JSON.stringify(body);
+  const sig = await withSecret(() => L.hmacHex(secret, timestamp, raw));
+  const headers = { [sigHeader]: tamper ? sig.replace(/.$/, (c) => (c === '0' ? '1' : '0')) : sig, [tsHeader]: timestamp };
+  for (const h of omit) delete headers[h];
+  return f.call({ body, headers });
+};
+
+test('vapi-webhook HMAC mode: a correct timestamped signature is accepted; wrong, tampered, stale, future, missing-header and static-secret-only requests are refused', async () => {
+  const f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_HMAC_SECRET: HMAC_SECRET, VAPI_WEBHOOK_SECRET: VAPI } });
+  const refused = [
+    ['signature from another secret', { secret: 'an0ther-Secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa-9999' }],
+    ['tampered signature', { tamper: true }],
+    ['stale timestamp (10 minutes old)', { timestamp: String(Math.floor(Date.now() / 1000) - 600) }],
+    ['future timestamp (10 minutes ahead)', { timestamp: String(Math.floor(Date.now() / 1000) + 600) }],
+    ['no signature header', { omit: ['x-signature'] }],
+    ['no timestamp header', { omit: ['x-timestamp'] }],
+    ['non-numeric timestamp', { timestamp: 'yesterday' }],
+  ];
+  for (const [name, opt] of refused) assert.equal((await sendSigned(f, opt)).status, 401, name);
+  assert.equal((await f.call({ body: ended, headers: { 'x-vapi-secret': VAPI } })).status, 401, 'when HMAC is configured the static header alone is not enough');
+  assert.equal(writes(f), 0, 'nothing was written by any refused request');
+  // body tampering after signing
+  const raw = JSON.stringify(ended); const ts = String(Math.floor(Date.now() / 1000));
+  const sig = await withSecret(() => L.hmacHex(HMAC_SECRET, ts, raw));
+  assert.equal((await f.call({ body: { ...ended, transcript: 'δεν με ενδιαφέρει' }, headers: { 'x-signature': sig, 'x-timestamp': ts } })).status, 401, 'a changed body invalidates the signature');
+  const ok = await sendSigned(f);
+  assert.equal(ok.status, 200, JSON.stringify(ok.json));
+  assert.equal(f.db.rows('voice_calls')[0].status, 'completed');
+  f.restore();
+});
+
+test('vapi-webhook HMAC mode: millisecond timestamps, custom header names and the previous HMAC secret during rotation', async () => {
+  const f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_HMAC_SECRET: HMAC_SECRET, VAPI_HMAC_SECRET_PREVIOUS: 'previ0us-Secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa-7', VAPI_HMAC_SIGNATURE_HEADER: 'x-vapi-signature', VAPI_HMAC_TIMESTAMP_HEADER: 'x-vapi-timestamp' } });
+  assert.equal((await sendSigned(f, { sigHeader: 'x-signature', tsHeader: 'x-timestamp' })).status, 401, 'default header names are not read when others are configured');
+  assert.equal((await sendSigned(f, { sigHeader: 'x-vapi-signature', tsHeader: 'x-vapi-timestamp', timestamp: String(Date.now()) })).status, 200, 'milliseconds accepted');
+  f.restore();
+  const g = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_HMAC_SECRET: HMAC_SECRET, VAPI_HMAC_SECRET_PREVIOUS: 'previ0us-Secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa-7' } });
+  assert.equal((await sendSigned(g, { secret: 'previ0us-Secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa-7' })).status, 200, 'previous HMAC secret accepted while rotating');
+  g.restore();
+  const weak = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_HMAC_SECRET: 'q'.repeat(40), VAPI_WEBHOOK_SECRET: VAPI } });
+  assert.equal((await sendSigned(weak, { secret: 'q'.repeat(40) })).status, 401, 'a weak HMAC secret is not configured');
+  assert.equal((await weak.call({ body: ended, headers: { 'x-vapi-secret': VAPI } })).status, 200, 'with only a weak HMAC secret the static secret remains the mechanism');
+  weak.restore();
+});
+
+test('verifyHmac unit: the window bounds replay, and every configured secret is tried', async () => {
+  const secrets = [HMAC_SECRET];
+  const now = Date.UTC(2026, 9, 31, 12, 0, 0);
+  const ts = String(Math.floor(now / 1000));
+  const sig = await withSecret(() => L.hmacHex(HMAC_SECRET, ts, 'BODY'));
+  assert.equal(await L.verifyHmac(secrets, sig, ts, 'BODY', now), true);
+  assert.equal(await L.verifyHmac(secrets, sig.toUpperCase(), ts, 'BODY', now), true, 'hex case does not matter');
+  assert.equal(await L.verifyHmac(secrets, sig, ts, 'BODY', now + L.HMAC_TOLERANCE_MS + 1000), false, 'replayed outside the window');
+  assert.equal(await L.verifyHmac(secrets, sig, ts, 'BODY!', now), false);
+  assert.equal(await L.verifyHmac([], sig, ts, 'BODY', now), false, 'no configured secret');
+  assert.equal(await L.verifyHmac(secrets, null, ts, 'BODY', now), false);
+  assert.equal(await L.verifyHmac(secrets, sig, null, 'BODY', now), false);
+  assert.equal(L.matchesAnySecret('x', []), false);
 });

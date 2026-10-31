@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
-import { timingSafeEqual } from "../_shared/signed-link.ts";
+import { configuredSecrets, matchesAnySecret } from "../_shared/webhook-auth.ts";
 
 // Ad-platform / Zapier lead intake → public.leads (the table the CRM lists).
 // Previously this wrote to the legacy hlektrismos_leads table, which the new CRM does not show, so ad-form leads never
@@ -27,9 +27,9 @@ serve(async (req) => {
   // Shared-secret auth: ad platforms / Zapier must send
   //   x-webhook-secret: <LEAD_WEBHOOK_SECRET>
   // Fails closed when the secret is not configured.
-  const expected = Deno.env.get("LEAD_WEBHOOK_SECRET") ?? "";
-  // A configured secret shorter than 16 characters is treated as not configured (same rule as vapi-webhook).
-  if (expected.length < 16 || !timingSafeEqual(req.headers.get("x-webhook-secret") ?? "", expected)) {
+  // A secret shorter than 32 characters or visibly repetitive counts as not configured; LEAD_WEBHOOK_SECRET_PREVIOUS keeps the
+  // old sender working while the secret is rotated (remove it once the sender has switched).
+  if (!matchesAnySecret(req.headers.get("x-webhook-secret") ?? "", configuredSecrets("LEAD_WEBHOOK_SECRET"))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

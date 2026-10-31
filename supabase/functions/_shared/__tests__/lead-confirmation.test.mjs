@@ -14,7 +14,8 @@ test('one confirmation per lead: ack_sent_at is read, claimed atomically before 
   assert.ok(src.includes('ack_sent_at') && /\.select\("id, first_name, email, created_at, ack_sent_at"\)/.test(src), 'the column is read');
   assert.ok(claim > 0 && smtp > claim, 'claimed before sending');
   assert.ok(/\.is\("ack_sent_at", null\)/.test(src), 'the claim is conditional (atomic): only one caller wins');
-  assert.ok(/catch \(sendErr\) \{\s*await logResult\(adminClient, entry, "failed"\);\s*if \(!dataStarted\) await releaseClaim\(\);\s*throw sendErr;/.test(src), 'a failed send releases the claim');
+  // Behaviour is proved in supabase/tests/outbound-limits.test.mjs (release before DATA, keep after, "unknown" recorded); this only pins the one line.
+  assert.ok(/if \(!dataStarted\) await releaseClaim\(\);\s*throw sendErr;/.test(src), 'the claim is released only before DATA');
   assert.ok(/skipped: "already confirmed"/.test(src));
 });
 

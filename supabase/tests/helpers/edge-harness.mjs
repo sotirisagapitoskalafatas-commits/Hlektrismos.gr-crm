@@ -107,7 +107,7 @@ function query(db, table) {
 function fakeClient(db, users) {
   return {
     from: (t) => query(db, t),
-    rpc: async (name, args) => { db.log.rpc.push({ name, args }); const fn = db.rpc?.[name]; return fn ? fn(args) : { data: null, error: null }; },
+    rpc: async (name, args) => { db.log.rpc.push({ name, args }); const fn = db.rpc?.[name]; if (fn) return fn(args); if (name === 'consume_rate_limit') return { data: true, error: null }; return { data: null, error: null }; },
     auth: {
       getUser: async (token) => (users[token] ? { data: { user: { id: users[token] } }, error: null } : { data: { user: null }, error: { message: 'invalid' } }),
       admin: { getUserById: async (id) => ({ data: { user: { id, email: `${id}@example.test` } }, error: null }) },

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 import { signExpiringLink } from "../_shared/signed-link.ts";
-import { callerKey, rateLimited } from "../_shared/limits.ts";
+import { callerKey, durableLimit, rateLimited } from "../_shared/limits.ts";
 
 /** The acceptance link stops working after this long (the offer must be re-sent). */
 const OFFER_LINK_TTL_SECONDS = 14 * 24 * 60 * 60;
@@ -38,6 +38,8 @@ Deno.serve(async (req: Request) => {
   const caller = await getCaller(req, supabase);
   if (caller instanceof Response) return caller;
   if (rateLimited(`send-offer:${callerKey(caller)}`, 20, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
+  const overQuota = await durableLimit(supabase, `send-offer:${callerKey(caller)}`, 100, 3600);
+  if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
   try {
     const body = await req.json().catch(() => null);

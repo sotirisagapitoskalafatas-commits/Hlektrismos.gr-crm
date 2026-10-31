@@ -535,3 +535,56 @@ test('verifyHmac unit: the window bounds replay, and every configured secret is 
   assert.equal(await L.verifyHmac(secrets, sig, null, 'BODY', now), false);
   assert.equal(L.matchesAnySecret('x', []), false);
 });
+
+// ───────────────────────────── durable, shared limit (phase1/21b) ─────────────────────────────
+test('durable limit: over the shared quota answers 429, an unreachable counter answers 503, and in both cases nothing is sent', async () => {
+  for (const [fn, body] of [['send-sms', { leads: ids(1), message: 'hi' }], ['send-campaign-email', { leads: ids(1), subject: 's', html_body: '<p>x</p>' }], ['make-voice-call', { lead_id: LEAD }], ['send-offer', { lead_id: LEAD, tariff_id: TARIFF }], ['send-email', {}]]) {
+    for (const [name, rpc, status] of [
+      ['over quota', async () => ({ data: false, error: null }), 429],
+      ['migration missing / database error', async () => ({ data: null, error: { message: 'function does not exist' } }), 503],
+      ['client throws', async () => { throw new Error('network'); }, 503],
+      ['unexpected null result', async () => ({ data: null, error: null }), 429],
+    ]) {
+      const db = outboundDb(); db.rpc = { consume_rate_limit: rpc };
+      const f = await loadFunction(fn, { db, users, env: { LINK_SIGNING_SECRET: SECRET, UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000' } });
+      const r = await f.call({ token: 'tok-admin', body });
+      assert.equal(r.status, status, `${fn}: ${name}`);
+      assert.equal(sent(f) + f.smtp.length, 0, `${fn}: ${name}: nothing sent`);
+      f.restore();
+    }
+  }
+});
+
+test('durable limit: the bucket is per function and per caller, taken from the session, never from the request', async () => {
+  const f = await loadFunction('send-sms', { db: outboundDb(), users });
+  await f.call({ token: 'tok-admin', body: { leads: ids(1), message: 'hi', caller: 'someone-else', bucket: 'x' } });
+  const call = f.db.log.rpc.find((c) => c.name === 'consume_rate_limit');
+  assert.equal(call.args.p_bucket, `send-sms:${ADMIN}`);
+  assert.equal(call.args.p_window_seconds, 3600);
+  f.restore();
+});
+
+test('durable limit runs AFTER the capability check: a refused role consumes no quota', async () => {
+  const f = await loadFunction('send-sms', { db: outboundDb(), users });
+  assert.equal((await f.call({ token: 'tok-manager', body: {} })).status, 403);
+  assert.equal(f.db.log.rpc.filter((c) => c.name === 'consume_rate_limit').length, 0);
+  f.restore();
+});
+
+// ───────────────────────────── scrape-b2b: the two-role model at its own gate ─────────────────────────────
+test('scrape-b2b: only Admin and inside_sales pass; legacy manager / back_office, field_sales, inactive and anonymous are refused before any search', async () => {
+  const db = outboundDb();
+  for (const [token, status] of [['tok-manager', 403], ['tok-bo', 403], ['tok-field', 403], ['tok-inactive', 403], [undefined, 401], ['tok-unknown', 401]]) {
+    const f = await loadFunction('scrape-b2b', { db, users });
+    const r = await f.call({ token, body: { query: 'x', location: 'y' } });
+    assert.equal(r.status, status, String(token));
+    assert.equal(f.outbound.length, 0, `${token}: no paid search`);
+    f.restore();
+  }
+  for (const token of ['tok-admin', 'tok-inside']) {
+    const f = await loadFunction('scrape-b2b', { db, users });
+    const r = await f.call({ token, body: {} });
+    assert.ok(![401, 403].includes(r.status), `${token} passes the gate (got ${r.status})`);
+    f.restore();
+  }
+});

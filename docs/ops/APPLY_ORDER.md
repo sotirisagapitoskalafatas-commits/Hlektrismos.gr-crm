@@ -31,6 +31,13 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 - **Check:** `select exists (select 1 from pg_policies where schemaname='public' and tablename='crm_integrations' and policyname='phase1/20 anon denied') and not has_table_privilege('anon','public.crm_integrations','SELECT') as applied;`
 - **Credentials:** treat `crm_integrations.config` values as potentially exposed until the access logs are reviewed; rotation decision is in the private rollout report.
 
+## 0b. `phase1/21b_function_rate_limits.sql` — required BEFORE the hardened outbound Edge Functions are deployed
+- **Why:** a shared, database-backed rate limit for functions that send messages, place calls or spend paid quota.
+- **Depends on:** nothing.
+- **After it:** no visible change. Only `service_role` can call `consume_rate_limit`.
+- **Order matters:** the hardened `send-sms`, `send-campaign-email`, `make-voice-call`, `send-offer` and `send-email` answer 503 and send nothing while this file is missing.
+- **Check:** see `pending_migrations_check.sql` row `phase1/21b_function_rate_limits`. Rollback: `rollback_phase1_21b_function_rate_limits.sql`.
+
 ## 1. `phase1/16_storage_docs_lockdown.sql` — security
 - **Depends on:** nothing.
 - **Unlocks on screen:** nothing visible. Anonymous visitors can no longer list or download files in `hlektrismos_docs` (they may still upload into `contact-forms/`); inactive accounts lose access.

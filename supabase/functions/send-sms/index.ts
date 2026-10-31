@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
-import { badBatch, callerKey, cleanText, rateLimited } from "../_shared/limits.ts";
+import { badBatch, callerKey, cleanText, durableLimit, rateLimited } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
@@ -27,6 +27,8 @@ serve(async (req) => {
   if (denied) return denied;
   // Best-effort per-caller throttle (limits.ts): slows a runaway or compromised staff account.
   if (rateLimited(`send-sms:${callerKey(caller)}`, 10, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
+  const overQuota = await durableLimit(supabase, `send-sms:${callerKey(caller)}`, 60, 3600);
+  if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
   try {
     const body = await req.json().catch(() => null);

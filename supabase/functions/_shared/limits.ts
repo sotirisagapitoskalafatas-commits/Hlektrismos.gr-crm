@@ -1,7 +1,7 @@
-// Input limits and a best-effort rate limiter for functions that send messages, place calls or spend paid quota.
-// The limiter is per function instance (in memory): it slows a runaway or compromised staff account but is NOT an
-// authoritative quota, because instances do not share state. The authoritative limits are the batch cap below, the
-// consent / frequency gate (outreach-gate.ts) and the OUTREACH_ENABLED switches.
+// Input limits and rate limits for functions that send messages, place calls or spend paid quota.
+// rateLimited() is per function instance (in memory) and only a cheap first filter. durableLimit() is the shared limit: it
+// counts in the database (phase1/21b, public.consume_rate_limit), so every instance sees the same count, and it FAILS CLOSED.
+// The batch cap below, the consent / frequency gate (outreach-gate.ts) and the OUTREACH_ENABLED switches apply as well.
 
 /** Largest number of recipients one request may name. */
 export const MAX_BATCH = 100;
@@ -39,3 +39,20 @@ export function rateLimited(key: string, limit: number, windowMs: number, now = 
 
 /** Test helper: forget every recorded attempt. */
 export function resetRateLimits(): void { buckets.clear(); }
+
+/** Minimal client shape: the service-role client of the calling function. */
+type RpcClient = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
+
+/**
+ * Shared per-caller limit. Returns null when the attempt may proceed, otherwise the status and message to answer with:
+ * 429 over the limit, 503 when the counter cannot be reached (nothing is sent when the limit cannot be checked).
+ */
+export async function durableLimit(admin: RpcClient, bucket: string, limit: number, windowSeconds: number): Promise<{ status: number; error: string } | null> {
+  try {
+    const { data, error } = await admin.rpc("consume_rate_limit", { p_bucket: bucket, p_limit: limit, p_window_seconds: windowSeconds });
+    if (error) return { status: 503, error: "Sending is unavailable right now. Try again later." };
+    return data === true ? null : { status: 429, error: "Hourly limit reached. Try again later." };
+  } catch {
+    return { status: 503, error: "Sending is unavailable right now. Try again later." };
+  }
+}

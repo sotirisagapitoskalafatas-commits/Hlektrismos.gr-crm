@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { Role, DEFAULT_ROLE } from './roles';
+import { takeAuthLink } from './auth-link';
+import { Role, DEFAULT_ROLE, canonicalRole } from './roles';
 import { fetchUserRoles } from './api';
 import { previewAllowed, ROLE_PREVIEW_HARD_STOP, setPreviewActive } from './role-preview';
 
@@ -18,6 +19,8 @@ interface AuthContextValue {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  /** True once the profile lookup for the current session has finished (found or not). Until then the role is unknown. */
+  profileReady: boolean;
   role: Role;
   /* Canonical multi-role set from user_roles (Phase 1.1). Falls back to the
      single profile role when the foundation tables are not yet live. */
@@ -42,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [canonicalRoles, setCanonicalRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileFor, setProfileFor] = useState<string | null>(null); // user id whose profile lookup has finished
   const [previewRole, setPreviewRole] = useState<Role | null>(() => {
     try { localStorage.removeItem(LEGACY_ROLE_KEY); return (sessionStorage.getItem(PREVIEW_KEY) as Role) ?? null; } catch { return null; }
   });
@@ -51,15 +55,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!supabase || !session?.user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, role, phone, avatar_url')
-      .eq('id', session.user.id)
-      .maybeSingle();
-    if (data) setProfile(data as Profile);
-    // Best-effort canonical multi-role read; empty if foundation not live.
-    const canonical = await fetchUserRoles(session.user.id);
-    setCanonicalRoles(canonical);
+    const uid = session.user.id;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, phone, avatar_url')
+        .eq('id', uid)
+        .maybeSingle();
+      // No row (or a failed read) is stored as null, never as the previous user's profile: an account without a profile gets no access.
+      setProfile(data ? { ...(data as Profile), role: canonicalRole((data as Profile).role) } : null);
+      // Best-effort canonical multi-role read; empty if foundation not live.
+      const canonical = await fetchUserRoles(uid);
+      setCanonicalRoles(canonical);
+    } finally {
+      setProfileFor(uid);
+    }
   }, [session?.user]);
 
   useEffect(() => {
@@ -75,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       // The e-mailed reset link signs the person in with a recovery session: send them to the choose-a-new-password page.
       if (event === 'PASSWORD_RECOVERY') window.location.hash = '/reset';
+      // An invitation signs the person in with no password yet: the same page lets them choose one.
+      else if (event === 'SIGNED_IN' && takeAuthLink() === 'invite') window.location.hash = '/reset';
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -92,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  const profileReady = !session?.user || profileFor === session.user.id;
   const physicalRole: Role = profile?.role ?? DEFAULT_ROLE;
 
   // Ask the server whether this account may use the presentation preview (fails closed on any error).
@@ -168,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: session?.user ?? null,
         profile,
         loading,
+        profileReady,
         role,
         roles,
         preview: { allowed, role: activePreview, expiresAt },

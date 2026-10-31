@@ -33,15 +33,27 @@ const caseOfB = { owner_id: AGENT_B, back_office_owner: AGENT_A };
 
 // ───────────────────────────── access.ts ─────────────────────────────
 test('categories: the two application groups; inactive or unknown roles get nothing', () => {
-  for (const r of ['admin', 'manager', 'back_office']) assert.equal(A.categoryOf(r, true), 'office');
+  assert.equal(A.categoryOf('admin', true), 'office');
+  for (const r of ['manager', 'back_office']) assert.equal(A.categoryOf(r, true), null, `legacy ${r} is in no category`);
   for (const r of ['inside_sales', 'field_sales']) assert.equal(A.categoryOf(r, true), 'sales');
   assert.equal(A.categoryOf('inside_sales', false), null, 'inactive');
   assert.equal(A.categoryOf('superuser', true), null, 'unknown role');
   assert.equal(A.categoryOf(null, true), null);
 });
 
-test('Back Office may act on every record; the service role is trusted for records', () => {
-  for (const c of [admin, office, manager, service]) {
+test('legacy back_office and manager have no access to any record', () => {
+  for (const c of [office, manager]) {
+    assert.equal(A.canAccessLead(c, leadOfB), false);
+    assert.equal(A.canAccessLead(c, leadOfA), false);
+    assert.equal(A.canAccessCase(c, caseOfB), false);
+    assert.equal(A.canAccessCustomer(c, { created_by: AGENT_B }), false);
+    assert.equal(A.canAccessLegacyLead(c, { assigned_to: AGENT_B }), false);
+    assert.equal(A.isOffice(c), false);
+  }
+});
+
+test('the shared Admin / Back Office login (admin) may act on every record; the service role is trusted for records', () => {
+  for (const c of [admin, service]) {
     assert.equal(A.canAccessLead(c, leadOfB), true);
     assert.equal(A.canAccessCase(c, caseOfB), true);
     assert.equal(A.canAccessCustomer(c, { created_by: AGENT_B }), true);
@@ -68,18 +80,21 @@ test('a Sales Agent may act on their own records only (assignment, creation, cas
 
 test('decide(): 401 without caller, 403 without capability, 404 when missing, 403 for another agent, ok otherwise', () => {
   assert.equal(A.decide(null, null, leadOfA, A.canAccessLead).status, 401);
-  assert.deepEqual(A.decide(field, 'communications.email.send', leadOfA, A.canAccessLead), { ok: false, status: 403, error: 'Not permitted for your role' }, 'field_sales lacks email');
+  const revoked = { ...field, overrides: { sales_agent: ['crm.read.assigned'] } };
+  assert.deepEqual(A.decide(revoked, 'communications.email.send', leadOfA, A.canAccessLead), { ok: false, status: 403, error: 'Not permitted for your role' }, 'a revoked capability');
   assert.equal(A.decide(inside, 'communications.voice.initiate', leadOfA, A.canAccessLead).status, 403, 'voice is admin-only');
   assert.equal(A.decide(inside, 'communications.email.send', null, A.canAccessLead).status, 404);
   assert.deepEqual(A.decide(inside, 'communications.email.send', leadOfB, A.canAccessLead), { ok: false, status: 403, error: 'Not your record' });
   assert.deepEqual(A.decide(inside, 'communications.email.send', leadOfA, A.canAccessLead), { ok: true });
   assert.deepEqual(A.decide(admin, 'communications.voice.initiate', leadOfB, A.canAccessLead), { ok: true }, 'admin everything');
   assert.equal(A.decide(office, 'campaign.send', leadOfB, A.canAccessLead).status, 403, 'back_office cannot send campaigns');
-  assert.deepEqual(A.decide(office, 'case.documents.verify', caseOfB, A.canAccessCase), { ok: true });
+  assert.equal(A.decide(office, 'case.documents.verify', caseOfB, A.canAccessCase).status, 403, 'legacy back_office can no longer verify documents');
+  assert.equal(A.decide(manager, 'campaign.approve', leadOfB, A.canAccessLead).status, 403, 'legacy manager can no longer approve campaigns');
+  assert.deepEqual(A.decide(admin, 'case.documents.verify', caseOfB, A.canAccessCase), { ok: true });
   assert.equal(A.decide(inside, 'case.documents.verify', caseOfA, A.canAccessCase).status, 403, 'sales cannot verify');
   assert.deepEqual(A.decide(service, 'campaign.send', leadOfB, A.canAccessLead), { ok: true });
   // admin-editable overrides can grant or remove a capability for non-admin roles, never lock out admin
-  const fieldWithEmail = { ...field, overrides: { field_sales: ['crm.read.assigned', 'case.update.sales', 'communications.email.send'] } };
+  const fieldWithEmail = { ...field, overrides: { sales_agent: ['crm.read.assigned', 'case.update.sales', 'communications.email.send'] } };
   assert.deepEqual(A.decide(fieldWithEmail, 'communications.email.send', leadOfA, A.canAccessLead), { ok: true });
   assert.equal(A.decide(fieldWithEmail, 'communications.email.send', leadOfB, A.canAccessLead).status, 403, 'override never widens records');
 });

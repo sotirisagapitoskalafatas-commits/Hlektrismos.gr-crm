@@ -10,49 +10,56 @@ import {
 import { labsVisible } from './labs';
 import { DOC_STATUS_TEXT } from './status-text';
 
-export type Role = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
-export const DEFAULT_ROLE: Role = 'inside_sales';
+export type Role = 'admin' | 'sales_agent';
+export const DEFAULT_ROLE: Role = 'sales_agent';
+
+/* ---------------- Exactly two account types ----------------
+   admin       = «Admin / Back Office»: ONE shared office login, full access.
+   sales_agent = «Sales Agent»: individual accounts, own records only.
+   Before phase6/25 the database stored Sales Agents as field_sales / inside_sales; canonicalRole() reads both, so the app works
+   before and after that migration. `manager`, `back_office` and unknown values stay as they are and hold no access. */
+const SALES_AGENT_ALIASES: readonly string[] = ['sales_agent', 'field_sales', 'inside_sales'];
+/** The one conversion point for a role read from the database. */
+export const canonicalRole = (r: unknown): Role => (typeof r === 'string' && SALES_AGENT_ALIASES.includes(r) ? 'sales_agent' : (r as Role));
+/** The only roles that hold any access in the CRM. */
+export const ACTIVE_ROLES: readonly Role[] = ['admin', 'sales_agent'];
+export const hasAccess = (r: unknown): r is Role => typeof r === 'string' && (ACTIVE_ROLES as readonly string[]).includes(r);
 
 export const ROLES: { id: Role; label: string; short: string; hint: string }[] = [
-  { id: 'admin', label: 'Διαχειριστής', short: 'ΑΔΜ', hint: 'Πλήρης πρόσβαση' },
-  { id: 'manager', label: 'Διευθυντής', short: 'ΔΝΣ', hint: 'Εποπτεία & reporting' },
-  { id: 'inside_sales', label: 'Inside Sales', short: 'INS', hint: 'Εξ αποστάσεως πωλήσεις' },
-  { id: 'field_sales', label: 'Field Sales', short: 'FLD', hint: 'Πωλήσεις πεδίου & επισκέψεις' },
-  { id: 'back_office', label: 'Back Office', short: 'BO', hint: 'Λειτουργική ολοκλήρωση' },
+  { id: 'admin', label: 'Admin / Back Office', short: 'ΑΔΜ', hint: 'Κοινός λογαριασμός γραφείου · πλήρης πρόσβαση' },
+  { id: 'sales_agent', label: 'Sales Agent', short: 'SLS', hint: 'Προσωπικοί πελάτες, πωλήσεις, επισκέψεις και διαδρομές' },
 ];
 
+export const LEGACY_ROLE_LABEL = 'Παλαιός ρόλος (χωρίς πρόσβαση)';
 export function roleLabel(r: Role) {
-  return r === 'inside_sales' || r === 'field_sales' ? 'Sales Agent' : 'Admin / Back Office';
+  if (!hasAccess(r)) return LEGACY_ROLE_LABEL;
+  return r === 'sales_agent' ? 'Sales Agent' : 'Admin / Back Office';
 }
 
-/* ---------------- Two access groups (master prompt §2) ----------------
-   A MAPPING over the five database roles — the roles themselves are unchanged.
-   «Back Office / Admin»: admin, manager, back_office → see everything.
-   «Πωλητής»: inside_sales, field_sales → see only their own leads, cases and customers (enforced by the staged
-   SQL phase4/18; until it is applied the database still lets them read everything). */
+/* ---------------- Access groups: one per account type ----------------
+   office: admin sees everything.   sales: sales_agent sees only their own leads, cases and customers (enforced in the database by
+   phase4/18 + phase4/21). */
 export type AccessGroup = 'office' | 'sales';
 export const ACCESS_GROUPS: { id: AccessGroup; label: string; hint: string; roles: Role[] }[] = [
-  { id: 'office', label: 'Admin / Back Office', hint: 'Διαχείριση ομάδας, αναθέσεων και back-office εργασιών.', roles: ['admin', 'manager', 'back_office'] },
-  { id: 'sales', label: 'Sales Agent', hint: 'Προσωπικά leads, πελάτες, επισκέψεις, follow-ups και διαδρομές.', roles: ['inside_sales', 'field_sales'] },
+  { id: 'office', label: 'Admin / Back Office', hint: 'Διαχείριση ομάδας, αναθέσεων και back-office εργασιών.', roles: ['admin'] },
+  { id: 'sales', label: 'Sales Agent', hint: 'Προσωπικά leads, πελάτες, επισκέψεις, follow-ups και διαδρομές.', roles: ['sales_agent'] },
 ];
-export const accessGroup = (r: Role): AccessGroup => (r === 'inside_sales' || r === 'field_sales' ? 'sales' : 'office');
+/** The access category of a role, or null: legacy and unknown roles belong to no category. */
+export const accessGroup = (r: Role): AccessGroup | null => (r === 'sales_agent' ? 'sales' : r === 'admin' ? 'office' : null);
 export const ACCESS_GROUP_COLOR = {
   office: '#475569',
   sales: '#156db5',
 } as const;
 
-export const accessGroupColor = (r: Role): string => ACCESS_GROUP_COLOR[accessGroup(r)];
-export const accessGroupLabel = (r: Role) => ACCESS_GROUPS.find(g => g.id === accessGroup(r))!.label;
+export const accessGroupColor = (r: Role): string => { const g = accessGroup(r); return g ? ACCESS_GROUP_COLOR[g] : '#94a3b8'; };
+export const accessGroupLabel = (r: Role): string => { const g = accessGroup(r); return g ? ACCESS_GROUPS.find(x => x.id === g)!.label : LEGACY_ROLE_LABEL; };
 
 /* ---------------- Role colors (CRM Shell Redesign) ----------------
    Hue per role, used by the role simulator chips, avatar ring and
    notification accents. Design palette. */
 export const ROLE_COLOR: Record<Role, string> = {
   admin: '#475569',
-  manager: '#0891b2',
-  inside_sales: '#0066cc',
-  field_sales: '#b45309',
-  back_office: '#7c3aed',
+  sales_agent: '#0066cc',
 };
 
 /* ---------------- Stages ---------------- */
@@ -96,7 +103,9 @@ export type ActivityType =
   | 'provider_submission' | 'activation' | 'status_change' | 'assignment'
   | 'comment' | 'completed' | 'navigation';
 
-export const ACTIVITY_META: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; team: Role | 'system' }> = {
+/** The kind of work an activity belongs to. These are work types kept on historical records, not account roles. */
+export type WorkTeam = 'inside_sales' | 'field_sales' | 'back_office' | 'admin' | 'system';
+export const ACTIVITY_META: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; team: WorkTeam }> = {
   created: { icon: Sparkles, label: 'Δημιουργία Case', team: 'system' },
   call: { icon: Phone, label: 'Τηλεφωνική Επικοινωνία', team: 'inside_sales' },
   email: { icon: Mail, label: 'Email', team: 'inside_sales' },
@@ -244,7 +253,7 @@ export const CATEGORY_COLORS: Record<NavSectionId, string> = {
   operations: '#0066cc', analytics: '#0066cc', ai: '#0066cc', system: '#0066cc',
 };
 
-const ALL: Role[] = ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'];
+const ALL: Role[] = ['admin', 'sales_agent'];
 
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -269,8 +278,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'CRM',
     icon: UsersRound,
     children: [
-      { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'manager', 'inside_sales'], maturity: 'live', badge: 'leads' },
-      { key: 'customers', label: 'Πελάτες', icon: UsersRound, page: 'customers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live', badge: 'customers' },
+      { key: 'leads', label: 'Leads', icon: UserPlus, page: 'leads', roles: ['admin', 'sales_agent'], maturity: 'live', badge: 'leads' },
+      { key: 'customers', label: 'Πελάτες', icon: UsersRound, page: 'customers', roles: ['admin', 'sales_agent'], maturity: 'live', badge: 'customers' },
     ],
   },
   {
@@ -279,8 +288,8 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: ShoppingBag,
     children: [
       { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
-      { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'manager', 'inside_sales', 'back_office'], maturity: 'beta', labs: true },
-      { key: 'providers', label: 'Πάροχοι', icon: Boxes, page: 'providers', roles: ['admin', 'manager', 'inside_sales', 'field_sales'], maturity: 'live' },
+      { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'sales_agent'], maturity: 'beta', labs: true },
+      { key: 'providers', label: 'Πάροχοι', icon: Boxes, page: 'providers', roles: ['admin', 'sales_agent'], maturity: 'live' },
     ],
   },
   {
@@ -288,9 +297,9 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Πεδίο',
     icon: Navigation,
     children: [
-      { key: 'myday', label: 'Ημέρα μου', icon: Sun, page: 'myday', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
-      { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'manager', 'field_sales'], maturity: 'live' },
-      { key: 'fieldmode', label: 'Λειτουργία Πεδίου', icon: Smartphone, page: 'field', roles: ['admin', 'manager', 'field_sales'], maturity: 'beta' },
+      { key: 'myday', label: 'Ημέρα μου', icon: Sun, page: 'myday', roles: ['admin', 'sales_agent'], maturity: 'live' },
+      { key: 'map', label: 'Χάρτης', icon: MapIcon, page: 'map', roles: ['admin', 'sales_agent'], maturity: 'live' },
+      { key: 'fieldmode', label: 'Λειτουργία Πεδίου', icon: Smartphone, page: 'field', roles: ['admin', 'sales_agent'], maturity: 'beta' },
     ],
   },
   {
@@ -298,7 +307,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Διεκπεραίωση',
     icon: Cog,
     children: [
-      { key: 'backoffice', label: 'Διεκπεραίωση', icon: MonitorCog, page: 'backoffice', roles: ['admin', 'manager', 'back_office'], maturity: 'live', badge: 'backoffice' },
+      { key: 'backoffice', label: 'Διεκπεραίωση', icon: MonitorCog, page: 'backoffice', roles: ['admin'], maturity: 'live', badge: 'backoffice' },
     ],
   },
   {
@@ -306,8 +315,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Ανάλυση',
     icon: BarChart3,
     children: [
-      { key: 'reports', label: 'Αναφορές', icon: Gauge, page: 'reports', roles: ['admin', 'manager'], maturity: 'live' },
-      { key: 'revenue', label: 'Έσοδα', icon: Wallet, page: 'revenue', roles: ['admin', 'manager'], maturity: 'live' },
+      { key: 'reports', label: 'Αναφορές', icon: Gauge, page: 'reports', roles: ['admin'], maturity: 'live' },
+      { key: 'revenue', label: 'Έσοδα', icon: Wallet, page: 'revenue', roles: ['admin'], maturity: 'live' },
     ],
   },
   {
@@ -315,8 +324,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Atlas AI',
     icon: Bot,
     children: [
-      { key: 'automations', label: 'Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin', 'manager'], maturity: 'beta', accent: true, labs: true },
-      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin', 'manager'], maturity: 'beta', accent: true, labs: true },
+      { key: 'automations', label: 'Αυτοματισμοί', icon: Bot, page: 'automations', roles: ['admin'], maturity: 'beta', accent: true, labs: true },
+      { key: 'aiworkforce', label: 'AI Εργατικό Δυναμικό', icon: Bot, page: 'aiworkforce', roles: ['admin'], maturity: 'beta', accent: true, labs: true },
     ],
   },
   {
@@ -327,15 +336,26 @@ export const NAV_SECTIONS: NavSection[] = [
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
       { key: 'homelayout', label: 'Αρχική σελίδα', icon: LayoutDashboard, page: 'homelayout', roles: ALL, maturity: 'live' },
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
-      { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin', 'manager', 'back_office'], maturity: 'live' },
+      { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin'], maturity: 'live' },
     ],
   },
 ];
 
 export function navForRole(role: Role): NavSection[] {
+  if (!hasAccess(role)) return []; // legacy / unknown roles: no navigation at all
   return NAV_SECTIONS
     .map(s => ({ ...s, children: s.children.filter(i => i.roles.includes(role) && (!i.labs || labsVisible(role))) }))
     .filter(s => s.children.length > 0);
+}
+
+
+/** The single page-boundary rule (AppShell): a page may be shown only if the role's own navigation contains it (Labs pages
+ *  additionally need the admin's Labs switch). A case opens for any role with
+ *  access. Unknown pages and legacy / unknown roles are refused. */
+export function canOpenPage(page: PageKey | 'case', role: Role): boolean {
+  if (!hasAccess(role)) return false;
+  if (page === 'case') return true;
+  return navForRole(role).some(s => s.children.some(i => i.page === page));
 }
 
 export function flattenNav(sections: NavSection[]): { section: NavSection; item: NavLeaf }[] {
@@ -406,13 +426,11 @@ export type CaseAction =
 
 export const PERMS: Record<Role, CaseAction[]> = {
   admin: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'verify_document', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature', 'create_application', 'submit_provider', 'change_stage', 'assign', 'delete'],
-  manager: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'verify_document', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature', 'create_application', 'submit_provider', 'change_stage', 'assign'],
-  inside_sales: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'change_stage', 'assign'],
-  field_sales: ['log_call', 'log_email', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature', 'change_stage'],
-  back_office: ['add_note', 'add_document', 'verify_document', 'create_application', 'submit_provider', 'change_stage', 'complete_followup'],
+  sales_agent: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'change_stage', 'assign', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature'],
 };
 
 export function can(role: Role, action: CaseAction): boolean {
+  if (!hasAccess(role)) return false; // legacy and unknown roles can do nothing, whatever PERMS says
   return (PERMS[role] ?? []).includes(action);
 }
 
@@ -482,7 +500,8 @@ export const TEAM_FILTERS: { id: string; label: string }[] = [
   { id: 'back_office', label: 'Back Office' },
   { id: 'system', label: 'Σύστημα' },
 ];/* ---------------- Org role predicates (Phase 1.1) ----------------
-   Canonical role keys: admin > manager > back_office > field_sales > inside_sales.
+   Canonical role keys: admin > field_sales > inside_sales. Legacy manager / back_office rank below everything (level 0) and
+   are rejected by isOrgRole / asOrgRole, so no hierarchy or fallback can lift them.
    `Role`, `ROLES`, `DEFAULT_ROLE`, `can()` above remain the app's source of
    truth for the UI catalog and per-role permission matrix. */
 export const ORG_ROLES: readonly Role[] = ALL;
@@ -491,10 +510,7 @@ export type OrgRole = Role;
 
 export const ROLE_LEVEL: Record<OrgRole, number> = {
   admin: 5,
-  manager: 4,
-  back_office: 3,
-  field_sales: 2,
-  inside_sales: 1,
+  sales_agent: 2,
 };
 
 export function isOrgRole(value: unknown): value is OrgRole {
@@ -514,10 +530,11 @@ export function hasAnyRole(roles: readonly OrgRole[] | null | undefined, candida
 }
 
 export function isAtLeastRole(roles: readonly OrgRole[] | null | undefined, min: OrgRole): boolean {
+  if (!hasAccess(min)) return false;
   const minLevel = ROLE_LEVEL[min];
-  return (roles ?? []).some((role) => ROLE_LEVEL[role] >= minLevel);
+  return (roles ?? []).some((role) => hasAccess(role) && ROLE_LEVEL[role] >= minLevel);
 }
 
 export function canManageRoles(roles: readonly OrgRole[] | null | undefined): boolean {
-  return hasRole(roles, 'admin') || hasRole(roles, 'manager');
+  return hasRole(roles, 'admin'); // only the shared Admin / Back Office login manages accounts
 }

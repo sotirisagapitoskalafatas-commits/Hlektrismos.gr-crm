@@ -14,7 +14,7 @@ begin
   if not public.is_staff() then raise exception 'backoffice assignee: not allowed' using errcode = '42501'; end if;
   select nullif(setting_value #>> '{}', '')::uuid into v_id from public.crm_settings where setting_key = 'default_backoffice_assignee';
   if v_id is null then return null; end if;
-  select p.full_name into v_name from public.profiles p where p.id = v_id and p.role = 'back_office' and coalesce(p.is_active, true);
+  select p.full_name into v_name from public.profiles p where p.id = v_id and p.role in ('admin', 'back_office') and coalesce(p.is_active, true);
   if v_name is null then return null; end if;   -- deactivated or role changed: treat as not set
   return jsonb_build_object('id', v_id, 'full_name', v_name);
 end;
@@ -26,8 +26,8 @@ as $$
 declare v_old text;
 begin
   if not public.is_role('admin') then raise exception 'backoffice assignee: not allowed' using errcode = '42501'; end if;
-  if p_user is not null and not exists (select 1 from public.profiles p where p.id = p_user and p.role = 'back_office' and coalesce(p.is_active, true)) then
-    raise exception 'backoffice assignee: must be an active Back Office user' using errcode = '22023';
+  if p_user is not null and not exists (select 1 from public.profiles p where p.id = p_user and p.role in ('admin', 'back_office') and coalesce(p.is_active, true)) then
+    raise exception 'backoffice assignee: must be an active Admin / Back Office user' using errcode = '22023';
   end if;
   select setting_value #>> '{}' into v_old from public.crm_settings where setting_key = 'default_backoffice_assignee';
   if exists (select 1 from public.crm_settings where setting_key = 'default_backoffice_assignee') then

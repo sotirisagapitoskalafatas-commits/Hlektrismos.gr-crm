@@ -7,7 +7,8 @@
 
 /** "call" = a person (sales agent) phoning; "voice" = an automated / AI call. */
 export type Channel = "email" | "sms" | "whatsapp" | "viber" | "voice" | "call";
-export type Purpose = "promotional" | "transactional";
+/** "requested": a reply to something the customer asked for, under a recorded request (phase3/11). It is still commercial content, so it stops at every refusal. */
+export type Purpose = "promotional" | "transactional" | "requested";
 
 export interface PermissionRecord {
   status: "granted" | "withdrawn" | "none";
@@ -83,7 +84,7 @@ function localHour(now: Date, timeZone: string): number | null {
 }
 
 const applies = (o: Objection, channel: Channel, purpose: Purpose) =>
-  (o.channels === null || o.channels.includes(channel)) && (purpose === "promotional" || o.scope === "all");
+  (o.channels === null || o.channels.includes(channel)) && (purpose !== "transactional" || o.scope === "all");
 
 function objectionReason(i: EligibilityInput): string | null {
   if (i.objections === undefined) return null;
@@ -124,6 +125,19 @@ export function decideEligibility(i: EligibilityInput): Decision {
     if (hour === null) reasons.add("TIME_UNKNOWN");
     else if (hour < c.contactHours.start || hour >= c.contactHours.end) reasons.add("OUTSIDE_CONTACT_HOURS");
   };
+
+  // A recorded request stands in for the consent record and the outreach switches, and for nothing else: refusals, frequency and hours still apply.
+  if (i.purpose === "requested") {
+    if (!i.hasAddress) reasons.add("NO_ADDRESS");
+    if (objection) reasons.add(objection);
+    if (p?.status === "withdrawn") reasons.add("OBJECTION_RECORDED");
+    if (i.suppressed === null) reasons.add("SUPPRESSION_UNKNOWN");
+    else if (i.suppressed) reasons.add("SUPPRESSED");
+    if (i.recentAttempts === null) reasons.add("FREQUENCY_UNKNOWN");
+    else if (i.recentAttempts >= c.maxAttemptsPerWindow) reasons.add("FREQUENCY_CAP");
+    hours();
+    return done();
+  }
 
   // A person phoning for sales. Not an automated send, so the campaign master switches do not apply; the number must
   // not have objected, and without recorded consent for calls it must have a fresh «not listed» Article 11 screening.

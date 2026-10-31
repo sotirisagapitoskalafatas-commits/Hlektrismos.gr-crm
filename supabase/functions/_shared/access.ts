@@ -4,28 +4,25 @@
 // itself whether the CALLER may act on the specific record. These rules mirror the staged database policies
 // (supabase/staged-migrations/phase4/18 + phase4/21) but do not depend on them being applied.
 //
-// Two application categories (src/lib/roles.ts), no new role:
-//   office = «Admin / Back Office» = admin, manager, back_office  -> every record
-//   sales  = «Πωλητής»             = inside_sales, field_sales     -> own records only
+// Exactly two account types (src/lib/roles.ts):
+//   office = «Admin / Back Office» = admin, the one shared office login  -> every record
+//   sales  = «Sales Agent»         = sales_agent, individual accounts     -> own records only
+// A stored `manager`, `back_office` or unknown role is neither: no access to any record.
 // The service role (pg_cron / internal calls presenting the service key) is trusted for records; its
 // callers are responsible for having authorised the end user first.
 
-import { hasCapability, type Capability, type Overrides } from "./permissions.ts";
+import { hasCapability, normalizeRole, type Capability, type Overrides } from "./permissions.ts";
 
 export type Category = "office" | "sales";
 export type Caller =
   | { kind: "service" }
   | { kind: "user"; id: string; role: string; category: Category; overrides?: Overrides };
 
-const OFFICE_ROLES = ["admin", "manager", "back_office"];
-const SALES_ROLES = ["inside_sales", "field_sales"];
-
 /** Category of an ACTIVE staff role, or null (inactive, unknown or missing role => no access at all). */
 export function categoryOf(role: string | null | undefined, isActive: boolean | null | undefined): Category | null {
   if (isActive === false || !role) return null;
-  if (OFFICE_ROLES.includes(role)) return "office";
-  if (SALES_ROLES.includes(role)) return "sales";
-  return null;
+  const type = normalizeRole(role);
+  return type === "admin" ? "office" : type === "sales_agent" ? "sales" : null;
 }
 
 export const isOffice = (c: Caller) => c.kind === "service" || c.category === "office";

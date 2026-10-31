@@ -27,7 +27,7 @@ import type { FolderTab } from '@/lib/folder';
 
 
 export default function LeadDetail({ leadId, version, onEdit }: { leadId: string; version: number; onEdit: (l: Lead) => void }) {
-  const { role, user } = useAuth();
+  const { role } = useAuth();
   const { go, openCase } = useNav();
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | undefined>(undefined);
@@ -41,7 +41,7 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
   const [noFolder, setNoFolder] = useState(false);
   const redirected = useRef(false);
   // Back Office may work (and convert) a lead routed to them with documents; the server allows any active staff.
-  const isStaff = can(role, 'create_case') || (role === 'back_office' && !!lead && lead.assigned_to_user_id === user?.id);
+  const isStaff = can(role, 'create_case');
 
   const load = useCallback(async () => {
     const [l, a, sp, tc] = await Promise.all([fetchLead(leadId), fetchEntityActivity('lead', leadId), fetchLeadSupplyPoints(leadId), fetchTariffCategories()]);

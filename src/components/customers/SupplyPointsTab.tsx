@@ -372,7 +372,7 @@ export default function SupplyPointsTab({ owner, points, tariffs, cases = [], do
 }) {
   const { toast } = useToast();
   const { role } = useAuth();
-  const canReview = role === 'admin' || role === 'manager' || role === 'back_office';
+  const canReview = role === 'admin';
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);

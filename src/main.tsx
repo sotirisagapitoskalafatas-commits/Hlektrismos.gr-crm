@@ -1,3 +1,4 @@
+import './lib/auth-link-boot'; // must run before the Supabase client reads (and clears) the URL hash
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';

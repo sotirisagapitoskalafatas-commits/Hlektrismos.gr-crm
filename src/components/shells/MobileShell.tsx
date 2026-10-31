@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import type { PageKey, Role } from '@/lib/roles';
 import {
-  Briefcase, Compass, Home, Map, MonitorCog, Plus, Route, UserCircle,
+  Briefcase, Compass, Home, Map, Plus, Route, UserCircle,
   UserPlus, X,
 } from 'lucide-react';
 
@@ -18,18 +18,15 @@ type Counts = { leads: number; followups: number; backoffice: number };
 
 type Tab = { page: PageKey; label: string; icon: typeof Home; badge?: keyof Counts };
 
-/* Role-aware 4-tab bar: Αρχική · two role-specific tabs · Εγώ. Sales → Leads/Cases; Field → Ημέρα μου/Χάρτης;
-   Back Office → Διεκπεραίωση/Cases. Everything else is one tap away in the module strip under the top bar. */
+/* Role-aware tab bar: Αρχική · two role-specific tabs. Admin → Leads/Cases; Sales Agent → Ημέρα μου/Leads.
+   Everything else is one tap away in the module strip under the top bar. */
 function tabsForRole(role: Role): Tab[] {
   const tabs: Tab[] = [{ page: 'home', label: 'Αρχική', icon: Home }];
-  if (role === 'admin' || role === 'manager' || role === 'inside_sales') {
-    tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
-    tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
-  } else if (role === 'field_sales') {
+  if (role === 'sales_agent') {
     tabs.push({ page: 'myday', label: 'Ημέρα μου', icon: Compass, badge: 'followups' });
-    tabs.push({ page: 'map', label: 'Χάρτης', icon: Map });
+    tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
   } else {
-    tabs.push({ page: 'backoffice', label: 'Διεκπεραίωση', icon: MonitorCog });
+    tabs.push({ page: 'leads', label: 'Leads', icon: UserPlus });
     tabs.push({ page: 'cases', label: 'Cases', icon: Briefcase });
   }
   return tabs.slice(0, 3);
@@ -136,7 +133,7 @@ export default function MobileShell({ current, counts }: MobileShellProps) {
   return (
     <>
       <BottomTabBar current={current} counts={counts} />
-      {role === 'field_sales' && (
+      {role === 'sales_agent' && (
         <FieldQuickActions open={sheet} onToggle={() => setSheet(s => !s)} />
       )}
     </>

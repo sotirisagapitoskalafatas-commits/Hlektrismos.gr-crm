@@ -2,16 +2,17 @@
 // Requires staged migration phase3/08. Flow: validate → quota → job row → searches → upsert prospects (the database
 // screens: keys, duplicates, quality) → job counts. Approval and distribution happen in the CRM (Back Office).
 //
-// Callers: active staff with role admin / manager / inside_sales / back_office, or the service role (AI orchestrator,
-// old {category, region} body still accepted). The SerpApi key stays server-side (crm_settings, never returned).
+// Callers: active staff holding the capability prospecting.search (permissions.ts: Admin always, Sales Agents through the defaults or an explicit
+// role_permissions entry; legacy manager / back_office never), or the service role (AI orchestrator, old {category, region} body still accepted).
+// The SerpApi key stays server-side (crm_settings, never returned).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "../_shared/keys.ts";
+import { getCaller, requireCapability } from "../_shared/authz.ts";
+import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 import { LIMITS, allowedQueries, planQueries, toProspect, validateSearch } from "../_shared/b2b-search.ts";
 import type { PlannedQuery } from "../_shared/b2b-search.ts";
 
-const SEARCH_ROLES = ["admin", "manager", "inside_sales", "back_office"];
 const json = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -37,19 +38,11 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(url, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
   // ── who is calling (role from the database, never from the request) ──
-  const internal = presentsSecretKey(req); // secret API key in the apikey header (constant-time match)
-  const token = userBearer(req);
-  if (!internal && !token) return json({ success: false, error: "Απαιτείται σύνδεση." }, 401);
-  let actorId: string | null = null;
-  if (!internal) {
-    const { data: { user }, error } = await admin.auth.getUser(token);
-    if (error || !user) return json({ success: false, error: "Μη έγκυρη συνεδρία." }, 401);
-    const { data: prof } = await admin.from("profiles").select("role, is_active").eq("id", user.id).maybeSingle();
-    if (!prof || prof.is_active === false || !SEARCH_ROLES.includes(prof.role)) {
-      return json({ success: false, error: "Ο ρόλος σας δεν έχει πρόσβαση στην αναζήτηση επιχειρήσεων." }, 403);
-    }
-    actorId = user.id;
-  }
+  const caller = await getCaller(req, admin);
+  if (caller instanceof Response) return caller;
+  const noCap = requireCapability(caller, "prospecting.search");
+  if (noCap) return noCap;
+  const actorId = caller.kind === "user" ? caller.id : null;
 
   const body = await req.json().catch(() => ({}));
   const v = validateSearch(body as Record<string, unknown>);

@@ -30,8 +30,6 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 function tabsFor(role: Role | null | undefined): Tab[] {
   if (role === 'admin') return ['overview', 'users', 'trash', 'permissions', 'workflow', 'documents', 'scraper', 'security', 'audit'];
-  if (role === 'manager') return ['overview', 'users', 'trash', 'permissions', 'workflow', 'documents', 'audit'];
-  if (role === 'back_office') return ['users'];
   return [];
 }
 
@@ -55,7 +53,7 @@ export default function AdminCenter() {
     <div className="atx-page atx-admin">
       <div className="atx-head">
         <p className="atx-eyebrow">Διαχείριση</p>
-        <h1 className="atx-title">{realRole === 'back_office' ? 'Ομάδα Back Office' : 'Κέντρο διαχείρισης'}</h1>
+        <h1 className="atx-title">Κέντρο διαχείρισης</h1>
         <p className="atx-sub">Χρήστες, ρόλοι, ροή εργασίας και έλεγχοι — με πραγματική κατάσταση, όχι στατικές δηλώσεις.</p>
       </div>
       {tabs.length > 1 && (
@@ -84,9 +82,9 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
   const [scope, setScope] = useState<SalesScope | null | 'loading'>('loading');
   useEffect(() => {
     let alive = true;
-    if (role === 'admin' || role === 'manager') void fetchSalesScope().then(s => alive && setScope(s));
+    if (role === 'admin') void fetchSalesScope().then(s => alive && setScope(s));
     void listStaff().then(r => alive && setStaff({ rows: r.rows, source: r.source }));
-    if (role === 'admin' || role === 'manager') void fetchScraperSettings().then(s => alive && setKeySet(s ? s.keySet : 'n/a'));
+    if (role === 'admin') void fetchScraperSettings().then(s => alive && setKeySet(s ? s.keySet : 'n/a'));
     return () => { alive = false; };
   }, [role]);
   const byGroup = useMemo(() => ACCESS_GROUPS.map(group => ({ group, n: staff?.rows.filter(s => group.roles.includes(s.role) && s.is_active).length ?? 0 })), [staff]);
@@ -106,7 +104,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
           <span className={`atx-ov-v ${staff?.source === 'server' ? '' : 'is-warn'}`}>{!staff ? '…' : staff.source === 'server' ? 'Ενεργή' : 'Εκκρεμεί'}</span>
           <span className="atx-ov-s">{staff?.source === 'server' ? 'Ο server απαντά στις ενέργειες διαχείρισης.' : pendingText(role, 'Εκκρεμεί η ενημέρωση της βάσης «Διαχείριση χρηστών» (phase2/05) και η function admin-users.', 'Η διαχείριση χρηστών ενεργοποιείται μετά την επόμενη ενημέρωση.')}</span>
         </button>
-        {(role === 'admin' || role === 'manager') && (
+        {(role === 'admin') && (
           <button type="button" className="atx-ov" data-testid="sales-scope" onClick={() => onOpen('users')}>
             <span className="atx-ov-k">Ορατότητα πωλητών</span>
             <span className={`atx-ov-v ${scope === 'loading' ? '' : scope?.enabled ? 'is-ok' : 'is-warn'}`}>{scope === 'loading' ? '…' : scope === null ? 'Εκκρεμεί' : scope.enabled ? 'Μόνο τα δικά τους' : 'Βλέπουν όλα'}</span>
@@ -123,7 +121,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
             <span className="atx-ov-s">{last ? `Τελευταίος έλεγχος ${new Date(last.at).toLocaleString('el-GR')}` : 'Εκτελέστε τους από «Ασφάλεια & Έλεγχοι».'}</span>
           </button>
         )}
-        {(role === 'admin' || role === 'manager') && (
+        {(role === 'admin') && (
           <button type="button" className="atx-ov" onClick={() => role === 'admin' && onOpen('scraper')}>
             <span className="atx-ov-k">Κλειδί SerpApi</span>
             <span className="atx-ov-v">{keySet === null ? '…' : keySet === 'n/a' ? 'Μη διαθέσιμο' : keySet ? 'Ρυθμισμένο' : 'Λείπει'}</span>

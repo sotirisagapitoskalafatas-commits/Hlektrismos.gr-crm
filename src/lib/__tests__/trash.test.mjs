@@ -10,8 +10,8 @@ const out = await build({
 });
 const T = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 
-test('only admin/manager trash; only admin purges; trashed rows never in normal lists', () => {
-  assert.deepEqual(['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'].map(T.canTrash), [true, true, false, false, false]);
+test('only the shared admin trashes and purges (legacy manager / back_office cannot); trashed rows never in normal lists', () => {
+  assert.deepEqual(['admin', 'manager', 'inside_sales', 'field_sales', 'back_office'].map(T.canTrash), [true, false, false, false, false]);
   assert.deepEqual(['admin', 'manager', 'back_office'].map(T.canPurge), [true, false, false]);
   assert.deepEqual(T.notTrashed([{ id: 1 }, { id: 2, deleted_at: '2026-10-14' }, { id: 3, deleted_at: null }]).map((r) => r.id), [1, 3]);
 });

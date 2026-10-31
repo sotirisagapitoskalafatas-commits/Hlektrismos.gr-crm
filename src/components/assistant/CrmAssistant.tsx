@@ -83,7 +83,7 @@ export default function CrmAssistant({ open, onClose }: { open: boolean; onClose
       const fi = detectFieldSalesIntent(text);
       // Field staff: their day is visits, so the field tools answer first. Everyone else: the work assistant answers
       // first and the field tools are only a fallback for requests it does not understand.
-      if (fi && role === 'field_sales') { applyField(await runFieldSalesIntent(fi, { role })); return; }
+      if (fi && role === 'sales_agent') { applyField(await runFieldSalesIntent(fi, { role })); return; }
       const reply = answer(text, {
         role: role as AssistantRole, uid: work.uid ?? '', now: work.now, allowedPages,
         items: work.items, summary: work.summary, cases: work.cases, leads: work.leads, customers,

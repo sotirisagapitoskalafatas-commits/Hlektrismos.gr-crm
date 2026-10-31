@@ -401,3 +401,15 @@ select exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_o
 - **Rollback:** [`rollback_phase6_22_crm_integrations_status_invoker.sql`](rollback_phase6_22_crm_integrations_status_invoker.sql) — a deliberate no-op that keeps `security_invoker = true` (restoring owner rights would reintroduce the finding).
 - **Check (must be true):** `select coalesce('security_invoker=true' = any (select unnest(reloptions) from pg_class where oid = 'public.crm_integrations_status'::regclass), false) as applied;`
 - **Tests:** `node --test supabase/tests/integrations-status-invoker.test.mjs` — local PGlite evidence on the ordered state (phase1/01 → 18 → phase2/05 → phase6/21 → 22) for admin, active and inactive Sales Agent, legacy back_office, legacy manager and anonymous. Not staging or production evidence.
+
+## 27. `phase6/25_exact_two_roles.sql` — exactly two account types: `admin` and `sales_agent`
+- **Depends on:** phase6/21, phase3/08, phase3/09 (the file checks this and stops otherwise).
+- **Order matters:** merge and deploy the code that reads `sales_agent` FIRST. That code accepts both spellings. Code from before this release refuses `sales_agent`, so applying this while it runs locks Sales Agents out. Creating a new Sales Agent needs this file applied.
+- **Changes:** Sales Agents (`field_sales`, `inside_sales`) become `sales_agent` with their active flag kept. `manager` and `back_office` rows become inactive `sales_agent`, which grants nothing. Their `user_roles` grants are removed and the old role keys leave the catalogue. No Auth user, lead, customer, case, assignment or audit row is touched. Every change is recorded in `role_normalization_audit`. It stops if an active manager/back_office account is not a known QA login.
+- **Rollback:** [`rollback_phase6_25_exact_two_roles.sql`](rollback_phase6_25_exact_two_roles.sql).
+- **Check:** see `pending_migrations_check.sql` row `phase6/25_exact_two_roles`.
+
+## 28. `phase6/26_single_active_admin.sql` — one active Admin, enforced — **after** the real Admin has signed in and the QA admins are switched off
+- **Depends on:** step 27, [`sql/deactivate_qa_accounts.sql`](sql/deactivate_qa_accounts.sql). It names no account and refuses unless exactly one active admin exists and can really sign in.
+- **Note:** the shared login is one identity. Audit rows name that account, not the employee using it.
+- **Rollback:** [`rollback_phase6_26_single_active_admin.sql`](rollback_phase6_26_single_active_admin.sql).

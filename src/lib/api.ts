@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { applyCanonicalLabels, loadCatalog, resolveProductId, resolveProviderId } from './catalog';
-import { ROLES } from './roles';
+import { ROLES, canonicalRole } from './roles';
 import type { Role, Stage } from './roles';
 import type { MapCoordinate } from './maps/types';
 import { LEAD_FILES_BUCKET, leadFilePath } from './lead-files';
@@ -262,7 +262,7 @@ export async function ensureProfile(): Promise<{ id: string; full_name: string; 
     .eq('id', user.id)
     .maybeSingle();
   if (error) { logError('ensureProfile', error); return null; }
-  return data ?? null;
+  return data ? { ...data, role: canonicalRole(data.role) } : null;
 }
 
 export async function updateProfile(id: string, patch: { full_name?: string; phone?: string | null; avatar_url?: string | null }): Promise<boolean> {
@@ -284,7 +284,7 @@ export async function fetchStaff(): Promise<StaffProfile[]> {
     .select('id, full_name, role, phone, avatar_url, created_at')
     .order('created_at', { ascending: true });
   if (error) { logError('fetchStaff', error); return []; }
-  return (data ?? []) as StaffProfile[];
+  return ((data ?? []) as StaffProfile[]).map(p => ({ ...p, role: canonicalRole(p.role) }));
 }
 
 const VALID_ROLE_KEYS = new Set<string>(ROLES.map(r => r.id));
@@ -308,7 +308,7 @@ export async function fetchUserRoles(userId: string): Promise<Role[]> {
       if (!rel) return [];
       return Array.isArray(rel) ? rel.map(x => x.key) : [rel.key];
     });
-    return keys.filter((k): k is Role => VALID_ROLE_KEYS.has(k));
+    return [...new Set(keys.map(canonicalRole))].filter(k => VALID_ROLE_KEYS.has(k));
   } catch {
     return [];
   }
@@ -729,7 +729,7 @@ export async function createFollowUp(input: {
       .single();
     if (error) { logError('createFollowUp', error); return null; }
     await addActivity(input.case_id, {
-      role: (profile?.role ?? 'inside_sales') as Role,
+      role: canonicalRole(profile?.role ?? 'sales_agent'),
       activity_type: 'follow_up',
       title: `Follow Up: ${input.channel}`,
       description: `${input.reason} — ${new Date(input.due_at).toLocaleString('el-GR')}`,
@@ -817,7 +817,7 @@ export async function setDocumentStatus(id: string, status: string): Promise<voi
     .single();
   if (data?.case_id) {
     await addActivity(data.case_id as string, {
-      role: (profile?.role ?? 'back_office') as Role,
+      role: canonicalRole(profile?.role ?? 'admin'),
       activity_type: 'document_check',
       title: `Έλεγχος εγγράφου: ${statusText(DOC_STATUS_TEXT, status)}`,
       description: status === 'verified' ? 'Έγγραφο ελέγχθηκε και είναι έγκυρο.' : `Κατάσταση εγγράφου: ${statusText(DOC_STATUS_TEXT, status)}`,
@@ -897,7 +897,7 @@ export async function createVisit(caseId: string, input: { purpose?: string; sch
       .single();
     if (error) { logError('createVisit', error); return null; }
     await addActivity(caseId, {
-      role: (profile?.role ?? 'field_sales') as Role,
+      role: canonicalRole(profile?.role ?? 'sales_agent'),
       activity_type: 'visit',
       title: 'Επίσκεψη προγραμματίστηκε',
       description: input.purpose || 'Επίσκεψη πεδίου',
@@ -923,7 +923,7 @@ export async function checkInVisit(id: string, coords?: CheckInCoords): Promise<
   if (data?.case_id) {
     const accLine = coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : '';
     await addActivity(data.case_id as string, {
-      role: (profile?.role ?? 'field_sales') as Role,
+      role: canonicalRole(profile?.role ?? 'sales_agent'),
       activity_type: 'check_in',
       title: 'Check In',
       description: `Ο πωλητής έφτασε στον πελάτη${accLine}.`,
@@ -947,7 +947,7 @@ export async function checkOutVisit(id: string, coords?: CheckInCoords, notes?: 
   if (data?.case_id) {
     const accLine = coords?.accuracy != null ? ` (ακρίβεια ±${Math.round(coords.accuracy)} μ)` : '';
     await addActivity(data.case_id as string, {
-      role: (profile?.role ?? 'field_sales') as Role,
+      role: canonicalRole(profile?.role ?? 'sales_agent'),
       activity_type: 'check_out',
       title: 'Check Out',
       description: `${notes ? notes + ' — ' : ''}Η επίσκεψη ολοκληρώθηκε${accLine}.`,
@@ -993,7 +993,7 @@ export async function captureSignature(caseId: string, input: { document_id?: st
     .single();
   if (error) { logError('captureSignature', error); return null; }
   await addActivity(caseId, {
-    role: (profile?.role ?? 'field_sales') as Role,
+    role: canonicalRole(profile?.role ?? 'sales_agent'),
     activity_type: 'signature',
     title: 'Υπογραφή λήφθηκε',
     description: input.notes || 'Υπογραφή πελάτη',
@@ -1007,7 +1007,7 @@ export async function setSignatureStatus(id: string, status: string, caseId: str
   await supabase.from('case_signatures').update({ status }).eq('id', id);
   const profile = await ensureProfile();
   await addActivity(caseId, {
-    role: (profile?.role ?? 'back_office') as Role,
+    role: canonicalRole(profile?.role ?? 'admin'),
     activity_type: 'signature',
     title: `Υπογραφή: ${status}`,
     description: 'Κατάσταση υπογραφής ενημερώθηκε.',
@@ -1138,7 +1138,7 @@ export async function createOffer(caseId: string, input: { amount: number; notes
     .single();
   if (error) { logError('createOffer', error); return null; }
   await addActivity(caseId, {
-    role: (profile?.role ?? 'inside_sales') as Role,
+    role: canonicalRole(profile?.role ?? 'sales_agent'),
     activity_type: 'offer',
     title: `Προσφορά: ${input.amount} €`,
     description: input.notes || 'Νέα προσφορά',
@@ -1152,7 +1152,7 @@ export async function markOfferSent(id: string, caseId: string): Promise<void> {
   await supabase.from('case_offers').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
   const profile = await ensureProfile();
   await addActivity(caseId, {
-    role: (profile?.role ?? 'inside_sales') as Role,
+    role: canonicalRole(profile?.role ?? 'sales_agent'),
     activity_type: 'send_offer',
     title: 'Προσφορά στάλθηκε',
     description: 'Η προσφορά εστάλη στον πελάτη.',

@@ -470,7 +470,9 @@ test('durable limit runs AFTER the capability check: a refused role consumes no 
   assert.equal((await f.call({ token: 'tok-inside', body: {} })).status, 403);
   assert.equal(f.db.log.rpc.filter((c) => c.name.startsWith('consume_rate_limit')).length, 0);
   f.restore();
-  const o = await loadFunction('send-offer', { db: outboundDb(), users });
+  const revokedDb = outboundDb();
+  revokedDb.rows('crm_settings').push({ setting_key: 'role_permissions', setting_value: { sales_agent: ['crm.read.assigned'] } });
+  const o = await loadFunction('send-offer', { db: revokedDb, users });
   assert.equal((await o.call({ token: 'tok-field', body: { lead_id: LEAD, tariff_id: TARIFF } })).status, 403);
   assert.equal(o.db.log.rpc.filter((c) => c.name.startsWith('consume_rate_limit')).length, 0, 'send-offer too');
   o.restore();
@@ -480,7 +482,7 @@ test('durable limit runs AFTER the capability check: a refused role consumes no 
 test('scrape-b2b: one authorization path. Admin, granted and revoked Sales Agents, legacy roles (even with an override), unknown, inactive, missing and anonymous', async () => {
   const UNKNOWN = 'aaaaaaaa-0000-4000-8000-0000000000f1', MISSING = 'aaaaaaaa-0000-4000-8000-0000000000f2';
   const all = { ...users, 'tok-unknown-role': UNKNOWN, 'tok-no-profile': MISSING };
-  const grants = { field_sales: ['prospecting.search'], inside_sales: [], manager: ['prospecting.search'], back_office: ['prospecting.search'] };
+  const grants = { sales_agent: [], manager: ['prospecting.search'], back_office: ['prospecting.search'] };
   const run = async (token, overrides) => {
     const db = outboundDb();
     db.rows('profiles').push({ id: UNKNOWN, role: 'partner', is_active: true });
@@ -496,9 +498,10 @@ test('scrape-b2b: one authorization path. Admin, granted and revoked Sales Agent
   passes(await run('tok-admin'));                         // Admin
   passes(await run('tok-admin', { admin: [] }));          // Admin cannot be locked out
   passes(await run('tok-inside'));                        // Sales Agent, default permission
-  refused(await run('tok-field'), 403);                   // Sales Agent without the permission
-  passes(await run('tok-field', grants));                 // Sales Agent, explicitly granted
+  passes(await run('tok-field'));                         // the other old spelling is the same Sales Agent
+  passes(await run('tok-field', { sales_agent: ['prospecting.search'] })); // Sales Agent, explicitly granted
   refused(await run('tok-inside', grants), 403);          // Sales Agent, revoked
+  refused(await run('tok-field', grants), 403);
   refused(await run('tok-manager'), 403);                 // legacy manager
   refused(await run('tok-bo'), 403);                      // legacy back_office
   refused(await run('tok-manager', grants), 403);         // legacy, with a manually inserted override
@@ -648,11 +651,12 @@ test('requirePermission: one rule with getCaller. Legacy and unknown roles stop 
     f.restore();
     return [r.status, r.json?.error];
   };
-  const grant = { manager: ['prospecting.search'], back_office: ['prospecting.search'], partner: ['prospecting.search'], field_sales: ['prospecting.search'], inside_sales: [] };
+  const grant = { manager: ['prospecting.search'], back_office: ['prospecting.search'], partner: ['prospecting.search'], sales_agent: [] };
   assert.equal((await run('tok-admin'))[0], 200);
   assert.equal((await run('tok-inside'))[0], 200);
-  assert.deepEqual(await run('tok-field'), [403, 'Not permitted for your role']);
-  assert.equal((await run('tok-field', grant))[0], 200, 'granted');
+  assert.equal((await run('tok-field'))[0], 200, 'the same Sales Agent');
+  assert.equal((await run('tok-field', { sales_agent: ['prospecting.search'] }))[0], 200, 'granted');
+  assert.deepEqual(await run('tok-field', grant), [403, 'Not permitted for your role'], 'revoked');
   assert.deepEqual(await run('tok-inside', grant), [403, 'Not permitted for your role'], 'revoked');
   for (const token of ['tok-manager', 'tok-bo', 'tok-unknown-role', 'tok-inactive']) assert.deepEqual(await run(token, grant), [403, 'Staff access only'], token);
   assert.equal((await run(undefined))[0], 401);

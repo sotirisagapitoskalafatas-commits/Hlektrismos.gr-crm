@@ -25,7 +25,7 @@ export interface SearchJob {
 }
 export interface SearchProfile { id: string; name: string; params: SearchParams; created_by: string | null; created_at: string }
 
-export const canSearch = (r: Role | null | undefined) => r === 'admin' || r === 'inside_sales';
+export const canSearch = (r: Role | null | undefined) => r === 'admin' || r === 'sales_agent';
 export const canReview = (r: Role | null | undefined) => r === 'admin';
 
 export const QUALITY_TEXT: Record<string, string> = { no_phone: 'χωρίς τηλέφωνο', no_website: 'χωρίς ιστοσελίδα', no_address: 'χωρίς διεύθυνση' };

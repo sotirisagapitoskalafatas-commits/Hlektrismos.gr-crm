@@ -42,7 +42,7 @@ const world = () => createDb({
 });
 // admin-users authorizes per action, so a signed-in outsider needs a real action to be refused, and the refusal is itself recorded in the audit table.
 // That one denial row is the only write any function may make here.
-const ACTION_BODY = { 'admin-users': { action: 'create', email: 'new.agent@example.gr', full_name: 'Test Agent', role: 'inside_sales', mode: 'invite' } };
+const ACTION_BODY = { 'admin-users': { action: 'create', email: 'new.agent@example.gr', full_name: 'Test Agent', role: 'sales_agent', mode: 'invite' } };
 const DENIAL_AUDIT = { 'admin-users': 'staff_admin_audit' };
 const untouched = (f, why, allowedTable) => {
   const writes = f.db.log.inserts.length + f.db.log.updates.length + f.db.log.deletes.length;

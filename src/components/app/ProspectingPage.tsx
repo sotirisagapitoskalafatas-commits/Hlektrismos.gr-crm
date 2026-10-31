@@ -322,7 +322,7 @@ function AssignTab({ onChanged }: { onChanged: () => void }) {
   const [agents, setAgents] = useState<string[]>([]);
   const [openLeads, setOpenLeads] = useState<Map<string, number>>(new Map());
   const [busy, setBusy] = useState(false);
-  const sales = staff.filter(s => s.role === 'inside_sales' || s.role === 'field_sales');
+  const sales = staff.filter(s => s.role === 'sales_agent');
   const load = useCallback(async () => {
     const r = await listProspects(['approved']);
     setRows(r.rows); setError(r.error); setSelected(new Set());
@@ -377,7 +377,7 @@ function AssignTab({ onChanged }: { onChanged: () => void }) {
             <li key={s.id}>
               <label className="flex items-center gap-2 text-[14px] cursor-pointer">
                 <input type={mode === 'manual' ? 'radio' : 'checkbox'} name="agent" checked={agents.includes(s.id)} onChange={() => toggleAgent(s.id)} />
-                <span className="flex-1">{s.full_name} <span className="text-[var(--atx-muted)] text-[12.5px]">· {s.role === 'inside_sales' ? 'Inside' : 'Field'} · {openLeads.get(s.id) ?? 0} ανοιχτά leads</span></span>
+                <span className="flex-1">{s.full_name} <span className="text-[var(--atx-muted)] text-[12.5px]">· {openLeads.get(s.id) ?? 0} ανοιχτά leads</span></span>
               </label>
             </li>
           ))}

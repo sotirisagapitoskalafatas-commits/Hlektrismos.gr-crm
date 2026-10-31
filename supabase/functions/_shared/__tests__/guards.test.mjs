@@ -47,7 +47,12 @@ test('overrides: valid ones apply, malformed ones are ignored, admin cannot be l
   const o = perms.parseOverrides('{"inside_sales":["communications.sms.send","bogus"],"admin":[]}');
   assert.equal(perms.hasCapability('inside_sales', 'communications.sms.send', o), true);
   assert.equal(perms.hasCapability('inside_sales', 'campaign.draft', o), false); // replaced list
+  assert.equal(perms.hasCapability('sales_agent', 'communications.sms.send', o), true, 'an override saved under an old name still applies');
   assert.equal(perms.hasCapability('admin', 'integrations.manage', o), true);
+  const both = perms.parseOverrides({ inside_sales: ['campaign.draft', 'prospecting.search'], field_sales: ['campaign.draft'] });
+  assert.deepEqual(both.sales_agent, ['campaign.draft'], 'two old lists: the stricter one, so nothing widens');
+  assert.deepEqual(perms.parseOverrides({ field_sales: ['campaign.draft'], sales_agent: ['audit.read'] }).sales_agent, ['audit.read'], 'an explicit sales_agent list wins');
+  assert.equal(perms.hasCapability('manager', 'crm.read.assigned', perms.parseOverrides({ manager: ['crm.read.assigned'] })), false, 'a retired role is never admitted');
   assert.deepEqual(perms.parseOverrides('not json'), {});
   assert.deepEqual(perms.parseOverrides(42), {});
 });

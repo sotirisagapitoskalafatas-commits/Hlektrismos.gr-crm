@@ -23,7 +23,7 @@
 -- ───────────── helpers (SECURITY DEFINER so they never recurse through RLS) ─────────────
 create or replace function public.is_sales_agent()
 returns boolean language sql stable security definer set search_path = public
-as $$ select exists (select 1 from public.profiles p where p.id = auth.uid() and coalesce(p.is_active, true) and p.role in ('inside_sales', 'field_sales')) $$;
+as $$ select exists (select 1 from public.profiles p where p.id = auth.uid() and coalesce(p.is_active, true) and p.role in ('sales_agent', 'inside_sales', 'field_sales')) $$;
 
 create or replace function public.sales_owns_lead(p_lead uuid)
 returns boolean language sql stable security definer set search_path = public

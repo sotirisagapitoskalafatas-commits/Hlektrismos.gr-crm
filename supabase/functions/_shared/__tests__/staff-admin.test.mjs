@@ -7,12 +7,13 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 const out = buildSync({ entryPoints: [fileURLToPath(new URL('../staff-admin.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent' });
 const S = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 
-test('two-role model: only the ACTIVE admin (shared Admin / Back Office login) manages accounts; new accounts are field_sales only', () => {
-  assert.deepEqual(S.manageableRoles('admin', true), ['field_sales'], 'one Sales Agent choice');
-  assert.equal(S.canManage('admin', true, null, 'field_sales'), true);
-  for (const r of ['inside_sales', 'admin', 'manager', 'back_office']) assert.equal(S.canManage('admin', true, null, r), false, 'cannot create ' + r);
+test('two-role model: only the ACTIVE admin (shared Admin / Back Office login) manages accounts; new accounts are sales_agent only', () => {
+  assert.deepEqual(S.manageableRoles('admin', true), ['sales_agent'], 'one Sales Agent choice');
+  assert.equal(S.canManage('admin', true, null, 'sales_agent'), true);
+  for (const r of ['inside_sales', 'field_sales', 'admin', 'manager', 'back_office']) assert.equal(S.canManage('admin', true, null, r), false, 'cannot create ' + r);
   assert.equal(S.canManage('admin', true, 'field_sales'), true);
-  assert.equal(S.canManage('admin', true, 'inside_sales', 'field_sales'), true, 'legacy sales profiles can be normalised');
+  assert.equal(S.canManage('admin', true, 'inside_sales', 'field_sales'), true, 'a row not yet converted is a Sales Agent');
+  assert.equal(S.canManage('admin', true, 'sales_agent', 'admin'), false, 'no promotion');
   assert.equal(S.canManage('admin', true, 'field_sales', 'admin'), false, 'no promotion');
   assert.equal(S.canManage('admin', true, 'field_sales', 'back_office'), false);
   // existing office rows: keep / reset / deactivate by the admin, never re-role
@@ -22,12 +23,12 @@ test('two-role model: only the ACTIVE admin (shared Admin / Back Office login) m
   // nobody else
   for (const actor of ['manager', 'back_office', 'inside_sales', 'field_sales', 'superuser', '', null, undefined]) {
     assert.deepEqual(S.manageableRoles(actor, true), [], String(actor));
-    for (const [t, n] of [[null, 'field_sales'], ['field_sales', null], ['inside_sales', 'field_sales'], ['admin', null], ['back_office', null]]) {
+    for (const [t, n] of [[null, 'sales_agent'], ['sales_agent', null], ['inside_sales', 'field_sales'], ['admin', null], ['back_office', null]]) {
       assert.equal(S.canManage(actor, true, t, n), false, `${actor} must not manage ${t}/${n}`);
     }
   }
   assert.deepEqual(S.manageableRoles('admin', false), [], 'an inactive admin has no rights');
-  assert.equal(S.canManage('admin', false, null, 'field_sales'), false);
+  assert.equal(S.canManage('admin', false, null, 'sales_agent'), false);
 });
 test('password reset: only the active admin; Manager, legacy Back Office and Sales Agents are refused; missing e-mail is a 404', () => {
   const admin = { actorRole: 'admin', actorActive: true, targetRole: 'field_sales', targetEmail: 'a@b.gr' };
@@ -52,7 +53,7 @@ test('edge function wiring: reset is audited, returns no link or password, and t
 });
 
 test('create validation: email, name, role, phone and temporary password strength', () => {
-  const ok = S.validateCreate({ email: ' New.User@Example.com ', full_name: 'Νέος Χρήστης', role: 'field_sales' });
+  const ok = S.validateCreate({ email: ' New.User@Example.com ', full_name: 'Νέος Χρήστης', role: 'sales_agent' });
   assert.equal(ok.ok, true); assert.equal(ok.value.email, 'new.user@example.com'); assert.equal(ok.value.mode, 'invite');
   assert.equal(S.validateCreate({ email: 'x', full_name: 'Α Β', role: 'admin' }).ok, false);
   assert.equal(S.validateCreate({ email: 'a@b.gr', full_name: 'Α Β', role: 'superuser' }).ok, false, 'role must be one of the five');

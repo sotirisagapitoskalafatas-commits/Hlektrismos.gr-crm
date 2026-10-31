@@ -39,13 +39,15 @@ async function sendEmail(db) {
 }
 const mail = { subject: 'Η προσφορά σας', text: 'Καλησπέρα σας' };
 
-test('send-email: no session 401, inactive 403, role without communications.email.send 403', async () => {
-  const f = await sendEmail(seed());
+test('send-email: no session 401, inactive 403, revoked communications.email.send 403', async () => {
+  const db = seed();
+  db.rows('crm_settings').push({ setting_key: 'role_permissions', setting_value: { sales_agent: ['crm.read.assigned'] } });
+  const f = await sendEmail(db);
   assert.equal((await f.call({ body: { ...mail, legacy_lead_id: LA } })).status, 401);
   assert.equal((await f.call({ token: 'tok-bogus', body: { ...mail, legacy_lead_id: LA } })).status, 401);
   assert.equal((await f.call({ token: 'tok-inactive', body: { ...mail, legacy_lead_id: LA } })).status, 403);
   const field = await f.call({ token: 'tok-b', body: { ...mail, legacy_lead_id: LB } });
-  assert.equal(field.status, 403, 'field_sales has no email capability by default');
+  assert.equal(field.status, 403, 'an Admin revoked it');
   assert.equal(f.smtp.length, 0, 'nothing was sent');
   f.restore();
 });

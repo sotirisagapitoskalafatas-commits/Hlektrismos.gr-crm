@@ -52,6 +52,7 @@ Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) aft
 | 25 | 22b | `phase4/21_sales_isolation_completion.sql` |
 | 26 | 23 | `phase5/19_field_sales_saved_routes.sql` |
 | 27 | 24 | `phase6/20_user_preferences.sql` |
+| 27b | 24b | `phase6/24_avatars_admin_only_read.sql` ← same window as 24: Admin-only photo read, private bucket (production has no `avatars` bucket today) |
 | 28 | 26 | `phase6/22_crm_integrations_status_invoker.sql` ← after phase6/21 (security_invoker view; advisor finding) |
 **Skipped on purpose:** already live — `phase1/03_drop_exec_sql`, `phase5/17_customer_supply_points`, `phase5/18_lead_supply_points`; superseded — `phase4/17_admin_only_staff_provisioning`, `phase4/20_backoffice_sales_agent_provisioning` (replaced by `phase6/21`).
 **Rehearsal result (local, restored production copy):** all 27 applied without error; only existing-data change = one seed row in `crm_settings` (32→33).

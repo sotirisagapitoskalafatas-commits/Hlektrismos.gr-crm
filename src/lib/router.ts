@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type Route = 'landing' | 'login' | 'reset' | 'app' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies' | 'copyright' | 'unsubscribed';
+export type Route = 'landing' | 'login' | 'reset' | 'app' | 'about' | 'services' | 'energy' | 'faq' | 'contact' | 'terms' | 'privacy' | 'cookies' | 'copyright' | 'unsubscribed' | 'offer';
 
 const PAGE_HASHES: Record<string, Route> = {
   '/login': 'login',
@@ -17,6 +17,7 @@ const PAGE_HASHES: Record<string, Route> = {
   '/cookies': 'cookies',
   '/copyright': 'copyright',
   '/unsubscribed': 'unsubscribed',
+  '/offer': 'offer',
 };
 
 export function useRoute(): [Route, (r: Route) => void] {

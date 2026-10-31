@@ -14,7 +14,7 @@ export const canReturn = (role: Role | null | undefined, c: ReturnableCase) =>
   && (RETURNABLE_STAGES as readonly string[]).includes(c.current_stage) && !c.returned_at;
 
 export const canResubmit = (role: Role | null | undefined, uid: string | null | undefined, c: ReturnableCase) =>
-  !!c.returned_at && hasAccess(role) && (role === 'admin' || role === c.return_to_team || (!!uid && c.next_action_owner_id === uid));
+  !!c.returned_at && hasAccess(role) && (role === 'admin' || role === 'sales_agent' || (!!uid && c.next_action_owner_id === uid));
 
 /** Missing signature → Field Sales (in-person step); anything else → Inside Sales (owns the customer contact). */
 export const defaultReturnTeam = (items: string[]): ReturnTeam => (items.some(i => /υπογ/i.test(i)) ? 'field_sales' : 'inside_sales');

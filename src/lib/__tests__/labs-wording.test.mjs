@@ -18,17 +18,17 @@ const labels = (role) => R.navForRole(role).flatMap((s) => s.children.map((c) =>
 
 test('labs modules are hidden by default for every role, including admin', () => {
   store.clear();
-  for (const role of ['admin', 'manager', 'inside_sales', 'field_sales', 'back_office']) {
+  for (const role of ['admin', 'manager', 'sales_agent', 'sales_agent', 'back_office']) {
     assert.deepEqual(labels(role).filter((l) => LABS.includes(l)), [], role);
   }
   assert.ok(labels('admin').includes('Διαχείριση'), 'the rest of the admin menu is unchanged');
-  assert.ok(labels('field_sales').includes('Λειτουργία Πεδίου'), 'field mode is not a labs module');
+  assert.ok(labels('sales_agent').includes('Λειτουργία Πεδίου'), 'field mode is not a labs module');
 });
 
 test('only an admin with the switch on sees them; the switch does nothing for other roles', () => {
   store.clear(); R.setLabsEnabled(true);
   assert.deepEqual(labels('admin').filter((l) => LABS.includes(l)).sort(), [...LABS].sort());
-  for (const role of ['manager', 'inside_sales', 'back_office']) assert.deepEqual(labels(role).filter((l) => LABS.includes(l)), [], role);
+  for (const role of ['manager', 'sales_agent', 'back_office']) assert.deepEqual(labels(role).filter((l) => LABS.includes(l)), [], role);
   R.setLabsEnabled(false);
   assert.equal(store.has('atlas.labs'), false);
 });
@@ -42,8 +42,8 @@ test('opening a labs page directly falls back to Αρχική unless allowed', (
   R.setLabsEnabled(true);
   assert.equal(R.labsPageAllowed('aiworkforce', 'admin'), true);
   assert.equal(R.labsPageAllowed('aiworkforce', 'manager'), false, 'a manager who sets the browser flag by hand still cannot');
-  assert.equal(R.labsPageAllowed('cases', 'field_sales'), true, 'other pages are unaffected');
-  assert.equal(R.labsPageAllowed('case', 'field_sales'), true);
+  assert.equal(R.labsPageAllowed('cases', 'sales_agent'), true, 'other pages are unaffected');
+  assert.equal(R.labsPageAllowed('case', 'sales_agent'), true);
   R.setLabsEnabled(false);
 });
 

@@ -1,113 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient, type RecordKind } from "../_shared/authz.ts";
+import { callerKey, claimOnce, rateLimited, releaseOnce, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
 import { buildHeaders, EmailSafetyError, parseRecipient, safeDisplayName, smtpDataBody } from "../_shared/email-safety.ts";
-
-// ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────
-class SmtpClient {
-  private conn: Deno.TcpConn | null = null;
-  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-  private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
-  private decoder = new TextDecoder();
-  private encoder = new TextEncoder();
-
-  async connect(host: string, port: number, secure: boolean = false) {
-    if (secure) {
-      // Direct TLS on port 465
-      this.conn = await Deno.connectTls({ hostname: host, port });
-    } else {
-      // Plain TCP, will upgrade to TLS via STARTTLS if needed
-      this.conn = await Deno.connect({ hostname: host, port });
-    }
-    const streams = this.conn.readable.tee();
-    this.reader = streams[0].getReader();
-    this.writer = this.conn.writable.getWriter();
-    const banner = await this.read();
-    if (!banner.startsWith("220")) throw new Error(`SMTP banner: ${banner}`);
-    return banner;
-  }
-
-  private async read(): Promise<string> {
-    const chunks: string[] = [];
-    while (true) {
-      const { value, done } = await this.reader!.read();
-      if (done) break;
-      chunks.push(this.decoder.decode(value));
-      const assembled = chunks.join("");
-      if (assembled.includes("\r\n")) break; // line received
-    }
-    return chunks.join("").replace(/\r\n$/, "");
-  }
-
-  private async write(cmd: string): Promise<void> {
-    await this.writer!.write(this.encoder.encode(cmd + "\r\n"));
-  }
-
-  async ehlo(domain: string) {
-    await this.write(`EHLO ${domain}`);
-    return await this.read();
-  }
-
-  async startTls(host: string) {
-    await this.write("STARTTLS");
-    const resp = await this.read();
-    if (!resp.startsWith("220")) throw new Error(`STARTTLS failed: ${resp}`);
-
-    // Upgrade to TLS
-    const transport = this.conn as unknown as { rid: number };
-    const tlsConn = await Deno.connectTls({ hostname: host, transport: { rid: transport.rid } as any });
-
-    // Re-create streams over TLS
-    const streams = tlsConn.readable.tee();
-    this.reader = streams[0].getReader();
-    this.writer = tlsConn.writable.getWriter();
-    this.conn = tlsConn;
-
-    return resp;
-  }
-
-  async auth(user: string, pass: string) {
-    const authString = btoa(`${user}:${pass}`);
-    await this.write(`AUTH PLAIN ${authString}`);
-    const resp = await this.read();
-    if (!resp.startsWith("235")) throw new Error(`AUTH failed: ${resp}`);
-    return resp;
-  }
-
-  async mail(from: string) {
-    await this.write(`MAIL FROM:<${from}>`);
-    const resp = await this.read();
-    if (!resp.startsWith("250")) throw new Error(`MAIL FROM failed: ${resp}`);
-    return resp;
-  }
-
-  async rcpt(to: string) {
-    await this.write(`RCPT TO:<${to}>`);
-    const resp = await this.read();
-    if (!resp.startsWith("250")) throw new Error(`RCPT TO failed: ${resp}`);
-    return resp;
-  }
-
-  async data(headers: string, body: string) {
-    await this.write("DATA");
-    const resp = await this.read();
-    if (!resp.startsWith("354")) throw new Error(`DATA failed: ${resp}`);
-
-    // Blank line between header block and body; CRLF + dot-stuffing so a "." line cannot end DATA early.
-    await this.write(smtpDataBody(headers + "\r\n\r\n" + body) + "\r\n.");
-    const endResp = await this.read();
-    if (!endResp.startsWith("250")) throw new Error(`DATA send failed: ${endResp}`);
-    return endResp;
-  }
-
-  async quit() {
-    try { await this.write("QUIT"); } catch { /* ignore */ }
-    try { this.reader?.cancel(); } catch { /* ignore */ }
-    try { this.writer?.close(); } catch { /* ignore */ }
-    try { this.conn?.close(); } catch { /* ignore */ }
-  }
-}
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
+import { emailObjection } from "../_shared/outreach-gate.ts";
+import { supabaseLoaders } from "../_shared/outreach-loaders.ts";
+import { openSecureSmtp, SmtpSecurityError } from "../_shared/smtp.ts";
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -139,6 +40,11 @@ Deno.serve(async (req) => {
   if (caller instanceof Response) return caller;
   const noCap = requireCapability(caller, "communications.email.send");
   if (noCap) return noCap;
+  if (rateLimited(`send-email:${callerKey(caller)}`, 30, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
+  const limits = outreachLimitsFromEnv();
+  if (!limits) return json(LIMITS_NOT_SET.status, { error: LIMITS_NOT_SET.error });
+  const overQuota = await admitRequest(adminClient, callerKey(caller), "email_direct", limits);
+  if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
   try {
     const payload = await req.json().catch(() => null);
@@ -156,12 +62,17 @@ Deno.serve(async (req) => {
     const refs = RECORD_FIELDS.filter(([field]) => payload[field] !== undefined && payload[field] !== null && payload[field] !== "");
     if (refs.length > 1) return json(400, { error: "Reference at most one record" });
     let recipient: string;
+    let recipientPhone: string | null = null; // an objection may be on the phone number: a spoken refusal is
+    let recordCustomer: string | null = null;
     if (refs.length === 1) {
       const [field, kind] = refs[0];
       const owned = await authorizeRecord(adminClient, caller, kind, payload[field], "communications.email.send");
       if (owned instanceof Response) return owned;
-      const stored = await loadRecordEmail(adminClient, kind, owned);
+      const contact = await loadRecordEmail(adminClient, kind, owned);
+      const stored = contact?.email;
       if (!stored) return json(422, { error: "The record has no valid email address" });
+      recipientPhone = contact.phone;
+      if (kind === "customer" || kind === "case") recordCustomer = String(kind === "case" ? owned.customer_id : owned.id);
       if (to !== undefined && to !== null && to !== "") {
         let requested = "";
         try { requested = parseRecipient(to); } catch { /* treated as a mismatch */ }
@@ -200,7 +111,11 @@ Deno.serve(async (req) => {
       return json(400, { error: "Sender address is not configured correctly. Go to Settings → Email." });
     }
     const fromLabel = safeDisplayName(from_name, safeDisplayName(cfg.from_name, "Hlektrismos.gr"));
-    const useTls = smtpPort === 465;
+
+    // A recorded «δεν θέλω επικοινωνία» stops this mail too. Unreadable objections stop it as well: refusal is the safe answer.
+    const objection = await emailObjection(supabaseLoaders(adminClient), recipient, recipientPhone, transactional === true ? "transactional" : "promotional");
+    if (objection === "unknown") return json(503, { error: "Objections cannot be checked right now. Nothing was sent." });
+    if (objection === "objected") return json(409, { error: "This person has asked not to be contacted." });
 
     // Commercial-email compliance (skipped only for explicit transactional mail).
     let outHtml: string | undefined = html;
@@ -253,50 +168,48 @@ Deno.serve(async (req) => {
       `--${boundary}--`,
     ].join("\r\n");
 
-    // Send via SMTP
-    const client = new SmtpClient();
+    // A double click or a retry of the same mail to the same person inside ten minutes stops here.
+    const onceKey = `send-once:email_direct:${await textHash(recipient, subject, mimeText)}`;
+    const once = await claimOnce(adminClient, onceKey, 600);
+    if (once) return json(once.status === 429 ? 409 : once.status, { error: "This email was just sent." });
+    const over = await reserveMessage(adminClient, callerKey(caller), "email_direct", { email: recipient }, limits);
+    if (over) return json(over.status, { error: over.error });
+    const [recordField, recordKind] = refs[0] ?? [];
+    const entry = {
+      action: "email_direct" as const, actor: caller, contact: { email: recipient },
+      lead_id: recordKind === "lead" || recordKind === "legacy_lead" ? String(payload[recordField as string]) : null,
+      customer_id: recordCustomer,
+    };
+    if (!(await logAttempt(adminClient, entry))) return json(500, { error: "Email could not be recorded" });
+
+    // Send via SMTP: TLS or nothing (smtp.ts). The session opens before the password or the message is written.
+    let client: Awaited<ReturnType<typeof openSecureSmtp>> | null = null;
     try {
-      await client.connect(smtpHost, smtpPort, useTls);
-      await client.ehlo("hlektrismos.gr");
-
-      // Try STARTTLS if not already TLS and server supports it
-      if (!useTls) {
-        try {
-          await client.startTls(smtpHost);
-          await client.ehlo("hlektrismos.gr");
-        } catch {
-          // Server doesn't support STARTTLS, continue in plain
-        }
-      }
-
+      client = await openSecureSmtp(smtpHost, smtpPort, "hlektrismos.gr");
       if (smtpUser && smtpPass) {
         await client.auth(smtpUser, smtpPass);
       }
 
       await client.mail(fromEmail);
       await client.rcpt(recipient);
-      await client.data(headers, body);
+      await client.data(smtpDataBody(headers + "\r\n\r\n" + body));
+    } catch (sendErr) {
+      await logResult(adminClient, entry, "failed");
+      if (sendErr instanceof SmtpSecurityError) await releaseOnce(adminClient, onceKey); // refused before anything was written, so a retry is not a duplicate
+      throw sendErr;
     } finally {
-      await client.quit();
+      await client?.quit();
     }
-
-    // Log email in crm_settings audit (optional)
-    await adminClient.from("crm_settings").upsert({
-      setting_key: "email_log_last",
-      setting_value: {
-        to: [recipient],
-        subject,
-        sent_at: new Date().toISOString(),
-        sent_by: caller.kind === "user" ? caller.id : "service",
-      },
-      category: "communications",
-      description: "Last email sent log",
-    }, { onConflict: "setting_key" });
+    await logResult(adminClient, entry, "sent");
 
     return json(200, { success: true, message: `Email sent to ${recipient}` });
   } catch (err) {
     if (err instanceof EmailSafetyError) {
       return json(400, { error: err.message });
+    }
+    if (err instanceof SmtpSecurityError) {
+      console.error("send-email refused: no TLS");
+      return json(502, { error: "The mail server does not offer a secure connection. Nothing was sent." });
     }
     // No recipient / SMTP transcript in logs or responses.
     console.error("send-email error:", err instanceof Error ? err.name : "unknown");
@@ -307,14 +220,14 @@ Deno.serve(async (req) => {
 /** The address stored on the authorised record (normalised), or null when missing/invalid. */
 async function loadRecordEmail(
   admin: ReturnType<typeof serviceClient>, kind: RecordKind, owned: Record<string, unknown>,
-): Promise<string | null> {
+): Promise<{ email: string; phone: string | null } | null> {
   const table = { lead: "leads", legacy_lead: "hlektrismos_leads", customer: "customers", case: "customers" }[kind];
   // A case has no address of its own: use its customer's.
   const id = kind === "case" ? owned.customer_id : owned.id;
   if (typeof id !== "string" || !id) return null;
-  const { data } = await admin.from(table).select("email").eq("id", id).maybeSingle();
+  const { data } = await admin.from(table).select("email, phone, deleted_at").eq("id", id).maybeSingle();
   try {
-    return data?.email ? parseRecipient(data.email) : null;
+    return data?.email && !data.deleted_at ? { email: parseRecipient(data.email), phone: data.phone ?? null } : null;
   } catch {
     return null;
   }

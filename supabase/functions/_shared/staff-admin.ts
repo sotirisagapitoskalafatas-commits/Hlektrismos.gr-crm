@@ -1,22 +1,19 @@
-// Staff administration decisions (pure, unit-tested). TWO-ROLE MODEL:
-//   • «Admin / Back Office» = the single shared office login, stored as role `admin`. Only it may create, edit,
-//     activate, deactivate, reset or delete Sales Agent accounts.
-//   • «Sales Agent» = individual logins, stored as `field_sales` for every new account (the legacy `inside_sales` value
-//     is kept for existing rows and is the same group). Sales Agents provision and manage nobody.
-//   • `manager` and `back_office` are LEGACY values: never creatable, never assignable, and they have NO account-management
-//     rights. An existing legacy row can only be kept, reset or deactivated by the Admin.
-// The database (phase6/21 staff_admin_can) enforces the same matrix; this module guards the Auth Admin API actions.
+// Staff administration decisions (pure, unit-tested). EXACTLY TWO ACCOUNT TYPES:
+//   • `admin` = «Admin / Back Office», the single shared office login. Only it may create, edit, activate, deactivate,
+//     reset or delete Sales Agent accounts.
+//   • `sales_agent` = «Sales Agent», individual logins. Sales Agents provision and manage nobody.
+// A row still stored as field_sales / inside_sales (before phase6/25) is read as a Sales Agent. No other role can be created or assigned.
+import { normalizeRole } from "./permissions.ts";
 
-export const STAFF_ROLES = ["admin", "manager", "inside_sales", "field_sales", "back_office"] as const;
+// The database (phase6/25 staff_admin_can) enforces the same matrix; this module guards the Auth Admin API actions.
+
+export const STAFF_ROLES = ["admin", "sales_agent"] as const;
 export type StaffRole = typeof STAFF_ROLES[number];
-const SALES_AGENT_ROLES: StaffRole[] = ["field_sales", "inside_sales"];
-const LEGACY_OFFICE_ROLES: StaffRole[] = ["manager", "back_office"];
 
 /** The only role a new account can be given. */
-export const CREATEABLE_SALES_ROLES: readonly StaffRole[] = ["field_sales"];
+export const CREATEABLE_SALES_ROLES: readonly StaffRole[] = ["sales_agent"];
 
-/** inside_sales and field_sales are one effective Sales Agent group. */
-export const isSalesAgentRole = (r: unknown): r is StaffRole => typeof r === "string" && SALES_AGENT_ROLES.includes(r as StaffRole);
+export const isSalesAgentRole = (r: unknown): boolean => typeof r === "string" && normalizeRole(r) === "sales_agent";
 
 export const isStaffRole = (r: unknown): r is StaffRole => typeof r === "string" && (STAFF_ROLES as readonly string[]).includes(r);
 
@@ -29,14 +26,13 @@ export function manageableRoles(actorRole: string | null | undefined, actorActiv
 }
 
 /** Authorization matrix used by the Auth Admin API (mirrored by public.staff_admin_can).
- * Create (targetRole null): newRole must be `field_sales`. Edit a Sales Agent: stays in the Sales Agent group.
- * The Admin can keep/reset/deactivate existing office rows but never create or promote one (no role change). */
+ * Create (targetRole null): newRole must be `sales_agent`. Edit a Sales Agent: stays a Sales Agent.
+ * The Admin can keep, reset or deactivate its own row and leftover rows of other kinds, but never create or promote one. */
 export function canManage(actorRole: string | null | undefined, actorActive: boolean, targetRole: string | null, newRole: string | null = null): boolean {
   if (!isAccountAdmin(actorRole, actorActive)) return false;
-  if (targetRole == null) return newRole === "field_sales";
+  if (targetRole == null) return newRole === "sales_agent";
   if (isSalesAgentRole(targetRole)) return newRole == null || isSalesAgentRole(newRole);
-  if (targetRole === "admin" || LEGACY_OFFICE_ROLES.includes(targetRole as StaffRole)) return newRole == null || newRole === targetRole;
-  return false;
+  return newRole == null || newRole === targetRole;
 }
 
 /** Decision for «send a password-reset e-mail»: only active office accounts may reset permitted targets. */

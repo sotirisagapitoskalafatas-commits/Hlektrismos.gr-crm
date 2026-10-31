@@ -162,8 +162,8 @@ export function StageChangeDialog({ c, stage, role, onClose, onDone }: {
   );
 }
 
-// Who can be handed a case per team: the office team is the shared Admin / Back Office login; both sales roles are one Sales Agent group.
-const TEAM_ROLES: Record<Team, Role[]> = { inside_sales: ['inside_sales', 'field_sales'], field_sales: ['inside_sales', 'field_sales'], back_office: ['admin'] };
+// Who can be handed a case per kind of work: the office work goes to the shared Admin / Back Office login, sales and field work to a Sales Agent.
+const TEAM_ROLES: Record<Team, Role[]> = { inside_sales: ['sales_agent'], field_sales: ['sales_agent'], back_office: ['admin'] };
 const TEAM_FIELD: Record<Team, 'inside_sales_owner' | 'field_sales_owner' | 'back_office_owner'> = {
   inside_sales: 'inside_sales_owner', field_sales: 'field_sales_owner', back_office: 'back_office_owner',
 };

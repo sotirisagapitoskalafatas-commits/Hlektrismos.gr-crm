@@ -1,6 +1,6 @@
 // «Προσαρμογή CRM»: Προφίλ (account), Εμφάνιση (preferences) and Αρχική σελίδα (homelayout) share this page;
 // the settings sidebar picks the section. Everything the old Account and Preferences pages offered is kept.
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, FlaskConical, LayoutDashboard, LogOut, Mail, Navigation, Phone as PhoneIcon, RotateCcw, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
@@ -11,7 +11,7 @@ import { THEMES } from '@/lib/theme';
 import { HOME_EDIT_FLAG } from '@/lib/home-widgets';
 import { usePreferences } from '@/lib/preferences';
 import { supabase } from '@/lib/supabase';
-import { looksLikeEmail } from '@/lib/password-rules';
+import { EMAIL_CHANGE_TEXT, readIdentity, requestEmailChange } from '@/lib/email-change';
 import { checkAvatarFile, cropToAvatarBlob, forgetAvatar, removeAvatar, uploadAvatar } from '@/lib/avatar';
 import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
 import type { NavigationApp } from '@/lib/navigation/external-maps';
@@ -51,22 +51,49 @@ function EmailChangeCard({ current }: { current: string }) {
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  // What the Auth server says right now: the ACTIVE address, and a change that still waits for confirmation (never shown as active).
+  const [identity, setIdentity] = useState<{ email: string; pendingEmail: string | null } | null>(null);
+  const { refreshProfile } = useAuth();
+  const activeEmail = identity?.email ?? current;
+
+  const reread = useCallback(async () => {
+    if (!supabase) return;
+    const found = await readIdentity(supabase.auth);
+    if (!found) return;
+    setIdentity((prev) => {
+      // A confirmed change: the active address moved. Refresh the session so the signed-in user and the profile follow it.
+      if (prev && prev.email.toLowerCase() !== found.email.toLowerCase()) void supabase.auth.refreshSession().then(() => refreshProfile());
+      return { email: found.email, pendingEmail: found.pendingEmail };
+    });
+  }, [refreshProfile]);
+  // On open, and whenever the tab regains focus (the confirmation link is opened in another tab or on a phone).
+  useEffect(() => {
+    void reread();
+    const onFocus = () => void reread();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); };
+  }, [reread]);
+
   const submit = async () => {
     setMsg(null);
-    if (!looksLikeEmail(next)) { setMsg({ tone: 'err', text: 'Συμπληρώστε μια έγκυρη διεύθυνση email.' }); return; }
-    if (next.trim().toLowerCase() === current.toLowerCase()) { setMsg({ tone: 'err', text: 'Η νέα διεύθυνση είναι ίδια με την τρέχουσα.' }); return; }
     if (!supabase) return;
     setBusy(true);
-    const { error } = await supabase.auth.updateUser({ email: next.trim() }, { emailRedirectTo: `${window.location.origin}/` });
+    const outcome = await requestEmailChange(supabase.auth, activeEmail, next);
     setBusy(false);
-    setMsg(error
-      ? { tone: 'err', text: 'Η αλλαγή δεν ξεκίνησε. Ελέγξτε τη διεύθυνση ή δοκιμάστε αργότερα.' }
-      : { tone: 'ok', text: 'Στείλαμε email επιβεβαίωσης. Ανοίξτε τον σύνδεσμο (ίσως και στην τρέχουσα διεύθυνση) για να ολοκληρωθεί η αλλαγή. Μέχρι τότε συνδέεστε με την τρέχουσα διεύθυνση.' });
+    setMsg(EMAIL_CHANGE_TEXT[outcome]);
+    if (outcome === 'pending') { setNext(''); void reread(); }
   };
   return (
     <Card>
       <CardHeader micro="Μόνο για τον λογαριασμό Admin / Back Office" title="Αλλαγή email του λογαριασμού" className="mb-3" />
-      <p className="text-xs text-ink/55 mb-3">Για παράδοση στο επίσημο email της εταιρείας. Ο λογαριασμός, το ιστορικό και οι αναθέσεις μένουν ίδια — αλλάζει μόνο η διεύθυνση σύνδεσης.</p>
+      <p className="text-sm mb-1">Τρέχον email σύνδεσης: <strong data-testid="active-email">{activeEmail}</strong></p>
+      {identity?.pendingEmail && (
+        <p className="text-xs mb-2 text-warn-600" role="status" data-testid="pending-email">
+          Σε αναμονή επιβεβαίωσης: <strong>{identity.pendingEmail}</strong>. Δεν είναι ακόμη ενεργή: η σύνδεση γίνεται με την τρέχουσα διεύθυνση μέχρι να επιβεβαιωθεί η αλλαγή.
+        </p>
+      )}
+      <p className="text-xs text-ink/55 mb-3">Για παράδοση στο επίσημο email της εταιρείας. Ο λογαριασμός, το ιστορικό και οι αναθέσεις παραμένουν ίδια: αλλάζει μόνο η διεύθυνση σύνδεσης. Θα σταλεί email επιβεβαίωσης και η αλλαγή ισχύει μόνο μετά την επιβεβαίωση.</p>
       <div className="flex flex-col sm:flex-row gap-2">
         <input type="email" className="field flex-1" value={next} onChange={(e) => setNext(e.target.value)} placeholder="νέο.email@εταιρεία.gr" aria-label="Νέο email" autoComplete="off" />
         <Btn onClick={() => void submit()} disabled={busy || !next.trim()}>{busy ? 'Αποστολή…' : 'Αποστολή επιβεβαίωσης'}</Btn>

@@ -536,6 +536,11 @@ test('only service_role reaches the functions; anon and a non-admin read nothing
     await assert.rejects(() => pg.query(`select public.offer_note_legacy_link($1, $2, 'unsigned', false)`, [LEAD, TARIFF]), /permission denied/, role);
     await assert.rejects(() => pg.query('insert into public.offers (lead_id, tariff_id, purpose, provider_name, program_name, expires_at) values ($1, $2, $3, $4, $5, now())', [LEAD, TARIFF, 'promotional', 'a', 'b']), /permission denied/, role);
   }
+  await as(null);
+  const signatures = ['offer_create(uuid,uuid,timestamptz,text,numeric,numeric,uuid)', 'offer_record_delivery(uuid,text,boolean,integer,uuid)', 'offer_mark_sent(uuid,text[],uuid)', 'offer_mark_failed(uuid,uuid)', 'offer_accept(uuid,uuid)', 'offer_note_legacy_link(uuid,uuid,text,boolean)'];
+  for (const sig of signatures) for (const role of ['anon', 'authenticated']) {
+    assert.equal((await pg.query(`select has_function_privilege($1, $2, 'EXECUTE') x`, [role, `public.${sig}`])).rows[0].x, false, `${role} ${sig}`);
+  }
   await as('anon');
   await assert.rejects(() => pg.query('select * from public.offers'), /permission denied/);
   await as('authenticated');

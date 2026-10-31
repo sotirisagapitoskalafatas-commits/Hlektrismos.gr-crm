@@ -142,7 +142,7 @@ begin
   -- Lead first, then offer: the order offer_create and offer_accept use, so these cannot deadlock each other.
   perform 1 from public.hlektrismos_leads where id = v_lead for update;
   select * into o from public.offers where id = p_offer_id for update;
-  if o.status <> 'created' then return false; end if;
+  if not found or o.status <> 'created' then return false; end if; -- the row may have gone between the two selects
   update public.offers set status = 'sent', sent_at = now() where id = p_offer_id;
   -- A lead closed while the message was going out stays closed.
   update public.hlektrismos_leads set status = 'follow_up', last_contact_at = now() where id = o.lead_id and status not in ('customer', 'lost', 'unsubscribed', 'do_not_contact');
@@ -159,8 +159,14 @@ end $$;
 -- Nothing was delivered: no status change on the lead, no task, and a retry may create a new offer at once.
 create or replace function public.offer_mark_failed(p_offer_id uuid, p_actor_id uuid)
 returns boolean language plpgsql security invoker set search_path = public as $$
-declare v_replaces uuid;
+declare
+  v_replaces uuid;
+  v_lead uuid;
 begin
+  select lead_id into v_lead from public.offers where id = p_offer_id;
+  if not found then return false; end if;
+  -- Lead first, then offer: the order offer_create, offer_mark_sent and offer_accept use, so a failure cannot interleave with an acceptance.
+  perform 1 from public.hlektrismos_leads where id = v_lead for update;
   update public.offers set status = 'failed', closed_at = now() where id = p_offer_id and status = 'created' returning replaces into v_replaces;
   if not found then return false; end if;
   insert into public.offer_events (offer_id, event, actor_id) values (p_offer_id, 'failed', p_actor_id);

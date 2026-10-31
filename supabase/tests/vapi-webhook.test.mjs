@@ -211,6 +211,15 @@ test('a soft-deleted lead is not updated and gets no note, but the call closes a
   f.restore();
 });
 
+test('a refusal that could not be recorded for a lead in the Trash is answered 5xx and the call stays open, so Vapi retries', async () => {
+  const database = db({ deleted_at: '2026-10-29T00:00:00Z' });
+  database.rpc = { record_spoken_objection: async () => ({ data: null, error: { message: 'down' } }) };
+  const f = await load(database);
+  assert.equal((await f.call({ body: fixture('spoken-opt-out'), headers: h })).status, 503);
+  assert.equal(f.db.rows('voice_calls')[0].status, 'ringing');
+  f.restore();
+});
+
 test('a passing fault is retried once; the note reports a pause only if the pause happened', async () => {
   let calls = 0;
   const database = db();

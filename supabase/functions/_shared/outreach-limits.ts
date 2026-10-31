@@ -86,6 +86,17 @@ export async function reserveMessage(
   admin: RpcClient, callerId: string, action: OutboundAction, contact: { phone?: string | null; email?: string | null }, limits: OutreachLimits,
 ): Promise<Refusal | null> {
   const a = limits.actions[action];
+  // The public confirmation has no signed-in caller: shared "caller" and organisation counters would let one visitor starve every customer. It is limited
+  // per person only, in a bucket of its own, so it cannot use up the limit that staff mail to the same person depends on.
+  if (action === "email_confirmation") {
+    const key = emailKey(contact.email);
+    if (!key) return { status: 400, error: "No contact address for this person.", scope: "contact" };
+    const h = await contactHash(key);
+    return consume(admin, [
+      { bucket: `contact:ec:${h}:h`, limit: limits.contact.email.perHour, window_seconds: HOUR },
+      { bucket: `contact:ec:${h}:d`, limit: limits.contact.email.perDay, window_seconds: DAY },
+    ]);
+  }
   const items: Item[] = [
     { bucket: `user:${callerId}:${action}:h`, limit: a.messagesPerHour, window_seconds: HOUR },
     { bucket: `user:${callerId}:${action}:d`, limit: a.messagesPerDay, window_seconds: DAY },

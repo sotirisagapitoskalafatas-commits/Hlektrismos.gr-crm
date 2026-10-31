@@ -188,6 +188,41 @@ test('a failed resend gives the customer back the working link', async () => {
   a.restore();
 });
 
+test('offer_mark_sent and offer_mark_failed on an offer that does not exist return false and change nothing', async () => {
+  const ghost = 'dddddddd-0000-4000-8000-0000000000ff';
+  const before = (await one('select count(*)::int n from public.crm_tasks'))[0].n;
+  await as('service_role');
+  assert.equal((await pg.query('select public.offer_mark_sent($1, $2, null) r', [ghost, ['email']])).rows[0].r, false);
+  assert.equal((await pg.query('select public.offer_mark_failed($1, null) r', [ghost])).rows[0].r, false);
+  assert.equal((await one('select count(*)::int n from public.crm_tasks'))[0].n, before);
+});
+
+test('lock order: the lead is locked before any offer row in create, mark_sent, mark_failed and accept, so they cannot deadlock each other', async () => {
+  await as(null);
+  for (const fn of ['offer_create', 'offer_mark_sent', 'offer_mark_failed', 'offer_accept']) {
+    const body = (await pg.query(`select pg_get_functiondef(p.oid) d from pg_proc p where p.proname = $1`, [fn])).rows[0].d.toLowerCase();
+    const leadLock = body.search(/from public.hlektrismos_leads where id = [a-z_]+ for update/);
+    const offerLock = body.search(/from public.offers where [^;]*for update/);
+    assert.ok(leadLock >= 0, `${fn} locks the lead`);
+    assert.ok(offerLock < 0 || leadLock < offerLock, `${fn} locks the lead before the offer`);
+  }
+});
+
+test('a failed resend restores the earlier offer and leaves the lead as it was, even if the lead was closed meanwhile', async () => {
+  const old = await seeded();
+  await one(`update public.offers set sent_at = now() where id = $1`, [old]);
+  await as('service_role');
+  const created = (await pg.query(`select public.offer_create($1, $2, now() + interval '5 days', 'promotional', 1, 1, null) r`, [LEAD, TARIFF])).rows[0].r;
+  assert.equal(created.state, 'open', 'inside ten minutes it is a double click, not a replacement');
+  await one(`update public.offers set created_at = '2020-01-01' where id = $1`, [old]);
+  await as('service_role');
+  const fresh = (await pg.query(`select public.offer_create($1, $2, now() + interval '5 days', 'promotional', 1, 1, null) r`, [LEAD, TARIFF])).rows[0].r;
+  assert.equal(fresh.state, 'created');
+  assert.equal(await status(old), 'superseded');
+  assert.equal((await pg.query('select public.offer_mark_failed($1, null) r', [fresh.offer_id])).rows[0].r, true);
+  assert.equal(await status(old), 'sent');
+});
+
 test('a lead closed while the offer was going out stays closed', async () => {
   const id = await seeded({ state: 'created' });
   await one(`update public.hlektrismos_leads set status = 'lost' where id = $1`, [LEAD]);

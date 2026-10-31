@@ -61,12 +61,16 @@ declare
   v_role text := public.contact_role();
   v_lead uuid;
 begin
-  select lead_id into v_lead from public.contact_service_requests where id = p_id and withdrawn_at is null;
-  if not found then return false; end if;
-  if v_role is null or (v_role <> 'admin' and not exists (select 1 from public.hlektrismos_leads l where l.id = v_lead and l.assigned_to = auth.uid())) then
+  if v_role is null then
     raise exception 'withdraw_service_request: not allowed' using errcode = '42501';
   end if;
-  update public.contact_service_requests set withdrawn_at = now() where id = p_id;
+  select lead_id into v_lead from public.contact_service_requests where id = p_id;
+  -- Authorization comes before any answer about the request: an agent who does not own the lead gets the same refusal whether or not the id exists.
+  if v_role <> 'admin' and not (v_lead is not null and exists (select 1 from public.hlektrismos_leads l where l.id = v_lead and l.assigned_to = auth.uid())) then
+    raise exception 'withdraw_service_request: not allowed' using errcode = '42501';
+  end if;
+  update public.contact_service_requests set withdrawn_at = now() where id = p_id and withdrawn_at is null;
+  if not found then return false; end if;
   perform public.contact_log('contact_service_request_withdrawn', v_lead, null, jsonb_build_object('request', p_id));
   return true;
 end $$;

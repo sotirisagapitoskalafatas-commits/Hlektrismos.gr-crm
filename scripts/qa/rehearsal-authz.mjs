@@ -38,20 +38,21 @@ export const TABLES = {
   crm_settings: { admin: 'rows', sales: 'none', inactive: 'none', legacy: 'none', anon: 'none' },
 };
 // Edge Functions: [name, who may reach the function's own logic]. 'staff' = Admin + both Sales Agents; 'admin' = Admin only;
-// 'public' = anyone; 'secret' = only a caller holding the function's own secret (never one of the test users).
+// 'public' = anyone or answered by its own token / body check; 'secret' = only a caller holding the function's own secret (never a test user).
+// These match the default capability table in _shared/permissions.ts.
 export const FUNCTIONS = [
-  ['admin-users', 'admin'], ['scrape-b2b', 'admin+inside'], ['aade-lookup', 'staff'], ['ask-market-rag', 'staff'], ['billing-ocr', 'staff'],
-  ['enrich-lead', 'staff'], ['fetch-emails', 'staff'], ['generate-embedding', 'staff'], ['make-voice-call', 'staff'], ['scrape-program-details', 'staff'],
-  ['send-campaign-email', 'staff'], ['send-email', 'staff'], ['send-offer', 'staff'], ['send-sms', 'staff'], ['sync-market-tariffs', 'staff'],
+  ['admin-users', 'public'], ['scrape-b2b', 'admin+inside'], ['aade-lookup', 'staff'], ['ask-market-rag', 'staff'], ['billing-ocr', 'staff'],
+  ['enrich-lead', 'staff'], ['fetch-emails', 'admin'], ['generate-embedding', 'staff'], ['make-voice-call', 'admin'], ['scrape-program-details', 'staff'],
+  ['send-campaign-email', 'admin'], ['send-email', 'admin+inside'], ['send-offer', 'admin+inside'], ['send-sms', 'admin'], ['sync-market-tariffs', 'staff'],
   ['ai-developer', 'staff'], ['ai-orchestrator', 'staff'], ['agent-worker', 'staff'], ['orchestrator', 'staff'], ['autonomous-tariff-scraper', 'staff'],
-  ['sync-green-tariffs', 'staff'], ['campaign-scheduler', 'secret'], ['vapi-webhook', 'secret'], ['receive-lead-webhook', 'secret'], ['accept-offer', 'secret'],
+  ['sync-green-tariffs', 'staff'], ['campaign-scheduler', 'admin'], ['vapi-webhook', 'secret'], ['receive-lead-webhook', 'secret'], ['accept-offer', 'public'],
   ['chat', 'public'], ['unsubscribe', 'public'], ['send-lead-confirmation', 'public'],
 ];
 export const CALLERS = ['anon', 'admin', 'inside', 'fieldA', 'inactive', 'manager', 'legacyBo'];
 
 // Functions that start work (campaigns, tariff syncs, scrapers, workers) without needing a request body. They are only exercised with
 // --include-work-functions, because an older, unguarded version would run when called, whoever the caller is.
-export const WORK_FUNCTIONS = new Set(['campaign-scheduler', 'sync-green-tariffs', 'sync-market-tariffs', 'autonomous-tariff-scraper', 'agent-worker', 'ai-orchestrator', 'orchestrator', 'ai-developer', 'scrape-program-details', 'enrich-lead', 'billing-ocr']);
+export const WORK_FUNCTIONS = new Set(['fetch-emails', 'campaign-scheduler', 'sync-green-tariffs', 'sync-market-tariffs', 'autonomous-tariff-scraper', 'agent-worker', 'ai-orchestrator', 'orchestrator', 'ai-developer', 'scrape-program-details', 'enrich-lead', 'billing-ocr']);
 
 /** The project this checkout is linked to (supabase db query --linked targets it), or null. */
 export function linkedRef(dir = process.cwd()) {
@@ -100,8 +101,12 @@ async function run() {
   const sql = (text) => {
     const f = join(workdir, `q-${randomBytes(3).toString('hex')}.sql`); writeFileSync(f, text);
     const r = cli(['db', 'query', '--linked', '-o', 'json', '-f', f]); rmSync(f, { force: true });
-    const i = r.out.indexOf('{'), j = r.out.lastIndexOf('}');
-    try { return JSON.parse(r.out.slice(i, j + 1)).rows ?? []; } catch { return []; }
+    // Any failure stops the run: an empty answer must never look like "nothing there".
+    if (r.code !== 0) throw new Error('sql failed');
+    const open = r.out.search(/[[{]/), close = Math.max(r.out.lastIndexOf('}'), r.out.lastIndexOf(']'));
+    if (open < 0) return [];
+    const parsed = JSON.parse(r.out.slice(open, close + 1));
+    return Array.isArray(parsed) ? parsed : parsed.rows ?? [];
   };
   // the project must be the one linked in this checkout: fail rather than touch another database
   const linked = cli(['projects', 'list', '-o', 'json']).out;
@@ -124,6 +129,7 @@ async function run() {
     // Legacy profiles can only be seeded while the trigger that forbids new legacy roles is absent: remember its exact definition,
     // drop it for the seeding statement, and put it back in every case (see the finally block).
     const trig = sql("select pg_get_triggerdef(t.oid) def from pg_trigger t where t.tgname = 'profiles_no_new_legacy_office' and not t.tgisinternal and t.tgrelid = 'public.profiles'::regclass")[0]?.def ?? null;
+    if (!trig) throw new Error('the guard trigger could not be read: refusing to drop it');
     restoreTrigger = () => { if (trig) sql(trig.replace(/^CREATE TRIGGER/i, 'CREATE OR REPLACE TRIGGER')); };
     sql('drop trigger if exists profiles_no_new_legacy_office on public.profiles');
     const seeded = Object.values(users).map((u) => `
@@ -168,7 +174,7 @@ async function run() {
     try { restoreTrigger(); } catch { /* verified just below */ }
     // the guard trigger must exist again whatever happened above
     const trigBack = sql("select count(*)::int n from pg_trigger where tgname = 'profiles_no_new_legacy_office' and not tgisinternal")[0]?.n;
-    if (trigBack === 0) console.log('WARNING  the guard trigger profiles_no_new_legacy_office is NOT present after the run; re-apply phase6/21 on this project');
+    if (trigBack !== 1) console.log('WARNING  the guard trigger profiles_no_new_legacy_office is NOT present after the run; re-apply phase6/21 on this project');
     rmSync(workdir, { recursive: true, force: true });
   }
   const bad = results.filter((x) => !x).length;

@@ -14,6 +14,9 @@ export function badBatch(leads: unknown): { status: number; error: string } | nu
   return null;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
+
 /** The trimmed string when it is a string of min..max characters, else null. */
 export function cleanText(v: unknown, min: number, max: number): string | null {
   if (typeof v !== "string") return null;
@@ -47,9 +50,9 @@ type RpcClient = { rpc(name: string, args: Record<string, unknown>): PromiseLike
  * Shared per-caller limit. Returns null when the attempt may proceed, otherwise the status and message to answer with:
  * 429 over the limit, 503 when the counter cannot be reached (nothing is sent when the limit cannot be checked).
  */
-export async function durableLimit(admin: RpcClient, bucket: string, limit: number, windowSeconds: number): Promise<{ status: number; error: string } | null> {
+export async function durableLimit(admin: RpcClient, bucket: string, limit: number, windowSeconds: number, cost = 1): Promise<{ status: number; error: string } | null> {
   try {
-    const { data, error } = await admin.rpc("consume_rate_limit", { p_bucket: bucket, p_limit: limit, p_window_seconds: windowSeconds });
+    const { data, error } = await admin.rpc("consume_rate_limit", { p_bucket: bucket, p_limit: limit, p_window_seconds: windowSeconds, p_cost: cost });
     if (error) return { status: 503, error: "Sending is unavailable right now. Try again later." };
     return data === true ? null : { status: 429, error: "Hourly limit reached. Try again later." };
   } catch {

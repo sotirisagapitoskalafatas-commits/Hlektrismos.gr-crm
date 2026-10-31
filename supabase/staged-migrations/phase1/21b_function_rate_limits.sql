@@ -3,6 +3,7 @@
 -- The in-memory throttle in _shared/limits.ts is per function instance, so it does not bound a horizontally scaled function.
 -- This counter lives in the database, so every instance shares it, and the increment is one atomic statement.
 -- MUST be applied BEFORE the functions that call consume_rate_limit are deployed: they refuse to send (503) when it is missing.
+-- It also adds the unique index behind the atomic send claim of send-sms and send-campaign-email (without it they send nothing to a campaign).
 -- Only service_role may call it; nothing here is reachable through the API by a signed-in or anonymous user.
 -- Idempotent. Rollback: docs/ops/rollback_phase1_21b_function_rate_limits.sql
 create table if not exists public.function_rate_limits (
@@ -15,8 +16,10 @@ alter table public.function_rate_limits enable row level security;
 revoke all on table public.function_rate_limits from public, anon, authenticated;
 grant all on table public.function_rate_limits to service_role;
 
--- True when this attempt is inside the limit. Fixed window: the count resets at each window boundary.
-create or replace function public.consume_rate_limit(p_bucket text, p_limit integer, p_window_seconds integer)
+create unique index if not exists campaign_sends_campaign_lead_unique on public.campaign_sends (campaign_id, lead_id);
+
+-- True when this attempt is inside the limit. p_cost counts recipients for a batch. Fixed window: the count resets at each boundary.
+create or replace function public.consume_rate_limit(p_bucket text, p_limit integer, p_window_seconds integer, p_cost integer default 1)
 returns boolean
 language plpgsql
 security invoker
@@ -26,13 +29,13 @@ declare
   v_window timestamptz;
   v_hits integer;
 begin
-  if p_bucket is null or length(p_bucket) = 0 or length(p_bucket) > 200 or p_limit < 1 or p_window_seconds < 1 then
+  if p_bucket is null or length(p_bucket) = 0 or length(p_bucket) > 200 or p_limit < 1 or p_window_seconds < 1 or p_cost < 1 then
     raise exception 'invalid rate limit arguments';
   end if;
   v_window := to_timestamp(floor(extract(epoch from now()) / p_window_seconds) * p_window_seconds);
   insert into public.function_rate_limits as r (bucket, window_start, hits)
-  values (p_bucket, v_window, 1)
-  on conflict (bucket, window_start) do update set hits = r.hits + 1
+  values (p_bucket, v_window, p_cost)
+  on conflict (bucket, window_start) do update set hits = r.hits + p_cost
   returning hits into v_hits;
   -- opportunistic cleanup, so the table stays small without a cron job
   if random() < 0.01 then
@@ -41,5 +44,5 @@ begin
   return v_hits <= p_limit;
 end;
 $$;
-revoke all on function public.consume_rate_limit(text, integer, integer) from public, anon, authenticated;
-grant execute on function public.consume_rate_limit(text, integer, integer) to service_role;
+revoke all on function public.consume_rate_limit(text, integer, integer, integer) from public, anon, authenticated;
+grant execute on function public.consume_rate_limit(text, integer, integer, integer) to service_role;

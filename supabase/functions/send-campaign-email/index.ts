@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
-import { badBatch, callerKey, cleanText, durableLimit, rateLimited } from "../_shared/limits.ts";
+import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { assertHeaderSafe, EmailSafetyError, parseRecipient, safeDisplayName } from "../_shared/email-safety.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
@@ -39,6 +39,11 @@ serve(async (req) => {
     if (!cleanText(subject, 1, 200)) return json(400, { error: "subject must be 1-200 characters" });
     const bad = badBatch(leads);
     if (bad) return json(bad.status, { error: bad.error });
+    if (campaign_id !== undefined && campaign_id !== null && !isUuid(campaign_id)) return json(400, { error: "campaign_id must be a UUID" });
+    if (!campaign_id && (leads as unknown[]).length > 1) return json(400, { error: "A batch needs a campaign_id" });
+    // Per recipient as well: the request limit alone would allow 100 recipients on every request.
+    const overRecipients = await durableLimit(supabase, `send-campaign-email-recipients:${callerKey(caller)}`, 1000, 3600, (leads as unknown[]).length);
+    if (overRecipients) return json(overRecipients.status, { error: overRecipients.error });
 
     // Header safety: the sender address is configuration; only a sanitised display name may be chosen and the
     // Subject must not contain CR/LF (header injection). Validated once, before any recipient is processed.
@@ -92,16 +97,7 @@ serve(async (req) => {
       results.errors.push(`${d.id}: not eligible (${d.reasons.join(",")})`);
     }
 
-    // Idempotency: a lead that already has a "sent" row for this campaign is never messaged twice, so a repeated request
-    // (double click, retry, replay) cannot send duplicates.
-    const alreadySent = new Set<string>();
-    if (campaign_id) {
-      const { data: prior } = await supabase.from("campaign_sends").select("lead_id").eq("campaign_id", campaign_id).eq("status", "sent");
-      for (const p of (prior ?? []) as { lead_id: string }[]) alreadySent.add(p.lead_id);
-    }
-
     for (const lead of gate.allowed) {
-      if (alreadySent.has(lead.id)) { results.skipped++; continue; }
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;
@@ -115,6 +111,15 @@ serve(async (req) => {
         continue;
       }
 
+      // Atomic claim (unique index, phase1/21b): only one request can own this lead in this campaign. A failed claim sends nothing.
+      if (campaign_id) {
+        const { data: claim, error: claimError } = await supabase.from("campaign_sends")
+          .upsert({ campaign_id, lead_id: lead.id, status: "queued" }, { onConflict: "campaign_id,lead_id", ignoreDuplicates: true }).select("lead_id");
+        if (claimError) { results.failed++; results.errors.push(`${lead.id}: could not reserve`); continue; }
+        if (!claim || claim.length === 0) { results.skipped++; continue; }
+      }
+      const release = async () => { if (campaign_id) await supabase.from("campaign_sends").delete().eq("campaign_id", campaign_id).eq("lead_id", lead.id).eq("status", "queued"); };
+
       try {
         const personalizedHtml = html_body
           .replace(/\{\{first_name\}\}/g, lead.first_name || "")
@@ -125,6 +130,7 @@ serve(async (req) => {
 
         const prepared = await prepareMarketingEmail(supabase, lead.email, { html: personalizedHtml });
         if (prepared.suppressed) {
+          await release();
           results.failed++;
           results.errors.push(`${lead.id}: unsubscribed (suppression list)`);
           continue;
@@ -151,18 +157,13 @@ serve(async (req) => {
         });
 
         if (resendRes.ok) {
-          const data = await resendRes.json();
+          const data = await resendRes.json().catch(() => ({})); // the mail WAS sent: a bad reply body must not lose that
           results.sent++;
 
           // Update campaign_sends if campaign_id provided
           if (campaign_id && lead.id) {
-            await supabase.from("campaign_sends").upsert({
-              campaign_id,
-              lead_id: lead.id,
-              status: "sent",
-              sent_at: new Date().toISOString(),
-              external_id: data.id,
-            });
+            await supabase.from("campaign_sends").update({ status: "sent", sent_at: new Date().toISOString(), external_id: data.id })
+              .eq("campaign_id", campaign_id).eq("lead_id", lead.id);
           }
 
           // Log in lead_notes
@@ -173,6 +174,7 @@ serve(async (req) => {
             note_type: "email_campaign",
           });
         } else {
+          await release(); // nothing was sent, so a retry may try again
           await resendRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
           results.failed++;
           console.error(`[send-campaign-email] provider HTTP ${resendRes.status} for lead ${lead.id}`);

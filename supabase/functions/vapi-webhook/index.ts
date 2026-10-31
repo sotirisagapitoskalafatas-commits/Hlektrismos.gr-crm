@@ -29,11 +29,11 @@ serve(async (req) => {
   //  * an HMAC credential: signature over "{timestamp}.{body}" (SHA-256, hex) with a timestamp header for replay protection
   //    -> VAPI_HMAC_SECRET (+ _PREVIOUS); header names default to x-signature / x-timestamp and can be set to the names configured in Vapi
   //    with VAPI_HMAC_SIGNATURE_HEADER / VAPI_HMAC_TIMESTAMP_HEADER. When VAPI_HMAC_SECRET is configured the HMAC is REQUIRED
-  //    (the static header alone is then not accepted). Secrets shorter than 32 characters or visibly repetitive count as not configured.
+  //    (the static header alone is then not accepted). Secrets shorter than 32 characters or visibly repetitive are never accepted.
   // The raw body is read once: the HMAC covers its exact bytes.
   const rawBody = await req.text();
   const hmacSecrets = configuredSecrets("VAPI_HMAC_SECRET");
-  const authorized = hmacSecrets.length > 0
+  const authorized = Deno.env.get("VAPI_HMAC_SECRET") // set but weak means no usable secret: refuse, never fall back to the static header
     ? await verifyHmac(
         hmacSecrets,
         req.headers.get(Deno.env.get("VAPI_HMAC_SIGNATURE_HEADER") || "x-signature"),
@@ -80,12 +80,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, note: "no matching voice_call" }), { headers: corsHeaders });
     }
 
-    // Replay safety: a call that is already completed is final. A replayed or duplicated end-of-call event changes nothing
-    // (no second status change, no duplicate transcript note), and a late partial transcript cannot overwrite the final one.
-    if (voiceCall.status === "completed") {
-      return new Response(JSON.stringify({ ok: true, note: "already completed" }), { headers: corsHeaders });
-    }
-
     if (eventType === "end-of-call-report") {
       const started = Date.parse(m?.call?.startedAt ?? ""), ended = Date.parse(m?.call?.endedAt ?? "");
       const duration = m?.durationSeconds ?? (Number.isFinite(started) && Number.isFinite(ended) ? Math.round((ended - started) / 1000) : 0);
@@ -95,21 +89,24 @@ serve(async (req) => {
       // Determine outcome from transcript
       let outcome = "unknown";
       let sentiment = "neutral";
-      const transcriptLower = (transcript || "").toLowerCase();
+      // Only the customer's words count (the transcript alternates "AI:" and "User:"), and a refusal is checked first:
+      // "μη με ξαναπαρείτε" must not read as a callback request.
+      const said = [...(transcript || "").matchAll(/User:\s*([\s\S]*?)(?=\s*(?:AI|User|Assistant|Bot):|$)/g)].map((x) => x[1]).join(" ");
+      const transcriptLower = (said || transcript || "").toLowerCase();
 
-      if (transcriptLower.includes("ενδιαφέρον") || transcriptLower.includes("προσφορά") || transcriptLower.includes("email") || transcriptLower.includes("ραντεβού")) {
-        outcome = "interested";
-        sentiment = "positive";
-      } else if (transcriptLower.includes("δεν με ενδιαφέρει") || transcriptLower.includes("όχι") || transcriptLower.includes("αρκεί")) {
+      if (transcriptLower.includes("μη με ξαναπαρ") || transcriptLower.includes("δεν με ενδιαφέρει") || transcriptLower.includes("όχι") || transcriptLower.includes("αρκεί")) {
         outcome = "not_interested";
         sentiment = "negative";
+      } else if (transcriptLower.includes("ενδιαφέρον") || transcriptLower.includes("προσφορά") || transcriptLower.includes("email") || transcriptLower.includes("ραντεβού")) {
+        outcome = "interested";
+        sentiment = "positive";
       } else if (transcriptLower.includes("τηλέφωνο") || transcriptLower.includes("ξαναπαρείτε") || transcriptLower.includes("αργότερα")) {
         outcome = "callback_requested";
       } else if (duration < 5) {
         outcome = "no_answer";
       }
 
-      await supabase
+      const { data: claimed, error: claimError } = await supabase
         .from("voice_calls")
         .update({
           status: "completed",
@@ -120,7 +117,13 @@ serve(async (req) => {
           outcome,
           ended_at: new Date().toISOString(),
         })
-        .eq("id", voiceCall.id);
+        .eq("id", voiceCall.id).neq("status", "completed").select("id");
+      if (claimError) throw claimError;
+      // Replay safety: a completed call is final. A replayed, duplicated or simultaneous report changes nothing here, so the note and the
+      // lead update happen once.
+      if (!claimed || claimed.length === 0) {
+        return new Response(JSON.stringify({ ok: true, note: "already completed" }), { headers: corsHeaders });
+      }
 
       // Update lead status based on outcome
       if (voiceCall.lead_id) {
@@ -148,7 +151,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
   } catch (e: any) {
-    console.error("vapi-webhook error:", e);
-    return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+    console.error("vapi-webhook error:", e?.name ?? "unknown");
+    return new Response(JSON.stringify({ error: "Webhook failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

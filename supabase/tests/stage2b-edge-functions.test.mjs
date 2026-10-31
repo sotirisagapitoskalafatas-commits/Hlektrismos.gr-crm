@@ -128,7 +128,7 @@ test('send-sms: capability first (inside_sales has none by default), then the le
   // An admin override grants SMS to inside_sales: records are still limited to the agent's own leads.
   const override = { setting_key: 'role_permissions', setting_value: { inside_sales: ['crm.read.assigned', 'communications.sms.send'] } };
   f = await loadFunction('send-sms', { db: seed({ crm_settings: [...smsSettings, override] }), users });
-  const other = await f.call({ token: 'tok-a', body: { leads: [{ id: LA }, { id: LB }], message: 'Γεια' } });
+  const other = await f.call({ token: 'tok-a', body: { campaign_id: 'dddddddd-0000-4000-8000-0000000000a1', leads: [{ id: LA }, { id: LB }], message: 'Γεια' } });
   assert.equal(other.status, 403);
   assert.equal(other.json.error, 'Not your record');
   assert.equal(f.outbound.filter((o) => o.url.includes('infobip')).length, 0, 'nothing sent when one lead is not theirs');

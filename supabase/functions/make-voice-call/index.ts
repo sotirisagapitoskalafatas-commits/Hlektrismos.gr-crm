@@ -52,7 +52,7 @@ serve(async (req) => {
     const { data: settings } = await supabase
       .from("crm_settings")
       .select("setting_key, setting_value")
-      .in("setting_key", ["VAPI_API_KEY", "VAPI_PHONE_NUMBER_ID", "SUPABASE_URL"]);
+      .in("setting_key", ["VAPI_API_KEY", "VAPI_PHONE_NUMBER_ID"]);
 
     const config: Record<string, string> = {};
     settings?.forEach((s: any) => {
@@ -61,13 +61,14 @@ serve(async (req) => {
 
     const vapiKey = config.VAPI_API_KEY;
     const phoneNumberId = config.VAPI_PHONE_NUMBER_ID;
-    const supabaseUrl = config.SUPABASE_URL || Deno.env.get("SUPABASE_URL");
+    // From the environment only: the webhook secret goes to this address, so it must not come from an editable settings row.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
 
     // This call supplies its assistant and server URL inline, so Vapi does not attach the org credential: the secret must travel in
     // server.headers (docs.vapi.ai/server-url/server-authentication). An HMAC credential needs a saved assistant, which this path does not
     // use. Without a usable webhook secret the result of a billable call would be lost, so no call is placed.
     const webhookSecret = configuredSecrets("VAPI_WEBHOOK_SECRET")[0];
-    if (!webhookSecret || configuredSecrets("VAPI_HMAC_SECRET").length > 0) {
+    if (!webhookSecret || Deno.env.get("VAPI_HMAC_SECRET")) {
       return json(503, { error: "Voice webhook is not configured" });
     }
 
@@ -87,8 +88,12 @@ serve(async (req) => {
 
     const leadName = [first_name, last_name].filter(Boolean).join(" ") || "Άγνωστος";
 
+    // Atomic: a double click or a retry cannot place two billable calls to one lead inside ten minutes.
+    const once = await durableLimit(supabase, `voice-lead:${lead_id}`, 1, 600);
+    if (once) return json(once.status === 429 ? 409 : once.status, { error: "A call to this lead was placed just now" });
+
     // Create voice_calls record
-    const { data: voiceCall } = await supabase
+    const { data: voiceCall, error: voiceCallError } = await supabase
       .from("voice_calls")
       .insert({
         lead_id: lead_id || null,
@@ -98,6 +103,9 @@ serve(async (req) => {
       })
       .select()
       .single();
+
+    // An untracked call could not be matched to its result: place none.
+    if (voiceCallError || !voiceCall) return json(500, { error: "The call could not be recorded" });
 
     // Call Vapi.ai
     const vapiRes = await fetch("https://api.vapi.ai/call/phone", {

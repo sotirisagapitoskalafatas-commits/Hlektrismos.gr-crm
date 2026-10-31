@@ -50,7 +50,9 @@ function query(db, table) {
   const exec = () => {
     const all = db.rows(table);
     if (st.op === 'insert' || st.op === 'upsert') {
-      const list = (Array.isArray(st.payload) ? st.payload : [st.payload]).map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: new Date().toISOString(), ...r }));
+      const keys = st.conflict?.onConflict?.split(',') ?? null;
+      const fresh = (Array.isArray(st.payload) ? st.payload : [st.payload]).filter((r) => !(keys && st.conflict.ignoreDuplicates && all.some((x) => keys.every((k) => x[k] === r[k]))));
+      const list = fresh.map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: new Date().toISOString(), ...r }));
       all.push(...list);
       db.log.inserts.push({ table, rows: list });
       return finish(list);
@@ -62,6 +64,7 @@ function query(db, table) {
       db.log.updates.push({ table, filters: st.filters, payload: st.payload, count: hit.length });
       return finish(hit);
     }
+    if (st.op === 'select') db.afterSelect?.(table);
     if (st.op === 'delete') {
       db.tables[table] = all.filter((r) => !hit.includes(r));
       db.log.deletes.push({ table, filters: st.filters, count: hit.length });
@@ -80,7 +83,7 @@ function query(db, table) {
   const b = {
     select() { if (st.op !== 'select') st.returning = true; return b; },
     insert(p) { st.op = 'insert'; st.payload = p; return b; },
-    upsert(p) { st.op = 'upsert'; st.payload = p; return b; },
+    upsert(p, o) { st.op = 'upsert'; st.payload = p; st.conflict = o ?? null; return b; },
     update(p) { st.op = 'update'; st.payload = p; return b; },
     delete() { st.op = 'delete'; return b; },
     eq(c, v) { st.filters.push(['eq', c, v]); return b; },
@@ -107,7 +110,7 @@ function query(db, table) {
 function fakeClient(db, users) {
   return {
     from: (t) => query(db, t),
-    rpc: async (name, args) => { db.log.rpc.push({ name, args }); const fn = db.rpc?.[name]; if (fn) return fn(args); if (name === 'consume_rate_limit') return { data: true, error: null }; return { data: null, error: null }; },
+    rpc: async (name, args) => { db.log.rpc.push({ name, args }); const fn = db.rpc?.[name]; if (fn) return fn(args); if (name === 'consume_rate_limit') { db.counters ??= {}; db.counters[args.p_bucket] = (db.counters[args.p_bucket] ?? 0) + (args.p_cost ?? 1); return { data: db.counters[args.p_bucket] <= args.p_limit, error: null }; } return { data: null, error: null }; },
     auth: {
       getUser: async (token) => (users[token] ? { data: { user: { id: users[token] } }, error: null } : { data: { user: null }, error: { message: 'invalid' } }),
       admin: { getUserById: async (id) => ({ data: { user: { id, email: `${id}@example.test` } }, error: null }) },
@@ -224,10 +227,10 @@ export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, f
   if (!handler) throw new Error(`harness: ${name} registered no handler`);
   return {
     db, outbound, smtp, clientKeys, restore: () => { globalThis.fetch = realFetch; },
-    async call({ token, body, method = 'POST', headers = {}, query = '' } = {}) {
+    async call({ token, body, method = 'POST', headers = {}, query = '', raw } = {}) {
       const res = await handler(new Request(`${SUPABASE_URL}/functions/v1/${name}${query}`, {
         method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
-        body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
+        body: method === 'GET' ? undefined : raw ?? JSON.stringify(body ?? {}),
       }));
       let json = null;
       const text = await res.text();

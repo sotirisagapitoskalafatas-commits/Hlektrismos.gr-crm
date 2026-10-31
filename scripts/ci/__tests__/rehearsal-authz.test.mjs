@@ -88,14 +88,16 @@ test('a real run is refused (exit 2, before any CLI or network call) without the
 test('functions that start work without a body are skipped by default; the list only names real functions', () => {
   const names = new Set(M.FUNCTIONS.map(([n]) => n));
   for (const f of M.WORK_FUNCTIONS) assert.ok(names.has(f), f);
-  for (const must of ['campaign-scheduler', 'sync-green-tariffs', 'autonomous-tariff-scraper']) assert.ok(M.WORK_FUNCTIONS.has(must), must);
+  for (const must of ['fetch-emails', 'campaign-scheduler', 'sync-green-tariffs', 'autonomous-tariff-scraper']) assert.ok(M.WORK_FUNCTIONS.has(must), must);
   const plan = run({ CRM_STAGING_REF: REF }, ['--plan']);
-  assert.match(plan.stdout, /campaign-scheduler\s+secret\s+\(skipped unless --include-work-functions\)/);
+  assert.match(plan.stdout, /campaign-scheduler\s+admin\s+\(skipped unless --include-work-functions\)/);
 });
 
 test('source: the trigger removed for seeding is restored in a finally block, and the run never prints a token', () => {
   const s = readFileSync(script, 'utf8').replace(/\r\n/g, '\n');
   assert.match(s, /pg_get_triggerdef/);
+  assert.ok(s.indexOf('refusing to drop it') < s.indexOf("sql('drop trigger"), 'the trigger is only dropped after its definition was read');
+  assert.match(s, /if \(r\.code !== 0\) throw new Error\('sql failed'\)/, 'a failed query stops the run');
   assert.ok(s.indexOf('} finally {') > s.indexOf('restoreTrigger = ') && s.includes('restoreTrigger();'), 'restored in finally');
   assert.ok(!/console\.(log|error)\([^)]*(tok\b|tok\[|access_token|PUB\b|password)/.test(s), 'no token, key or password reaches the console');
 });

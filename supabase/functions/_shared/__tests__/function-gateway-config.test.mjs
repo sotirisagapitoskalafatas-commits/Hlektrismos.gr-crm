@@ -9,19 +9,28 @@ import { join } from 'node:path';
 
 const fnDir = fileURLToPath(new URL('../../', import.meta.url));
 const cfg = readFileSync(join(fnDir, '../config.toml'), 'utf8').replace(/\r\n/g, '\n');
-const off = new Set([...cfg.matchAll(/\[functions\.([\w-]+)\]\s*\n\s*verify_jwt\s*=\s*false/g)].map((m) => m[1]));
+// Read the TOML sections line by line, so a comment or another key before verify_jwt cannot hide a switched-off function.
+const off = new Set();
+{
+  let fn = null;
+  for (const line of cfg.split('\n').map((l) => l.replace(/#.*$/, '').trim())) {
+    const head = /^\[functions\.([\w-]+)\]$/.exec(line);
+    if (head) fn = head[1]; else if (line.startsWith('[')) fn = null;
+    else if (fn && /^verify_jwt\s*=\s*false$/.test(line)) off.add(fn);
+  }
+}
 const fns = readdirSync(fnDir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith('_')).map((d) => d.name);
-const src = (f) => readFileSync(join(fnDir, f, 'index.ts'), 'utf8');
+const src = (f) => readFileSync(join(fnDir, f, 'index.ts'), 'utf8').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
 
 // the guard each function uses when the gateway does not check a JWT
-const OWN_GUARD = /getCaller\(|presentsSecretKey\(|x-vapi-secret|x-webhook-secret|verifyLink\(|verifyExpiringLink\(|verifyUnsubscribe|createHmac|timingSafeEqual/;
+const OWN_GUARD = /getCaller\(|presentsSecretKey\(|configuredSecrets\(|verifyLink\(|verifyExpiringLink\(|verifyUnsubscribe|createHmac|timingSafeEqual/;
 const PUBLIC_BY_DESIGN = new Set(['chat']); // public chatbot: no login, bounded elsewhere
 
 // callers that cannot send a Supabase JWT: provider webhook, e-mailed link, ad-platform webhook
 const EXTERNAL = {
-  'vapi-webhook': /x-vapi-secret/,
+  'vapi-webhook': /configuredSecrets\("VAPI_WEBHOOK_SECRET"\)/,
   'accept-offer': /verifyExpiringLink\(/,
-  'receive-lead-webhook': /x-webhook-secret/,
+  'receive-lead-webhook': /configuredSecrets\("LEAD_WEBHOOK_SECRET"\)/,
 };
 
 test('every function with verify_jwt=false authenticates the caller itself (or is public by design)', () => {

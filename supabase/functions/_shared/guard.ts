@@ -1,3 +1,4 @@
+import { categoryOf } from "./access.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "./cors.ts";
 import { hasCapability, parseOverrides, type Capability } from "./permissions.ts";
@@ -34,10 +35,10 @@ export async function requireStaff(req: Request): Promise<Response | null> {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("id, is_active")
+    .select("id, role, is_active")
     .eq("id", user.id)
     .maybeSingle();
-  if (!profile || profile.is_active === false) return deny(403, "Staff access only");
+  if (!profile || !categoryOf(profile.role, profile.is_active)) return deny(403, "Staff access only"); // legacy and unknown roles hold no access
 
   return null;
 }

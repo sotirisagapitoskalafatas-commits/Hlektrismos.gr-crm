@@ -13,6 +13,7 @@ import { loadFunction, createDb } from './helpers/edge-harness.mjs';
 const SECRET = 'link-signing-secret-not-real-000000000';
 const ADMIN = 'aaaaaaaa-0000-4000-8000-0000000000a1';
 const LEAD = 'bbbbbbbb-0000-4000-8000-0000000000a1';
+const CAMPAIGN = 'dddddddd-0000-4000-8000-0000000000a1';
 const TARIFF = 'cccccccc-0000-4000-8000-0000000000a1';
 const INSIDE = 'aaaaaaaa-0000-4000-8000-0000000000c1';
 const FIELD = 'aaaaaaaa-0000-4000-8000-0000000000c2';
@@ -90,77 +91,87 @@ const offerDb = (leadExtra = {}, withOffer = true) => createDb({
   energy_tariffs: [{ id: TARIFF, provider_name: 'P', program_name: 'Q' }],
   lead_notes: [],
 });
-const q = (tok, lead = LEAD, tariff = TARIFF) => `?lead_id=${lead}&tariff_id=${tariff}&t=${encodeURIComponent(tok)}`;
 const writes = (f) => f.db.log.updates.length + f.db.log.inserts.length;
+const accept = (f, t, lead = LEAD, tariff = TARIFF) => f.call({ body: { lead_id: lead, tariff_id: tariff, t } });
+const OTHER = 'bbbbbbbb-0000-4000-8000-0000000000ff';
 
-test('accept-offer: a valid link only SHOWS a confirmation on GET; the lead is converted by an explicit POST, once', async () => {
+test('accept-offer: only POST + JSON; a GET (mail scanner, link preview) changes nothing and no HTML is served', async () => {
   const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: SECRET } });
-  const tok = await sign('accept-offer', 3600, LEAD, TARIFF);
-  const get = await f.call({ method: 'GET', query: q(tok) });
-  assert.equal(get.status, 200);
-  assert.match(get.json, /<form method="POST"/);
-  assert.equal(writes(f), 0, 'a GET (mail scanner, link preview) changes nothing');
-  const post = await f.call({ method: 'POST', query: q(tok) });
-  assert.equal(post.status, 200);
+  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
+  const get = await f.call({ method: 'GET', query: `?lead_id=${LEAD}&tariff_id=${TARIFF}&t=${encodeURIComponent(t)}` });
+  assert.equal(get.status, 405);
+  assert.equal(writes(f), 0);
+  assert.deepEqual((await f.call({ raw: 'not json' })).json, { state: 'invalid' });
+  const r = await accept(f, t);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.state, 'accepted');
   assert.equal(f.db.rows('hlektrismos_leads')[0].status, 'customer');
   assert.equal(f.db.rows('lead_notes').length, 1);
-  const tasksAfter = f.db.rows('crm_tasks').length;
-  // replay: the same link again changes nothing and creates no second task or note
-  const again = await f.call({ method: 'POST', query: q(tok) });
-  assert.equal(again.status, 200);
-  assert.match(again.json, /ήδη γίνει αποδεκτή/);
+  const tasks = f.db.rows('crm_tasks').length;
+  assert.equal((await accept(f, t)).json.state, 'already_accepted', 'replay');
   assert.equal(f.db.rows('lead_notes').length, 1);
-  assert.equal(f.db.rows('crm_tasks').length, tasksAfter);
+  assert.equal(f.db.rows('crm_tasks').length, tasks);
   f.restore();
 });
 
-test('accept-offer: forged, tampered, wrong-pair, unsigned and expired links change nothing', async () => {
+test('accept-offer: two simultaneous POSTs convert once (compare-and-set), so there is one note and one task', async () => {
+  const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: SECRET } });
+  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
+  const r = await Promise.all([accept(f, t), accept(f, t), accept(f, t)]);
+  assert.equal(r.filter((x) => x.json.state === 'accepted').length, 1, JSON.stringify(r.map((x) => x.json)));
+  assert.equal(f.db.rows('lead_notes').length, 1);
+  f.restore();
+});
+
+test('accept-offer: when another request wins between the read and the write, this one writes nothing (compare-and-set, deterministic)', async () => {
+  const db = offerDb();
+  db.afterSelect = (table) => { if (table === 'crm_tasks') db.rows('hlektrismos_leads')[0].status = 'customer'; };
+  const f = await loadFunction('accept-offer', { db, env: { LINK_SIGNING_SECRET: SECRET } });
+  const r = await accept(f, await sign('accept-offer', 3600, LEAD, TARIFF));
+  assert.equal(r.json.state, 'already_accepted');
+  assert.equal(f.db.rows('lead_notes').length, 0, 'the loser adds no note');
+  f.restore();
+});
+
+test('accept-offer: forged, tampered, wrong-pair, unsigned and expired tokens change nothing', async () => {
   const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: SECRET } });
   const good = await sign('accept-offer', 3600, LEAD, TARIFF);
-  const other = 'bbbbbbbb-0000-4000-8000-0000000000ff';
   const past = Math.floor(Date.now() / 1000) - 10;
   const expired = `${past}.${await signRaw('accept-offer', String(past), LEAD, TARIFF)}`;
-  for (const [name, query, status] of [
-    ['no token', `?lead_id=${LEAD}&tariff_id=${TARIFF}`, 403],
-    ['plain two ids with a guessed token', q('AAAA'), 403],
-    ['a token for another lead', q(good, other, TARIFF), 403],
-    ['a token for another tariff', q(good, LEAD, other), 403],
-    ['the old non-expiring token format', q(await signRaw('accept-offer', LEAD, TARIFF)), 403],
-    ['expired', q(expired), 410],
-  ]) {
-    for (const method of ['GET', 'POST']) {
-      const r = await f.call({ method, query });
-      assert.equal(r.status, status, `${name} (${method})`);
-    }
-  }
-  assert.equal(writes(f), 0, 'nothing was written by any refused request');
+  for (const [name, r, status] of [
+    ['guessed token', await accept(f, 'AAAA'), 403],
+    ['token for another lead', await accept(f, good, OTHER, TARIFF), 403],
+    ['token for another tariff', await accept(f, good, LEAD, OTHER), 403],
+    ['old non-expiring format', await accept(f, await signRaw('accept-offer', LEAD, TARIFF)), 403],
+    ['expired', await accept(f, expired), 410],
+    ['no token', await f.call({ body: { lead_id: LEAD, tariff_id: TARIFF } }), 400],
+    ['not a uuid', await accept(f, good, 'x', TARIFF), 400],
+  ]) assert.equal(r.status, status, name);
+  assert.equal(writes(f), 0);
   assert.equal(f.db.rows('hlektrismos_leads')[0].status, 'follow_up');
   f.restore();
 });
 
-test('accept-offer: a valid link cannot convert a lost / deleted / unknown lead or an offer that was never sent', async () => {
-  const tok = await sign('accept-offer', 3600, LEAD, TARIFF);
+test('accept-offer: a valid token cannot convert a closed, deleted or unknown lead, or an offer that was never sent', async () => {
+  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
   for (const [name, db, status] of [
     ['lost lead', offerDb({ status: 'lost' }), 409],
     ['unsubscribed lead', offerDb({ status: 'unsubscribed' }), 409],
     ['deleted lead', offerDb({ deleted_at: '2026-10-01T00:00:00Z' }), 404],
-    ['offer never sent for this lead and tariff', offerDb({}, false), 404],
+    ['offer never sent', offerDb({}, false), 404],
+    ['unknown lead', createDb({ hlektrismos_leads: [], crm_tasks: [] }), 404],
   ]) {
     const f = await loadFunction('accept-offer', { db, env: { LINK_SIGNING_SECRET: SECRET } });
-    const r = await f.call({ method: 'POST', query: q(tok) });
-    assert.equal(r.status, status, name);
-    assert.equal(writes(f), 0, `${name}: nothing written`);
+    assert.equal((await accept(f, t)).status, status, name);
+    assert.equal(writes(f), 0, name);
     f.restore();
   }
-  const f = await loadFunction('accept-offer', { db: createDb({ hlektrismos_leads: [], crm_tasks: [] }), env: { LINK_SIGNING_SECRET: SECRET } });
-  assert.equal((await f.call({ method: 'POST', query: q(tok) })).status, 404, 'unknown lead');
-  f.restore();
 });
 
-test('accept-offer: without LINK_SIGNING_SECRET every link is refused', async () => {
-  const tok = await sign('accept-offer', 3600, LEAD, TARIFF);
+test('accept-offer: without LINK_SIGNING_SECRET every token is refused', async () => {
+  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
   const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: undefined } });
-  assert.equal((await f.call({ method: 'POST', query: q(tok) })).status, 403);
+  assert.equal((await accept(f, t)).status, 403);
   assert.equal(writes(f), 0);
   f.restore();
 });
@@ -199,13 +210,10 @@ test('vapi-webhook: a call ends once; a replayed or duplicated end event, and a 
   assert.equal(f.db.rows('voice_calls')[0].status, 'completed');
   assert.equal(f.db.rows('hlektrismos_leads')[0].pipeline_status, 'qualified');
   assert.equal(f.db.rows('lead_notes').length, 1);
-  const finalTranscript = f.db.rows('voice_calls')[0].transcript;
   const replay = await f.call({ body: report('δεν με ενδιαφέρει'), headers: h });
   assert.equal(replay.status, 200);
   assert.equal(f.db.rows('lead_notes').length, 1, 'no duplicate transcript note');
   assert.equal(f.db.rows('hlektrismos_leads')[0].pipeline_status, 'qualified', 'a replay cannot flip the lead to lost');
-  await f.call({ body: { message: { type: 'transcript', call: { id: 'call-1' }, transcriptType: 'partial', transcript: 'late partial' } }, headers: h });
-  assert.equal(f.db.rows('voice_calls')[0].transcript, finalTranscript, 'a late partial cannot overwrite the final transcript');
   f.restore();
 });
 
@@ -231,8 +239,7 @@ test('send-sms: oversized batch, missing / oversized message and malformed JSON 
   assert.equal((await call({ leads: ids(1) })).status, 400);
   assert.equal((await call({ leads: ids(1), message: 'x'.repeat(1001) })).status, 400);
   assert.equal((await call({ leads: 'nope', message: 'hi' })).status, 400);
-  const raw = await f.call({ token: 'tok-admin', body: undefined, headers: {} });
-  assert.ok([400, 413].includes(raw.status));
+  assert.equal((await f.call({ token: 'tok-admin', raw: '{not json' })).status, 400);
   assert.equal(sent(f), 0);
   f.restore();
 });
@@ -279,23 +286,6 @@ test('make-voice-call and send-email: anonymous refused; per-caller throttle', a
   m.restore();
 });
 
-test('send-offer: the same offer is not sent twice inside ten minutes, and the acceptance link it issues expires', async () => {
-  const f = await loadFunction('send-offer', { db: outboundDb(), users, env: { LINK_SIGNING_SECRET: SECRET, UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000', COMPANY_POSTAL_ADDRESS: 'Test 1, Athens' } });
-  const body = { lead_id: LEAD, tariff_id: TARIFF };
-  const first = await f.call({ token: 'tok-admin', body });
-  assert.equal(first.status, 200, JSON.stringify(first.json));
-  const url = new URL(first.json.accept_url);
-  assert.match(url.searchParams.get('t'), /^\d+\.[A-Za-z0-9_-]+$/, 'expiring token');
-  const exp = Number(url.searchParams.get('t').split('.')[0]);
-  const days = (exp - Date.now() / 1000) / 86400;
-  assert.ok(days > 13 && days <= 14.01, `link lifetime is about 14 days (${days.toFixed(2)})`);
-  assert.equal(await withSecret(() => L.verifyExpiringLink(url.searchParams.get('t'), 'accept-offer', LEAD, TARIFF)), 'ok');
-  const second = await f.call({ token: 'tok-admin', body });
-  assert.equal(second.status, 409);
-  assert.equal(f.db.rows('crm_tasks').filter((t) => String(t.title).startsWith('Προσφορά στάλθηκε')).length, 1, 'no second task');
-  assert.equal((await f.call({ body })).status, 401, 'anonymous refused');
-  f.restore();
-});
 
 
 // ───────────────────────────── receive-lead-webhook ─────────────────────────────
@@ -366,7 +356,7 @@ const providerCalls = (f, re) => f.outbound.filter((o) => re.test(o.url)).length
 test('send-sms (end to end): an eligible lead is messaged once; the SAME campaign request replayed sends nothing more', async () => {
   await withClock(async () => {
     const f = await loadFunction('send-sms', { db: consentDb('sms'), users, env: GATE_ENV });
-    const body = { campaign_id: 'camp-1', leads: [{ id: LEAD }], message: 'Γεια σας {{first_name}}', channel: 'sms' };
+    const body = { campaign_id: CAMPAIGN, leads: [{ id: LEAD }], message: 'Γεια σας {{first_name}}', channel: 'sms' };
     const first = await f.call({ token: 'tok-admin', body });
     assert.equal(first.status, 200, JSON.stringify(first.json));
     assert.equal(first.json.sent, 1, JSON.stringify(first.json));
@@ -384,7 +374,7 @@ test('send-sms (end to end): an eligible lead is messaged once; the SAME campaig
 test('send-sms (end to end): without consent nothing is sent (the gate is enforced server-side, whatever the request says)', async () => {
   await withClock(async () => {
     const f = await loadFunction('send-sms', { db: outboundDb(), users, env: GATE_ENV });
-    const r = await f.call({ token: 'tok-admin', body: { campaign_id: 'camp-1', leads: [{ id: LEAD, consent: true, phone: '6911111111' }], message: 'hi', channel: 'sms' } });
+    const r = await f.call({ token: 'tok-admin', body: { campaign_id: CAMPAIGN, leads: [{ id: LEAD, consent: true, phone: '6911111111' }], message: 'hi', channel: 'sms' } });
     assert.equal(r.status, 200);
     assert.equal(r.json.sent, 0);
     assert.match(JSON.stringify(r.json.errors), /NO_CHANNEL_PERMISSION/, 'a client-supplied consent flag is ignored');
@@ -396,7 +386,7 @@ test('send-sms (end to end): without consent nothing is sent (the gate is enforc
 test('send-campaign-email (end to end): an eligible lead is e-mailed once; the SAME campaign request replayed sends nothing more', async () => {
   await withClock(async () => {
     const f = await loadFunction('send-campaign-email', { db: consentDb('email'), users, env: GATE_ENV });
-    const body = { campaign_id: 'camp-9', leads: [{ id: LEAD }], subject: 'Προσφορά', html_body: '<p>Γεια σας {{first_name}}</p>' };
+    const body = { campaign_id: CAMPAIGN, leads: [{ id: LEAD }], subject: 'Προσφορά', html_body: '<p>Γεια σας {{first_name}}</p>' };
     const first = await f.call({ token: 'tok-admin', body });
     assert.equal(first.status, 200, JSON.stringify(first.json));
     assert.equal(first.json.sent, 1, JSON.stringify(first.json));
@@ -519,7 +509,7 @@ test('vapi-webhook HMAC mode: millisecond timestamps, custom header names and th
   g.restore();
   const weak = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_HMAC_SECRET: 'q'.repeat(40), VAPI_WEBHOOK_SECRET: VAPI } });
   assert.equal((await sendSigned(weak, { secret: 'q'.repeat(40) })).status, 401, 'a weak HMAC secret is not configured');
-  assert.equal((await weak.call({ body: ended, headers: { 'x-vapi-secret': VAPI } })).status, 200, 'with only a weak HMAC secret the static secret remains the mechanism');
+  assert.equal((await weak.call({ body: ended, headers: { 'x-vapi-secret': VAPI } })).status, 401, 'a weak HMAC secret refuses everything: it never falls back to the static header');
   weak.restore();
 });
 
@@ -568,9 +558,13 @@ test('durable limit: the bucket is per function and per caller, taken from the s
 
 test('durable limit runs AFTER the capability check: a refused role consumes no quota', async () => {
   const f = await loadFunction('send-sms', { db: outboundDb(), users });
-  assert.equal((await f.call({ token: 'tok-manager', body: {} })).status, 403);
+  assert.equal((await f.call({ token: 'tok-inside', body: {} })).status, 403);
   assert.equal(f.db.log.rpc.filter((c) => c.name === 'consume_rate_limit').length, 0);
   f.restore();
+  const o = await loadFunction('send-offer', { db: outboundDb(), users });
+  assert.equal((await o.call({ token: 'tok-field', body: { lead_id: LEAD, tariff_id: TARIFF } })).status, 403);
+  assert.equal(o.db.log.rpc.filter((c) => c.name === 'consume_rate_limit').length, 0, 'send-offer too');
+  o.restore();
 });
 
 // ───────────────────────────── scrape-b2b: the two-role model at its own gate ─────────────────────────────
@@ -636,4 +630,167 @@ test('make-voice-call: no usable webhook secret means no call; when configured t
     assert.ok(!JSON.stringify(r.json).includes(VAPI), 'the secret is never returned to the caller');
     f.restore();
   });
+});
+
+// ───────────────────────────── review findings: offers, claims, voice, legacy roles ─────────────────────────────
+const OFFER_ENV = { ...GATE_ENV, LINK_SIGNING_SECRET: SECRET, SITE_URL: 'https://crm.example.test' };
+const offerBody = { lead_id: LEAD, tariff_id: TARIFF };
+
+test('send-offer: consent is enforced server-side per channel; no permitted channel means nothing sent and nothing recorded', async () => {
+  await withClock(async () => {
+    const f = await loadFunction('send-offer', { db: outboundDb(), users, env: OFFER_ENV });
+    assert.equal((await f.call({ token: 'tok-admin', body: offerBody })).status, 403);
+    assert.equal(sent(f), 0);
+    assert.equal(f.db.rows('crm_tasks').length, 0);
+    assert.equal(f.db.rows('hlektrismos_leads')[0].status, undefined, 'status untouched');
+    f.restore();
+  });
+});
+
+test('send-offer: an eligible lead gets one offer; the link opens the CRM page, expires, is not returned to staff; a repeat is refused', async () => {
+  await withClock(async () => {
+    const f = await loadFunction('send-offer', { db: consentDb('email'), users, env: OFFER_ENV });
+    const r = await f.call({ token: 'tok-admin', body: offerBody });
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.equal(r.json.accept_url, undefined, 'a staff member must not hold the customer\'s link');
+    const mail = JSON.parse(f.outbound.find((o) => /resend/.test(o.url)).body);
+    const m = /https:\/\/crm\.example\.test\/#\/offer\?lead_id=[0-9a-f-]+&(?:amp;)?tariff_id=[0-9a-f-]+&(?:amp;)?t=(\d+\.[A-Za-z0-9_-]+)/.exec(JSON.stringify(mail));
+    assert.ok(m, 'the mail links to the CRM confirmation page');
+    const t = m[1];
+    assert.match(t, /^\d+\.[A-Za-z0-9_-]+$/);
+    const days = (Number(t.split('.')[0]) - Date.now() / 1000) / 86400;
+    assert.ok(days > 13 && days <= 14.01);
+    assert.equal(await withSecret(() => L.verifyExpiringLink(t, 'accept-offer', LEAD, TARIFF)), 'ok');
+    const again = await f.call({ token: 'tok-admin', body: offerBody });
+    assert.equal(again.status, 409);
+    assert.equal(f.db.rows('crm_tasks').length, 1);
+    f.restore();
+  });
+});
+
+test('send-offer: two simultaneous requests send one offer', async () => {
+  await withClock(async () => {
+    const f = await loadFunction('send-offer', { db: consentDb('email'), users, env: OFFER_ENV });
+    const r = await Promise.all([f.call({ token: 'tok-admin', body: offerBody }), f.call({ token: 'tok-admin', body: offerBody })]);
+    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
+    assert.equal(providerCalls(f, /resend/), 1);
+    f.restore();
+  });
+});
+
+test('send-offer: a closed or deleted lead is refused and stays closed, so older links cannot be revived; a failed delivery records nothing', async () => {
+  await withClock(async () => {
+    for (const [extra, status] of [[{ status: 'customer' }, 409], [{ status: 'lost' }, 409], [{ status: 'unsubscribed' }, 409], [{ deleted_at: '2026-10-01T00:00:00Z' }, 404]]) {
+      const db = consentDb('email'); Object.assign(db.rows('hlektrismos_leads')[0], extra);
+      const f = await loadFunction('send-offer', { db, users, env: OFFER_ENV });
+      assert.equal((await f.call({ token: 'tok-admin', body: offerBody })).status, status, JSON.stringify(extra));
+      assert.equal(db.rows('hlektrismos_leads')[0].status, extra.status);
+      assert.equal(sent(f), 0);
+      f.restore();
+    }
+    const f = await loadFunction('send-offer', { db: consentDb('email'), users, env: OFFER_ENV, fetchHandler: async () => new Response('{}', { status: 500 }) });
+    assert.equal((await f.call({ token: 'tok-admin', body: offerBody })).status, 502);
+    assert.equal(f.db.rows('crm_tasks').length, 0, 'no "sent" task for an offer that did not go out');
+    f.restore();
+    const n = await loadFunction('send-offer', { db: consentDb('email'), users, env: { ...OFFER_ENV, SITE_URL: undefined } });
+    assert.equal((await n.call({ token: 'tok-admin', body: offerBody })).status, 503, 'no SITE_URL, no offer');
+    assert.equal(sent(n), 0);
+    n.restore();
+  });
+});
+
+test('bulk senders: simultaneous identical requests send once; a failed claim sends nothing; a provider failure can be retried', async () => {
+  await withClock(async () => {
+    const body = { campaign_id: CAMPAIGN, leads: [{ id: LEAD }], message: 'Γεια', channel: 'sms' };
+    const f = await loadFunction('send-sms', { db: consentDb('sms'), users, env: GATE_ENV });
+    const r = await Promise.all([f.call({ token: 'tok-admin', body }), f.call({ token: 'tok-admin', body })]);
+    assert.equal(r[0].json.sent + r[1].json.sent, 1);
+    assert.equal(providerCalls(f, /infobip/), 1);
+    f.restore();
+    let down = true;
+    const g = await loadFunction('send-sms', { db: consentDb('sms'), users, env: GATE_ENV, fetchHandler: async () => (down ? new Response('x', { status: 500 }) : new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })) });
+    assert.equal((await g.call({ token: 'tok-admin', body })).json.failed, 1);
+    down = false;
+    assert.equal((await g.call({ token: 'tok-admin', body })).json.sent, 1, 'the failed attempt released its claim');
+    g.restore();
+    const bad = await loadFunction('send-sms', { db: consentDb('sms'), users, env: GATE_ENV });
+    assert.equal((await bad.call({ token: 'tok-admin', body: { ...body, campaign_id: 'camp-1' } })).status, 400);
+    assert.equal((await bad.call({ token: 'tok-admin', body: { leads: ids(2), message: 'x' } })).status, 400, 'a batch without a campaign cannot be de-duplicated');
+    bad.restore();
+  });
+});
+
+test('per-recipient limit: 100-recipient requests exhaust the hourly recipient budget before the request limit', async () => {
+  const db = outboundDb();
+  const f = await loadFunction('send-sms', { db, users });
+  db.counters = { [`send-sms-recipients:${ADMIN}`]: 450 };
+  assert.equal((await f.call({ token: 'tok-admin', body: { campaign_id: CAMPAIGN, leads: ids(100), message: 'x' } })).status, 429);
+  assert.equal(sent(f), 0);
+  f.restore();
+});
+
+test('make-voice-call: a double click places one call; a failed tracking row places none', async () => {
+  await withClock(async () => {
+    const voiceDb = () => {
+      const db = consentDb('voice');
+      db.rows('crm_settings').push({ setting_key: 'VAPI_API_KEY', setting_value: 'vapi-key-not-real' }, { setting_key: 'VAPI_PHONE_NUMBER_ID', setting_value: 'pn-1' }, { setting_key: 'SUPABASE_URL', setting_value: 'https://attacker.example.test' });
+      db.rows('article11_screenings').push({ phone_key: CK.phoneKey('6900000001'), result: 'not_listed', screened_at: '2026-10-25T09:00:00Z' });
+      db.tables.voice_calls = [];
+      return db;
+    };
+    const f = await loadFunction('make-voice-call', { db: voiceDb(), users, env: { ...GATE_ENV, AUTO_VOICE_CALLS: 'on', VAPI_WEBHOOK_SECRET: VAPI }, fetchHandler: async () => new Response(JSON.stringify({ id: 'c' }), { status: 200, headers: { 'content-type': 'application/json' } }) });
+    const r = await Promise.all([f.call({ token: 'tok-admin', body: { lead_id: LEAD } }), f.call({ token: 'tok-admin', body: { lead_id: LEAD } })]);
+    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
+    const calls = f.outbound.filter((o) => /api\.vapi\.ai/.test(o.url));
+    assert.equal(calls.length, 1);
+    assert.ok(!calls[0].body.includes('attacker.example.test'), 'the webhook address and secret never follow a settings row');
+    f.restore();
+  });
+});
+
+test('vapi-webhook: simultaneous reports act once; the customer\'s words decide and a refusal wins; a database failure answers 500', async () => {
+  const h = { 'x-vapi-secret': VAPI };
+  let f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: VAPI } });
+  await Promise.all([f.call({ body: ended, headers: h }), f.call({ body: ended, headers: h })]);
+  assert.equal(f.db.rows('lead_notes').length, 1, 'one note');
+  f.restore();
+  for (const [text, outcome] of [
+    ['AI: Θα σας στείλω προσφορά στο email. User: μη με ξαναπαρείτε', 'not_interested'],
+    ['AI: Έχετε ενδιαφέρον για προσφορά; User: Καλησπέρα', 'unknown'],
+    ['AI: Γεια. User: έχω ενδιαφέρον', 'interested'],
+  ]) {
+    f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: VAPI } });
+    await f.call({ body: report(text), headers: h });
+    assert.equal(f.db.rows('voice_calls')[0].outcome, outcome, text);
+    f.restore();
+  }
+});
+
+test('legacy roles: requireStaff refuses manager, back_office and unknown roles (aade-lookup); Sales Agents and Admin pass', async () => {
+  for (const [token, ok] of [['tok-manager', false], ['tok-bo', false], ['tok-inactive', false], ['tok-field', true], ['tok-admin', true]]) {
+    const f = await loadFunction('aade-lookup', { db: outboundDb(), users });
+    const r = await f.call({ token, body: { afm: 'x' } });
+    assert.equal(r.status, ok ? 400 : 403, String(token));
+    f.restore();
+  }
+});
+
+test('the confirmation page is a public route that only POSTs, on a button press', () => {
+  const page = readFileSync(fnDir + '../../src/pages/OfferAccept.tsx', 'utf8');
+  assert.match(page, /onClick=\{\(\) => void accept\(\)\}/);
+  assert.match(page, /method: 'POST'/);
+  assert.ok(!/useEffect/.test(page), 'opening the page does nothing by itself');
+  assert.match(readFileSync(fnDir + '../../src/lib/router.ts', 'utf8'), /'\/offer': 'offer'/);
+});
+
+test('durable limit: the request limit and the recipient limit are enforced independently', async () => {
+  for (const [fn, body] of [['send-sms', { leads: ids(1), message: 'hi' }], ['send-campaign-email', { leads: ids(1), subject: 's', html_body: '<p>x</p>' }]]) {
+    for (const prefix of [`${fn}:`, `${fn}-recipients:`]) {
+      const db = outboundDb();
+      db.rpc = { consume_rate_limit: async ({ p_bucket }) => ({ data: !p_bucket.startsWith(prefix), error: null }) };
+      const f = await loadFunction(fn, { db, users });
+      assert.equal((await f.call({ token: 'tok-admin', body })).status, 429, prefix);
+      f.restore();
+    }
+  }
 });

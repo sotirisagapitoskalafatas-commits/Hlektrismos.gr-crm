@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
-import { badBatch, callerKey, cleanText, durableLimit, rateLimited } from "../_shared/limits.ts";
+import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
@@ -38,6 +38,11 @@ serve(async (req) => {
     if (!text) return json(400, { error: "message must be 1-1000 characters" });
     const bad = badBatch(leads);
     if (bad) return json(bad.status, { error: bad.error });
+    if (campaign_id !== undefined && campaign_id !== null && !isUuid(campaign_id)) return json(400, { error: "campaign_id must be a UUID" });
+    if (!campaign_id && (leads as unknown[]).length > 1) return json(400, { error: "A batch needs a campaign_id" });
+    // Per recipient as well: the request limit alone would allow 100 recipients on every request.
+    const overRecipients = await durableLimit(supabase, `send-sms-recipients:${callerKey(caller)}`, 500, 3600, (leads as unknown[]).length);
+    if (overRecipients) return json(overRecipients.status, { error: overRecipients.error });
 
     const { data: settings } = await supabase
       .from("crm_settings")
@@ -83,16 +88,7 @@ serve(async (req) => {
       results.errors.push(`${d.id}: not eligible (${d.reasons.join(",")})`);
     }
 
-    // Idempotency: a lead that already has a "sent" row for this campaign is never messaged twice, so a repeated request
-    // (double click, retry, replay) cannot send duplicates.
-    const alreadySent = new Set<string>();
-    if (campaign_id) {
-      const { data: prior } = await supabase.from("campaign_sends").select("lead_id").eq("campaign_id", campaign_id).eq("status", "sent");
-      for (const p of (prior ?? []) as { lead_id: string }[]) alreadySent.add(p.lead_id);
-    }
-
     for (const lead of gate.allowed) {
-      if (alreadySent.has(lead.id)) { results.skipped++; continue; }
       // Kill Switch: skip leads with AI paused
       if (lead.ai_paused) {
         results.failed++;
@@ -105,6 +101,15 @@ serve(async (req) => {
         results.errors.push(`${lead.id}: no phone`);
         continue;
       }
+
+      // Atomic claim (unique index, phase1/21b): only one request can own this lead in this campaign. A failed claim sends nothing.
+      if (campaign_id) {
+        const { data: claim, error: claimError } = await supabase.from("campaign_sends")
+          .upsert({ campaign_id, lead_id: lead.id, status: "queued" }, { onConflict: "campaign_id,lead_id", ignoreDuplicates: true }).select("lead_id");
+        if (claimError) { results.failed++; results.errors.push(`${lead.id}: could not reserve`); continue; }
+        if (!claim || claim.length === 0) { results.skipped++; continue; }
+      }
+      const release = async () => { if (campaign_id) await supabase.from("campaign_sends").delete().eq("campaign_id", campaign_id).eq("lead_id", lead.id).eq("status", "queued"); };
 
       try {
         const personalizedMessage = text
@@ -155,18 +160,13 @@ serve(async (req) => {
         });
 
         if (smsRes.ok) {
-          const data = await smsRes.json();
+          const data = await smsRes.json().catch(() => ({})); // the message WAS sent: a bad reply body must not lose that
           results.sent++;
           const externalId = data.bulkId || data.messages?.[0]?.messageId || "";
 
           if (campaign_id && lead.id) {
-            await supabase.from("campaign_sends").upsert({
-              campaign_id,
-              lead_id: lead.id,
-              status: "sent",
-              sent_at: new Date().toISOString(),
-              external_id: externalId,
-            });
+            await supabase.from("campaign_sends").update({ status: "sent", sent_at: new Date().toISOString(), external_id: externalId })
+              .eq("campaign_id", campaign_id).eq("lead_id", lead.id);
           }
 
           await supabase.from("lead_notes").insert({
@@ -177,6 +177,7 @@ serve(async (req) => {
           });
         } else {
           await smsRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
+          await release(); // nothing was sent, so a retry may try again
           results.failed++;
           console.error(`[send-sms] provider HTTP ${smsRes.status} for lead ${lead.id}`);
           results.errors.push(`${lead.id}: provider error ${smsRes.status}`);

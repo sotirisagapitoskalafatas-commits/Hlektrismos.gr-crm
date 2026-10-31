@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import type { PageKey, Role } from '@/lib/roles';
 import {
-  Briefcase, Compass, Home, Map, MonitorCog, Plus, Route, UserCircle,
+  Briefcase, Compass, Home, Map, Plus, Route, UserCircle,
   UserPlus, X,
 } from 'lucide-react';
 

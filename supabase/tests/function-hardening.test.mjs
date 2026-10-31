@@ -1,7 +1,7 @@
 // Handler-level tests (real Edge Function code through helpers/edge-harness.mjs; LOCAL, no network, no Supabase project) for:
 //   * expiring signed links, input limits and the best-effort throttle (_shared/signed-link.ts, _shared/limits.ts)
 //   * accept-offer: expiring token, explicit POST, current-state validation, replay-safe single transition
-//   * vapi-webhook: secret required, payload shape, replay-safe call-ended handling
+//   * vapi-webhook: secret required, documented payload shape, replay-safe end-of-call handling
 //   * outbound functions: batch cap, input validation, throttle, duplicate-send protection
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -172,7 +172,9 @@ const callDb = () => createDb({
   hlektrismos_leads: [{ id: LEAD, pipeline_status: 'new' }],
   lead_notes: [],
 });
-const ended = { message: { type: 'call-ended' }, call: { id: 'call-1', duration: 42 }, transcript: 'με ενδιαφέρον' };
+// The documented shape (docs.vapi.ai/server-url/events): everything is nested under `message`.
+const report = (transcript) => ({ message: { type: 'end-of-call-report', endedReason: 'hangup', call: { id: 'call-1', startedAt: '2026-10-30T10:00:00Z', endedAt: '2026-10-30T10:00:42Z' }, artifact: { transcript, recording: { url: 'https://storage.vapi.test/r.mp3' } } } });
+const ended = report('με ενδιαφέρον');
 
 test('vapi-webhook: the shared secret is required (missing, wrong, short) and the payload must be an object', async () => {
   const f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: VAPI } });
@@ -198,11 +200,11 @@ test('vapi-webhook: a call ends once; a replayed or duplicated end event, and a 
   assert.equal(f.db.rows('hlektrismos_leads')[0].pipeline_status, 'qualified');
   assert.equal(f.db.rows('lead_notes').length, 1);
   const finalTranscript = f.db.rows('voice_calls')[0].transcript;
-  const replay = await f.call({ body: { ...ended, transcript: 'δεν με ενδιαφέρει' }, headers: h });
+  const replay = await f.call({ body: report('δεν με ενδιαφέρει'), headers: h });
   assert.equal(replay.status, 200);
   assert.equal(f.db.rows('lead_notes').length, 1, 'no duplicate transcript note');
   assert.equal(f.db.rows('hlektrismos_leads')[0].pipeline_status, 'qualified', 'a replay cannot flip the lead to lost');
-  await f.call({ body: { message: { type: 'transcript-update' }, call: { id: 'call-1' }, transcript: 'late partial' }, headers: h });
+  await f.call({ body: { message: { type: 'transcript', call: { id: 'call-1' }, transcriptType: 'partial', transcript: 'late partial' } }, headers: h });
   assert.equal(f.db.rows('voice_calls')[0].transcript, finalTranscript, 'a late partial cannot overwrite the final transcript');
   f.restore();
 });
@@ -500,7 +502,7 @@ test('vapi-webhook HMAC mode: a correct timestamped signature is accepted; wrong
   // body tampering after signing
   const raw = JSON.stringify(ended); const ts = String(Math.floor(Date.now() / 1000));
   const sig = await withSecret(() => L.hmacHex(HMAC_SECRET, ts, raw));
-  assert.equal((await f.call({ body: { ...ended, transcript: 'δεν με ενδιαφέρει' }, headers: { 'x-signature': sig, 'x-timestamp': ts } })).status, 401, 'a changed body invalidates the signature');
+  assert.equal((await f.call({ body: report('δεν με ενδιαφέρει'), headers: { 'x-signature': sig, 'x-timestamp': ts } })).status, 401, 'a changed body invalidates the signature');
   const ok = await sendSigned(f);
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
   assert.equal(f.db.rows('voice_calls')[0].status, 'completed');
@@ -587,4 +589,51 @@ test('scrape-b2b: only Admin and inside_sales pass; legacy manager / back_office
     assert.ok(![401, 403].includes(r.status), `${token} passes the gate (got ${r.status})`);
     f.restore();
   }
+});
+
+// ───────────────────────────── Vapi: the documented event and the credential path ─────────────────────────────
+test('vapi-webhook: the documented end-of-call-report records outcome, duration, recording and transcript; informational messages change nothing', async () => {
+  const f = await loadFunction('vapi-webhook', { db: callDb(), env: { VAPI_WEBHOOK_SECRET: VAPI } });
+  const h = { 'x-vapi-secret': VAPI };
+  for (const body of [{ message: { type: 'status-update', status: 'ended', call: { id: 'call-1' } } }, { message: { type: 'speech-update', call: { id: 'call-1' } } }, { message: { type: 'call-ended', call: { id: 'call-1' } } }]) {
+    assert.equal((await f.call({ body, headers: h })).status, 200);
+  }
+  assert.equal(f.db.rows('voice_calls')[0].status, 'initiated', 'only the end-of-call report completes a call');
+  await f.call({ body: ended, headers: h });
+  const c = f.db.rows('voice_calls')[0];
+  assert.equal(c.status, 'completed');
+  assert.equal(c.outcome, 'interested');
+  assert.equal(c.duration_seconds, 42);
+  assert.equal(c.recording_url, 'https://storage.vapi.test/r.mp3');
+  assert.equal(c.transcript, 'με ενδιαφέρον');
+  f.restore();
+});
+
+test('make-voice-call: no usable webhook secret means no call; when configured the secret travels in assistant.server.headers, not as an unknown field', async () => {
+  await withClock(async () => {
+    const voiceDb = () => {
+      const db = consentDb('voice');
+      db.rows('crm_settings').push({ setting_key: 'VAPI_API_KEY', setting_value: 'vapi-key-not-real' }, { setting_key: 'VAPI_PHONE_NUMBER_ID', setting_value: 'pn-1' });
+      db.rows('article11_screenings').push({ phone_key: CK.phoneKey('6900000001'), result: 'not_listed', screened_at: '2026-10-25T09:00:00Z' });
+      db.tables.voice_calls = [];
+      return db;
+    };
+    const env = { ...GATE_ENV, AUTO_VOICE_CALLS: 'on' };
+    for (const [name, extra] of [['no secret', {}], ['weak secret', { VAPI_WEBHOOK_SECRET: 'x'.repeat(40) }], ['HMAC mode', { VAPI_WEBHOOK_SECRET: VAPI, VAPI_HMAC_SECRET: HMAC_SECRET }]]) {
+      const f = await loadFunction('make-voice-call', { db: voiceDb(), users, env: { ...env, ...extra } });
+      const r = await f.call({ token: 'tok-admin', body: { lead_id: LEAD } });
+      assert.equal(r.status, 503, name);
+      assert.equal(f.outbound.filter((o) => /vapi/.test(o.url)).length, 0, `${name}: no billable call`);
+      f.restore();
+    }
+    const f = await loadFunction('make-voice-call', { db: voiceDb(), users, env: { ...env, VAPI_WEBHOOK_SECRET: VAPI }, fetchHandler: async () => new Response(JSON.stringify({ id: 'call-9' }), { status: 200, headers: { 'content-type': 'application/json' } }) });
+    const r = await f.call({ token: 'tok-admin', body: { lead_id: LEAD } });
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    const sentBody = JSON.parse(f.outbound.find((o) => /api\.vapi\.ai/.test(o.url)).body);
+    assert.match(sentBody.assistant.server.url, /\/functions\/v1\/vapi-webhook$/);
+    assert.equal(sentBody.assistant.server.headers['x-vapi-secret'], VAPI);
+    assert.equal(sentBody.webhookUrl, undefined);
+    assert.ok(!JSON.stringify(r.json).includes(VAPI), 'the secret is never returned to the caller');
+    f.restore();
+  });
 });

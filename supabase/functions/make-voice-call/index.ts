@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { configuredSecrets } from "../_shared/webhook-auth.ts";
 import { callerKey, durableLimit, rateLimited } from "../_shared/limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
@@ -61,6 +62,14 @@ serve(async (req) => {
     const vapiKey = config.VAPI_API_KEY;
     const phoneNumberId = config.VAPI_PHONE_NUMBER_ID;
     const supabaseUrl = config.SUPABASE_URL || Deno.env.get("SUPABASE_URL");
+
+    // This call supplies its assistant and server URL inline, so Vapi does not attach the org credential: the secret must travel in
+    // server.headers (docs.vapi.ai/server-url/server-authentication). An HMAC credential needs a saved assistant, which this path does not
+    // use. Without a usable webhook secret the result of a billable call would be lost, so no call is placed.
+    const webhookSecret = configuredSecrets("VAPI_WEBHOOK_SECRET")[0];
+    if (!webhookSecret || configuredSecrets("VAPI_HMAC_SECRET").length > 0) {
+      return json(503, { error: "Voice webhook is not configured" });
+    }
 
     if (!vapiKey || !phoneNumberId) {
       return new Response(
@@ -141,8 +150,8 @@ serve(async (req) => {
           firstMessage: `Γεια σας, ${leadName}! Είμαι ο Αλέξης, ψηφιακός βοηθός τεχνητής νοημοσύνης της Hlektrismos.gr. Η κλήση καταγράφεται και απομαγνητοφωνείται για να καταχωρήσουμε σωστά το αίτημά σας. Αν προτιμάτε να μιλήσετε με άνθρωπο ή δεν θέλετε καταγραφή, πείτε το μου και θα κλείσω. Σας ενοχλώ για λίγο;`,
           endCallMessage: "Σας ευχαριστώ πολύ για τον χρόνο σας. Καλή συνέχεια!",
           endCallPhrases: ["αντίο", "γεια σας", "δεν με ενδιαφέρει", "μη με ξαναπαρείτε", "τέλος"],
+          server: { url: `${supabaseUrl}/functions/v1/vapi-webhook`, headers: { "x-vapi-secret": webhookSecret } },
         },
-        webhookUrl: `${supabaseUrl}/functions/v1/vapi-webhook`,
         metadata: {
           lead_id: lead_id || "",
           voice_call_id: voiceCall?.id || "",

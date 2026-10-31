@@ -11,10 +11,12 @@ const corsHeaders = {
 
 /** The fields of a Vapi server message this function reads. */
 type VapiEvent = {
-  message?: { type?: string };
-  call?: { id?: string; duration?: number; recordingUrl?: string; transcript?: string };
-  callId?: string;
-  transcript?: string;
+  message?: {
+    type?: string;
+    call?: { id?: string; startedAt?: string; endedAt?: string };
+    durationSeconds?: number;
+    artifact?: { transcript?: string; recording?: { url?: string } | string; recordingUrl?: string };
+  };
 };
 
 serve(async (req) => {
@@ -56,9 +58,12 @@ serve(async (req) => {
     if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey());
 
-    const eventType = p.message?.type;
-    const callId = p.call?.id || p.callId;
-    const transcript = p.transcript || p.call?.transcript;
+    // Vapi nests every field under `message` (docs.vapi.ai/server-url/events). Only the end-of-call report changes data: it carries the
+    // complete transcript. status-update, transcript and the other informational messages are acknowledged and ignored.
+    const m = p.message;
+    const eventType = m?.type;
+    const callId = m?.call?.id;
+    const transcript = m?.artifact?.transcript;
 
     if (!callId) {
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -81,9 +86,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, note: "already completed" }), { headers: corsHeaders });
     }
 
-    if (eventType === "call-ended") {
-      const duration = p.call?.duration || 0;
-      const recordingUrl = p.call?.recordingUrl || "";
+    if (eventType === "end-of-call-report") {
+      const started = Date.parse(m?.call?.startedAt ?? ""), ended = Date.parse(m?.call?.endedAt ?? "");
+      const duration = m?.durationSeconds ?? (Number.isFinite(started) && Number.isFinite(ended) ? Math.round((ended - started) / 1000) : 0);
+      const rec = m?.artifact?.recording;
+      const recordingUrl = (typeof rec === "string" ? rec : rec?.url) || m?.artifact?.recordingUrl || "";
 
       // Determine outcome from transcript
       let outcome = "unknown";
@@ -137,12 +144,6 @@ serve(async (req) => {
           note_type: "ai_call_transcript",
         });
       }
-    } else if (eventType === "transcript-update" && transcript) {
-      // Partial transcript updates during the call
-      await supabase
-        .from("voice_calls")
-        .update({ transcript: transcript })
-        .eq("id", voiceCall.id);
     }
 
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });

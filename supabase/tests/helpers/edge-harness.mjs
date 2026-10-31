@@ -23,6 +23,7 @@ const wide = { requestsPerHour: 100000, messagesPerHour: 100000, messagesPerDay:
 export const TEST_OUTREACH_LIMITS = JSON.stringify({
   actions: { sms: wide, viber: wide, whatsapp: wide, voice: wide, email_campaign: wide, email_direct: wide, offer: wide },
   contact: { phone: { perHour: 100000, perDay: 100000 }, email: { perHour: 100000, perDay: 100000 } },
+  voiceMaxCallSeconds: 300,
 });
 
 // ───────────────────────────── in-memory database ─────────────────────────────
@@ -57,6 +58,7 @@ function query(db, table) {
   const exec = () => {
     const all = db.rows(table);
     if (st.op === 'insert' || st.op === 'upsert') {
+      if (db.failInsert?.includes(table)) return { data: null, error: { message: `insert into ${table} failed` } };
       const keys = st.conflict?.onConflict?.split(',') ?? null;
       const fresh = (Array.isArray(st.payload) ? st.payload : [st.payload]).filter((r) => !(keys && st.conflict.ignoreDuplicates && all.some((x) => keys.every((k) => x[k] === r[k]))));
       const list = fresh.map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: new Date().toISOString(), ...r }));
@@ -64,6 +66,7 @@ function query(db, table) {
       db.log.inserts.push({ table, rows: list });
       return finish(list);
     }
+    if (st.op === 'select' && db.failSelect?.includes(table)) return { data: null, error: { message: `select from ${table} failed` } };
     let hit = all.filter((r) => match(r, st.filters));
     if (st.orFilter) hit = hit.filter(st.orFilter);
     if (st.op === 'update') {
@@ -204,9 +207,9 @@ function fakeSmtp(sessions, { mode = 'starttls', tls = false } = {}) {
  * Bundles supabase/functions/<name>/index.ts and returns { call(req), db, outbound }.
  * env: extra Deno.env values. users: { token: userId }. dns: { host: [addresses] }. fetchHandler(url, init) -> Response.
  */
-export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, fetchHandler, smtpMode } = {}) {
+export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, fetchHandler, smtpMode, entry } = {}) {
   const out = await build({
-    entryPoints: [join(FUNCTIONS, name, 'index.ts')], bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent',
+    entryPoints: [entry ?? join(FUNCTIONS, name, 'index.ts')], bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent',
     plugins: [{
       name: 'edge-stubs',
       setup(b) {

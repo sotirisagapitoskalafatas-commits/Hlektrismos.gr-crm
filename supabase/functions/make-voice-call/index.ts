@@ -167,6 +167,7 @@ serve(async (req) => {
           // the call is recorded/transcribed. Do not remove or move later.
           firstMessage: `Γεια σας, ${leadName}! Είμαι ο Αλέξης, ψηφιακός βοηθός τεχνητής νοημοσύνης της Hlektrismos.gr. Η κλήση καταγράφεται και απομαγνητοφωνείται για να καταχωρήσουμε σωστά το αίτημά σας. Αν προτιμάτε να μιλήσετε με άνθρωπο ή δεν θέλετε καταγραφή, πείτε το μου και θα κλείσω. Σας ενοχλώ για λίγο;`,
           endCallMessage: "Σας ευχαριστώ πολύ για τον χρόνο σας. Καλή συνέχεια!",
+          maxDurationSeconds: limits.voiceMaxCallSeconds,
           endCallPhrases: ["αντίο", "γεια σας", "δεν με ενδιαφέρει", "μη με ξαναπαρείτε", "τέλος"],
           server: { url: `${supabaseUrl}/functions/v1/vapi-webhook`, headers: { "x-vapi-secret": webhookSecret } },
         },

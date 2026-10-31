@@ -2,7 +2,13 @@
 // written only on an encrypted connection. Every "refused" case asserts what actually crossed the wire before TLS, not only the status code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
+import { buildSync } from 'esbuild';
 import { loadFunction, createDb } from './helpers/edge-harness.mjs';
+
+const fnDir = fileURLToPath(new URL('../functions/', import.meta.url));
+const out = buildSync({ stdin: { contents: "export * from './smtp.ts';", resolveDir: fnDir + '_shared', loader: 'ts' }, bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent' });
+const S = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 
 const ADMIN = 'aaaaaaaa-0000-4000-8000-0000000000a1';
 const users = { 'tok-admin': ADMIN };
@@ -56,6 +62,44 @@ for (const [mode, why] of [
     assert.equal(log.at(-1).result, 'failed', 'the audit trail shows the failure');
   });
 }
+
+// A plain connection that advertises nothing. Two separate layers refuse it; each is proved on its own here, because either alone hides the other in a handler test.
+const plainConn = () => {
+  const replies = ['220 hello\r\n', '250 ok\r\n'];
+  const written = [];
+  return { written, async read(b) { const r = new TextEncoder().encode(replies.shift() ?? ''); b.set(r); return r.length || null; }, async write(b) { written.push(new TextDecoder().decode(b)); return b.length; }, close() {} };
+};
+test('layer one: openSecureSmtp refuses a server that does not offer STARTTLS, naming that reason', async () => {
+  const prev = globalThis.Deno;
+  const conn = plainConn();
+  globalThis.Deno = { connect: async () => conn };
+  try { await assert.rejects(() => S.openSecureSmtp('h.test', 2525, 'd'), /does not offer STARTTLS/); } finally { globalThis.Deno = prev; }
+  assert.deepEqual(conn.written.map((c) => c.split(' ')[0].trim()), ['EHLO']);
+});
+const offering = (afterStartTls) => {
+  const replies = ['220 hello\r\n', '250-host\r\n250 STARTTLS\r\n', afterStartTls];
+  return { async read(b) { const r = new TextEncoder().encode(replies.shift() ?? ''); b.set(r); return r.length || null; }, async write(b) { return b.length; }, close() {} };
+};
+test('layer one: a refused STARTTLS and a failed upgrade each stop the session with their own reason', async () => {
+  const prev = globalThis.Deno;
+  try {
+    globalThis.Deno = { connect: async () => offering('454 not now\r\n') };
+    await assert.rejects(() => S.openSecureSmtp('h.test', 2525, 'd'), /refused STARTTLS/);
+    globalThis.Deno = { connect: async () => offering('220 go\r\n'), startTls: async () => { throw new Error('bad certificate'); } };
+    await assert.rejects(() => S.openSecureSmtp('h.test', 2525, 'd'), /TLS upgrade failed/);
+  } finally { globalThis.Deno = prev; }
+});
+test('layer two: even called directly, the client writes no AUTH, MAIL, RCPT or DATA on a connection that is not encrypted', async () => {
+  const prev = globalThis.Deno;
+  const conn = plainConn();
+  globalThis.Deno = { connect: async () => conn };
+  try {
+    const c = new S.SmtpClient();
+    await c.connect('h.test', 2525);
+    for (const step of [() => c.auth('u', 'p'), () => c.mail('a@b.gr'), () => c.rcpt('a@b.gr'), () => c.data('x')]) await assert.rejects(step, S.SmtpSecurityError);
+  } finally { globalThis.Deno = prev; }
+  assert.equal(conn.written.length, 0);
+});
 
 test('send-lead-confirmation: the same transport rule; a failed upgrade releases the claim and sends nothing', async () => {
   const now = new Date().toISOString();

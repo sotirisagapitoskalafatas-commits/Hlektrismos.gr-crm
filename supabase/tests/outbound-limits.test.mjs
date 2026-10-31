@@ -75,6 +75,9 @@ test('configuration: anything other than a complete, valid value counts as not c
   assert.equal(K.parseOutreachLimits(without((c) => { c.actions.sms.messagesPerDay = 1.5; })), null, 'a fraction');
   assert.equal(K.parseOutreachLimits(without((c) => { c.actions.sms.messagesPerDay = '10'; })), null, 'a string');
   assert.equal(K.parseOutreachLimits(without((c) => { delete c.actions.email_direct.orgMessagesPerDay; })), null, 'a missing field');
+  assert.equal(K.parseOutreachLimits(without((c) => { delete c.voiceMaxCallSeconds; })), null, 'no call length');
+  assert.equal(K.parseOutreachLimits(without((c) => { c.voiceMaxCallSeconds = 5; })), null, 'too short to be real');
+  assert.equal(K.parseOutreachLimits(without((c) => { c.voiceMaxCallSeconds = 7200; })), null, 'over an hour');
 });
 
 test('without OUTREACH_LIMITS every sender answers 503, sends nothing and touches no counter', async () => {
@@ -124,6 +127,20 @@ test('messages per hour, per day and per organisation each stop the batch with t
   }
 });
 
+test('the campaign email has the same limits; once the caller or organisation limit is reached the batch stops trying', async () => {
+  await withClock(async () => {
+    const f = await load('send-campaign-email', db(), { OUTREACH_LIMITS: limits({ actions: { email_campaign: { orgMessagesPerDay: 1 } } }) });
+    const r = await f.call({ token: 'tok-admin', body: { campaign_id: CAMPAIGN, leads: [{ id: LEAD }, { id: LEAD2 }, { id: LEAD3 }], subject: 's', html_body: '<p>x</p>' } });
+    assert.equal(r.json.sent, 1);
+    assert.equal(providerCalls(f), 1);
+    f.restore();
+    const s = await load('send-sms', db(), { OUTREACH_LIMITS: limits({ actions: { sms: { orgMessagesPerDay: 1 } } }) });
+    await s.call(sms([LEAD, LEAD3, LEAD2], { campaign_id: CAMPAIGN }));
+    assert.equal(s.db.log.rpc.filter((c) => c.name === 'consume_rate_limits' && c.args.p_items.length > 1).length, 2, 'one success, one refusal, then no more attempts');
+    s.restore();
+  });
+});
+
 test('combined: a voice call and an SMS to one person use one counter, even from different lead records', async () => {
   await withClock(async () => {
     const database = db();
@@ -155,6 +172,16 @@ test('combined, the other way round, and across phone channels; the daily count 
     assert.equal(r.status, 429);
     assert.equal(providerCalls(v), 0, 'no second contact in the day, on any channel');
     v.restore();
+  });
+});
+
+test('each AI call carries the configured maximum length, the ceiling on what one call can cost', async () => {
+  await withClock(async () => {
+    const base = JSON.parse(limits());
+    const f = await load('make-voice-call', db(), { OUTREACH_LIMITS: JSON.stringify({ ...base, voiceMaxCallSeconds: 180 }) });
+    assert.equal((await f.call({ token: 'tok-admin', body: { lead_id: LEAD } })).status, 200);
+    assert.equal(JSON.parse(f.outbound.find((o) => /api\.vapi\.ai/.test(o.url)).body).assistant.maxDurationSeconds, 180);
+    f.restore();
   });
 });
 
@@ -268,12 +295,17 @@ test('an attempt that cannot be recorded is not sent, on every sender', async ()
     ]) {
       const database = db();
       database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+      database.failInsert = ['communication_log']; // reads still work, so the gate lets it through to this check
       const f = await load(fn, database);
-      const realFrom = f.db.tables;
-      Object.defineProperty(realFrom, 'communication_log', { get() { throw new Error('table missing'); } });
-      await f.call({ token: 'tok-admin', body }).catch(() => null);
+      await f.call({ token: 'tok-admin', body });
       assert.equal(providerCalls(f) + f.smtp.filter((x) => x.data).length, 0, fn);
       f.restore();
+      const control = db();
+      control.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+      const g = await load(fn, control);
+      await g.call({ token: 'tok-admin', body });
+      assert.equal(providerCalls(g) + g.smtp.filter((x) => x.data).length, 1, `${fn}: the same request sends when the record can be written`);
+      g.restore();
     }
   });
 });

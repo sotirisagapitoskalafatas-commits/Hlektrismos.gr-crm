@@ -74,6 +74,16 @@ test('a duplicate delivery is harmless, in sequence and at the same moment', asy
   g.restore();
 });
 
+test('a replayed opt-out on a completed call stops at once: no second objection attempt, no note', async () => {
+  const database = db({}, { status: 'completed' });
+  database.rpc = { record_spoken_objection: async () => ({ data: true, error: null }) };
+  const f = await load(database);
+  assert.equal((await f.call({ body: fixture('spoken-opt-out'), headers: h })).json.note, 'already completed');
+  assert.equal(f.db.log.rpc.length, 0);
+  assert.equal(f.db.rows('lead_notes').length, 0);
+  f.restore();
+});
+
 test('a late or different report cannot overwrite a completed call', async () => {
   const f = await load();
   await f.call({ body: fixture('end-of-call-report'), headers: h });
@@ -102,7 +112,9 @@ test('invalid payloads cannot modify CRM records', async () => {
   ];
   for (const [name, req] of bad) {
     const f = await load();
-    assert.equal((await f.call({ ...req, headers: h })).status, 400, name);
+    const r = await f.call({ ...req, headers: h });
+    assert.equal(r.status, 400, name);
+    assert.equal(r.json.error, 'Invalid payload', name);
     assert.equal(f.db.rows('voice_calls')[0].status, 'ringing', name);
     assert.equal(f.db.rows('lead_notes').length, 0, name);
     f.restore();
@@ -120,12 +132,17 @@ test('an unusable recording URL is dropped, never stored; a huge transcript is c
   assert.equal((await stored({ durationSeconds: 999_999 })).duration_seconds, 92);
 });
 
-test('a database failure answers 500 so the report is not silently lost', async () => {
+test('a database failure answers 500 so the report is not silently lost: a thrown error, and a read that returns an error', async () => {
   const database = db();
   Object.defineProperty(database.tables, 'voice_calls', { get() { throw new Error('down'); } });
   const f = await load(database);
   assert.equal((await f.call({ body: fixture('end-of-call-report'), headers: h })).status, 500);
   f.restore();
+  const returned = db();
+  returned.failSelect = ['voice_calls'];
+  const g = await load(returned);
+  assert.equal((await g.call({ body: fixture('end-of-call-report'), headers: h })).status, 500);
+  g.restore();
 });
 
 test('an unknown call id changes nothing', async () => {

@@ -128,6 +128,11 @@ test('an unavailable function answers 500 and reports no lead', async () => {
   const g = await handler(async () => ({ data: null, error: null }));
   assert.equal((await g.call({ body: body(), headers: h })).status, 500, 'an empty answer is not success');
   g.restore();
+  const k = await handler(async () => ({ data: {}, error: null }));
+  const r = await k.call({ body: body(), headers: h });
+  assert.equal(r.status, 500, 'an answer naming no lead is not success');
+  assert.equal(r.json.success, undefined);
+  k.restore();
 });
 
 test('input validation: bad email or phone, overlong and hostile fields, odd custom_questions, unusable event ids', async () => {

@@ -19,7 +19,7 @@ revoke insert, update, delete on public.outreach_decisions from authenticated;
 
 drop policy if exists "audit readers read outreach_decisions" on public.outreach_decisions;
 create policy "audit readers read outreach_decisions" on public.outreach_decisions
-  for select to authenticated using (public.is_role('admin') or public.is_role('manager'));
+  for select to authenticated using (public.is_role('admin'));
 
 create or replace function public.outreach_decisions_append_only() returns trigger
 language plpgsql as $$

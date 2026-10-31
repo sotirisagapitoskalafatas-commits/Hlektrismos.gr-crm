@@ -20,7 +20,8 @@ All values are whole numbers of at least 1. A missing field makes the whole valu
   "contact": {
     "phone": { "perHour": 0, "perDay": 0 },
     "email": { "perHour": 0, "perDay": 0 }
-  }
+  },
+  "voiceMaxCallSeconds": 0
 }
 ```
 The zeros above are placeholders and are refused as they stand.
@@ -34,6 +35,7 @@ The zeros above are placeholders and are refused as they stand.
 | `maxRecipients` | one request | recipients; 100 is a hard ceiling in code |
 | `contact.phone` | one person, across SMS, Viber, WhatsApp **and voice calls together** | contacts, keyed by the normalised number, so the same person under two lead records counts once |
 | `contact.email` | one person, across every kind of email | contacts |
+| `voiceMaxCallSeconds` | one AI call, 10 to 3600 | sent to Vapi as `assistant.maxDurationSeconds`; the ceiling on what one call can cost |
 
 ## How the limits behave
 - **Atomic.** The caller, organisation and person counters advance in one database transaction (`consume_rate_limits`, phase1/21b). A refusal by any one advances none.

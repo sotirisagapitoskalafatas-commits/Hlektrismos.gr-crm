@@ -186,6 +186,23 @@ test('duplicate request without a campaign: the same text to the same person ins
   });
 });
 
+test('a duplicate lock that cannot be checked sends nothing: database error, thrown error, or an answer that is not true', async () => {
+  await withClock(async () => {
+    for (const [name, rpc] of [
+      ['database error', async () => ({ data: null, error: { message: 'down' } })], ['client throws', async () => { throw new Error('network'); }],
+      ['null answer', async () => ({ data: null, error: null })], ['a truthy answer that is not true', async () => ({ data: 'yes', error: null })],
+    ]) {
+      for (const [fn, body] of [['send-sms', { leads: [{ id: LEAD }], message: 'x' }], ['send-campaign-email', { leads: [{ id: LEAD }], subject: 's', html_body: '<p>x</p>' }], ['make-voice-call', { lead_id: LEAD }]]) {
+        const database = db(); database.rpc = { consume_rate_limit: rpc };
+        const f = await load(fn, database);
+        await f.call({ token: 'tok-admin', body });
+        assert.equal(providerCalls(f), 0, `${fn}: ${name}`);
+        f.restore();
+      }
+    }
+  });
+});
+
 test('duplicate request with a campaign: concurrent batches send each person once', async () => {
   await withClock(async () => {
     const f = await load('send-sms', db());

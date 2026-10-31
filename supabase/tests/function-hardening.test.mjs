@@ -1,6 +1,5 @@
 // Handler-level tests (real Edge Function code through helpers/edge-harness.mjs; LOCAL, no network, no Supabase project) for:
 //   * expiring signed links, input limits and the best-effort throttle (_shared/signed-link.ts, _shared/limits.ts)
-//   * accept-offer: expiring token, explicit POST, current-state validation, replay-safe single transition
 //   * vapi-webhook: secret required, documented payload shape, replay-safe end-of-call handling
 //   * outbound functions: batch cap, input validation, throttle, duplicate-send protection
 import test from 'node:test';
@@ -84,97 +83,7 @@ test('limits: batch cap, text bounds, throttle window', () => {
   assert.equal(L.callerKey({ kind: 'service' }), 'service');
 });
 
-// ───────────────────────────── accept-offer ─────────────────────────────
-const offerDb = (leadExtra = {}, withOffer = true) => createDb({
-  hlektrismos_leads: [{ id: LEAD, status: 'follow_up', ...leadExtra }],
-  crm_tasks: withOffer ? [{ id: 't-offer', lead_id: LEAD, tariff_id: TARIFF, title: 'Προσφορά στάλθηκε: P — Q', status: 'pending' }] : [],
-  energy_tariffs: [{ id: TARIFF, provider_name: 'P', program_name: 'Q' }],
-  lead_notes: [],
-});
 const writes = (f) => f.db.log.updates.length + f.db.log.inserts.length;
-const accept = (f, t, lead = LEAD, tariff = TARIFF) => f.call({ body: { lead_id: lead, tariff_id: tariff, t } });
-const OTHER = 'bbbbbbbb-0000-4000-8000-0000000000ff';
-
-test('accept-offer: only POST + JSON; a GET (mail scanner, link preview) changes nothing and no HTML is served', async () => {
-  const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: SECRET } });
-  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
-  const get = await f.call({ method: 'GET', query: `?lead_id=${LEAD}&tariff_id=${TARIFF}&t=${encodeURIComponent(t)}` });
-  assert.equal(get.status, 405);
-  assert.equal(writes(f), 0);
-  assert.deepEqual((await f.call({ raw: 'not json' })).json, { state: 'invalid' });
-  const r = await accept(f, t);
-  assert.equal(r.status, 200);
-  assert.equal(r.json.state, 'accepted');
-  assert.equal(f.db.rows('hlektrismos_leads')[0].status, 'customer');
-  assert.equal(f.db.rows('lead_notes').length, 1);
-  const tasks = f.db.rows('crm_tasks').length;
-  assert.equal((await accept(f, t)).json.state, 'already_accepted', 'replay');
-  assert.equal(f.db.rows('lead_notes').length, 1);
-  assert.equal(f.db.rows('crm_tasks').length, tasks);
-  f.restore();
-});
-
-test('accept-offer: two simultaneous POSTs convert once (compare-and-set), so there is one note and one task', async () => {
-  const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: SECRET } });
-  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
-  const r = await Promise.all([accept(f, t), accept(f, t), accept(f, t)]);
-  assert.equal(r.filter((x) => x.json.state === 'accepted').length, 1, JSON.stringify(r.map((x) => x.json)));
-  assert.equal(f.db.rows('lead_notes').length, 1);
-  f.restore();
-});
-
-test('accept-offer: when another request wins between the read and the write, this one writes nothing (compare-and-set, deterministic)', async () => {
-  const db = offerDb();
-  db.afterSelect = (table) => { if (table === 'crm_tasks') db.rows('hlektrismos_leads')[0].status = 'customer'; };
-  const f = await loadFunction('accept-offer', { db, env: { LINK_SIGNING_SECRET: SECRET } });
-  const r = await accept(f, await sign('accept-offer', 3600, LEAD, TARIFF));
-  assert.equal(r.json.state, 'already_accepted');
-  assert.equal(f.db.rows('lead_notes').length, 0, 'the loser adds no note');
-  f.restore();
-});
-
-test('accept-offer: forged, tampered, wrong-pair, unsigned and expired tokens change nothing', async () => {
-  const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: SECRET } });
-  const good = await sign('accept-offer', 3600, LEAD, TARIFF);
-  const past = Math.floor(Date.now() / 1000) - 10;
-  const expired = `${past}.${await signRaw('accept-offer', String(past), LEAD, TARIFF)}`;
-  for (const [name, r, status] of [
-    ['guessed token', await accept(f, 'AAAA'), 403],
-    ['token for another lead', await accept(f, good, OTHER, TARIFF), 403],
-    ['token for another tariff', await accept(f, good, LEAD, OTHER), 403],
-    ['old non-expiring format', await accept(f, await signRaw('accept-offer', LEAD, TARIFF)), 403],
-    ['expired', await accept(f, expired), 410],
-    ['no token', await f.call({ body: { lead_id: LEAD, tariff_id: TARIFF } }), 400],
-    ['not a uuid', await accept(f, good, 'x', TARIFF), 400],
-  ]) assert.equal(r.status, status, name);
-  assert.equal(writes(f), 0);
-  assert.equal(f.db.rows('hlektrismos_leads')[0].status, 'follow_up');
-  f.restore();
-});
-
-test('accept-offer: a valid token cannot convert a closed, deleted or unknown lead, or an offer that was never sent', async () => {
-  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
-  for (const [name, db, status] of [
-    ['lost lead', offerDb({ status: 'lost' }), 409],
-    ['unsubscribed lead', offerDb({ status: 'unsubscribed' }), 409],
-    ['deleted lead', offerDb({ deleted_at: '2026-10-01T00:00:00Z' }), 404],
-    ['offer never sent', offerDb({}, false), 404],
-    ['unknown lead', createDb({ hlektrismos_leads: [], crm_tasks: [] }), 404],
-  ]) {
-    const f = await loadFunction('accept-offer', { db, env: { LINK_SIGNING_SECRET: SECRET } });
-    assert.equal((await accept(f, t)).status, status, name);
-    assert.equal(writes(f), 0, name);
-    f.restore();
-  }
-});
-
-test('accept-offer: without LINK_SIGNING_SECRET every token is refused', async () => {
-  const t = await sign('accept-offer', 3600, LEAD, TARIFF);
-  const f = await loadFunction('accept-offer', { db: offerDb(), env: { LINK_SIGNING_SECRET: undefined } });
-  assert.equal((await accept(f, t)).status, 403);
-  assert.equal(writes(f), 0);
-  f.restore();
-});
 
 // ───────────────────────────── vapi-webhook ─────────────────────────────
 const VAPI = 'vapi-secret-not-real-000000000000';
@@ -651,69 +560,6 @@ test('make-voice-call: no usable webhook secret means no call; when configured t
 // ───────────────────────────── review findings: offers, claims, voice, legacy roles ─────────────────────────────
 const OFFER_ENV = { ...GATE_ENV, LINK_SIGNING_SECRET: SECRET, SITE_URL: 'https://crm.example.test' };
 const offerBody = { lead_id: LEAD, tariff_id: TARIFF };
-
-test('send-offer: consent is enforced server-side per channel; no permitted channel means nothing sent and nothing recorded', async () => {
-  await withClock(async () => {
-    const f = await loadFunction('send-offer', { db: outboundDb(), users, env: OFFER_ENV });
-    assert.equal((await f.call({ token: 'tok-admin', body: offerBody })).status, 403);
-    assert.equal(sent(f), 0);
-    assert.equal(f.db.rows('crm_tasks').length, 0);
-    assert.equal(f.db.rows('hlektrismos_leads')[0].status, undefined, 'status untouched');
-    f.restore();
-  });
-});
-
-test('send-offer: an eligible lead gets one offer; the link opens the CRM page, expires, is not returned to staff; a repeat is refused', async () => {
-  await withClock(async () => {
-    const f = await loadFunction('send-offer', { db: consentDb('email'), users, env: OFFER_ENV });
-    const r = await f.call({ token: 'tok-admin', body: offerBody });
-    assert.equal(r.status, 200, JSON.stringify(r.json));
-    assert.equal(r.json.accept_url, undefined, 'a staff member must not hold the customer\'s link');
-    const mail = JSON.parse(f.outbound.find((o) => /resend/.test(o.url)).body);
-    const m = /https:\/\/crm\.example\.test\/#\/offer\?lead_id=[0-9a-f-]+&(?:amp;)?tariff_id=[0-9a-f-]+&(?:amp;)?t=(\d+\.[A-Za-z0-9_-]+)/.exec(JSON.stringify(mail));
-    assert.ok(m, 'the mail links to the CRM confirmation page');
-    const t = m[1];
-    assert.match(t, /^\d+\.[A-Za-z0-9_-]+$/);
-    const days = (Number(t.split('.')[0]) - Date.now() / 1000) / 86400;
-    assert.ok(days > 13 && days <= 14.01);
-    assert.equal(await withSecret(() => L.verifyExpiringLink(t, 'accept-offer', LEAD, TARIFF)), 'ok');
-    const again = await f.call({ token: 'tok-admin', body: offerBody });
-    assert.equal(again.status, 409);
-    assert.equal(f.db.rows('crm_tasks').length, 1);
-    f.restore();
-  });
-});
-
-test('send-offer: two simultaneous requests send one offer', async () => {
-  await withClock(async () => {
-    const f = await loadFunction('send-offer', { db: consentDb('email'), users, env: OFFER_ENV });
-    const r = await Promise.all([f.call({ token: 'tok-admin', body: offerBody }), f.call({ token: 'tok-admin', body: offerBody })]);
-    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
-    assert.equal(providerCalls(f, /resend/), 1);
-    f.restore();
-  });
-});
-
-test('send-offer: a closed or deleted lead is refused and stays closed, so older links cannot be revived; a failed delivery records nothing', async () => {
-  await withClock(async () => {
-    for (const [extra, status] of [[{ status: 'customer' }, 409], [{ status: 'lost' }, 409], [{ status: 'unsubscribed' }, 409], [{ deleted_at: '2026-10-01T00:00:00Z' }, 404]]) {
-      const db = consentDb('email'); Object.assign(db.rows('hlektrismos_leads')[0], extra);
-      const f = await loadFunction('send-offer', { db, users, env: OFFER_ENV });
-      assert.equal((await f.call({ token: 'tok-admin', body: offerBody })).status, status, JSON.stringify(extra));
-      assert.equal(db.rows('hlektrismos_leads')[0].status, extra.status);
-      assert.equal(sent(f), 0);
-      f.restore();
-    }
-    const f = await loadFunction('send-offer', { db: consentDb('email'), users, env: OFFER_ENV, fetchHandler: async () => new Response('{}', { status: 500 }) });
-    assert.equal((await f.call({ token: 'tok-admin', body: offerBody })).status, 502);
-    assert.equal(f.db.rows('crm_tasks').length, 0, 'no "sent" task for an offer that did not go out');
-    f.restore();
-    const n = await loadFunction('send-offer', { db: consentDb('email'), users, env: { ...OFFER_ENV, SITE_URL: undefined } });
-    assert.equal((await n.call({ token: 'tok-admin', body: offerBody })).status, 503, 'no SITE_URL, no offer');
-    assert.equal(sent(n), 0);
-    n.restore();
-  });
-});
 
 test('bulk senders: simultaneous identical requests send once; a failed claim sends nothing; a provider failure can be retried', async () => {
   await withClock(async () => {

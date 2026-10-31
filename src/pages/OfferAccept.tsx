@@ -1,12 +1,13 @@
 import { useState } from 'react';
 
-/* Public confirmation page for an e-mailed offer (#/offer?lead_id=…&tariff_id=…&t=…). Opening the link changes nothing: the customer
-   must press the button, which POSTs to the accept-offer Edge Function. The function decides everything; this page only shows the answer. */
-type State = 'idle' | 'busy' | 'accepted' | 'already_accepted' | 'expired' | 'closed' | 'invalid' | 'not_found' | 'error';
+/* Public confirmation page for an e-mailed offer (#/offer?offer_id=…&lead_id=…&t=…, or the fields of an older link). Opening the link changes nothing: the
+   customer must press the button, which POSTs to the accept-offer Edge Function. The function decides everything; this page only shows the answer. */
+type State = 'idle' | 'busy' | 'accepted' | 'already_accepted' | 'needs_review' | 'expired' | 'closed' | 'invalid' | 'not_found' | 'error';
 
 const TEXT: Record<Exclude<State, 'idle' | 'busy'>, { title: string; body: string }> = {
   accepted: { title: 'Ευχαριστούμε!', body: 'Η αποδοχή καταχωρήθηκε. Θα επικοινωνήσουμε μαζί σας σύντομα.' },
   already_accepted: { title: 'Η προσφορά έχει ήδη γίνει αποδεκτή', body: 'Θα επικοινωνήσουμε μαζί σας σύντομα.' },
+  needs_review: { title: 'Λάβαμε το αίτημά σας', body: 'Αυτός ο σύνδεσμος είναι παλαιότερος και δεν ολοκληρώνει αυτόματα την αποδοχή. Ένας σύμβουλός μας θα επικοινωνήσει μαζί σας για να την επιβεβαιώσει.' },
   expired: { title: 'Ο σύνδεσμος έχει λήξει', body: 'Παρακαλώ ζητήστε νέα προσφορά από τον υπάλληλό σας.' },
   closed: { title: 'Η προσφορά δεν είναι πλέον διαθέσιμη', body: 'Παρακαλώ επικοινωνήστε με τον υπάλληλό σας.' },
   invalid: { title: 'Μη έγκυρος σύνδεσμος', body: 'Παρακαλώ ζητήστε νέα προσφορά από τον υπάλληλό σας.' },
@@ -24,7 +25,7 @@ export default function OfferAccept() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/accept-offer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: q.get('lead_id'), tariff_id: q.get('tariff_id'), t: q.get('t') }),
+        body: JSON.stringify({ offer_id: q.get('offer_id'), lead_id: q.get('lead_id'), tariff_id: q.get('tariff_id'), t: q.get('t') }),
       });
       const { state: next } = await res.json() as { state?: string };
       setState(next && next in TEXT ? next as State : 'error');

@@ -271,6 +271,17 @@ select to_regclass('public.b2b_prospects') is not null as applied;
 select to_regclass('public.contact_objections') is not null as applied;
 ```
 
+## 18b. `phase3/10_offer_lifecycle.sql` — required BEFORE the hardened `send-offer` and `accept-offer` are deployed
+- **Why:** one record per offer, a link bound to that offer and lead, acceptance and its audit as one transaction.
+- **Depends on:** `hlektrismos_leads`, `energy_tariffs`, `crm_tasks`, `lead_notes`, `is_role()`.
+- **Order matters:** without it `send-offer` answers 503 and sends nothing, and `accept-offer` answers 500 and changes nothing.
+- **Old links:** read [`OFFER_LINKS.md`](OFFER_LINKS.md) before deploying.
+- **Rollback:** `rollback_phase3_10_offer_lifecycle.sql` (export the offer tables first).
+
+## 18c. `phase3/11_contact_service_requests.sql` — separates a customer's request from marketing consent
+- **Depends on:** step 18 (`contact_role`, `contact_log`).
+- **After it:** nothing changes until the owner sets `SERVICE_COMMS_APPROVED`. Do not set it without counsel's advice.
+
 ## 19. `phase5/17_customer_supply_points.sql`
 - **Depends on:** nothing new (uses `customers`, `cases`, `case_documents`, `profiles`, `is_staff()`, `is_role()`, `activity_log`). The legacy `supply_points` / `customer_meters` are not touched.
 - **Unlocks on screen:** the **«Παροχές»** tab right after Σύνοψη in the customer folder (cards, add/edit/archive, duplicate signal and review flag, documents and cases per connection); the case hint «Επιλέξτε παροχή για αυτή την υπόθεση»; the admin tariff list (Γ1, Γ1Ν, Γ21, Γ22, Γ23).

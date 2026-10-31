@@ -5,6 +5,13 @@
    Fonts: Inter (bundled with a Greek subset) for headings and body.
    ───────────────────────────────────────────────────────────────────────────── */
 
+/* Lenis measures the page by observing <html> (and reads its scrollHeight). index.css pins html and body to the viewport height for the CRM shell,
+   so on the landing page html's own box never grew with the content: after the optional form section opened, Lenis kept its old scroll limit and
+   the lower part of the page, including the footer, could not be reached. This is the base rule Lenis itself documents. `html.lenis` exists only
+   while Lenis is mounted (the landing page), so no CRM screen is affected. */
+html.lenis, html.lenis body { height: auto; }
+html.lenis body { min-height: 100dvh; }
+
 .lp, .lp-chrome {
   --lp-navy: #0b2547;
   --lp-navy-2: #12355f;

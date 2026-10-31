@@ -9,6 +9,14 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
+/** The fields of a Vapi server message this function reads. */
+type VapiEvent = {
+  message?: { type?: string };
+  call?: { id?: string; duration?: number; recordingUrl?: string; transcript?: string };
+  callId?: string;
+  transcript?: string;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -43,15 +51,12 @@ serve(async (req) => {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    // deno-lint-ignore no-explicit-any
-    const { message } = payload as any;
+    const p = payload as VapiEvent;
 
     if (!secretKey()) return missingKeyResponse("secret", corsHeaders);
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", secretKey());
 
-    const eventType = message?.type;
-    // deno-lint-ignore no-explicit-any
-    const p = payload as any;
+    const eventType = p.message?.type;
     const callId = p.call?.id || p.callId;
     const transcript = p.transcript || p.call?.transcript;
 

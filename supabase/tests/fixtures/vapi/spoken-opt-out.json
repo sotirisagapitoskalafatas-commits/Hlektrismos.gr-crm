@@ -1,0 +1,16 @@
+{
+  "message": {
+    "type": "end-of-call-report",
+    "endedReason": "customer-ended-call",
+    "durationSeconds": 21.2,
+    "call": { "id": "call-synthetic-0001", "status": "ended" },
+    "artifact": {
+      "transcript": "AI: Γεια σας. Θα σας ξαναπάρουμε αν θέλετε. User: Όχι, μη με ξαναπάρετε. AI: Κατανοητό, δεν θα ξανακληθείτε.",
+      "messages": [
+        { "role": "assistant", "message": "Γεια σας. Θα σας ξαναπάρουμε αν θέλετε." },
+        { "role": "user", "message": "Όχι, μη με ξαναπάρετε." },
+        { "role": "assistant", "message": "Κατανοητό, δεν θα ξανακληθείτε." }
+      ]
+    }
+  }
+}

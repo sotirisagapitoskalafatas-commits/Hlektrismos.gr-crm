@@ -22,7 +22,7 @@ export type FieldGate = 'allow' | 'approve' | 'deny';
 
 type FieldRule = { gate: FieldGate; roles: Role[] };
 
-const FIELD_ROLES: Role[] = ['admin', 'field_sales'];
+const FIELD_ROLES: Role[] = ['admin', 'sales_agent'];
 
 export const FIELD_SALES_POLICY: Record<FieldAction, FieldRule> = {
   map: { gate: 'allow', roles: FIELD_ROLES },

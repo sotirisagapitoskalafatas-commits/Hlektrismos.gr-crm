@@ -1,5 +1,5 @@
 // Supabase-backed loaders + environment config for the outreach gate (Deno runtime only).
-// Requires the staged migrations phase1/02 (`outreach_decisions`) and phase3/09 (`contact_consents`,
+// Requires the staged migrations phase1/02 (`outreach_decisions`), phase1/21b (`communication_log`) and phase3/09 (`contact_consents`,
 // `contact_objections`, `article11_screenings`). If those tables do not exist yet, a lookup throws and the gate
 // fails closed (nothing is sent).
 
@@ -87,9 +87,9 @@ export function supabaseLoaders(admin: any): Loaders {
       if (error) throw error;
     },
     async recentAttempts(ids, sinceIso) {
+      // Every sender writes this log, so a call, an SMS and an email to one person all count towards the same frequency cap.
       const { data, error } = await admin
-        .from("campaign_sends").select("lead_id").in("lead_id", ids).gte("created_at", sinceIso)
-        .in("status", ["sent", "delivered", "opened", "clicked", "replied", "queued"]);
+        .from("communication_log").select("lead_id").in("lead_id", ids).gte("created_at", sinceIso).eq("result", "sent");
       if (error) throw error;
       const out: Record<string, number> = {};
       for (const r of data ?? []) out[r.lead_id] = (out[r.lead_id] ?? 0) + 1;

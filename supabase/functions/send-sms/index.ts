@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { authorizeRecord, getCaller, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
+import { badBatch, callerKey, claimOnce, cleanText, isUuid, rateLimited, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage, type OutboundAction } from "../_shared/outreach-limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -24,9 +27,24 @@ serve(async (req) => {
   if (caller instanceof Response) return caller;
   const denied = requireCapability(caller, "communications.sms.send");
   if (denied) return denied;
+  // Best-effort per-caller throttle (limits.ts): slows a runaway or compromised staff account.
+  if (rateLimited(`send-sms:${callerKey(caller)}`, 10, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
+  const limits = outreachLimitsFromEnv();
+  if (!limits) return json(LIMITS_NOT_SET.status, { error: LIMITS_NOT_SET.error });
 
   try {
-    const { campaign_id, leads, message, channel } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json(400, { error: "A JSON body is required" });
+    const { campaign_id, leads, channel } = body as { campaign_id?: string; leads?: unknown; channel?: string };
+    const text = cleanText((body as { message?: unknown }).message, 1, 1000);
+    if (!text) return json(400, { error: "message must be 1-1000 characters" });
+    const action: OutboundAction = channel === "viber" ? "viber" : channel === "whatsapp" ? "whatsapp" : "sms";
+    const bad = badBatch(leads, limits.actions[action].maxRecipients);
+    if (bad) return json(bad.status, { error: bad.error });
+    if (campaign_id !== undefined && campaign_id !== null && !isUuid(campaign_id)) return json(400, { error: "campaign_id must be a UUID" });
+    if (!campaign_id && (leads as unknown[]).length > 1) return json(400, { error: "A batch needs a campaign_id" });
+    const overQuota = await admitRequest(supabase, callerKey(caller), action, limits);
+    if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
     const { data: settings } = await supabase
       .from("crm_settings")
@@ -48,7 +66,7 @@ serve(async (req) => {
       );
     }
 
-    const results = { sent: 0, failed: 0, errors: [] as string[] };
+    const results = { sent: 0, failed: 0, skipped: 0, errors: [] as string[] };
 
     // Server-selected recipients + central eligibility gate (see send-campaign-email).
     if (!Array.isArray(leads)) {
@@ -64,8 +82,7 @@ serve(async (req) => {
         if (owned instanceof Response) return owned;
       }
     }
-    const gateChannel = channel === "viber" || channel === "whatsapp" ? channel : "sms";
-    const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), gateChannel, "promotional",
+    const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), action, "promotional",
       supabaseLoaders(supabase), outreachConfigFromEnv());
     for (const d of gate.denied) {
       results.failed++;
@@ -86,8 +103,38 @@ serve(async (req) => {
         continue;
       }
 
+      // Atomic claim (unique index, phase1/21b): only one request can own this lead in this campaign. A failed claim sends nothing.
+      if (campaign_id) {
+        const { data: claim, error: claimError } = await supabase.from("campaign_sends")
+          .upsert({ campaign_id, lead_id: lead.id, status: "queued" }, { onConflict: "campaign_id,lead_id", ignoreDuplicates: true }).select("lead_id");
+        if (claimError) { results.failed++; results.errors.push(`${lead.id}: could not reserve`); continue; }
+        if (!claim || claim.length === 0) { results.skipped++; continue; }
+      }
+      const release = async () => { if (campaign_id) await supabase.from("campaign_sends").delete().eq("campaign_id", campaign_id).eq("lead_id", lead.id).eq("status", "queued"); };
+      // Without a campaign there is no claim row: a double click or a retry of the same text to the same person inside ten minutes stops here.
+      if (!campaign_id) {
+        const once = await claimOnce(supabase, `send-once:${action}:${lead.id}:${await textHash(text)}`, 600);
+        if (once) { results.skipped++; continue; }
+      }
+      // Per caller, per organisation and per person, in one atomic step. The phone counter is shared with the other phone channels and with voice calls.
+      const over = await reserveMessage(supabase, callerKey(caller), action, { phone: lead.phone }, limits);
+      if (over) {
+        await release();
+        if (over.scope === "contact") { results.skipped++; results.errors.push(`${lead.id}: contact limit reached`); continue; }
+        results.failed++;
+        results.errors.push(`${lead.id}: ${over.error}`);
+        break; // the caller's or organisation's limit applies to everyone left in this batch too
+      }
+      const entry = { action, actor: caller, lead_id: lead.id, campaign_id: campaign_id ?? null, contact: { phone: lead.phone } };
+      if (!(await logAttempt(supabase, entry))) {
+        await release();
+        results.failed++;
+        results.errors.push(`${lead.id}: could not be recorded`);
+        continue;
+      }
+
       try {
-        const personalizedMessage = message
+        const personalizedMessage = text
           .replace(/\{\{first_name\}\}/g, lead.first_name || "")
           .replace(/\{\{last_name\}\}/g, lead.last_name || "")
           .replace(/\{\{company_name\}\}/g, lead.company_name || "")
@@ -135,18 +182,14 @@ serve(async (req) => {
         });
 
         if (smsRes.ok) {
-          const data = await smsRes.json();
+          const data = await smsRes.json().catch(() => ({})); // the message WAS sent: a bad reply body must not lose that
           results.sent++;
           const externalId = data.bulkId || data.messages?.[0]?.messageId || "";
+          await logResult(supabase, entry, "sent", { provider_status: smsRes.status, provider_ref: externalId ? String(externalId).slice(0, 200) : null });
 
           if (campaign_id && lead.id) {
-            await supabase.from("campaign_sends").upsert({
-              campaign_id,
-              lead_id: lead.id,
-              status: "sent",
-              sent_at: new Date().toISOString(),
-              external_id: externalId,
-            });
+            await supabase.from("campaign_sends").update({ status: "sent", sent_at: new Date().toISOString(), external_id: externalId })
+              .eq("campaign_id", campaign_id).eq("lead_id", lead.id);
           }
 
           await supabase.from("lead_notes").insert({
@@ -157,11 +200,14 @@ serve(async (req) => {
           });
         } else {
           await smsRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
+          await release(); // nothing was sent, so a retry may try again
+          await logResult(supabase, entry, "failed", { provider_status: smsRes.status });
           results.failed++;
           console.error(`[send-sms] provider HTTP ${smsRes.status} for lead ${lead.id}`);
           results.errors.push(`${lead.id}: provider error ${smsRes.status}`);
         }
       } catch {
+        await logResult(supabase, entry, "failed"); // outcome unknown: the claim stays, so a retry cannot send a duplicate
         results.failed++;
         results.errors.push(`${lead.id}: send failed`);
       }

@@ -19,7 +19,7 @@ Every finding is labelled **confirmed-in-source** (the code/SQL does this) or **
 
 ## 1. Executive summary
 
-* No privileged secret (service-role key, SMTP password, API key) was found in tracked files or in Git history. A `.env` was once committed (3 commits) but contained only the **anon-role** key and URL (verified by decoding the JWT `role` claim; values not printed). The anon key is public by design, so no rotation is needed for that reason.
+* **Correction (31 Oct 2026):** an earlier version of this line said no privileged secret was in Git history. That was wrong. A later full-history scan found a **service-role key** of the live project in history (see `docs/ops/SECURITY_AUDIT.md` F-01 and `docs/ops/SERVICE_KEY_INCIDENT.md`); it must be treated as exposed until it is rotated. A `.env` was also once committed and held only the **anon-role** key and URL (verified by decoding the JWT `role` claim; values not printed). The anon key is public by design. No key value or fingerprint is recorded in this repository.
 * Because the anon key is public, **Row Level Security is the only database boundary**. The first migrations created many `USING (true)` / `TO anon` policies; later migrations fixed several but **two sensitive tables were never revisited** (S-01, S-02).
 * Edge functions are the largest hole: with `verify_jwt` left at its default, **the public anon key passes the gateway check**, and 7 functions had no further authentication, 4 more only checked "any signed-in user" (S-03, S-04).
 * Two code-level vulnerabilities were confirmed and **fixed in this branch**: stored XSS from public form fields into the agent's session (S-05), and unsigned one-click offer acceptance (S-06).

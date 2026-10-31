@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
     }
     const newId = created.data.user.id;
 
-    // handle_new_user() normally created an inactive inside_sales profile; set the real values (service role).
+    // handle_new_user() normally created an inactive profile; set the real values (service role).
     const { error: profErr } = await admin.from("profiles").upsert({
       id: newId, full_name: input.full_name, phone: input.phone, role: input.role, is_active: true, updated_at: new Date().toISOString(),
     });

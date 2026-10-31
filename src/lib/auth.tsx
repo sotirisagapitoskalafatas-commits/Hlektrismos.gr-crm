@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { takeAuthLink } from './auth-link';
-import { Role, DEFAULT_ROLE } from './roles';
+import { Role, DEFAULT_ROLE, canonicalRole } from './roles';
 import { fetchUserRoles } from './api';
 import { previewAllowed, ROLE_PREVIEW_HARD_STOP, setPreviewActive } from './role-preview';
 
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', uid)
         .maybeSingle();
       // No row (or a failed read) is stored as null, never as the previous user's profile: an account without a profile gets no access.
-      setProfile((data as Profile | null) ?? null);
+      setProfile(data ? { ...(data as Profile), role: canonicalRole((data as Profile).role) } : null);
       // Best-effort canonical multi-role read; empty if foundation not live.
       const canonical = await fetchUserRoles(uid);
       setCanonicalRoles(canonical);

@@ -53,16 +53,18 @@ export async function getCaller(req: Request, admin: SupabaseClient): Promise<Ca
 
 export type RecordKind = "lead" | "legacy_lead" | "case" | "customer";
 const SOURCES: Record<RecordKind, { table: string; columns: string }> = {
-  lead: { table: "leads", columns: "id, assigned_to_user_id, created_by_user_id" },
-  legacy_lead: { table: "hlektrismos_leads", columns: "id, assigned_to" },
+  lead: { table: "leads", columns: "id, assigned_to_user_id, created_by_user_id, deleted_at" },
+  legacy_lead: { table: "hlektrismos_leads", columns: "id, assigned_to, deleted_at" },
   case: { table: "cases", columns: "id, owner_id, inside_sales_owner, field_sales_owner, next_action_owner_id, created_by, customer_id, lead_id" },
-  customer: { table: "customers", columns: "id, created_by" },
+  customer: { table: "customers", columns: "id, created_by, deleted_at" },
 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Loads the record (ownership columns only) and decides whether `caller` may perform `cap` on it.
  * Returns the ownership row, or a Response (401/403/404) that the function must return unchanged.
+ * A record in the Trash (deleted_at set, on the record or on the customer of a case) answers 404 like a missing one: no Edge Function works on deleted
+ * records, and restoring one is a database function (phase2/06). Needs phase2/06 on leads and customers: without the column the query fails, which refuses.
  * Logs a PII-free audit line on refusal.
  */
 export async function authorizeRecord(
@@ -72,7 +74,12 @@ export async function authorizeRecord(
   const src = SOURCES[kind];
   // The column list is chosen at runtime, so supabase-js cannot type the row; a failed query gives null (refused).
   const { data } = await admin.from(src.table).select(src.columns).eq("id", id).maybeSingle();
-  const row = data as unknown as Record<string, unknown> | null;
+  let row = data as unknown as Record<string, unknown> | null;
+  if (row?.deleted_at) row = null;
+  if (row && kind === "case" && row.customer_id) {
+    const { data: owner, error } = await admin.from("customers").select("deleted_at").eq("id", row.customer_id).maybeSingle();
+    if (error || owner?.deleted_at) row = null;
+  }
   let cases: Record<string, unknown>[] = [];
   if (kind === "customer" && row && caller.kind === "user" && caller.category === "sales") {
     const { data: owned } = await admin.from("cases").select(SOURCES.case.columns).eq("customer_id", id);

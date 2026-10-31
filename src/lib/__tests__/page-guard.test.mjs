@@ -19,23 +19,23 @@ const mod = { exports: {} };
 new Function('module', 'exports', 'require', out.outputFiles[0].text)(mod, mod.exports, createRequire(import.meta.url));
 const R = mod.exports;
 
-const ROLES = ['admin', 'inside_sales', 'field_sales', 'manager', 'back_office'];
+const ROLES = ['admin', 'sales_agent', 'manager', 'back_office'];
 // page -> roles allowed with the Labs switch OFF (lib/labs.ts: Labs modules are additionally admin-only and need the switch)
 const EXPECTED = {
-  home: ['admin', 'inside_sales', 'field_sales'],
-  mywork: ['admin', 'inside_sales', 'field_sales'],
-  followups: ['admin', 'inside_sales', 'field_sales'],
-  cases: ['admin', 'inside_sales', 'field_sales'],
-  case: ['admin', 'inside_sales', 'field_sales'], // record-level authorization stays in the case page / database
-  customers: ['admin', 'inside_sales', 'field_sales'],
-  providers: ['admin', 'inside_sales', 'field_sales'],
-  account: ['admin', 'inside_sales', 'field_sales'],
-  preferences: ['admin', 'inside_sales', 'field_sales'],
-  homelayout: ['admin', 'inside_sales', 'field_sales'],
-  leads: ['admin', 'inside_sales', 'field_sales'], // field_sales: link-only (not in its sidebar) - work items, map, field assistant link to it
-  map: ['admin', 'field_sales'],
-  myday: ['admin', 'field_sales'],
-  field: ['admin', 'field_sales'],
+  home: ['admin', 'sales_agent', 'sales_agent'],
+  mywork: ['admin', 'sales_agent', 'sales_agent'],
+  followups: ['admin', 'sales_agent', 'sales_agent'],
+  cases: ['admin', 'sales_agent', 'sales_agent'],
+  case: ['admin', 'sales_agent', 'sales_agent'], // record-level authorization stays in the case page / database
+  customers: ['admin', 'sales_agent', 'sales_agent'],
+  providers: ['admin', 'sales_agent', 'sales_agent'],
+  account: ['admin', 'sales_agent', 'sales_agent'],
+  preferences: ['admin', 'sales_agent', 'sales_agent'],
+  homelayout: ['admin', 'sales_agent', 'sales_agent'],
+  leads: ['admin', 'sales_agent'],
+  map: ['admin', 'sales_agent'],
+  myday: ['admin', 'sales_agent'],
+  field: ['admin', 'sales_agent'],
   backoffice: ['admin'],
   reports: ['admin'],
   revenue: ['admin'],
@@ -69,26 +69,25 @@ test('Labs pages: only the Admin with the Labs switch on; never a Sales Agent, n
   } finally { labs = 'off'; }
 });
 
-test("the sidebar is unchanged by the guard: leads stays out of the field agent's navigation, but the link-only page is allowed", () => {
+test('a Sales Agent has Leads in the sidebar; legacy roles open nothing', () => {
   const nav = (r) => R.navForRole(r).flatMap((s) => s.children.map((c) => c.page));
-  assert.ok(!nav('field_sales').includes('leads'));
-  assert.equal(R.canOpenPage('leads', 'field_sales'), true);
-  for (const r of ['manager', 'back_office']) assert.equal(R.canOpenPage('leads', r), false);
+  assert.ok(nav('sales_agent').includes('leads'));
+  assert.equal(R.canOpenPage('leads', 'sales_agent'), true);
+  for (const r of ['manager', 'back_office', 'field_sales', 'inside_sales']) assert.equal(R.canOpenPage('leads', r), false, r + ': an unconverted value opens nothing; canonicalRole is the one way in');
 });
 
 test('direct / programmatic navigation: a Sales Agent cannot open any Admin-only page', () => {
-  for (const role of ['inside_sales', 'field_sales']) {
+  for (const role of ['sales_agent']) {
     for (const page of ['backoffice', 'reports', 'revenue', 'admin', ...LABS_PAGES]) {
       assert.equal(R.canOpenPage(page, role), false, `${role} must not open ${page}`);
     }
   }
   // Sales Agents keep what they legitimately use
   for (const page of ['home', 'mywork', 'followups', 'cases', 'case', 'customers', 'providers', 'account']) {
-    for (const role of ['inside_sales', 'field_sales']) assert.equal(R.canOpenPage(page, role), true, `${role} keeps ${page}`);
+    for (const role of ['sales_agent']) assert.equal(R.canOpenPage(page, role), true, `${role} keeps ${page}`);
   }
-  assert.equal(R.canOpenPage('leads', 'inside_sales'), true);
-  assert.equal(R.canOpenPage('field', 'field_sales'), true);
-  assert.equal(R.canOpenPage('field', 'inside_sales'), false);
+  assert.equal(R.canOpenPage('leads', 'sales_agent'), true);
+  assert.equal(R.canOpenPage('field', 'sales_agent'), true);
 });
 
 test('unknown pages and unknown / missing roles are refused (nothing falls through to a default)', () => {
@@ -151,17 +150,17 @@ test('navigation helpers only change the route (view); they cannot bypass the sh
 // In-app links: a control that sends a role to a page that role cannot open would dead-end in the denied state. Every audited
 // link source below is paired with the roles that can SEE the control.
 const LINKS = [
-  ['components/app/MapPage.tsx', 'leads', ['admin', 'field_sales']],
-  ['components/work/WorkRow.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']],
-  ['components/customers/SupplyPointsTab.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']],
-  ['components/dashboards/OperationalStrip.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']],
-  ['components/app/AppShell.tsx', 'leads', ['admin', 'inside_sales', 'field_sales']], // command palette lead hits
-  ['components/dashboards/InsideSalesDashboard.tsx', 'leads', ['inside_sales']],
-  ['components/dashboards/FieldSalesDashboard.tsx', 'myday', ['field_sales']],
-  ['components/dashboards/FieldSalesDashboard.tsx', 'map', ['field_sales']],
-  ['components/shells/MobileShell.tsx', 'myday', ['field_sales']], // rendered only for field_sales
-  ['components/shells/MobileShell.tsx', 'map', ['field_sales']],
-  ['components/app/MyDayPage.tsx', 'field', ['admin', 'field_sales']],
+  ['components/app/MapPage.tsx', 'leads', ['admin', 'sales_agent']],
+  ['components/work/WorkRow.tsx', 'leads', ['admin', 'sales_agent', 'sales_agent']],
+  ['components/customers/SupplyPointsTab.tsx', 'leads', ['admin', 'sales_agent', 'sales_agent']],
+  ['components/dashboards/OperationalStrip.tsx', 'leads', ['admin', 'sales_agent', 'sales_agent']],
+  ['components/app/AppShell.tsx', 'leads', ['admin', 'sales_agent', 'sales_agent']], // command palette lead hits
+  ['components/dashboards/InsideSalesDashboard.tsx', 'leads', ['sales_agent']],
+  ['components/dashboards/FieldSalesDashboard.tsx', 'myday', ['sales_agent']],
+  ['components/dashboards/FieldSalesDashboard.tsx', 'map', ['sales_agent']],
+  ['components/shells/MobileShell.tsx', 'myday', ['sales_agent']], // rendered only for a Sales Agent
+  ['components/shells/MobileShell.tsx', 'map', ['sales_agent']],
+  ['components/app/MyDayPage.tsx', 'field', ['admin', 'sales_agent']],
   ['components/dashboards/AdminDashboard.tsx', 'reports', ['admin']],
   ['components/dashboards/AdminDashboard.tsx', 'backoffice', ['admin']],
   ['components/shell/TopBar.tsx', 'admin', ['admin']],
@@ -178,7 +177,7 @@ test('the denied state returns to Home inside the app (go), not to the public we
   const pd = readFileSync(join(root, 'components/app/PageDenied.tsx'), 'utf8');
   assert.match(pd, /go\('home'\)/);
   assert.ok(!/href="#\/"/.test(pd), '#/ is the public landing route, not the CRM Home');
-  for (const role of ['admin', 'inside_sales', 'field_sales']) assert.equal(R.canOpenPage('home', role), true, role + ' can open Home, so the way out cannot loop');
+  for (const role of ['admin', 'sales_agent', 'sales_agent']) assert.equal(R.canOpenPage('home', role), true, role + ' can open Home, so the way out cannot loop');
 });
 
 test('a signed-in account with no usable profile reaches nothing: the role is not assumed', () => {
@@ -188,9 +187,9 @@ test('a signed-in account with no usable profile reaches nothing: the role is no
   assert.ok(wait > 0 && gate > wait, 'App waits for the profile, then admits only a role that holds access');
   const auth = readFileSync(join(root, 'lib/auth.tsx'), 'utf8');
   assert.match(auth, /profileReady/);
-  assert.match(auth, /setProfile\(\(data as Profile \| null\) \?\? null\)/, 'a missing row is stored as null, never the previous profile');
+  assert.match(auth, /setProfile\(data \? \{ \.\.\.\(data as Profile\), role: canonicalRole\(\(data as Profile\)\.role\) \} : null\)/, 'a missing row is stored as null, never the previous profile; the role is converted at this one point');
   assert.match(auth, /finally \{\s*setProfileFor\(uid\)/, 'readiness is set even when the read fails (fail closed, not stuck)');
   // the role used while no profile exists is the least-privileged ACTIVE role, and App never lets it render the shell
-  assert.equal(R.DEFAULT_ROLE, 'inside_sales');
+  assert.equal(R.DEFAULT_ROLE, 'sales_agent');
   for (const r of [undefined, null, '', 'intern', 'manager', 'back_office']) assert.equal(R.hasAccess(r), false, String(r) + ' is not admitted');
 });

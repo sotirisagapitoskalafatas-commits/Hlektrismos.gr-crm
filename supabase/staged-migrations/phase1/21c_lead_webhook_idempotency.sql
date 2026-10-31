@@ -28,7 +28,7 @@ declare
   v_lead uuid;
   v_seen timestamptz;
 begin
-  if p_source is null or length(p_source) = 0 or length(p_source) > 80 or jsonb_typeof(p_lead) is distinct from 'object'
+  if p_source is null or length(p_source) = 0 or length(p_source) > 120 or jsonb_typeof(p_lead) is distinct from 'object'
      or (p_event_id is null and p_contact_hash is null) or length(p_event_id) > 200 or length(p_contact_hash) > 100 then
     raise exception 'invalid webhook lead arguments';
   end if;

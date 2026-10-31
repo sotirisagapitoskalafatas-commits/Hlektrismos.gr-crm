@@ -15,12 +15,14 @@ All values are whole numbers of at least 1. A missing field makes the whole valu
     "voice":          { "...": "the same five fields" },
     "email_campaign": { "...": "the same five fields" },
     "email_direct":   { "...": "the same five fields" },
+    "email_confirmation": { "...": "the same five fields" },
     "offer":          { "...": "the same five fields" }
   },
   "contact": {
     "phone": { "perHour": 0, "perDay": 0 },
     "email": { "perHour": 0, "perDay": 0 }
-  }
+  },
+  "voiceMaxCallSeconds": 0
 }
 ```
 The zeros above are placeholders and are refused as they stand.
@@ -34,6 +36,7 @@ The zeros above are placeholders and are refused as they stand.
 | `maxRecipients` | one request | recipients; 100 is a hard ceiling in code |
 | `contact.phone` | one person, across SMS, Viber, WhatsApp **and voice calls together** | contacts, keyed by the normalised number, so the same person under two lead records counts once |
 | `contact.email` | one person, across every kind of email | contacts |
+| `voiceMaxCallSeconds` | one AI call, 10 to 3600 | sent to Vapi as `assistant.maxDurationSeconds`; the ceiling on what one call can cost |
 
 ## How the limits behave
 - **Atomic.** The caller, organisation and person counters advance in one database transaction (`consume_rate_limits`, phase1/21b). A refusal by any one advances none.
@@ -41,6 +44,7 @@ The zeros above are placeholders and are refused as they stand.
 - **Fixed windows.** Hour and day windows reset on the boundary, so a burst across a boundary can reach twice a limit. Set figures with that in mind.
 - **Fail closed.** If the counter cannot be reached, nothing is sent (503).
 - **Provider failures are not refunded.** The provider may have accepted the message, so the count errs towards sending less.
-- **Retries.** A campaign send holds a claim per lead. A provider error releases it so a retry can send; a network failure keeps it, because the outcome is unknown. Without a campaign, the same text to the same person is sent once in ten minutes.
+- **Retries.** A campaign send holds a claim per lead. A provider error releases it so a retry can send; a network failure keeps it, because the outcome is unknown. Without a campaign, the same text to the same person is sent once in ten minutes (`claim_once`, an expiry per key, so a clock boundary does not reopen it).
+- **`send-lead-confirmation`** is public, so it spends `email_confirmation` and `contact.email` too, and skips the mail when it cannot.
 - **Frequency cap.** The gate also counts sent messages and calls from `communication_log`, so all channels share `maxAttemptsPerWindow` (2 in 7 days, `_shared/eligibility.ts`).
 - Voice calls also keep a ten-minute lock per lead.

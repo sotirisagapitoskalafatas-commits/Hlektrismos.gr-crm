@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
-import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited, textHash } from "../_shared/limits.ts";
+import { badBatch, callerKey, claimOnce, cleanText, isUuid, rateLimited, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { logAttempt, logResult } from "../_shared/communication-log.ts";
 import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage, type OutboundAction } from "../_shared/outreach-limits.ts";
@@ -113,7 +113,7 @@ serve(async (req) => {
       const release = async () => { if (campaign_id) await supabase.from("campaign_sends").delete().eq("campaign_id", campaign_id).eq("lead_id", lead.id).eq("status", "queued"); };
       // Without a campaign there is no claim row: a double click or a retry of the same text to the same person inside ten minutes stops here.
       if (!campaign_id) {
-        const once = await durableLimit(supabase, `send-once:${action}:${lead.id}:${await textHash(text)}`, 1, 600);
+        const once = await claimOnce(supabase, `send-once:${action}:${lead.id}:${await textHash(text)}`, 600);
         if (once) { results.skipped++; continue; }
       }
       // Per caller, per organisation and per person, in one atomic step. The phone counter is shared with the other phone channels and with voice calls.

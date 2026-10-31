@@ -22,8 +22,9 @@ import { assertHeaderSafe, parseRecipient } from "../_shared/email-safety.ts";
 //
 // Promotional or requested: an offer is promotional and passes the full gate on each channel. The one exception is a quote the customer asked for, and it
 // applies only when the owner has set SERVICE_COMMS_APPROVED=yes after counsel's advice AND contact_service_requests holds a live, evidenced request for
-// that lead and channel (phase3/11). Then the gate applies its non-marketing rule: an address, and no «stop all contact» objection. If the lookup fails,
-// the promotional rule applies. A request is never treated as marketing consent.
+// that lead and channel (phase3/11). Then the gate applies its "requested" rule, which replaces only the consent record and the outreach switches: every
+// refusal still stops it (objection, withdrawn consent, suppression), and so do the frequency cap and contact hours. If the lookup fails, the promotional rule
+// applies. A request is never treated as marketing consent.
 //
 // Authorization (stage 2b): the caller needs communications.email.send AND access to the lead
 // (public.hlektrismos_leads: office = all, sales = own). Viber/WhatsApp additionally need
@@ -108,7 +109,7 @@ Deno.serve(async (req: Request) => {
       if (!error) for (const r of asked ?? []) for (const c of r.channels ?? []) requested.add(c);
     }
     const passes = async (channel: "email" | "viber" | "whatsapp") =>
-      (await gateRecipients([lead_id], channel, requested.has(channel) ? "transactional" : "promotional", supabaseLoaders(supabase), outreachConfigFromEnv())).allowed.length > 0;
+      (await gateRecipients([lead_id], channel, requested.has(channel) ? "requested" : "promotional", supabaseLoaders(supabase), outreachConfigFromEnv())).allowed.length > 0;
     const mayEmail = !!customer_email && await passes("email");
     const mayViber = !!customer_phone && mayMessagePhone && await passes("viber");
     const mayWhatsApp = !!customer_phone && mayMessagePhone && await passes("whatsapp");
@@ -160,6 +161,12 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
       await supabase.rpc("offer_record_delivery", { p_offer_id: offerId, p_channel: channel, p_ok: res.ok, p_status: res.status, p_actor_id: actorId });
     };
 
+    // A thrown request: the outcome is unknown, so the attempt is closed as failed in both records rather than left open.
+    const unknownOutcome = async (channel: string) => {
+      await logResult(supabase, { action: "offer", actor: caller, lead_id: String(lead_id), contact: channel === "email" ? { email: customer_email } : { phone: customer_phone } }, "failed");
+      await supabase.rpc("offer_record_delivery", { p_offer_id: offerId, p_channel: channel, p_ok: false, p_status: 0, p_actor_id: actorId });
+    };
+
     // 3. Send via Viber (if phone available and the caller may message phones)
     let viberResult = null;
     if (mayViber) {
@@ -186,6 +193,7 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
           console.log(`[send-offer] Viber: ${viberResult.status}`);
         }
       } catch (err: unknown) {
+        await unknownOutcome("viber");
         console.warn(`[send-offer] Viber failed: ${err instanceof Error ? err.name : "unknown"}`);
       }
     }
@@ -217,6 +225,7 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
           console.log(`[send-offer] WhatsApp: ${whatsappResult.status}`);
         }
       } catch (err: unknown) {
+        await unknownOutcome("whatsapp");
         console.warn(`[send-offer] WhatsApp failed: ${err instanceof Error ? err.name : "unknown"}`);
       }
     }
@@ -254,6 +263,7 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
           }
         }
       } catch (err: unknown) {
+        await unknownOutcome("email");
         console.warn(`[send-offer] Email failed: ${err instanceof Error ? err.name : "unknown"}`);
       }
     }

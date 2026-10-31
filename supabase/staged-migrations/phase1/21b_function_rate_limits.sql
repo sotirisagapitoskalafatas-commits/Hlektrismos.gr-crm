@@ -2,7 +2,7 @@
 -- Phase 1 / 21b: a durable, shared rate limit for Edge Functions that send messages, place calls or spend paid quota.
 -- The in-memory throttle in _shared/limits.ts is per function instance, so it does not bound a horizontally scaled function.
 -- This counter lives in the database, so every instance shares it, and the increment is one atomic statement.
--- MUST be applied BEFORE the functions that call consume_rate_limit are deployed: they refuse to send (503) when it is missing.
+-- MUST be applied BEFORE the functions that call consume_rate_limits and claim_once are deployed: they refuse to send (503) when it is missing.
 -- It also adds the unique index behind the atomic send claim of send-sms and send-campaign-email (without it they send nothing to a campaign),
 -- and public.communication_log, which every sender writes before sending (without it nothing is sent).
 -- Only service_role may call the counters; a signed-in Admin may read the log. Nothing else here is reachable through the API.
@@ -19,34 +19,49 @@ grant all on table public.function_rate_limits to service_role;
 
 create unique index if not exists campaign_sends_campaign_lead_unique on public.campaign_sends (campaign_id, lead_id);
 
--- True when this attempt is inside the limit. p_cost counts recipients for a batch. Fixed window: the count resets at each boundary.
-create or replace function public.consume_rate_limit(p_bucket text, p_limit integer, p_window_seconds integer, p_cost integer default 1)
+-- "Only once for this long": a duplicate click, a retry or a simultaneous request. True for the one caller that takes the key. The expiry is per key, so two
+-- calls either side of a clock boundary cannot both pass, which a fixed window would allow. The insert is one atomic statement.
+create table if not exists public.function_once_locks (
+  key        text primary key,
+  expires_at timestamptz not null
+);
+alter table public.function_once_locks enable row level security;
+revoke all on table public.function_once_locks from public, anon, authenticated;
+grant all on table public.function_once_locks to service_role;
+
+create or replace function public.claim_once(p_key text, p_seconds integer)
 returns boolean
 language plpgsql
 security invoker
 set search_path = public
 as $$
 declare
-  v_window timestamptz;
-  v_hits integer;
+  v_taken boolean;
 begin
-  if p_bucket is null or length(p_bucket) = 0 or length(p_bucket) > 200 or p_limit < 1 or p_window_seconds < 1 or p_cost < 1 then
-    raise exception 'invalid rate limit arguments';
+  if p_key is null or length(p_key) = 0 or length(p_key) > 200 or p_seconds is null or p_seconds < 1 or p_seconds > 86400 then
+    raise exception 'invalid once-lock arguments';
   end if;
-  v_window := to_timestamp(floor(extract(epoch from now()) / p_window_seconds) * p_window_seconds);
-  insert into public.function_rate_limits as r (bucket, window_start, hits)
-  values (p_bucket, v_window, p_cost)
-  on conflict (bucket, window_start) do update set hits = r.hits + p_cost
-  returning hits into v_hits;
-  -- opportunistic cleanup, so the table stays small without a cron job
+  insert into public.function_once_locks as l (key, expires_at) values (p_key, now() + make_interval(secs => p_seconds))
+  on conflict (key) do update set expires_at = excluded.expires_at where l.expires_at <= now()
+  returning true into v_taken;
   if random() < 0.01 then
-    delete from public.function_rate_limits where window_start < now() - interval '2 days';
+    delete from public.function_once_locks where expires_at < now() - interval '1 day';
   end if;
-  return v_hits <= p_limit;
+  return coalesce(v_taken, false);
 end;
 $$;
-revoke all on function public.consume_rate_limit(text, integer, integer, integer) from public, anon, authenticated;
-grant execute on function public.consume_rate_limit(text, integer, integer, integer) to service_role;
+revoke all on function public.claim_once(text, integer) from public, anon, authenticated;
+grant execute on function public.claim_once(text, integer) to service_role;
+
+-- Gives the key back after a send that definitely did not happen, so a genuine retry can go out.
+create or replace function public.release_once(p_key text)
+returns void
+language sql
+security invoker
+set search_path = public
+as $$ delete from public.function_once_locks where key = p_key; $$;
+revoke all on function public.release_once(text) from public, anon, authenticated;
+grant execute on function public.release_once(text) to service_role;
 
 -- Several limits as one step: every counter advances, or none does. p_items = [{bucket, limit, window_seconds, cost?}].
 -- Answers {"ok":true} or {"ok":false,"bucket":<the first one that refused>}. Counters are locked in sorted order, so two calls sharing buckets
@@ -63,6 +78,9 @@ declare
 begin
   if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 20 then
     raise exception 'invalid rate limit arguments';
+  end if;
+  if (select count(*) <> count(distinct e ->> 'bucket') from jsonb_array_elements(p_items) e) then
+    raise exception 'invalid rate limit arguments: a bucket appears twice'; -- the two costs would not add up
   end if;
   for r in
     select x.bucket, x."limit" as lim, x.window_seconds as win, coalesce(x.cost, 1) as cost,
@@ -100,7 +118,7 @@ grant execute on function public.consume_rate_limits(jsonb) to service_role;
 -- No message text, no provider reply, no secret; the address appears only as a SHA-256 hash, the record through its ids.
 create table if not exists public.communication_log (
   id              bigint generated always as identity primary key,
-  action          text not null check (action in ('sms', 'viber', 'whatsapp', 'voice', 'email_campaign', 'email_direct', 'offer')),
+  action          text not null check (action in ('sms', 'viber', 'whatsapp', 'voice', 'email_campaign', 'email_direct', 'email_confirmation', 'offer')),
   result          text not null check (result in ('attempt', 'sent', 'failed')),
   actor_kind      text not null check (actor_kind in ('user', 'service')),
   actor_id        uuid,

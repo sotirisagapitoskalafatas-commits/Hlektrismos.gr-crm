@@ -177,18 +177,20 @@ test('only an admin lifts an objection, with a reason; the facts update immediat
 test('a spoken refusal: service_role only, one row however often it is delivered, marketing on every channel, and no transcript stored', async () => {
   const CALL = 'cccccccc-0000-4000-8000-000000000001';
   const LEAD = 'dddddddd-0000-4000-8000-000000000001';
-  const call = (phone) => db.query('select public.record_spoken_objection($1, $2, $3) r', [phone, LEAD, CALL]);
+  const call = (phone, email = null) => db.query('select public.record_spoken_objection($1, $2, $3, $4) r', [phone, email, LEAD, CALL]);
   for (const who of [INSIDE, ADMIN]) {
     await as(who);
-    assert.ok(!(await run(`select public.record_spoken_objection('6910000077', null, null)`)).ok, 'no signed-in person may call it');
+    assert.ok(!(await run(`select public.record_spoken_objection('6910000077', null, null, null)`)).ok, 'no signed-in person may call it');
   }
   await as(null);
-  assert.ok(!(await run(`select public.record_spoken_objection('6910000077', null, null)`)).ok, 'nor anon');
+  assert.ok(!(await run(`select public.record_spoken_objection('6910000077', null, null, null)`)).ok, 'nor anon');
   await su();
   await db.exec('set role service_role');
   assert.equal((await call('+30 691 000 0077')).rows[0].r, true);
   assert.equal((await call('6910000077')).rows[0].r, false, 'a repeat changes nothing');
-  await assert.rejects(() => call('not a number'), /no phone number/);
+  await assert.rejects(() => call('not a number'), /no phone number or email/);
+  assert.equal((await call('6910000077', 'Spoken@Example.gr')).rows[0].r, true, 'the email is added; the phone is not repeated');
+  assert.equal((await call('6910000077', 'spoken@example.gr')).rows[0].r, false);
   await su();
   const rows = (await db.query("select * from public.contact_objections where address_key = '6910000077'")).rows;
   assert.equal(rows.length, 1);
@@ -196,6 +198,8 @@ test('a spoken refusal: service_role only, one row however often it is delivered
   assert.equal(rows[0].channels, null, 'every channel');
   assert.equal(rows[0].source, 'customer_request');
   assert.equal(rows[0].lead_id, LEAD);
+  assert.equal((await db.query("select count(*)::int n from public.contact_objections where address_key = 'spoken@example.gr'")).rows[0].n, 1);
+  assert.equal((await db.query("select reason from public.email_suppressions where email = 'spoken@example.gr'")).rows[0].reason, 'objection');
   const log = (await db.query("select details from public.activity_log where action = 'contact_objection' order by created_at desc limit 1")).rows[0].details;
   assert.equal(log.voice_call, CALL);
 });

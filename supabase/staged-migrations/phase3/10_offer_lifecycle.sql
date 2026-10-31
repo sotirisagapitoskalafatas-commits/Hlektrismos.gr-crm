@@ -26,6 +26,7 @@ create table if not exists public.offers (
   expires_at     timestamptz not null,
   accepted_at    timestamptz,
   closed_at      timestamptz,
+  replaces       uuid references public.offers (id) on delete set null, -- the open offer this one took over from; it comes back if nothing is delivered
   constraint offers_accepted_dated check ((status = 'accepted') = (accepted_at is not null))
 );
 -- One open offer per lead and tariff; one accepted offer per lead. These hold even if two requests race past every other check.
@@ -36,7 +37,7 @@ create index if not exists offers_lead_idx on public.offers (lead_id, created_at
 create table if not exists public.offer_events (
   id         bigint generated always as identity primary key,
   offer_id   uuid not null references public.offers (id) on delete cascade,
-  event      text not null check (event in ('created', 'delivery_sent', 'delivery_failed', 'sent', 'failed', 'accepted', 'accept_refused', 'expired', 'superseded', 'withdrawn')),
+  event      text not null check (event in ('created', 'delivery_sent', 'delivery_failed', 'sent', 'failed', 'accepted', 'accept_refused', 'expired', 'superseded', 'restored', 'withdrawn')),
   channel    text check (channel is null or channel in ('email', 'viber', 'whatsapp')),
   actor_id   uuid,               -- null = the customer's link or the system
   detail     jsonb not null default '{}'::jsonb,
@@ -85,7 +86,8 @@ drop trigger if exists offer_events_no_change on public.offer_events;
 create trigger offer_events_no_change before update or delete on public.offer_events
   for each row execute function public.offer_events_append_only();
 
--- An open offer older than ten minutes is replaced by a new one (its link then answers "closed"); younger than that, it is a double click.
+-- An open offer older than ten minutes is replaced by a new one (its link then answers "closed"); younger than that, it is a double click. If the new one
+-- reaches nobody, offer_mark_failed puts the old one back, so a failed resend does not cost the customer a working link.
 create or replace function public.offer_create(
   p_lead_id uuid, p_tariff_id uuid, p_expires_at timestamptz, p_purpose text, p_estimated_cost numeric, p_savings numeric, p_actor_id uuid)
 returns jsonb language plpgsql security invoker set search_path = public as $$
@@ -94,6 +96,7 @@ declare
   v_tariff record;
   v_open record;
   v_id uuid;
+  v_replaces uuid;
 begin
   if p_expires_at is null or p_expires_at <= now() or p_expires_at > now() + interval '60 days' then
     raise exception 'offer_create: invalid expiry';
@@ -111,10 +114,11 @@ begin
     end if;
     update public.offers set status = 'superseded', closed_at = now() where id = v_open.id;
     insert into public.offer_events (offer_id, event, actor_id) values (v_open.id, 'superseded', p_actor_id);
+    v_replaces := v_open.id;
   end if;
 
-  insert into public.offers (lead_id, tariff_id, purpose, provider_name, program_name, estimated_cost, savings, created_by, expires_at)
-  values (p_lead_id, p_tariff_id, p_purpose, v_tariff.provider_name, v_tariff.program_name, p_estimated_cost, p_savings, p_actor_id, p_expires_at)
+  insert into public.offers (lead_id, tariff_id, purpose, provider_name, program_name, estimated_cost, savings, created_by, expires_at, replaces)
+  values (p_lead_id, p_tariff_id, p_purpose, v_tariff.provider_name, v_tariff.program_name, p_estimated_cost, p_savings, p_actor_id, p_expires_at, v_replaces)
   returning id into v_id;
   insert into public.offer_events (offer_id, event, actor_id, detail) values (v_id, 'created', p_actor_id, jsonb_build_object('purpose', p_purpose));
   return jsonb_build_object('state', 'created', 'offer_id', v_id, 'provider_name', v_tariff.provider_name, 'program_name', v_tariff.program_name);
@@ -129,12 +133,19 @@ $$;
 -- At least one channel delivered: the offer, the lead, the follow-up task, the note and the history move together.
 create or replace function public.offer_mark_sent(p_offer_id uuid, p_channels text[], p_actor_id uuid)
 returns boolean language plpgsql security invoker set search_path = public as $$
-declare o public.offers;
+declare
+  o public.offers;
+  v_lead uuid;
 begin
+  select lead_id into v_lead from public.offers where id = p_offer_id;
+  if not found then return false; end if;
+  -- Lead first, then offer: the order offer_create and offer_accept use, so these cannot deadlock each other.
+  perform 1 from public.hlektrismos_leads where id = v_lead for update;
   select * into o from public.offers where id = p_offer_id for update;
-  if not found or o.status <> 'created' then return false; end if;
+  if o.status <> 'created' then return false; end if;
   update public.offers set status = 'sent', sent_at = now() where id = p_offer_id;
-  update public.hlektrismos_leads set status = 'follow_up', last_contact_at = now() where id = o.lead_id;
+  -- A lead closed while the message was going out stays closed.
+  update public.hlektrismos_leads set status = 'follow_up', last_contact_at = now() where id = o.lead_id and status not in ('customer', 'lost', 'unsubscribed', 'do_not_contact');
   insert into public.crm_tasks (lead_id, tariff_id, title, description, status, priority, due_date)
   values (o.lead_id, o.tariff_id, 'Προσφορά στάλθηκε: ' || o.provider_name || ' - ' || o.program_name,
           'Εκτιμώμενο κόστος: €' || coalesce(o.estimated_cost::text, '') || '/μήνα. Εξοικονόμηση: €' || coalesce(o.savings::text, '0') || '/μήνα. Περιμένουμε απάντηση.',
@@ -148,10 +159,16 @@ end $$;
 -- Nothing was delivered: no status change on the lead, no task, and a retry may create a new offer at once.
 create or replace function public.offer_mark_failed(p_offer_id uuid, p_actor_id uuid)
 returns boolean language plpgsql security invoker set search_path = public as $$
+declare v_replaces uuid;
 begin
-  update public.offers set status = 'failed', closed_at = now() where id = p_offer_id and status = 'created';
+  update public.offers set status = 'failed', closed_at = now() where id = p_offer_id and status = 'created' returning replaces into v_replaces;
   if not found then return false; end if;
   insert into public.offer_events (offer_id, event, actor_id) values (p_offer_id, 'failed', p_actor_id);
+  if v_replaces is not null then
+    update public.offers set status = case when sent_at is null then 'created' else 'sent' end, closed_at = null
+    where id = v_replaces and status = 'superseded' and expires_at > now();
+    if found then insert into public.offer_events (offer_id, event, actor_id) values (v_replaces, 'restored', p_actor_id); end if;
+  end if;
   return true;
 end $$;
 
@@ -185,6 +202,8 @@ begin
   end if;
 
   update public.offers set status = 'accepted', accepted_at = now(), closed_at = now() where id = o.id;
+  insert into public.offer_events (offer_id, event)
+  select id, 'superseded' from public.offers where lead_id = p_lead_id and id <> o.id and status in ('created', 'sent');
   update public.offers set status = 'superseded', closed_at = now() where lead_id = p_lead_id and id <> o.id and status in ('created', 'sent');
   update public.hlektrismos_leads set status = 'customer', converted_at = now() where id = p_lead_id;
   insert into public.crm_tasks (lead_id, tariff_id, title, description, status, priority, completed_at)

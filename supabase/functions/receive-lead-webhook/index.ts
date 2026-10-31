@@ -22,7 +22,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /** The sender's own identifier for this delivery, when it has one: a header, or the field a lead form or connector carries. */
 function eventIdOf(req: Request, body: Record<string, unknown>): string | null {
-  const raw = req.headers.get("x-event-id") ?? req.headers.get("idempotency-key") ?? body.event_id ?? body.leadgen_id ?? body.lead_id ?? body.id;
+  const raw = req.headers.get("x-event-id") ?? req.headers.get("idempotency-key") ?? body.event_id ?? body.leadgen_id ?? body.lead_id; // not a generic "id": a form's constant id would swallow every later lead
   const id = typeof raw === "number" ? String(raw) : raw;
   return typeof id === "string" && /^[\x21-\x7e]{1,200}$/.test(id) ? id : null;
 }

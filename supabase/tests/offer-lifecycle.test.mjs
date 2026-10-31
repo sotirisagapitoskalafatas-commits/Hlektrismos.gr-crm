@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildSync } from 'esbuild';
 import { PGlite } from '@electric-sql/pglite';
-import { loadFunction, createDb } from './helpers/edge-harness.mjs';
+import { loadFunction, createDb, TEST_OUTREACH_LIMITS } from './helpers/edge-harness.mjs';
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const fnDir = fileURLToPath(new URL('../functions/', import.meta.url));
@@ -172,6 +172,53 @@ test('send-offer: an older open offer is replaced, and its link then says closed
   a.restore();
 });
 
+test('a failed resend gives the customer back the working link', async () => {
+  const { id, t } = await sendOne();
+  await one(`update public.offers set created_at = '2026-10-30T09:00:00Z' where id = $1`, [id]);
+  await withClock(async () => {
+    const f = await sender(undefined, {}, async () => new Response('', { status: 500 }));
+    assert.equal((await f.call(offerBody)).status, 502);
+    f.restore();
+  });
+  assert.equal(await status(id), 'sent', 'the earlier offer is live again');
+  assert.deepEqual((await events(id)).slice(-2), ['superseded', 'restored']);
+  await one(`update public.hlektrismos_leads set status = 'new'`);
+  const a = await acceptor();
+  assert.equal((await a.call({ body: { offer_id: id, lead_id: LEAD, t } })).json.state, 'accepted');
+  a.restore();
+});
+
+test('a lead closed while the offer was going out stays closed', async () => {
+  const id = await seeded({ state: 'created' });
+  await one(`update public.hlektrismos_leads set status = 'lost' where id = $1`, [LEAD]);
+  await as('service_role');
+  await pg.query('select public.offer_mark_sent($1, $2, null)', [id, ['email']]);
+  assert.equal(await leadStatus(), 'lost');
+});
+
+test('limits and the audit trail on send-offer: a refused channel sends nothing; an attempt that cannot be recorded sends nothing; a thrown request is closed in both records', async () => {
+  await withClock(async () => {
+    const over = await sender(undefined, { OUTREACH_LIMITS: JSON.stringify({ ...JSON.parse(TEST_OUTREACH_LIMITS), contact: { phone: { perHour: 9, perDay: 9 }, email: { perHour: 1, perDay: 9 } } }) });
+    const db1 = over.db; db1.counters = {};
+    db1.rpc.consume_rate_limits = async ({ p_items }) => (p_items.length > 1 ? { data: { ok: false, bucket: 'contact:e:x:h' }, error: null } : { data: { ok: true }, error: null });
+    assert.equal((await over.call(offerBody)).status, 502);
+    assert.equal(over.outbound.filter((o) => /resend/.test(o.url)).length, 0, 'over the limit');
+    over.restore();
+    await one('update public.offers set status = $1', ['failed']);
+    const db2 = senderDb(); db2.failInsert = ['communication_log'];
+    const norec = await sender(db2);
+    assert.equal((await norec.call(offerBody)).status, 502);
+    assert.equal(norec.outbound.filter((o) => /resend/.test(o.url)).length, 0, 'not recorded, not sent');
+    norec.restore();
+    await one('update public.offers set status = $1', ['failed']);
+    const thrown = await sender(undefined, {}, async (url) => { if (/resend/.test(url)) throw new Error('timeout'); return ok(); });
+    assert.equal((await thrown.call(offerBody)).status, 502);
+    assert.deepEqual(thrown.db.rows('communication_log').map((r) => r.result), ['attempt', 'failed']);
+    thrown.restore();
+    assert.equal((await one(`select count(*)::int n from public.offer_events where event = 'delivery_failed'`))[0].n, 1);
+  });
+});
+
 test('send-offer: nothing delivered marks the offer failed, records nothing on the lead, and a retry works at once', async () => {
   await withClock(async () => {
     const f = await sender(undefined, {}, async () => new Response('{"to":"detail"}', { status: 500 }));
@@ -233,6 +280,28 @@ test('promotional and requested are kept apart: a recorded request changes nothi
     assert.equal(await run(withRequest(), { SERVICE_COMMS_APPROVED: 'yes' }), 200, 'approved, live, evidenced, this channel');
     assert.equal((await one('select purpose from public.offers'))[0].purpose, 'requested_service');
   });
+});
+
+test('a requested quote still stops at every refusal, and at the frequency cap and contact hours', async () => {
+  const requested = () => { const db = senderDb([]); db.rows('contact_service_requests').push({ lead_id: LEAD, request_type: 'quote', channels: ['email'], withdrawn_at: null, expires_at: '2027-01-01T00:00:00Z' }); return db; };
+  const run = async (tweak, clock = withClock) => clock(async () => {
+    const db = requested(); tweak(db);
+    const f = await sender(db, { SERVICE_COMMS_APPROVED: 'yes' });
+    const r = await f.call(offerBody);
+    assert.equal(f.outbound.filter((o) => /resend/.test(o.url)).length, 0);
+    f.restore();
+    return r.status;
+  });
+  const key = 'a@example.gr';
+  assert.equal(await run((d) => d.rows('contact_objections').push({ address_kind: 'email', address_key: key, scope: 'marketing', channels: null, lifted_at: null })), 403, 'marketing objection');
+  assert.equal(await run((d) => d.rows('contact_objections').push({ address_kind: 'phone', address_key: L.phoneKey('6900000001'), scope: 'marketing', channels: null, lifted_at: null })), 403, 'spoken refusal on the phone');
+  assert.equal(await run((d) => d.rows('contact_consents').push({ address_kind: 'email', address_key: key, channel: 'email', status: 'withdrawn' })), 403, 'withdrawn consent');
+  assert.equal(await run((d) => d.rows('email_suppressions').push({ email: key })), 403, 'unsubscribed');
+  const recent = new Date(NOON_ATHENS - 3600_000).toISOString();
+  assert.equal(await run((d) => d.rows('communication_log').push({ lead_id: LEAD, result: 'sent', created_at: recent }, { lead_id: LEAD, result: 'sent', created_at: recent })), 403, 'frequency cap');
+  const NIGHT = Date.parse('2026-10-30T23:00:00Z');
+  const atNight = async (fn) => { const Real = Date; globalThis.Date = class extends Real { constructor(...a) { super(...(a.length ? a : [NIGHT])); } static now() { return NIGHT; } }; try { return await fn(); } finally { globalThis.Date = Real; } };
+  assert.equal(await run(() => {}, atNight), 403, 'outside contact hours');
 });
 
 test('a stop-all objection still stops a requested quote', async () => {
@@ -370,6 +439,7 @@ test('accepting one offer closes the lead\'s other open offers; a second can nev
   const a = await acceptor();
   await a.call({ body: { offer_id: first, lead_id: LEAD, t: await sign(3600, first, LEAD) } });
   assert.equal(await status(second), 'superseded');
+  assert.deepEqual(await events(second), ['superseded'], 'the change is in its history');
   assert.equal((await a.call({ body: { offer_id: second, lead_id: LEAD, t: await sign(3600, second, LEAD) } })).json.state, 'closed');
   a.restore();
 });

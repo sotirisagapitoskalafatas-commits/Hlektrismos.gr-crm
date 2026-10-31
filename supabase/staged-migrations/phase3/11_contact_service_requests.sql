@@ -54,6 +54,26 @@ end $$;
 revoke all on function public.record_service_request(uuid, text, text[], text, timestamptz, timestamptz) from public, anon;
 grant execute on function public.record_service_request(uuid, text, text[], text, timestamptz, timestamptz) to authenticated;
 
+-- The customer changed their mind, or the request was recorded by mistake. The same people who can record one can withdraw it.
+create or replace function public.withdraw_service_request(p_id uuid)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare
+  v_role text := public.contact_role();
+  v_lead uuid;
+begin
+  select lead_id into v_lead from public.contact_service_requests where id = p_id and withdrawn_at is null;
+  if not found then return false; end if;
+  if v_role is null or (v_role <> 'admin' and not exists (select 1 from public.hlektrismos_leads l where l.id = v_lead and l.assigned_to = auth.uid())) then
+    raise exception 'withdraw_service_request: not allowed' using errcode = '42501';
+  end if;
+  update public.contact_service_requests set withdrawn_at = now() where id = p_id;
+  perform public.contact_log('contact_service_request_withdrawn', v_lead, null, jsonb_build_object('request', p_id));
+  return true;
+end $$;
+revoke all on function public.withdraw_service_request(uuid) from public, anon;
+grant execute on function public.withdraw_service_request(uuid) to authenticated;
+
 -- ROLLBACK (drops the recorded requests: export them first):
+--   drop function public.withdraw_service_request(uuid);
 --   drop function public.record_service_request(uuid, text, text[], text, timestamptz, timestamptz);
 --   drop table public.contact_service_requests;

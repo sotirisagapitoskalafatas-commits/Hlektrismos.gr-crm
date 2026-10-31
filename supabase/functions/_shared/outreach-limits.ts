@@ -5,8 +5,8 @@
 
 import { contactHash, emailKey, phoneKey } from "./contact-keys.ts";
 
-export type OutboundAction = "sms" | "viber" | "whatsapp" | "voice" | "email_campaign" | "email_direct" | "offer";
-const ACTIONS: OutboundAction[] = ["sms", "viber", "whatsapp", "voice", "email_campaign", "email_direct", "offer"];
+export type OutboundAction = "sms" | "viber" | "whatsapp" | "voice" | "email_campaign" | "email_direct" | "email_confirmation" | "offer";
+const ACTIONS: OutboundAction[] = ["sms", "viber", "whatsapp", "voice", "email_campaign", "email_direct", "email_confirmation", "offer"];
 
 export interface ActionLimits {
   /** Requests one caller may make per hour. */ requestsPerHour: number;
@@ -19,6 +19,8 @@ export interface OutreachLimits {
   actions: Record<OutboundAction, ActionLimits>;
   /** One person, across channels: `phone` is shared by SMS, Viber, WhatsApp and voice calls, `email` by every kind of email. */
   contact: { phone: ContactLimits; email: ContactLimits };
+  /** Longest AI call, in seconds. Without it one call has no cost ceiling of its own. */
+  voiceMaxCallSeconds: number;
 }
 
 const positive = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1;
@@ -38,6 +40,7 @@ export function parseOutreachLimits(raw: string | null | undefined): OutreachLim
   if (!o || typeof o !== "object" || !o.actions || !o.contact) return null;
   if (!ACTIONS.every((k) => actionOk((o.actions as Record<string, unknown>)[k]))) return null;
   if (!contactOk(o.contact.phone) || !contactOk(o.contact.email)) return null;
+  if (!positive(o.voiceMaxCallSeconds) || o.voiceMaxCallSeconds < 10 || o.voiceMaxCallSeconds > 3600) return null;
   return o as OutreachLimits;
 }
 

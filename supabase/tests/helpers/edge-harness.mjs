@@ -21,8 +21,9 @@ export const SUPABASE_URL = 'https://project.supabase.test';
 // Large enough that only a test which sets its own value ever meets a limit. Not a proposal: the real figures are the owner's (OUTREACH_LIMITS.md).
 const wide = { requestsPerHour: 100000, messagesPerHour: 100000, messagesPerDay: 100000, orgMessagesPerDay: 100000, maxRecipients: 100 };
 export const TEST_OUTREACH_LIMITS = JSON.stringify({
-  actions: { sms: wide, viber: wide, whatsapp: wide, voice: wide, email_campaign: wide, email_direct: wide, offer: wide },
+  actions: { sms: wide, viber: wide, whatsapp: wide, voice: wide, email_campaign: wide, email_direct: wide, email_confirmation: wide, offer: wide },
   contact: { phone: { perHour: 100000, perDay: 100000 }, email: { perHour: 100000, perDay: 100000 } },
+  voiceMaxCallSeconds: 300,
 });
 
 // ───────────────────────────── in-memory database ─────────────────────────────
@@ -57,6 +58,7 @@ function query(db, table) {
   const exec = () => {
     const all = db.rows(table);
     if (st.op === 'insert' || st.op === 'upsert') {
+      if (db.failInsert?.includes(table)) return { data: null, error: { message: `insert into ${table} failed` } };
       const keys = st.conflict?.onConflict?.split(',') ?? null;
       const fresh = (Array.isArray(st.payload) ? st.payload : [st.payload]).filter((r) => !(keys && st.conflict.ignoreDuplicates && all.some((x) => keys.every((k) => x[k] === r[k]))));
       const list = fresh.map((r) => ({ id: r.id ?? crypto.randomUUID(), created_at: new Date().toISOString(), ...r }));
@@ -64,9 +66,11 @@ function query(db, table) {
       db.log.inserts.push({ table, rows: list });
       return finish(list);
     }
+    if (st.op === 'select' && db.failSelect?.includes(table)) return { data: null, error: { message: `select from ${table} failed` } };
     let hit = all.filter((r) => match(r, st.filters));
     if (st.orFilter) hit = hit.filter(st.orFilter);
     if (st.op === 'update') {
+      if (db.failUpdate?.includes(table)) return { data: null, error: { message: `update of ${table} failed` } };
       hit.forEach((r) => Object.assign(r, st.payload));
       db.log.updates.push({ table, filters: st.filters, payload: st.payload, count: hit.length });
       return finish(hit);
@@ -130,7 +134,7 @@ function ingestLead(db, { p_source, p_event_id, p_contact_hash, p_lead }) {
 function fakeClient(db, users) {
   return {
     from: (t) => query(db, t),
-    rpc: async (name, args) => { db.log.rpc.push({ name, args }); const fn = db.rpc?.[name]; if (fn) return fn(args); if (name === 'consume_rate_limit') { db.counters ??= {}; db.counters[args.p_bucket] = (db.counters[args.p_bucket] ?? 0) + (args.p_cost ?? 1); return { data: db.counters[args.p_bucket] <= args.p_limit, error: null }; } if (name === 'consume_rate_limits') { db.counters ??= {}; for (const i of args.p_items) if ((db.counters[i.bucket] ?? 0) + (i.cost ?? 1) > i.limit) return { data: { ok: false, bucket: i.bucket }, error: null }; for (const i of args.p_items) db.counters[i.bucket] = (db.counters[i.bucket] ?? 0) + (i.cost ?? 1); return { data: { ok: true }, error: null }; } if (name === 'ingest_webhook_lead') return ingestLead(db, args); return { data: null, error: null }; },
+    rpc: async (name, args) => { db.log.rpc.push({ name, args }); const fn = db.rpc?.[name]; if (fn) return fn(args); if (name === 'claim_once') { db.once ??= new Set(); if (db.once.has(args.p_key)) return { data: false, error: null }; db.once.add(args.p_key); return { data: true, error: null }; } if (name === 'release_once') { db.once?.delete(args.p_key); return { data: null, error: null }; } if (name === 'consume_rate_limits') { db.counters ??= {}; for (const i of args.p_items) if ((db.counters[i.bucket] ?? 0) + (i.cost ?? 1) > i.limit) return { data: { ok: false, bucket: i.bucket }, error: null }; for (const i of args.p_items) db.counters[i.bucket] = (db.counters[i.bucket] ?? 0) + (i.cost ?? 1); return { data: { ok: true }, error: null }; } if (name === 'ingest_webhook_lead') return ingestLead(db, args); return { data: null, error: null }; },
     auth: {
       getUser: async (token) => (users[token] ? { data: { user: { id: users[token] } }, error: null } : { data: { user: null }, error: { message: 'invalid' } }),
       admin: { getUserById: async (id) => ({ data: { user: { id, email: `${id}@example.test` } }, error: null }) },
@@ -204,9 +208,9 @@ function fakeSmtp(sessions, { mode = 'starttls', tls = false } = {}) {
  * Bundles supabase/functions/<name>/index.ts and returns { call(req), db, outbound }.
  * env: extra Deno.env values. users: { token: userId }. dns: { host: [addresses] }. fetchHandler(url, init) -> Response.
  */
-export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, fetchHandler, smtpMode } = {}) {
+export async function loadFunction(name, { db, users = {}, env = {}, dns = {}, fetchHandler, smtpMode, entry } = {}) {
   const out = await build({
-    entryPoints: [join(FUNCTIONS, name, 'index.ts')], bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent',
+    entryPoints: [entry ?? join(FUNCTIONS, name, 'index.ts')], bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent',
     plugins: [{
       name: 'edge-stubs',
       setup(b) {

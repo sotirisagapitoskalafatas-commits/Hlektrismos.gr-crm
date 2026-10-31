@@ -7,7 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const db = new PGlite();
-const hit = async (b, limit = 3, win = 3600) => (await db.query('select public.consume_rate_limit($1,$2,$3) ok', [b, limit, win])).rows[0].ok;
+const hit = async (b, limit = 3, win = 3600) => (await db.query('select public.consume_rate_limits($1::jsonb) r', [JSON.stringify([{ bucket: b, limit, window_seconds: win }])])).rows[0].r.ok;
 const as = async (r) => { await db.exec('reset role'); if (r) await db.exec(`set role ${r}`); };
 
 before(async () => {
@@ -31,7 +31,7 @@ test('concurrent attempts share one counter: exactly the limit succeed', async (
 
 test('cost counts recipients: a batch uses up the limit by its size', async () => {
   await as('service_role');
-  const cost = async (n) => (await db.query('select public.consume_rate_limit($1,$2,$3,$4) ok', ['batch', 150, 3600, n])).rows[0].ok;
+  const cost = async (n) => (await db.query('select public.consume_rate_limits($1::jsonb) r', [JSON.stringify([{ bucket: 'batch', limit: 150, window_seconds: 3600, cost: n }])])).rows[0].r.ok;
   assert.deepEqual([await cost(100), await cost(50), await cost(1)], [true, true, false]);
   await assert.rejects(() => cost(0));
 });
@@ -77,10 +77,37 @@ test('a refused attempt does not raise the count, and exactly the limit passes u
   assert.equal(await hits('burst-many'), 5);
 });
 
-test('cost, ordering and bad input: a cost above the limit is refused, the same bucket twice cannot pass the limit, bad input raises', async () => {
+test('once-locks: one caller takes the key, the expiry is per key, release gives it back, and only service_role reaches them', async () => {
+  await as('service_role');
+  const claim = async (k, s = 600) => (await db.query('select public.claim_once($1, $2) r', [k, s])).rows[0].r;
+  const results = await Promise.all(Array.from({ length: 8 }, () => claim('o1')));
+  assert.equal(results.filter(Boolean).length, 1);
+  assert.equal(await claim('o2'), true, 'another key is free');
+  await db.query('select public.release_once($1)', ['o1']);
+  assert.equal(await claim('o1'), true, 'released');
+  await as(null);
+  await db.exec("update public.function_once_locks set expires_at = now() - interval '1 second' where key = 'o2'");
+  await as('service_role');
+  assert.equal(await claim('o2'), true, 'expired: free again, whatever the clock boundary');
+  assert.equal(await claim('o2'), false, 'and held again');
+  await assert.rejects(() => claim(''));
+  await assert.rejects(() => claim('x', 0));
+  await assert.rejects(() => claim('x', 90000));
+  for (const r of ['anon', 'authenticated']) {
+    await as(r);
+    await assert.rejects(() => db.query("select public.claim_once('a', 1)"), /permission denied/);
+    await assert.rejects(() => db.query("select public.release_once('a')"), /permission denied/);
+    await assert.rejects(() => db.query('select * from public.function_once_locks'), /permission denied/);
+  }
+  await as(null);
+});
+
+test('cost, duplicates and bad input: a cost above the limit is refused, the same bucket twice raises, bad input raises', async () => {
   await as('service_role');
   assert.deepEqual(await many(items(['c1', 3, 4])), { ok: false, bucket: 'c1' });
   assert.deepEqual(await many(items(['c2', 3, 3])), { ok: true });
+  await assert.rejects(() => many(items(['d1', 3, 2], ['d1', 3, 2])), /appears twice/);
+  assert.equal(await hits('d1'), 0);
   for (const bad of ['[]', '{}', 'null', items(['x', 0]), JSON.stringify([{ bucket: '', limit: 1, window_seconds: 1 }]), JSON.stringify([{ bucket: 'x', limit: 1 }])]) {
     await assert.rejects(() => many(bad), undefined, bad);
   }

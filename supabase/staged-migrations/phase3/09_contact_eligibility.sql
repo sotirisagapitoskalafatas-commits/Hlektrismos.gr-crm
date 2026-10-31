@@ -210,25 +210,38 @@ begin
 end;
 $$;
 
--- A refusal spoken to the AI caller, recorded by vapi-webhook (service_role only: there is no signed-in person). Attaches to the phone number and covers
--- every channel for marketing. Safe to repeat: the same number is not recorded twice. It stores no transcript text.
-create or replace function public.record_spoken_objection(p_phone text, p_lead_id uuid, p_voice_call_id uuid)
+-- A refusal spoken to the AI caller, recorded by vapi-webhook (service_role only: there is no signed-in person). Attaches to the phone number, and to the
+-- email when the record has one, so every channel stops for marketing whichever address a later send looks at; the email also goes on the suppression list.
+-- Safe to repeat: an address is not recorded twice. It stores no transcript text.
+create or replace function public.record_spoken_objection(p_phone text, p_email text, p_lead_id uuid, p_voice_call_id uuid)
 returns boolean language plpgsql security definer set search_path = public
 as $$
-declare pk text := public.contact_phone_key(p_phone);
+declare
+  pk text := public.contact_phone_key(p_phone);
+  ek text := public.contact_email_key(p_email);
+  v_batch uuid := gen_random_uuid();
+  n integer := 0;
 begin
-  if pk is null then
-    raise exception 'record_spoken_objection: no phone number' using errcode = '22023';
+  if pk is null and ek is null then
+    raise exception 'record_spoken_objection: no phone number or email' using errcode = '22023';
   end if;
-  perform pg_advisory_xact_lock(hashtextextended('objection|' || pk, 0));
-  if exists (select 1 from public.contact_objections o where o.address_kind = 'phone' and o.address_key = pk and o.lifted_at is null and o.channels is null) then
-    return false;
+  perform pg_advisory_xact_lock(hashtextextended('objection|' || coalesce(pk, ek), 0));
+  if pk is not null and not exists (select 1 from public.contact_objections o where o.address_kind = 'phone' and o.address_key = pk and o.lifted_at is null and o.channels is null) then
+    insert into public.contact_objections (batch_id, address_kind, address_key, scope, channels, reason, source, lead_id)
+    values (v_batch, 'phone', pk, 'marketing', null, 'Προφορική άρνηση σε κλήση AI', 'customer_request', p_lead_id);
+    n := n + 1;
   end if;
-  insert into public.contact_objections (address_kind, address_key, scope, channels, reason, source, lead_id)
-  values ('phone', pk, 'marketing', null, 'Προφορική άρνηση σε κλήση AI', 'customer_request', p_lead_id);
-  perform public.contact_log('contact_objection', p_lead_id, null,
-    jsonb_build_object('scope', 'marketing', 'source', 'spoken', 'voice_call', p_voice_call_id));
-  return true;
+  if ek is not null and not exists (select 1 from public.contact_objections o where o.address_kind = 'email' and o.address_key = ek and o.lifted_at is null and o.channels is null) then
+    insert into public.contact_objections (batch_id, address_kind, address_key, scope, channels, reason, source, lead_id)
+    values (v_batch, 'email', ek, 'marketing', null, 'Προφορική άρνηση σε κλήση AI', 'customer_request', p_lead_id);
+    insert into public.email_suppressions (email, reason, source) values (ek, 'objection', 'crm') on conflict (email) do nothing;
+    n := n + 1;
+  end if;
+  if n > 0 then
+    perform public.contact_log('contact_objection', p_lead_id, null,
+      jsonb_build_object('scope', 'marketing', 'source', 'spoken', 'voice_call', p_voice_call_id));
+  end if;
+  return n > 0;
 end;
 $$;
 
@@ -382,8 +395,8 @@ $$;
 
 revoke all on function public.contact_facts(text, text) from public, anon;
 revoke all on function public.record_contact_objection(text, text, text, text[], text, text, uuid, uuid) from public, anon;
-revoke all on function public.record_spoken_objection(text, uuid, uuid) from public, anon, authenticated;
-grant execute on function public.record_spoken_objection(text, uuid, uuid) to service_role;
+revoke all on function public.record_spoken_objection(text, text, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.record_spoken_objection(text, text, uuid, uuid) to service_role;
 revoke all on function public.lift_contact_objection(uuid, text) from public, anon;
 revoke all on function public.record_contact_consent(text, text, text, text, text, timestamptz, text, text, uuid, uuid) from public, anon;
 revoke all on function public.withdraw_contact_consent(text, text, text, text, uuid, uuid) from public, anon;
@@ -399,7 +412,7 @@ grant execute on function public.record_article11_screening(text, text, text, te
 --   drop function public.record_article11_screening(text, text, text, text, timestamptz, uuid, uuid);
 --   drop function public.withdraw_contact_consent(text, text, text, text, uuid, uuid);
 --   drop function public.record_contact_consent(text, text, text, text, text, timestamptz, text, text, uuid, uuid);
---   drop function public.record_spoken_objection(text, uuid, uuid);
+--   drop function public.record_spoken_objection(text, text, uuid, uuid);
 --   drop function public.lift_contact_objection(uuid, text);
 --   drop function public.record_contact_objection(text, text, text, text[], text, text, uuid, uuid);
 --   drop function public.contact_log(text, uuid, uuid, jsonb);

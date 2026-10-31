@@ -14,7 +14,8 @@
 | D, valid | shows the page; nothing changes | converts, once | accepted |
 | D, repeated | same | nothing changes | already accepted |
 | D, past expiry | same | nothing changes | expired |
-| D, replaced by a newer offer, withdrawn, or lead closed | same | nothing changes; refusal recorded in `offer_events` | not available |
+| D, replaced by a newer offer that reached the customer, withdrawn, or lead closed | same | nothing changes; refusal recorded in `offer_events` | not available |
+| D, replaced by a newer offer that reached nobody | same | converts: the earlier offer is restored | accepted |
 | D, edited, or used with another offer or lead | same | nothing changes | invalid link |
 | A, B or C for a lead and tariff with a recorded offer | redirected to the page; nothing changes | **no conversion**; a row is queued in `offer_legacy_link_reviews` | «Λάβαμε το αίτημά σας», a consultant will confirm |
 | A, B or C with no recorded offer | same | nothing changes, nothing stored | offer not found |

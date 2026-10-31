@@ -635,3 +635,25 @@ test('the confirmation page is a public route that only POSTs, on a button press
   assert.ok(!/useEffect/.test(page), 'opening the page does nothing by itself');
   assert.match(readFileSync(fnDir + '../../src/lib/router.ts', 'utf8'), /'\/offer': 'offer'/);
 });
+
+test('requirePermission: one rule with getCaller. Legacy and unknown roles stop before any override is read, and an override cannot admit them', async () => {
+  const UNKNOWN = 'aaaaaaaa-0000-4000-8000-0000000000f1';
+  const entry = fileURLToPath(new URL('./fixtures/functions/require-permission.ts', import.meta.url));
+  const run = async (token, overrides) => {
+    const db = outboundDb();
+    db.rows('profiles').push({ id: UNKNOWN, role: 'partner', is_active: true });
+    if (overrides) db.rows('crm_settings').push({ setting_key: 'role_permissions', setting_value: overrides });
+    const f = await loadFunction('require-permission', { db, users: { ...users, 'tok-unknown-role': UNKNOWN }, entry });
+    const r = await f.call({ token, body: {} });
+    f.restore();
+    return [r.status, r.json?.error];
+  };
+  const grant = { manager: ['prospecting.search'], back_office: ['prospecting.search'], partner: ['prospecting.search'], field_sales: ['prospecting.search'], inside_sales: [] };
+  assert.equal((await run('tok-admin'))[0], 200);
+  assert.equal((await run('tok-inside'))[0], 200);
+  assert.deepEqual(await run('tok-field'), [403, 'Not permitted for your role']);
+  assert.equal((await run('tok-field', grant))[0], 200, 'granted');
+  assert.deepEqual(await run('tok-inside', grant), [403, 'Not permitted for your role'], 'revoked');
+  for (const token of ['tok-manager', 'tok-bo', 'tok-unknown-role', 'tok-inactive']) assert.deepEqual(await run(token, grant), [403, 'Staff access only'], token);
+  assert.equal((await run(undefined))[0], 401);
+});

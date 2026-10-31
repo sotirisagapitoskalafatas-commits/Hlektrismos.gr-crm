@@ -41,7 +41,7 @@ const greeting = () => {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const DETAIL_KEY = 'atlas.home.detail';
 const NA = 'μη διαθέσιμο';
-const ROLE_GROUPS: [string, string][] = [['admin', 'Διαχειριστές'], ['manager', 'Παλαιός ρόλος (χωρίς πρόσβαση)'], ['inside_sales', 'Inside Sales'], ['field_sales', 'Field Sales'], ['back_office', 'Παλαιός ρόλος (χωρίς πρόσβαση)']];
+const ROLE_GROUPS: [string, string][] = [['admin', 'Admin / Back Office'], ['sales_agent', 'Sales Agents']];
 
 function Kpi({ icon: Icon, tone, value, label, sub, subTone, alert, onClick, tile }: {
   icon: LucideIcon; tone: string; value: number | string | null; label: string; sub?: string; subTone?: 'red' | 'green' | 'blue' | 'gray'; alert?: boolean; onClick: () => void; tile?: string;
@@ -321,10 +321,8 @@ export default function HomePage() {
             <div className="space-y-4">
               {/* The 8-stage pipeline is shown once, above; active cases / weighted pipeline are shown by the manager
                   dashboard with more context, so the strip omits them there. */}
-              <OperationalStrip d={d} pipeline={false} omit={role === 'inside_sales' ? ['active'] : []} />
-              {role === 'inside_sales' ? <InsideSalesDashboard d={d} />
-                : role === 'field_sales' ? <FieldSalesDashboard d={d} />
-                : <BackOfficeDashboard d={d} />}
+              <OperationalStrip d={d} pipeline={false} omit={role === 'sales_agent' ? ['active'] : []} />
+              {role === 'sales_agent' ? <><InsideSalesDashboard d={d} /><FieldSalesDashboard d={d} /></> : <BackOfficeDashboard d={d} />}
             </div>
           )
         )}

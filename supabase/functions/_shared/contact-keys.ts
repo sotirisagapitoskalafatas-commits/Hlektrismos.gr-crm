@@ -13,3 +13,9 @@ export function emailKey(e: string | null | undefined): string | null {
   if (s.indexOf("@") < 1 || s.endsWith("@hlektrismos.local")) return null;
   return s;
 }
+
+/** Hex SHA-256 of a normalised key: the form in which a contact point appears in rate-limit buckets and the communication log. */
+export async function contactHash(key: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}

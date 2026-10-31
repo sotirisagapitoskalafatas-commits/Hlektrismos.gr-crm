@@ -9,7 +9,7 @@
 
 import type { HomeSummary, WorkItem } from './work';
 
-export type AssistantRole = 'admin' | 'manager' | 'inside_sales' | 'field_sales' | 'back_office';
+export type AssistantRole = 'admin' | 'sales_agent';
 
 export type AssistantAction =
   | { type: 'case'; id: string }
@@ -64,7 +64,7 @@ const leadName = (l: AssistantCtx['leads'][number]) =>
 export function suggestionsFor(role: AssistantRole): string[] {
   const base = ['Τι έχω σήμερα;', 'Εκπρόθεσμα follow-ups', 'Βρες πελάτη…'];
   if (role === 'admin') return [...base, 'Σύνοψη ομάδας', 'Άνοιξε Cases'];
-  if (role === 'field_sales') return [...base, 'Άνοιξε Ημέρα μου'];
+  if (role === 'sales_agent') return [...base, 'Άνοιξε Ημέρα μου'];
   return [...base, 'Leads για επικοινωνία', 'Άνοιξε Leads'];
 }
 

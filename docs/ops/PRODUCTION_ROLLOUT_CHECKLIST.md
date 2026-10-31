@@ -78,6 +78,8 @@ Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) aft
 | E5 | `deactivate_qa_accounts.sql` (the script refuses unless the real admin has signed in) | ⏳ after E2 + successful sign-in |
 | E5b | `deactivate_probe_accounts.sql` (the two verification probe logins; same guard) | ⏳ after E5 |
 
+**Hardened functions (PRs #137, #138, #139):** follow "Deployment sequence" in `APPLY_ORDER.md`. phase1/21b, phase1/21c, phase3/10 and phase3/11 must exist, and the secrets be set, before these functions are deployed, by hand or by the integration.
+
 Deployment-integration facts: production has **27 Edge Functions and no `admin-users`**; the GitHub integration deploys only the 6 functions declared in `supabase/config.toml` (`agent-worker`, `ai-developer`, `chat`, `orchestrator`, `scrape-b2b`, `unsubscribe`). Merging #130 deploys the **frontend** to production at once — so it follows the SQL.
 
 ## 5. Account onboarding (template — the filled-in table with real addresses is kept privately)

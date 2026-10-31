@@ -95,7 +95,7 @@ as $function$
       select 1 from public.profiles p
       where p.id = p_owner
         and coalesce(p.is_active, true)
-        and p.role in ('field_sales', 'inside_sales')
+        and p.role in ('sales_agent', 'field_sales', 'inside_sales')
     );
 $function$;
 revoke all on function public.field_sales_route_owner_allowed(uuid) from public, anon;
@@ -506,7 +506,7 @@ begin
   from public.profiles p
   where p.id = auth.uid() and coalesce(p.is_active,true);
 
-  if v_role is null or v_role not in ('admin','manager','back_office','inside_sales','field_sales') then
+  if v_role is null or v_role not in ('admin','sales_agent','manager','back_office','inside_sales','field_sales') then
     raise exception 'field_sales_candidate_duplicate_signal: not allowed' using errcode = '42501';
   end if;
 
@@ -656,14 +656,14 @@ begin
     select p.role into v_requester_role
     from public.profiles p
     where p.id = auth.uid() and coalesce(p.is_active,true);
-    if v_requester_role in ('inside_sales','field_sales') then
+    if v_requester_role in ('sales_agent','inside_sales','field_sales') then
       -- A Sales Agent's own prospect request must remain assigned to that same account.
       new.prospective_owner_id := auth.uid();
     elsif v_requester_role in ('admin','manager','back_office') then
       if new.prospective_owner_id is null or not exists (
         select 1 from public.profiles p
         where p.id = new.prospective_owner_id
-          and p.role in ('inside_sales','field_sales')
+          and p.role in ('sales_agent','inside_sales','field_sales')
           and coalesce(p.is_active,true)
       ) then
         raise exception 'field_sales_duplicate_reviews: choose an active Sales Agent owner' using errcode = '42501';

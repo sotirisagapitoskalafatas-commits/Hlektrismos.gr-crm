@@ -14,7 +14,12 @@ const SECRET = 'link-signing-secret-not-real-000000000';
 const ADMIN = 'aaaaaaaa-0000-4000-8000-0000000000a1';
 const LEAD = 'bbbbbbbb-0000-4000-8000-0000000000a1';
 const TARIFF = 'cccccccc-0000-4000-8000-0000000000a1';
-const users = { 'tok-admin': ADMIN };
+const INSIDE = 'aaaaaaaa-0000-4000-8000-0000000000c1';
+const FIELD = 'aaaaaaaa-0000-4000-8000-0000000000c2';
+const MANAGER = 'aaaaaaaa-0000-4000-8000-0000000000e1'; // legacy
+const BACKOFFICE = 'aaaaaaaa-0000-4000-8000-0000000000e2'; // legacy
+const INACTIVE = 'aaaaaaaa-0000-4000-8000-0000000000d1';
+const users = { 'tok-admin': ADMIN, 'tok-inside': INSIDE, 'tok-field': FIELD, 'tok-manager': MANAGER, 'tok-bo': BACKOFFICE, 'tok-inactive': INACTIVE };
 const fnDir = fileURLToPath(new URL('../functions/', import.meta.url));
 const src = (rel) => readFileSync(fnDir + rel, 'utf8').replace(/\r\n/g, '\n');
 
@@ -204,7 +209,10 @@ test('vapi-webhook: a call ends once; a replayed or duplicated end event, and a 
 
 // ───────────────────────────── outbound functions ─────────────────────────────
 const outboundDb = () => createDb({
-  profiles: [{ id: ADMIN, role: 'admin', is_active: true }],
+  profiles: [
+    { id: ADMIN, role: 'admin', is_active: true }, { id: INSIDE, role: 'inside_sales', is_active: true }, { id: FIELD, role: 'field_sales', is_active: true },
+    { id: MANAGER, role: 'manager', is_active: true }, { id: BACKOFFICE, role: 'back_office', is_active: true }, { id: INACTIVE, role: 'inside_sales', is_active: false },
+  ],
   hlektrismos_leads: [{ id: LEAD, assigned_to: ADMIN, first_name: 'L', last_name: 'A', email: 'lead.a@example.gr', phone: '6900000001' }],
   crm_settings: [{ setting_key: 'INFOBIP_API_KEY', setting_value: 'infobip-key-not-real' }, { setting_key: 'RESEND_API_KEY', setting_value: 'resend-key-not-real' }],
   energy_tariffs: [{ id: TARIFF, provider_name: 'P', program_name: 'Q' }],
@@ -287,14 +295,6 @@ test('send-offer: the same offer is not sent twice inside ten minutes, and the a
   f.restore();
 });
 
-test('duplicate-send protection is wired into both bulk senders (a "sent" campaign_sends row is skipped)', () => {
-  for (const fn of ['send-sms', 'send-campaign-email']) {
-    const s = src(`${fn}/index.ts`);
-    assert.match(s, /from\("campaign_sends"\)\.select\("lead_id"\)\.eq\("campaign_id", campaign_id\)\.eq\("status", "sent"\)/, `${fn} loads the already-sent leads`);
-    assert.match(s, /if \(alreadySent\.has\(lead\.id\)\) \{ results\.skipped\+\+; continue; \}/, `${fn} skips them`);
-    assert.ok(s.indexOf('alreadySent.has(lead.id)') < s.indexOf('await fetch('), `${fn}: the skip happens before any provider call`);
-  }
-});
 
 // ───────────────────────────── receive-lead-webhook ─────────────────────────────
 const HOOK = 'lead-webhook-secret-not-real-0000';
@@ -334,4 +334,97 @@ test('receive-lead-webhook: age gate, contact required, and a retried delivery i
   assert.equal(f.db.rows('leads').length, 2, 'a different contact is a different lead');
   assert.notEqual(other.json.lead_id, a.json.lead_id);
   f.restore();
+});
+
+// ───────────────────────────── duplicate-send protection, end to end ─────────────────────────────
+// These run the real handler all the way to the provider call: consent is granted, outreach is switched on, the clock is pinned
+// to 12:00 in Athens (contact hours), so the central gate ALLOWS the send. Then the same campaign request is replayed.
+const CK = await bundle(`export { phoneKey, emailKey } from './contact-keys.ts';`);
+const NOON_ATHENS = Date.parse('2026-10-30T10:00:00Z');
+const withClock = async (fn) => {
+  const RealDate = Date;
+  globalThis.Date = class extends RealDate {
+    constructor(...a) { super(...(a.length ? a : [NOON_ATHENS])); }
+    static now() { return NOON_ATHENS; }
+  };
+  try { return await fn(); } finally { globalThis.Date = RealDate; }
+};
+const GATE_ENV = { OUTREACH_ENABLED: 'on', LEGAL_APPROVAL_RECORDED: 'yes', UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000', COMPANY_POSTAL_ADDRESS: 'Test 1, Athens' };
+const consentDb = (channel) => {
+  const db = outboundDb();
+  const lead = db.rows('hlektrismos_leads')[0];
+  db.rows('contact_consents').push({
+    address_kind: channel === 'email' ? 'email' : 'phone', channel, status: 'granted', basis: 'consent', evidence_ref: 'form-123', evidence_at: '2026-10-01T09:00:00Z',
+    address_key: channel === 'email' ? CK.emailKey(lead.email) : CK.phoneKey(lead.phone),
+  });
+  return db;
+};
+const providerCalls = (f, re) => f.outbound.filter((o) => re.test(o.url)).length;
+
+test('send-sms (end to end): an eligible lead is messaged once; the SAME campaign request replayed sends nothing more', async () => {
+  await withClock(async () => {
+    const f = await loadFunction('send-sms', { db: consentDb('sms'), users, env: GATE_ENV });
+    const body = { campaign_id: 'camp-1', leads: [{ id: LEAD }], message: 'Γεια σας {{first_name}}', channel: 'sms' };
+    const first = await f.call({ token: 'tok-admin', body });
+    assert.equal(first.status, 200, JSON.stringify(first.json));
+    assert.equal(first.json.sent, 1, JSON.stringify(first.json));
+    assert.equal(providerCalls(f, /infobip/), 1);
+    assert.equal(f.db.rows('campaign_sends').filter((r) => r.status === 'sent').length, 1);
+    const replay = await f.call({ token: 'tok-admin', body });
+    assert.equal(replay.status, 200);
+    assert.equal(replay.json.sent, 0, 'nothing is sent a second time');
+    assert.equal(replay.json.skipped, 1, 'the lead is reported as skipped');
+    assert.equal(providerCalls(f, /infobip/), 1, 'still exactly one provider call');
+    f.restore();
+  });
+});
+
+test('send-sms (end to end): without consent nothing is sent (the gate is enforced server-side, whatever the request says)', async () => {
+  await withClock(async () => {
+    const f = await loadFunction('send-sms', { db: outboundDb(), users, env: GATE_ENV });
+    const r = await f.call({ token: 'tok-admin', body: { campaign_id: 'camp-1', leads: [{ id: LEAD, consent: true, phone: '6911111111' }], message: 'hi', channel: 'sms' } });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.sent, 0);
+    assert.match(JSON.stringify(r.json.errors), /NO_CHANNEL_PERMISSION/, 'a client-supplied consent flag is ignored');
+    assert.equal(providerCalls(f, /infobip/), 0);
+    f.restore();
+  });
+});
+
+test('send-campaign-email (end to end): an eligible lead is e-mailed once; the SAME campaign request replayed sends nothing more', async () => {
+  await withClock(async () => {
+    const f = await loadFunction('send-campaign-email', { db: consentDb('email'), users, env: GATE_ENV });
+    const body = { campaign_id: 'camp-9', leads: [{ id: LEAD }], subject: 'Προσφορά', html_body: '<p>Γεια σας {{first_name}}</p>' };
+    const first = await f.call({ token: 'tok-admin', body });
+    assert.equal(first.status, 200, JSON.stringify(first.json));
+    assert.equal(first.json.sent, 1, JSON.stringify(first.json));
+    assert.equal(providerCalls(f, /resend/), 1);
+    const replay = await f.call({ token: 'tok-admin', body });
+    assert.equal(replay.json.sent, 0);
+    assert.equal(replay.json.skipped, 1);
+    assert.equal(providerCalls(f, /resend/), 1, 'still exactly one provider call');
+    f.restore();
+  });
+});
+
+// ───────────────────────────── capability is enforced BEFORE any input is processed ─────────────────────────────
+// Who may reach the function's own logic is decided first: a role without the capability (Sales Agents by default, the legacy
+// roles always, an inactive account) gets 403 even with a malformed body, so it learns nothing about validation and costs nothing.
+test('capability-gated senders: Sales Agents without the capability, legacy manager / back_office and inactive accounts get 403 before any validation', async () => {
+  const cases = [['send-sms', 'tok-inside'], ['send-sms', 'tok-field'], ['send-campaign-email', 'tok-inside'], ['send-campaign-email', 'tok-field'], ['make-voice-call', 'tok-inside'], ['make-voice-call', 'tok-field']];
+  for (const [fn, token] of cases) {
+    const f = await loadFunction(fn, { db: outboundDb(), users });
+    const r = await f.call({ token, body: {} });
+    assert.equal(r.status, 403, `${fn} / ${token}: must be 403 (not a 400 from validation); got ${r.status}`);
+    assert.equal(sent(f), 0);
+    f.restore();
+  }
+  for (const fn of ['send-sms', 'send-campaign-email', 'make-voice-call', 'send-email', 'send-offer']) {
+    for (const token of ['tok-manager', 'tok-bo', 'tok-inactive']) {
+      const f = await loadFunction(fn, { db: outboundDb(), users, env: { UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000' } });
+      const r = await f.call({ token, body: {} });
+      assert.equal(r.status, 403, `${fn} / ${token}: legacy or inactive accounts are refused with 403; got ${r.status}`);
+      f.restore();
+    }
+  }
 });

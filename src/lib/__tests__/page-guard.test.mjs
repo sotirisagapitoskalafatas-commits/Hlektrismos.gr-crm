@@ -143,8 +143,11 @@ test('AppShell is the only place that renders pages from the route', () => {
 test('navigation helpers only change the route (view); they cannot bypass the shell guard', () => {
   const nav = readFileSync(join(root, 'lib/nav.tsx'), 'utf8');
   assert.ok(!/canOpenPage|fetch|supabase/.test(nav), 'nav.tsx just holds the view state');
-  assert.match(nav, /setView\(\{ page: p/);
-  assert.match(nav, /setView\(\{ page: 'case'/);
+  // The view is now kept in the URL by nav-url.ts. It must stay just as inert: no access decision, no data access, only page, case id and filters.
+  const url = readFileSync(join(root, 'lib/nav-url.ts'), 'utf8');
+  assert.ok(!/canOpenPage|fetch\(|supabase|localStorage|sessionStorage|document\.cookie/.test(url), 'nav-url.ts only reads and writes the hash');
+  assert.match(url, /go: \(page: PageKey, filters\?: PageFilters\) => write\(\{ page, caseId: null/);
+  assert.match(url, /openCase: \(id: string\) => write\(\{ page: 'case'/);
 });
 
 // In-app links: a control that sends a role to a page that role cannot open would dead-end in the denied state. Every audited

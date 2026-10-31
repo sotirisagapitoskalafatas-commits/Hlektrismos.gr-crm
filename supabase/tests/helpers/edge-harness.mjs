@@ -174,7 +174,7 @@ function fakeSmtp(sessions, { mode = 'starttls', tls = false } = {}) {
     if (verb === 'EHLO') { say('250-fake.smtp.test'); if (mode !== 'no-starttls' && !session.tls) say('250-STARTTLS'); say('250 8BITMIME'); }
     else if (verb === 'MAIL') { session.mailFrom = line.replace(/^MAIL FROM:/i, ''); say('250 ok'); }
     else if (verb === 'RCPT') { session.rcptTo.push(line.replace(/^RCPT TO:/i, '')); say('250 ok'); }
-    else if (verb === 'DATA') { inData = true; say('354 go ahead'); }
+    else if (verb === 'DATA') { inData = true; say(mode === 'reject-data' ? '554 transaction failed' : '354 go ahead'); }
     else if (verb === 'STARTTLS') { if (mode === 'refuse-starttls') say('454 TLS not available'); else say(mode === 'inject' ? `220 ready${CRLF}250 injected` : '220 ready'); }
     else if (verb === 'AUTH') say('235 authenticated');
     else if (verb === 'QUIT') say('221 bye');

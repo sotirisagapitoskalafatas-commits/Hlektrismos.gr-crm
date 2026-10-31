@@ -131,6 +131,10 @@ create table if not exists public.communication_log (
   created_at      timestamptz not null default now(),
   constraint communication_log_user_named check (actor_kind <> 'user' or actor_id is not null)
 );
+-- an earlier version of this file created the table with a shorter list of actions
+alter table public.communication_log drop constraint if exists communication_log_action_check;
+alter table public.communication_log add constraint communication_log_action_check
+  check (action in ('sms', 'viber', 'whatsapp', 'voice', 'email_campaign', 'email_direct', 'email_confirmation', 'offer'));
 create index if not exists communication_log_lead_idx on public.communication_log (lead_id, created_at desc) where result = 'sent';
 create index if not exists communication_log_recipient_idx on public.communication_log (recipient_hash, created_at desc);
 alter table public.communication_log enable row level security;

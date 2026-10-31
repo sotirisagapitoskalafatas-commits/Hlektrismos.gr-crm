@@ -111,8 +111,9 @@ test('exempt functions still refuse an outsider on their own terms and touch not
     f.restore();
   }
   const f = await loadFunction('unsubscribe', { db: world(), env: { UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000', SITE_URL: 'https://crm.example.test' } });
-  const r = await f.call({ method: 'GET', query: '?e=victim%40example.gr&t=forged' });
-  assert.ok([200, 302, 400].includes(r.status));
+  const e = Buffer.from('victim@example.gr').toString('base64url'); // well formed, so the signature check is what refuses it
+  const r = await f.call({ method: 'GET', query: `?e=${e}&t=forged` });
+  assert.ok([302, 400].includes(r.status));
   assert.equal(f.db.rows('email_suppressions').length, 0, 'a forged link suppresses nobody');
   untouched(f, 'unsubscribe');
   f.restore();

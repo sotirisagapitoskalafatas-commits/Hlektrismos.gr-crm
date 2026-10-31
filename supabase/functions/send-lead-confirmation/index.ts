@@ -160,6 +160,7 @@ serve(async (req) => {
 
     // TLS or nothing (smtp.ts): the session opens before the password or the message is written.
     let client: Awaited<ReturnType<typeof openSecureSmtp>> | null = null;
+    let dataStarted = false; // after DATA the outcome can be unknown: the claim then stays, so a retry cannot send a second mail
     try {
       client = await openSecureSmtp(smtpHost, smtpPort, "hlektrismos.gr");
       if (smtpUser && smtpPass) {
@@ -167,10 +168,11 @@ serve(async (req) => {
       }
       await client.mail(fromEmail);
       await client.rcpt(email);
+      dataStarted = true;
       await client.data(smtpDataBody(headers + "\r\n\r\n" + body));
     } catch (sendErr) {
       await logResult(adminClient, entry, "failed");
-      await releaseClaim();
+      if (!dataStarted) await releaseClaim();
       throw sendErr;
     } finally {
       await client?.quit();

@@ -213,6 +213,7 @@ $$;
 -- A refusal spoken to the AI caller, recorded by vapi-webhook (service_role only: there is no signed-in person). Attaches to the phone number, and to the
 -- email when the record has one, so every channel stops for marketing whichever address a later send looks at; the email also goes on the suppression list.
 -- Safe to repeat: an address is not recorded twice. It stores no transcript text.
+drop function if exists public.record_spoken_objection(text, uuid, uuid); -- an earlier version had no email argument
 create or replace function public.record_spoken_objection(p_phone text, p_email text, p_lead_id uuid, p_voice_call_id uuid)
 returns boolean language plpgsql security definer set search_path = public
 as $$

@@ -181,6 +181,30 @@ test('confirmation mail: limited, logged, and skipped without limits or over the
   }
 });
 
+test('confirmation mail: a visitor cannot starve other customers or the staff mail to one person', async () => {
+  const now = new Date().toISOString();
+  const database = db();
+  database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
+  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+  const f = await loadFunction('send-lead-confirmation', { db: database, env: { OUTREACH_LIMITS: limits() } });
+  await f.call({ body: { email: 'new@example.gr' } });
+  const buckets = f.db.log.rpc.filter((c) => c.name === 'consume_rate_limits').flatMap((c) => c.args.p_items.map((i) => i.bucket));
+  assert.ok(buckets.length === 2 && buckets.every((b) => b.startsWith('contact:ec:')), buckets.join(' '));
+  assert.ok(!buckets.some((b) => /^(user|org|request):/.test(b) || b.startsWith('contact:e:')), 'no shared caller, organisation or staff-mail bucket');
+  f.restore();
+});
+
+test('confirmation mail: after DATA the claim stays, so an unknown outcome cannot send twice', async () => {
+  const now = new Date().toISOString();
+  const database = db();
+  database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
+  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+  const f = await loadFunction('send-lead-confirmation', { db: database, smtpMode: 'reject-data' });
+  assert.equal((await f.call({ body: { email: 'new@example.gr' } })).status, 500);
+  assert.ok(database.rows('leads')[0].ack_sent_at, 'claim kept');
+  f.restore();
+});
+
 test('send-lead-confirmation: a failed lead read is an error, not "no recent lead"', async () => {
   const d = db(); d.failSelect = ['leads'];
   const f = await loadFunction('send-lead-confirmation', { db: d });

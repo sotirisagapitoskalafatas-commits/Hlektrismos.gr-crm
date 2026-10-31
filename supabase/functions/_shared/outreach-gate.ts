@@ -56,7 +56,7 @@ const norm = (e: string) => e.trim().toLowerCase();
 export async function emailObjection(loaders: Pick<Loaders, "objections">, email: string, phone: string | null, purpose: Purpose): Promise<"objected" | "unknown" | null> {
   try {
     const found = (await loaders.objections([{ id: "recipient", email, phone }])).recipient ?? [];
-    return found.some((o) => (o.channels === null || o.channels.includes("email")) && (purpose === "promotional" || o.scope === "all")) ? "objected" : null;
+    return found.some((o) => (o.channels === null || o.channels.includes("email")) && (purpose !== "transactional" || o.scope === "all")) ? "objected" : null;
   } catch {
     return "unknown";
   }

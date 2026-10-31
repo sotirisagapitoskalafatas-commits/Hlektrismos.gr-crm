@@ -102,6 +102,11 @@ serve(async (req) => {
       if (!objectionRecorded) console.error(JSON.stringify({ event: "spoken_objection_not_recorded", voice_call: voiceCall.id }));
     }
 
+    // A refusal that could not be recorded for a lead in the Trash has no note or pause to fall back on: answer 5xx so Vapi retries, and do not close the call.
+    if (optOut && !objectionRecorded && !liveLead) {
+      return new Response(JSON.stringify({ error: "Refusal not recorded" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { data: claimed, error: claimError } = await supabase
       .from("voice_calls")
       .update({

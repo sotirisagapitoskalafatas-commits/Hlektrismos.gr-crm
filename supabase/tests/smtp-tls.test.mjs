@@ -144,6 +144,17 @@ test('fetch-emails: IMAP refuses any port but implicit TLS, so LOGIN is never wr
   f.restore();
 });
 
+test('a refusal recorded on the phone number stops a commercial email to that record', async () => {
+  const LEAD = 'bbbbbbbb-0000-4000-8000-0000000000a1';
+  const database = db(465);
+  database.tables.hlektrismos_leads = [{ id: LEAD, email: 'lead@example.gr', phone: '+30 690 000 0001', deleted_at: null }];
+  database.tables.contact_objections = [{ address_kind: 'phone', address_key: '6900000001', scope: 'marketing', channels: null, lifted_at: null }];
+  const f = await loadFunction('send-email', { db: database, users, env });
+  assert.equal((await f.call({ token: 'tok-admin', body: { legacy_lead_id: LEAD, subject: 's', text: 't' } })).status, 409);
+  assert.equal(f.smtp.length, 0);
+  f.restore();
+});
+
 test('a recorded objection stops a staff email; a marketing objection does not stop a service message; unreadable objections stop it', async () => {
   const objection = (scope) => ({ address_kind: 'email', address_key: 'customer@example.gr', scope, channels: null, lifted_at: null });
   const run = async (rows, body = mail.body) => {
@@ -157,9 +168,11 @@ test('a recorded objection stops a staff email; a marketing objection does not s
   assert.deepEqual(await run([objection('marketing')]), { status: 200, sent: 1 }, 'transactional');
   assert.deepEqual(await run([objection('marketing')], { ...mail.body, transactional: false }), { status: 409, sent: 0 }, 'commercial');
   const missing = db(465);
-  Object.defineProperty(missing.tables, 'contact_objections', { get() { throw new Error('relation does not exist'); } });
+  missing.failSelect = ['contact_objections'];
   const f = await loadFunction('send-email', { db: missing, users, env });
-  assert.equal((await f.call(mail)).status, 409, 'the table is missing: refused');
+  const r = await f.call(mail);
+  assert.equal(r.status, 503, 'the table is missing: refused, and not reported as the customer\'s objection');
+  assert.match(r.json.error, /cannot be checked/);
   assert.equal(f.smtp.length, 0);
   f.restore();
 });

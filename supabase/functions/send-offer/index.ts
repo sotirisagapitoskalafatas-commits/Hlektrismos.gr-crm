@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 import { signExpiringLink } from "../_shared/signed-link.ts";
-import { callerKey, durableLimit, rateLimited } from "../_shared/limits.ts";
+import { callerKey, claimOnce, rateLimited } from "../_shared/limits.ts";
 import { logAttempt, logResult } from "../_shared/communication-log.ts";
 import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 
@@ -100,7 +100,7 @@ Deno.serve(async (req: Request) => {
     if ((recent.data ?? []).length > 0) return json(409, { error: "This offer was just sent. Wait a few minutes before sending it again." });
 
     // Atomic: two simultaneous requests cannot both pass (the task check above only sees finished sends).
-    const once = await durableLimit(supabase, `send-offer-once:${lead_id}:${tariff_id}`, 1, 600);
+    const once = await claimOnce(supabase, `send-offer-once:${lead_id}:${tariff_id}`, 600);
     if (once) return json(once.status === 429 ? 409 : once.status, { error: "This offer was just sent. Wait a few minutes before sending it again." });
 
     // An offer is commercial: each channel goes through the central gate (consent, objections, suppression, hours, master switches).

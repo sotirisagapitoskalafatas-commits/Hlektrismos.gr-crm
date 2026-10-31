@@ -79,6 +79,21 @@ test('the id may come from a header or from the sender\'s own field; two differe
   f.restore();
 });
 
+test('a generic body.id is not an event id: a constant form id must not swallow later leads', async () => {
+  const f = await handler();
+  const a = await f.call({ body: body({ id: 'form-7', email: 'g1@example.gr' }), headers: h });
+  const b = await f.call({ body: body({ id: 'form-7', email: 'g2@example.gr' }), headers: h });
+  assert.notEqual(b.json.lead_id, a.json.lead_id);
+  f.restore();
+});
+
+test('a long source label from the sender is stored, not refused forever', async () => {
+  const f = await handler();
+  const r = await f.call({ body: body({ source_label: 'x'.repeat(300), email: 'label@example.gr' }), headers: h });
+  assert.equal(r.status, 200);
+  f.restore();
+});
+
 test('the same event id from another source is another event', async () => {
   const f = await handler();
   const a = await f.call({ body: body({ event_id: 'shared', email: 's1@example.gr' }), headers: { ...h, 'x-source': 'facebook' } });

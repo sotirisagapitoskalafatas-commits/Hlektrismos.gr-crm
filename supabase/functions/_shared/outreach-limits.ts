@@ -5,8 +5,8 @@
 
 import { contactHash, emailKey, phoneKey } from "./contact-keys.ts";
 
-export type OutboundAction = "sms" | "viber" | "whatsapp" | "voice" | "email_campaign" | "email_direct" | "offer";
-const ACTIONS: OutboundAction[] = ["sms", "viber", "whatsapp", "voice", "email_campaign", "email_direct", "offer"];
+export type OutboundAction = "sms" | "viber" | "whatsapp" | "voice" | "email_campaign" | "email_direct" | "email_confirmation" | "offer";
+const ACTIONS: OutboundAction[] = ["sms", "viber", "whatsapp", "voice", "email_campaign", "email_direct", "email_confirmation", "offer"];
 
 export interface ActionLimits {
   /** Requests one caller may make per hour. */ requestsPerHour: number;

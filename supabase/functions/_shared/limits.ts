@@ -1,6 +1,6 @@
 // Input limits and rate limits for functions that send messages, place calls or spend paid quota.
-// rateLimited() is per function instance (in memory) and only a cheap first filter. durableLimit() is a one-counter shared limit, used for
-// "once" locks: it counts in the database (phase1/21b, public.consume_rate_limit), so every instance sees the same count, and it FAILS CLOSED.
+// rateLimited() is per function instance (in memory) and only a cheap first filter. claimOnce() is a shared "only once for this long" lock in the
+// database (phase1/21b, public.claim_once), so every instance sees it, and it FAILS CLOSED.
 // The volume limits are in outreach-limits.ts. The batch cap below, the consent / frequency gate (outreach-gate.ts) and the OUTREACH_ENABLED
 // switches apply as well.
 
@@ -55,15 +55,20 @@ export async function textHash(...parts: unknown[]): Promise<string> {
 }
 
 /**
- * Shared single-counter limit. Returns null when the attempt may proceed, otherwise the status and message to answer with:
- * 429 over the limit, 503 when the counter cannot be reached (nothing is sent when the limit cannot be checked).
+ * Takes the lock on `key` for `seconds`. Returns null when this caller holds it, otherwise the status and message to answer with:
+ * 429 already taken, 503 when the lock cannot be reached (nothing is sent when it cannot be checked).
  */
-export async function durableLimit(admin: RpcClient, bucket: string, limit: number, windowSeconds: number, cost = 1): Promise<{ status: number; error: string } | null> {
+export async function claimOnce(admin: RpcClient, key: string, seconds: number): Promise<{ status: number; error: string } | null> {
   try {
-    const { data, error } = await admin.rpc("consume_rate_limit", { p_bucket: bucket, p_limit: limit, p_window_seconds: windowSeconds, p_cost: cost });
+    const { data, error } = await admin.rpc("claim_once", { p_key: key, p_seconds: seconds });
     if (error) return { status: 503, error: "Sending is unavailable right now. Try again later." };
-    return data === true ? null : { status: 429, error: "Hourly limit reached. Try again later." };
+    return data === true ? null : { status: 429, error: "This was just sent." };
   } catch {
     return { status: 503, error: "Sending is unavailable right now. Try again later." };
   }
+}
+
+/** Gives the lock back after a send that definitely did not happen. Best effort: if this fails, the lock simply expires. */
+export async function releaseOnce(admin: RpcClient, key: string): Promise<void> {
+  try { await admin.rpc("release_once", { p_key: key }); } catch { /* it expires by itself */ }
 }

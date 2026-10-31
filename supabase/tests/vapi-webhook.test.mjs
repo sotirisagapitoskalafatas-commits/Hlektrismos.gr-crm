@@ -97,8 +97,9 @@ test('a late or different report cannot overwrite a completed call', async () =>
 });
 
 test('informational messages are acknowledged and touch nothing, not even a read', async () => {
-  const f = await load();
-  assert.equal((await f.call({ body: fixture('status-update'), headers: h })).status, 200);
+  const database = db(); database.failSelect = ['voice_calls'];
+  const f = await load(database);
+  assert.equal((await f.call({ body: fixture('status-update'), headers: h })).status, 200, 'a read would have failed');
   assert.equal(f.db.rows('voice_calls')[0].status, 'ringing');
   f.restore();
 });
@@ -160,7 +161,7 @@ test('spoken opt-out: recorded through the service-role function, and the note s
   const f = await load(database);
   await f.call({ body: fixture('spoken-opt-out'), headers: h });
   const call = f.db.log.rpc.find((c) => c.name === 'record_spoken_objection');
-  assert.deepEqual(call.args, { p_phone: '6900000001', p_lead_id: LEAD, p_voice_call_id: CALL });
+  assert.deepEqual(call.args, { p_phone: '6900000001', p_email: null, p_lead_id: LEAD, p_voice_call_id: CALL });
   assert.match(f.db.rows('lead_notes')[0].content, /Η άρνηση καταχωρήθηκε/);
   assert.equal(f.db.rows('hlektrismos_leads')[0].ai_paused, undefined, 'the objection itself stops outreach');
   f.restore();
@@ -198,12 +199,31 @@ test('only the customer\'s words count: the assistant saying "ξαναπάρου
   t.restore();
 });
 
-test('a soft-deleted lead is not updated and gets no note or objection, but the call still closes', async () => {
-  const f = await load(db({ deleted_at: '2026-10-29T00:00:00Z' }));
+test('a soft-deleted lead is not updated and gets no note, but the call closes and the refusal is still recorded for when it is restored', async () => {
+  const database = db({ deleted_at: '2026-10-29T00:00:00Z' });
+  database.rpc = { record_spoken_objection: async () => ({ data: true, error: null }) };
+  const f = await load(database);
   await f.call({ body: fixture('spoken-opt-out'), headers: h });
   assert.equal(f.db.rows('voice_calls')[0].status, 'completed');
   assert.equal(f.db.rows('hlektrismos_leads')[0].pipeline_status, 'new');
   assert.equal(f.db.rows('lead_notes').length, 0);
-  assert.equal(f.db.log.rpc.length, 0);
+  assert.equal(f.db.log.rpc.filter((c) => c.name === 'record_spoken_objection').length, 1);
   f.restore();
+});
+
+test('a passing fault is retried once; the note reports a pause only if the pause happened', async () => {
+  let calls = 0;
+  const database = db();
+  database.rpc = { record_spoken_objection: async () => (++calls === 1 ? { data: null, error: { message: 'blip' } } : { data: true, error: null }) };
+  const f = await load(database);
+  await f.call({ body: fixture('spoken-opt-out'), headers: h });
+  assert.match(f.db.rows('lead_notes')[0].content, /Η άρνηση καταχωρήθηκε/);
+  f.restore();
+  const down = db();
+  down.rpc = { record_spoken_objection: async () => ({ data: null, error: { message: 'down' } }) };
+  down.failUpdate = ['hlektrismos_leads'];
+  const g = await load(down);
+  await g.call({ body: fixture('spoken-opt-out'), headers: h });
+  assert.match(g.db.rows('lead_notes')[0].content, /Η παύση AI ΑΠΕΤΥΧΕ/);
+  g.restore();
 });

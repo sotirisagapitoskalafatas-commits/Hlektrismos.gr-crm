@@ -8,7 +8,11 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 // ════════════════════════════════════════════════════════════════════════════
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
 import { smtpDataBody } from "../_shared/email-safety.ts";
+import { outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
+import { emailObjection } from "../_shared/outreach-gate.ts";
+import { supabaseLoaders } from "../_shared/outreach-loaders.ts";
 import { openSecureSmtp } from "../_shared/smtp.ts";
 
 const corsHeaders = {
@@ -33,7 +37,7 @@ serve(async (req) => {
 
     // Guard: only confirm a lead that genuinely submitted the website form in the last 15 min.
     const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-    const { data: lead } = await adminClient
+    const { data: lead, error: leadError } = await adminClient
       .from("leads")
       .select("id, first_name, email, created_at, ack_sent_at")
       .eq("email", email)
@@ -42,7 +46,8 @@ serve(async (req) => {
       .gte("created_at", cutoff)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
+    if (leadError) throw leadError; // not the same as "no recent lead": that answer would hide a missing column or a failed read
 
     if (!lead) {
       // Nothing to confirm silently — the form insert already went through.
@@ -67,6 +72,15 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: "already confirmed" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const releaseClaim = async () => { await adminClient.from("leads").update({ ack_sent_at: null }).eq("id", lead.id); };
+
+    // Reachable with the public key, so it counts like any other send: the per-person email limit, an objection, and a record. Any refusal skips the mail.
+    const limits = outreachLimitsFromEnv();
+    const objected = await emailObjection(supabaseLoaders(adminClient), email, null, "transactional");
+    const entry = { action: "email_confirmation" as const, actor: { kind: "service" }, contact: { email } };
+    if (!limits || objected || (await reserveMessage(adminClient, "public", "email_confirmation", { email }, limits)) || !(await logAttempt(adminClient, entry))) {
+      await releaseClaim();
+      return new Response(JSON.stringify({ ok: true, skipped: "not sent" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const { data: setting } = await adminClient
       .from("crm_settings")
@@ -155,11 +169,13 @@ serve(async (req) => {
       await client.rcpt(email);
       await client.data(smtpDataBody(headers + "\r\n\r\n" + body));
     } catch (sendErr) {
+      await logResult(adminClient, entry, "failed");
       await releaseClaim();
       throw sendErr;
     } finally {
       await client?.quit();
     }
+    await logResult(adminClient, entry, "sent");
 
     return new Response(JSON.stringify({ ok: true, message: "Confirmation email sent" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {

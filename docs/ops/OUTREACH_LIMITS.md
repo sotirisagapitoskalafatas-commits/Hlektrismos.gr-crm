@@ -15,6 +15,7 @@ All values are whole numbers of at least 1. A missing field makes the whole valu
     "voice":          { "...": "the same five fields" },
     "email_campaign": { "...": "the same five fields" },
     "email_direct":   { "...": "the same five fields" },
+    "email_confirmation": { "...": "the same five fields" },
     "offer":          { "...": "the same five fields" }
   },
   "contact": {
@@ -43,6 +44,7 @@ The zeros above are placeholders and are refused as they stand.
 - **Fixed windows.** Hour and day windows reset on the boundary, so a burst across a boundary can reach twice a limit. Set figures with that in mind.
 - **Fail closed.** If the counter cannot be reached, nothing is sent (503).
 - **Provider failures are not refunded.** The provider may have accepted the message, so the count errs towards sending less.
-- **Retries.** A campaign send holds a claim per lead. A provider error releases it so a retry can send; a network failure keeps it, because the outcome is unknown. Without a campaign, the same text to the same person is sent once in ten minutes.
+- **Retries.** A campaign send holds a claim per lead. A provider error releases it so a retry can send; a network failure keeps it, because the outcome is unknown. Without a campaign, the same text to the same person is sent once in ten minutes (`claim_once`, an expiry per key, so a clock boundary does not reopen it).
+- **`send-lead-confirmation`** is public, so it spends `email_confirmation` and `contact.email` too, and skips the mail when it cannot.
 - **Frequency cap.** The gate also counts sent messages and calls from `communication_log`, so all channels share `maxAttemptsPerWindow` (2 in 7 days, `_shared/eligibility.ts`).
 - Voice calls also keep a ten-minute lock per lead.

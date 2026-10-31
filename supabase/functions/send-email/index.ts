@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient, type RecordKind } from "../_shared/authz.ts";
-import { callerKey, durableLimit, rateLimited, textHash } from "../_shared/limits.ts";
+import { callerKey, claimOnce, rateLimited, releaseOnce, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { logAttempt, logResult } from "../_shared/communication-log.ts";
 import { buildHeaders, EmailSafetyError, parseRecipient, safeDisplayName, smtpDataBody } from "../_shared/email-safety.ts";
@@ -62,12 +62,17 @@ Deno.serve(async (req) => {
     const refs = RECORD_FIELDS.filter(([field]) => payload[field] !== undefined && payload[field] !== null && payload[field] !== "");
     if (refs.length > 1) return json(400, { error: "Reference at most one record" });
     let recipient: string;
+    let recipientPhone: string | null = null; // an objection may be on the phone number: a spoken refusal is
+    let recordCustomer: string | null = null;
     if (refs.length === 1) {
       const [field, kind] = refs[0];
       const owned = await authorizeRecord(adminClient, caller, kind, payload[field], "communications.email.send");
       if (owned instanceof Response) return owned;
-      const stored = await loadRecordEmail(adminClient, kind, owned);
+      const contact = await loadRecordEmail(adminClient, kind, owned);
+      const stored = contact?.email;
       if (!stored) return json(422, { error: "The record has no valid email address" });
+      recipientPhone = contact.phone;
+      if (kind === "customer" || kind === "case") recordCustomer = String(kind === "case" ? owned.customer_id : owned.id);
       if (to !== undefined && to !== null && to !== "") {
         let requested = "";
         try { requested = parseRecipient(to); } catch { /* treated as a mismatch */ }
@@ -108,8 +113,9 @@ Deno.serve(async (req) => {
     const fromLabel = safeDisplayName(from_name, safeDisplayName(cfg.from_name, "Hlektrismos.gr"));
 
     // A recorded «δεν θέλω επικοινωνία» stops this mail too. Unreadable objections stop it as well: refusal is the safe answer.
-    const objection = await emailObjection(supabaseLoaders(adminClient), recipient, transactional === true ? "transactional" : "promotional");
-    if (objection) return json(409, { error: "This person has asked not to be contacted." });
+    const objection = await emailObjection(supabaseLoaders(adminClient), recipient, recipientPhone, transactional === true ? "transactional" : "promotional");
+    if (objection === "unknown") return json(503, { error: "Objections cannot be checked right now. Nothing was sent." });
+    if (objection === "objected") return json(409, { error: "This person has asked not to be contacted." });
 
     // Commercial-email compliance (skipped only for explicit transactional mail).
     let outHtml: string | undefined = html;
@@ -163,7 +169,8 @@ Deno.serve(async (req) => {
     ].join("\r\n");
 
     // A double click or a retry of the same mail to the same person inside ten minutes stops here.
-    const once = await durableLimit(adminClient, `send-once:email_direct:${await textHash(recipient, subject, mimeText)}`, 1, 600);
+    const onceKey = `send-once:email_direct:${await textHash(recipient, subject, mimeText)}`;
+    const once = await claimOnce(adminClient, onceKey, 600);
     if (once) return json(once.status === 429 ? 409 : once.status, { error: "This email was just sent." });
     const over = await reserveMessage(adminClient, callerKey(caller), "email_direct", { email: recipient }, limits);
     if (over) return json(over.status, { error: over.error });
@@ -171,7 +178,7 @@ Deno.serve(async (req) => {
     const entry = {
       action: "email_direct" as const, actor: caller, contact: { email: recipient },
       lead_id: recordKind === "lead" || recordKind === "legacy_lead" ? String(payload[recordField as string]) : null,
-      customer_id: recordKind === "customer" ? String(payload[recordField as string]) : null,
+      customer_id: recordCustomer,
     };
     if (!(await logAttempt(adminClient, entry))) return json(500, { error: "Email could not be recorded" });
 
@@ -188,6 +195,7 @@ Deno.serve(async (req) => {
       await client.data(smtpDataBody(headers + "\r\n\r\n" + body));
     } catch (sendErr) {
       await logResult(adminClient, entry, "failed");
+      if (sendErr instanceof SmtpSecurityError) await releaseOnce(adminClient, onceKey); // refused before anything was written, so a retry is not a duplicate
       throw sendErr;
     } finally {
       await client?.quit();
@@ -212,14 +220,14 @@ Deno.serve(async (req) => {
 /** The address stored on the authorised record (normalised), or null when missing/invalid. */
 async function loadRecordEmail(
   admin: ReturnType<typeof serviceClient>, kind: RecordKind, owned: Record<string, unknown>,
-): Promise<string | null> {
+): Promise<{ email: string; phone: string | null } | null> {
   const table = { lead: "leads", legacy_lead: "hlektrismos_leads", customer: "customers", case: "customers" }[kind];
   // A case has no address of its own: use its customer's.
   const id = kind === "case" ? owned.customer_id : owned.id;
   if (typeof id !== "string" || !id) return null;
-  const { data } = await admin.from(table).select("email, deleted_at").eq("id", id).maybeSingle();
+  const { data } = await admin.from(table).select("email, phone, deleted_at").eq("id", id).maybeSingle();
   try {
-    return data?.email && !data.deleted_at ? parseRecipient(data.email) : null;
+    return data?.email && !data.deleted_at ? { email: parseRecipient(data.email), phone: data.phone ?? null } : null;
   } catch {
     return null;
   }

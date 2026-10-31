@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
 import { configuredSecrets } from "../_shared/webhook-auth.ts";
-import { callerKey, durableLimit, rateLimited } from "../_shared/limits.ts";
+import { callerKey, claimOnce, rateLimited } from "../_shared/limits.ts";
 import { logAttempt, logResult } from "../_shared/communication-log.ts";
 import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
@@ -93,7 +93,7 @@ serve(async (req) => {
     const leadName = [first_name, last_name].filter(Boolean).join(" ") || "Άγνωστος";
 
     // Atomic: a double click or a retry cannot place two billable calls to one lead inside ten minutes.
-    const once = await durableLimit(supabase, `voice-lead:${lead_id}`, 1, 600);
+    const once = await claimOnce(supabase, `voice-lead:${lead_id}`, 600);
     if (once) return json(once.status === 429 ? 409 : once.status, { error: "A call to this lead was placed just now" });
 
     // Per caller, per organisation and per person. The phone counter is the one SMS, Viber and WhatsApp use, so calls and messages add up.
@@ -119,6 +119,7 @@ serve(async (req) => {
 
     // Call Vapi.ai
     const vapiRes = await fetch("https://api.vapi.ai/call/phone", {
+      signal: AbortSignal.timeout(20_000),
       method: "POST",
       headers: {
         Authorization: `Bearer ${vapiKey}`,
@@ -176,6 +177,11 @@ serve(async (req) => {
           voice_call_id: voiceCall?.id || "",
         },
       }),
+    }).catch(async (e: unknown) => {
+      // Timeout or network error: the outcome is unknown, so the lock stays, and the records say so instead of staying at "attempt" and "initiating".
+      await logResult(supabase, entry, "failed");
+      await supabase.from("voice_calls").update({ status: "failed" }).eq("id", voiceCall.id);
+      throw e;
     });
 
     if (vapiRes.ok) {

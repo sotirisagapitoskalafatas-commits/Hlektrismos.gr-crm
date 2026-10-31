@@ -85,7 +85,7 @@ serve(async (req) => {
 
     // The lead, unless it was deleted meanwhile: a deleted record is not updated, and its call result stays on the voice_calls row only.
     const { data: lead, error: leadError } = voiceCall.lead_id
-      ? await supabase.from("hlektrismos_leads").select("id, phone, deleted_at").eq("id", voiceCall.lead_id).maybeSingle()
+      ? await supabase.from("hlektrismos_leads").select("id, phone, email, deleted_at").eq("id", voiceCall.lead_id).maybeSingle()
       : { data: null, error: null };
     if (leadError) throw leadError;
     const liveLead = lead && !lead.deleted_at ? lead : null;
@@ -93,9 +93,13 @@ serve(async (req) => {
     // A spoken «μη με ξαναπάρετε» is recorded before the call is closed, so a failure here is still visible below.
     const optOut = spokenOptOut(report.customerWords);
     let objectionRecorded = false;
-    if (optOut && liveLead) {
-      const { error: objectionError } = await supabase.rpc("record_spoken_objection", { p_phone: liveLead.phone, p_lead_id: liveLead.id, p_voice_call_id: voiceCall.id });
-      objectionRecorded = !objectionError;
+    // Recorded for a lead in the Trash too: it holds the phone number, and the «no» must still be there if the lead is restored. One retry for a passing fault.
+    if (optOut && lead) {
+      for (let attempt = 0; attempt < 2 && !objectionRecorded; attempt++) {
+        const { error: objectionError } = await supabase.rpc("record_spoken_objection", { p_phone: lead.phone, p_email: lead.email ?? null, p_lead_id: lead.id, p_voice_call_id: voiceCall.id });
+        objectionRecorded = !objectionError;
+      }
+      if (!objectionRecorded) console.error(JSON.stringify({ event: "spoken_objection_not_recorded", voice_call: voiceCall.id }));
     }
 
     const { data: claimed, error: claimError } = await supabase
@@ -131,14 +135,15 @@ serve(async (req) => {
       }
 
       // The objection could not be written (its table may not exist yet). The lead is paused so nothing automated reaches them, and the note says
-      // plainly that the refusal is NOT on record, so a person can act on it.
+      // plainly that the refusal is NOT on record, so a person can act on it. The note reports the pause only if the pause happened.
+      let paused = false;
       if (optOut && !objectionRecorded) {
-        await supabase.from("hlektrismos_leads").update({ ai_paused: true }).eq("id", liveLead.id);
-        console.error(JSON.stringify({ event: "spoken_objection_not_recorded", voice_call: voiceCall.id }));
+        const { error: pauseError } = await supabase.from("hlektrismos_leads").update({ ai_paused: true }).eq("id", liveLead.id);
+        paused = !pauseError;
       }
       const optOutLine = !optOut ? "" : objectionRecorded
         ? "🚫 Ο πελάτης ζήτησε να μην τον ξανακαλέσουμε. Η άρνηση καταχωρήθηκε.\n\n"
-        : "⚠️ Ο πελάτης ζήτησε να μην τον ξανακαλέσουμε. Η άρνηση ΔΕΝ καταχωρήθηκε: καταχωρήστε την χειροκίνητα. Το lead μπήκε σε παύση AI.\n\n";
+        : `⚠️ Ο πελάτης ζήτησε να μην τον ξανακαλέσουμε. Η άρνηση ΔΕΝ καταχωρήθηκε: καταχωρήστε την χειροκίνητα. ${paused ? "Το lead μπήκε σε παύση AI." : "Η παύση AI ΑΠΕΤΥΧΕ."}\n\n`;
 
       // Log transcript in lead_notes
       await supabase.from("lead_notes").insert({

@@ -532,12 +532,12 @@ test('verifyHmac unit: the window bounds replay, and every configured secret is 
 test('durable limit: over the shared quota answers 429, an unreachable counter answers 503, and in both cases nothing is sent', async () => {
   for (const [fn, body] of [['send-sms', { leads: ids(1), message: 'hi' }], ['send-campaign-email', { leads: ids(1), subject: 's', html_body: '<p>x</p>' }], ['make-voice-call', { lead_id: LEAD }], ['send-offer', { lead_id: LEAD, tariff_id: TARIFF }], ['send-email', {}]]) {
     for (const [name, rpc, status] of [
-      ['over quota', async () => ({ data: false, error: null }), 429],
+      ['over quota', async () => ({ data: { ok: false, bucket: `request:${ADMIN}:sms` }, error: null }), 429],
       ['migration missing / database error', async () => ({ data: null, error: { message: 'function does not exist' } }), 503],
       ['client throws', async () => { throw new Error('network'); }, 503],
-      ['unexpected null result', async () => ({ data: null, error: null }), 429],
+      ['unexpected null result', async () => ({ data: null, error: null }), 503],
     ]) {
-      const db = outboundDb(); db.rpc = { consume_rate_limit: rpc };
+      const db = outboundDb(); db.rpc = { consume_rate_limits: rpc };
       const f = await loadFunction(fn, { db, users, env: { LINK_SIGNING_SECRET: SECRET, UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000' } });
       const r = await f.call({ token: 'tok-admin', body });
       assert.equal(r.status, status, `${fn}: ${name}`);
@@ -550,39 +550,55 @@ test('durable limit: over the shared quota answers 429, an unreachable counter a
 test('durable limit: the bucket is per function and per caller, taken from the session, never from the request', async () => {
   const f = await loadFunction('send-sms', { db: outboundDb(), users });
   await f.call({ token: 'tok-admin', body: { leads: ids(1), message: 'hi', caller: 'someone-else', bucket: 'x' } });
-  const call = f.db.log.rpc.find((c) => c.name === 'consume_rate_limit');
-  assert.equal(call.args.p_bucket, `send-sms:${ADMIN}`);
-  assert.equal(call.args.p_window_seconds, 3600);
+  const call = f.db.log.rpc.find((c) => c.name === 'consume_rate_limits');
+  assert.equal(call.args.p_items[0].bucket, `request:${ADMIN}:sms`);
+  assert.equal(call.args.p_items[0].window_seconds, 3600);
   f.restore();
 });
 
 test('durable limit runs AFTER the capability check: a refused role consumes no quota', async () => {
   const f = await loadFunction('send-sms', { db: outboundDb(), users });
   assert.equal((await f.call({ token: 'tok-inside', body: {} })).status, 403);
-  assert.equal(f.db.log.rpc.filter((c) => c.name === 'consume_rate_limit').length, 0);
+  assert.equal(f.db.log.rpc.filter((c) => c.name.startsWith('consume_rate_limit')).length, 0);
   f.restore();
   const o = await loadFunction('send-offer', { db: outboundDb(), users });
   assert.equal((await o.call({ token: 'tok-field', body: { lead_id: LEAD, tariff_id: TARIFF } })).status, 403);
-  assert.equal(o.db.log.rpc.filter((c) => c.name === 'consume_rate_limit').length, 0, 'send-offer too');
+  assert.equal(o.db.log.rpc.filter((c) => c.name.startsWith('consume_rate_limit')).length, 0, 'send-offer too');
   o.restore();
 });
 
 // ───────────────────────────── scrape-b2b: the two-role model at its own gate ─────────────────────────────
-test('scrape-b2b: only Admin and inside_sales pass; legacy manager / back_office, field_sales, inactive and anonymous are refused before any search', async () => {
-  const db = outboundDb();
-  for (const [token, status] of [['tok-manager', 403], ['tok-bo', 403], ['tok-field', 403], ['tok-inactive', 403], [undefined, 401], ['tok-unknown', 401]]) {
-    const f = await loadFunction('scrape-b2b', { db, users });
-    const r = await f.call({ token, body: { query: 'x', location: 'y' } });
-    assert.equal(r.status, status, String(token));
-    assert.equal(f.outbound.length, 0, `${token}: no paid search`);
+test('scrape-b2b: one authorization path. Admin, granted and revoked Sales Agents, legacy roles (even with an override), unknown, inactive, missing and anonymous', async () => {
+  const UNKNOWN = 'aaaaaaaa-0000-4000-8000-0000000000f1', MISSING = 'aaaaaaaa-0000-4000-8000-0000000000f2';
+  const all = { ...users, 'tok-unknown-role': UNKNOWN, 'tok-no-profile': MISSING };
+  const grants = { field_sales: ['prospecting.search'], inside_sales: [], manager: ['prospecting.search'], back_office: ['prospecting.search'] };
+  const run = async (token, overrides) => {
+    const db = outboundDb();
+    db.rows('profiles').push({ id: UNKNOWN, role: 'partner', is_active: true });
+    if (overrides) db.rows('crm_settings').push({ setting_key: 'role_permissions', setting_value: overrides });
+    const f = await loadFunction('scrape-b2b', { db, users: all, fetchHandler: async () => { throw new Error('no search may run'); } });
+    const r = await f.call({ token, body: { category: 'x' } });
+    const touched = f.outbound.length;
     f.restore();
-  }
-  for (const token of ['tok-admin', 'tok-inside']) {
-    const f = await loadFunction('scrape-b2b', { db, users });
-    const r = await f.call({ token, body: {} });
-    assert.ok(![401, 403].includes(r.status), `${token} passes the gate (got ${r.status})`);
-    f.restore();
-  }
+    return { status: r.status, touched };
+  };
+  const passes = (x) => assert.ok(![401, 403].includes(x.status), JSON.stringify(x));
+  const refused = (x, status) => { assert.equal(x.status, status); assert.equal(x.touched, 0); };
+  passes(await run('tok-admin'));                         // Admin
+  passes(await run('tok-admin', { admin: [] }));          // Admin cannot be locked out
+  passes(await run('tok-inside'));                        // Sales Agent, default permission
+  refused(await run('tok-field'), 403);                   // Sales Agent without the permission
+  passes(await run('tok-field', grants));                 // Sales Agent, explicitly granted
+  refused(await run('tok-inside', grants), 403);          // Sales Agent, revoked
+  refused(await run('tok-manager'), 403);                 // legacy manager
+  refused(await run('tok-bo'), 403);                      // legacy back_office
+  refused(await run('tok-manager', grants), 403);         // legacy, with a manually inserted override
+  refused(await run('tok-bo', grants), 403);
+  refused(await run('tok-unknown-role', { partner: ['prospecting.search'] }), 403); // unknown role
+  refused(await run('tok-inactive', grants), 403);        // inactive profile
+  refused(await run('tok-no-profile', grants), 403);      // missing profile
+  refused(await run(undefined), 401);                     // anonymous
+  refused(await run('tok-not-a-session'), 401);
 });
 
 // ───────────────────────────── Vapi: the documented event and the credential path ─────────────────────────────
@@ -720,15 +736,6 @@ test('bulk senders: simultaneous identical requests send once; a failed claim se
   });
 });
 
-test('per-recipient limit: 100-recipient requests exhaust the hourly recipient budget before the request limit', async () => {
-  const db = outboundDb();
-  const f = await loadFunction('send-sms', { db, users });
-  db.counters = { [`send-sms-recipients:${ADMIN}`]: 450 };
-  assert.equal((await f.call({ token: 'tok-admin', body: { campaign_id: CAMPAIGN, leads: ids(100), message: 'x' } })).status, 429);
-  assert.equal(sent(f), 0);
-  f.restore();
-});
-
 test('make-voice-call: a double click places one call; a failed tracking row places none', async () => {
   await withClock(async () => {
     const voiceDb = () => {
@@ -781,16 +788,4 @@ test('the confirmation page is a public route that only POSTs, on a button press
   assert.match(page, /method: 'POST'/);
   assert.ok(!/useEffect/.test(page), 'opening the page does nothing by itself');
   assert.match(readFileSync(fnDir + '../../src/lib/router.ts', 'utf8'), /'\/offer': 'offer'/);
-});
-
-test('durable limit: the request limit and the recipient limit are enforced independently', async () => {
-  for (const [fn, body] of [['send-sms', { leads: ids(1), message: 'hi' }], ['send-campaign-email', { leads: ids(1), subject: 's', html_body: '<p>x</p>' }]]) {
-    for (const prefix of [`${fn}:`, `${fn}-recipients:`]) {
-      const db = outboundDb();
-      db.rpc = { consume_rate_limit: async ({ p_bucket }) => ({ data: !p_bucket.startsWith(prefix), error: null }) };
-      const f = await loadFunction(fn, { db, users });
-      assert.equal((await f.call({ token: 'tok-admin', body })).status, 429, prefix);
-      f.restore();
-    }
-  }
 });

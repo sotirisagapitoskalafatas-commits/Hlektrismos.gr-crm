@@ -12,7 +12,8 @@ const as = async (r) => { await db.exec('reset role'); if (r) await db.exec(`set
 
 before(async () => {
   await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls; grant usage on schema public to anon, authenticated, service_role;
-    create table public.campaign_sends (id serial primary key, campaign_id uuid, lead_id uuid, status text);`);
+    create table public.campaign_sends (id serial primary key, campaign_id uuid, lead_id uuid, status text);
+    create function public.is_role(r text) returns boolean language sql as 'select false';`);
   for (let i = 0; i < 2; i++) await db.exec(read('../staged-migrations/phase1/21b_function_rate_limits.sql'));
 });
 
@@ -54,6 +55,53 @@ test('invalid arguments raise (the caller then fails closed)', async () => {
   await assert.rejects(() => hit('', 3));
   await assert.rejects(() => hit('x', 0));
   await assert.rejects(() => hit('x'.repeat(201), 3));
+});
+
+const items = (...x) => JSON.stringify(x.map(([bucket, limit, cost]) => ({ bucket, limit, window_seconds: 3600, ...(cost ? { cost } : {}) })));
+const many = async (json) => (await db.query('select public.consume_rate_limits($1::jsonb) r', [json])).rows[0].r;
+const hits = async (b) => Number((await db.query('select coalesce(sum(hits), 0) n from public.function_rate_limits where bucket = $1', [b])).rows[0].n);
+
+test('several limits move together: a refusal by any one of them advances none', async () => {
+  await as('service_role');
+  assert.deepEqual(await many(items(['m1', 2], ['m2', 1])), { ok: true });
+  assert.deepEqual(await many(items(['m1', 2], ['m2', 1])), { ok: false, bucket: 'm2' }, 'the bucket that refused is named');
+  assert.equal(await hits('m1'), 1, 'm1 was not advanced by the refused call');
+  assert.deepEqual(await many(items(['m1', 2], ['m3', 5])), { ok: true }, 'the unused unit is still there');
+  assert.equal(await hits('m1'), 2);
+});
+
+test('a refused attempt does not raise the count, and exactly the limit passes under a burst of calls', async () => {
+  await as('service_role');
+  const r = await Promise.all(Array.from({ length: 20 }, () => many(items(['burst-many', 5]))));
+  assert.equal(r.filter((x) => x.ok).length, 5);
+  assert.equal(await hits('burst-many'), 5);
+});
+
+test('cost, ordering and bad input: a cost above the limit is refused, the same bucket twice cannot pass the limit, bad input raises', async () => {
+  await as('service_role');
+  assert.deepEqual(await many(items(['c1', 3, 4])), { ok: false, bucket: 'c1' });
+  assert.deepEqual(await many(items(['c2', 3, 3])), { ok: true });
+  for (const bad of ['[]', '{}', 'null', items(['x', 0]), JSON.stringify([{ bucket: '', limit: 1, window_seconds: 1 }]), JSON.stringify([{ bucket: 'x', limit: 1 }])]) {
+    await assert.rejects(() => many(bad), undefined, bad);
+  }
+  await assert.rejects(() => many(JSON.stringify(Array.from({ length: 21 }, (_, i) => ({ bucket: `b${i}`, limit: 1, window_seconds: 60 })))));
+});
+
+test('communication_log: service_role inserts and reads, nobody can change or delete a row, anon and a non-admin see nothing', async () => {
+  await as('service_role');
+  const ins = "insert into public.communication_log (action, result, actor_kind) values ('sms', 'attempt', 'service')";
+  await db.exec(ins);
+  await assert.rejects(() => db.exec('update public.communication_log set result = \'sent\''), /permission denied|append-only/);
+  await assert.rejects(() => db.exec('delete from public.communication_log'), /permission denied|append-only/);
+  await assert.rejects(() => db.exec("insert into public.communication_log (action, result, actor_kind) values ('sms', 'attempt', 'user')"), /communication_log_user_named/, 'a user send must name the user');
+  await as(null);
+  await assert.rejects(() => db.exec('update public.communication_log set result = \'sent\''), /append-only/, 'not even the table owner');
+  await as('anon');
+  await assert.rejects(() => db.query('select * from public.communication_log'), /permission denied/);
+  await as('authenticated');
+  assert.equal((await db.query('select * from public.communication_log')).rows.length, 0, 'is_role is false here: RLS hides every row');
+  await assert.rejects(() => db.exec(ins), /permission denied/);
+  await as(null);
 });
 
 test('anon and authenticated can neither call it nor touch the table', async () => {

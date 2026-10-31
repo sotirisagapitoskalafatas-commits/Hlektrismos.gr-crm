@@ -66,7 +66,8 @@ export async function requirePermission(req: Request, capability: Capability): P
   if (error || !user) return deny(401, "Invalid session");
 
   const { data: profile } = await admin.from("profiles").select("role, is_active").eq("id", user.id).maybeSingle();
-  if (!profile || profile.is_active === false) return deny(403, "Staff access only");
+  // Legacy and unknown roles stop here, before any role_permissions override is read.
+  if (!profile || !categoryOf(profile.role, profile.is_active)) return deny(403, "Staff access only");
 
   const { data: setting } = await admin.from("crm_settings").select("setting_value").eq("setting_key", "role_permissions").maybeSingle();
   const overrides = parseOverrides(setting?.setting_value);

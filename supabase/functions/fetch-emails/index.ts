@@ -5,6 +5,8 @@ import { getCaller, requireCapability, serviceClient } from "../_shared/authz.ts
 // people and AI tools reading the note/lead treat it as data, never as instructions.
 const UNTRUSTED_PREFIX = "[ΜΗ ΕΠΑΛΗΘΕΥΜΕΝΟ ΕΞΩΤΕΡΙΚΟ ΚΕΙΜΕΝΟ / UNTRUSTED EXTERNAL EMAIL CONTENT]";
 
+class ImapSecurityError extends Error { override name = "ImapSecurityError"; }
+
 // ─── Minimal IMAP Client (Deno-native) ────────────────────────────────────────
 class ImapClient {
   private conn: Deno.TcpConn | null = null;
@@ -15,12 +17,9 @@ class ImapClient {
   private tag = 0;
 
   async connect(host: string, port: number) {
-    const useTls = port === 993;
-    if (useTls) {
-      this.conn = await Deno.connectTls({ hostname: host, port });
-    } else {
-      this.conn = await Deno.connect({ hostname: host, port });
-    }
+    // LOGIN sends the password as written, so only implicit TLS is acceptable. There is no plain-text mode.
+    if (port !== 993) throw new ImapSecurityError();
+    this.conn = await Deno.connectTls({ hostname: host, port });
     const streams = this.conn.readable.tee();
     this.reader = streams[0].getReader();
     this.writer = this.conn.writable.getWriter();

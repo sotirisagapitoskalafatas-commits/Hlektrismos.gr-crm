@@ -32,11 +32,18 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 - **Credentials:** treat `crm_integrations.config` values as potentially exposed until the access logs are reviewed; rotation decision is in the private rollout report.
 
 ## 0b. `phase1/21b_function_rate_limits.sql` — required BEFORE the hardened outbound Edge Functions are deployed
-- **Why:** a shared, database-backed rate limit for functions that send messages, place calls or spend paid quota.
-- **Depends on:** nothing.
-- **After it:** no visible change. Only `service_role` can call `consume_rate_limit`.
-- **Order matters:** the hardened `send-sms`, `send-campaign-email`, `make-voice-call`, `send-offer` and `send-email` answer 503 and send nothing while this file is missing.
+- **Why:** a shared, database-backed rate limit for functions that send messages, place calls or spend paid quota, and the insert-only `communication_log`.
+- **Depends on:** `is_role()` (present on production).
+- **After it:** no visible change. Only `service_role` can call the counters; an active Admin can read the log.
+- **Order matters:** the hardened `send-sms`, `send-campaign-email`, `make-voice-call`, `send-offer` and `send-email` answer 503 and send nothing while this file is missing. They also refuse without the secret `OUTREACH_LIMITS` ([`OUTREACH_LIMITS.md`](OUTREACH_LIMITS.md)).
 - **Check:** see `pending_migrations_check.sql` row `phase1/21b_function_rate_limits`. Rollback: `rollback_phase1_21b_function_rate_limits.sql`.
+
+## 0c. `phase1/21c_lead_webhook_idempotency.sql` — required BEFORE the hardened `receive-lead-webhook` is deployed
+- **Why:** one delivery creates one lead, even when two arrive at once; lead, event and audit row are one transaction.
+- **Depends on:** `leads`, `activity_log` (present on production).
+- **After it:** no visible change. Only `service_role` can call `ingest_webhook_lead`.
+- **Order matters:** the hardened function answers 500 and stores nothing while this file is missing.
+- **Check:** see `pending_migrations_check.sql` row `phase1/21c_lead_webhook_idempotency`. Rollback: `rollback_phase1_21c_lead_webhook_idempotency.sql`.
 
 ## 1. `phase1/16_storage_docs_lockdown.sql` — security
 - **Depends on:** nothing.

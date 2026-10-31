@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
-import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited } from "../_shared/limits.ts";
+import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { assertHeaderSafe, EmailSafetyError, parseRecipient, safeDisplayName } from "../_shared/email-safety.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
@@ -27,8 +29,8 @@ serve(async (req) => {
   const denied = requireCapability(caller, "campaign.send");
   if (denied) return denied;
   if (rateLimited(`send-campaign-email:${callerKey(caller)}`, 5, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
-  const overQuota = await durableLimit(supabase, `send-campaign-email:${callerKey(caller)}`, 20, 3600);
-  if (overQuota) return json(overQuota.status, { error: overQuota.error });
+  const limits = outreachLimitsFromEnv();
+  if (!limits) return json(LIMITS_NOT_SET.status, { error: LIMITS_NOT_SET.error });
 
   try {
     const body = await req.json().catch(() => null);
@@ -37,13 +39,12 @@ serve(async (req) => {
     const html_body = cleanText((body as { html_body?: unknown }).html_body, 1, 200_000);
     if (!html_body) return json(400, { error: "html_body must be 1-200000 characters" });
     if (!cleanText(subject, 1, 200)) return json(400, { error: "subject must be 1-200 characters" });
-    const bad = badBatch(leads);
+    const bad = badBatch(leads, limits.actions.email_campaign.maxRecipients);
     if (bad) return json(bad.status, { error: bad.error });
     if (campaign_id !== undefined && campaign_id !== null && !isUuid(campaign_id)) return json(400, { error: "campaign_id must be a UUID" });
     if (!campaign_id && (leads as unknown[]).length > 1) return json(400, { error: "A batch needs a campaign_id" });
-    // Per recipient as well: the request limit alone would allow 100 recipients on every request.
-    const overRecipients = await durableLimit(supabase, `send-campaign-email-recipients:${callerKey(caller)}`, 1000, 3600, (leads as unknown[]).length);
-    if (overRecipients) return json(overRecipients.status, { error: overRecipients.error });
+    const overQuota = await admitRequest(supabase, callerKey(caller), "email_campaign", limits);
+    if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
     // Header safety: the sender address is configuration; only a sanitised display name may be chosen and the
     // Subject must not contain CR/LF (header injection). Validated once, before any recipient is processed.
@@ -119,6 +120,26 @@ serve(async (req) => {
         if (!claim || claim.length === 0) { results.skipped++; continue; }
       }
       const release = async () => { if (campaign_id) await supabase.from("campaign_sends").delete().eq("campaign_id", campaign_id).eq("lead_id", lead.id).eq("status", "queued"); };
+      // Without a campaign there is no claim row: a double click or a retry of the same mail to the same person inside ten minutes stops here.
+      if (!campaign_id) {
+        const once = await durableLimit(supabase, `send-once:email_campaign:${lead.id}:${await textHash(subject, html_body)}`, 1, 600);
+        if (once) { results.skipped++; continue; }
+      }
+      const over = await reserveMessage(supabase, callerKey(caller), "email_campaign", { email: lead.email }, limits);
+      if (over) {
+        await release();
+        if (over.scope === "contact") { results.skipped++; results.errors.push(`${lead.id}: contact limit reached`); continue; }
+        results.failed++;
+        results.errors.push(`${lead.id}: ${over.error}`);
+        break; // the caller's or organisation's limit applies to everyone left in this batch too
+      }
+      const entry = { action: "email_campaign" as const, actor: caller, lead_id: lead.id, campaign_id: campaign_id ?? null, contact: { email: lead.email } };
+      if (!(await logAttempt(supabase, entry))) {
+        await release();
+        results.failed++;
+        results.errors.push(`${lead.id}: could not be recorded`);
+        continue;
+      }
 
       try {
         const personalizedHtml = html_body
@@ -159,6 +180,7 @@ serve(async (req) => {
         if (resendRes.ok) {
           const data = await resendRes.json().catch(() => ({})); // the mail WAS sent: a bad reply body must not lose that
           results.sent++;
+          await logResult(supabase, entry, "sent", { provider_status: resendRes.status, provider_ref: typeof data.id === "string" ? data.id.slice(0, 200) : null });
 
           // Update campaign_sends if campaign_id provided
           if (campaign_id && lead.id) {
@@ -175,12 +197,14 @@ serve(async (req) => {
           });
         } else {
           await release(); // nothing was sent, so a retry may try again
+          await logResult(supabase, entry, "failed", { provider_status: resendRes.status });
           await resendRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
           results.failed++;
           console.error(`[send-campaign-email] provider HTTP ${resendRes.status} for lead ${lead.id}`);
           results.errors.push(`${lead.id}: provider error ${resendRes.status}`);
         }
       } catch {
+        await logResult(supabase, entry, "failed"); // outcome unknown: the claim stays, so a retry cannot send a duplicate
         results.failed++;
         results.errors.push(`${lead.id}: send failed`);
       }

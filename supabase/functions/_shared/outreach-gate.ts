@@ -48,6 +48,19 @@ export interface GateResult {
 
 const norm = (e: string) => e.trim().toLowerCase();
 
+/**
+ * For a single staff-written email, which does not go through the campaign gate: true when a recorded objection covers this address, or when
+ * the objections cannot be read. Marketing objections stop commercial mail; only a «stop all contact» objection stops a service message.
+ */
+export async function emailObjection(loaders: Pick<Loaders, "objections">, email: string, purpose: Purpose): Promise<boolean> {
+  try {
+    const found = (await loaders.objections([{ id: "recipient", email }])).recipient ?? [];
+    return found.some((o) => (o.channels === null || o.channels.includes("email")) && (purpose === "promotional" || o.scope === "all"));
+  } catch {
+    return true;
+  }
+}
+
 export async function gateRecipients(
   rawIds: unknown,
   channel: Channel,

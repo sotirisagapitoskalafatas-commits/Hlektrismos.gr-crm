@@ -89,27 +89,34 @@ test('anyone on staff records «δεν θέλει επικοινωνία»; it f
   assert.equal((await db.query("select count(*)::int as n from public.activity_log where action = 'contact_objection' and entity_id = $1", [LEAD])).rows[0].n, 1);
 });
 
-test('direct table access: no writes for anyone on staff; reads only for admin / manager / back office; nothing for anon', async () => {
+test('direct table access: no writes for anyone on staff; reads only for Admin; nothing for anon or legacy roles', async () => {
   await as(ADMIN);
   const w = await run(`insert into public.contact_consents (address_kind, address_key, channel, status) values ('phone','2109999999','sms','withdrawn')`);
   assert.ok(!w.ok, 'even admin writes only through the functions');
   assert.ok(!(await run(`update public.contact_objections set lifted_at = now(), lifted_by = '${ADMIN}', lifted_reason = 'παράκαμψη'`)).ok, 'no direct lift');
-  await as(BO);
+  await as(ADMIN);
   assert.equal((await run('select * from public.contact_objections')).rows.length, 2);
   await as(INSIDE);
   assert.equal((await run('select * from public.contact_objections')).rows.length, 0, 'agents use contact_facts, not the raw table');
   await as(GONE);
   assert.ok(!(await run(`select public.contact_facts('2101234567', null)`)).ok, 'inactive account is refused');
+  for (const legacy of [MANAGER, BO]) {
+    await as(legacy);
+    assert.equal((await run('select * from public.contact_objections')).rows.length, 0, 'a legacy role reads nothing');
+    assert.ok(!(await run(`select public.contact_facts('2101234567', null)`)).ok, 'a legacy role is refused');
+    assert.ok(!(await run(`select public.record_contact_consent('6910000099', null, 'sms', 'consent', 'Έντυπο 1', now())`)).ok, 'a legacy role records no consent');
+    assert.ok(!(await run(`select public.record_contact_objection('6910000099', null, 'marketing', null, 'δοκιμή')`)).ok, 'a legacy role is not staff here');
+  }
   await as(null);
   assert.ok(!(await run(`select public.contact_facts('2101234567', null)`)).ok, 'anon cannot read facts');
   assert.ok(!(await run('select * from public.contact_objections')).ok, 'anon cannot read the table');
 });
 
-test('consent: needs admin/manager/back office AND evidence; withdrawal is open to all staff', async () => {
+test('consent: needs Admin AND evidence; withdrawal is open to all staff', async () => {
   await as(FIELD);
   const denied = await run(`select public.record_contact_consent('6910000010', null, 'sms', 'consent', 'Έντυπο 0042', now() - interval '1 day')`);
   assert.ok(!denied.ok && /not allowed/.test(denied.err));
-  await as(BO);
+  await as(ADMIN);
   const noEvidence = await run(`select public.record_contact_consent('6910000010', null, 'sms', 'consent', '', now())`);
   assert.ok(!noEvidence.ok && /evidence is required/.test(noEvidence.err));
   const future = await run(`select public.record_contact_consent('6910000010', null, 'sms', 'consent', 'Έντυπο 0042', now() + interval '2 days')`);
@@ -131,21 +138,21 @@ test('consent: needs admin/manager/back office AND evidence; withdrawal is open 
   assert.equal((await facts(null, 'nikos@example.gr')).email_suppressed, true, 'withdrawn email consent also suppresses');
 });
 
-test('Article 11 screening: back office records it, latest wins, B2B prospects are flagged', async () => {
+test('Article 11 screening: Admin records it, latest wins, B2B prospects are flagged', async () => {
   await as(INSIDE);
   assert.ok(!(await run(`select public.record_article11_screening('2101234567', 'not_listed', 'Μητρώο Άρθρου 11')`)).ok, 'agents cannot record screenings');
-  await as(BO);
+  await as(ADMIN);
   const old = await run(`select public.record_article11_screening('2101234567', 'not_listed', 'Μητρώο Άρθρου 11 — λίστα παρόχου', 'αρχείο 2026-10', now() - interval '3 days')`);
   assert.equal(old.ok, true, old.err);
   await su();
   assert.equal((await db.query("select phone_screening from public.b2b_prospects")).rows[0].phone_screening, 'clear');
-  await as(BO);
+  await as(ADMIN);
   await run(`select public.record_article11_screening('+30 210 1234567', 'listed', 'Μητρώο Άρθρου 11', null, now() - interval '1 hour')`);
   const a = (await facts('2101234567', null)).article11;
   assert.equal(a.result, 'listed', 'the latest screening wins');
   await su();
   assert.equal((await db.query("select phone_screening from public.b2b_prospects")).rows[0].phone_screening, 'opted_out');
-  await as(BO);
+  await as(ADMIN);
   const bad = await run(`select public.record_article11_screening('2101234567', 'listed', 'Μητρώο', null, now() - interval '2 years')`);
   assert.ok(!bad.ok && /invalid screening date/.test(bad.err));
   assert.ok(!(await run(`select public.record_article11_screening('2101234567', 'maybe', 'Μητρώο')`)).ok);
@@ -165,4 +172,30 @@ test('only an admin lifts an objection, with a reason; the facts update immediat
   assert.equal((await facts(null, 'maria@example.gr')).email_suppressed, false, 'the suppression it created is removed');
   assert.equal((await facts(null, 'nikos@example.gr')).email_suppressed, true, 'a suppression from a consent withdrawal stays');
   assert.equal((await run('select public.lift_contact_objection($1, $2) as done', [id, 'ξανά'])).rows[0].done, false, 'already lifted');
+});
+
+test('a spoken refusal: service_role only, one row however often it is delivered, marketing on every channel, and no transcript stored', async () => {
+  const CALL = 'cccccccc-0000-4000-8000-000000000001';
+  const LEAD = 'dddddddd-0000-4000-8000-000000000001';
+  const call = (phone) => db.query('select public.record_spoken_objection($1, $2, $3) r', [phone, LEAD, CALL]);
+  for (const who of [INSIDE, ADMIN]) {
+    await as(who);
+    assert.ok(!(await run(`select public.record_spoken_objection('6910000077', null, null)`)).ok, 'no signed-in person may call it');
+  }
+  await as(null);
+  assert.ok(!(await run(`select public.record_spoken_objection('6910000077', null, null)`)).ok, 'nor anon');
+  await su();
+  await db.exec('set role service_role');
+  assert.equal((await call('+30 691 000 0077')).rows[0].r, true);
+  assert.equal((await call('6910000077')).rows[0].r, false, 'a repeat changes nothing');
+  await assert.rejects(() => call('not a number'), /no phone number/);
+  await su();
+  const rows = (await db.query("select * from public.contact_objections where address_key = '6910000077'")).rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].scope, 'marketing');
+  assert.equal(rows[0].channels, null, 'every channel');
+  assert.equal(rows[0].source, 'customer_request');
+  assert.equal(rows[0].lead_id, LEAD);
+  const log = (await db.query("select details from public.activity_log where action = 'contact_objection' order by created_at desc limit 1")).rows[0].details;
+  assert.equal(log.voice_call, CALL);
 });

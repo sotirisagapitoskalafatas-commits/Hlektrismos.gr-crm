@@ -8,102 +8,8 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 // ════════════════════════════════════════════════════════════════════════════
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
-
-// ─── Minimal SMTP Client (Deno-native) ───────────────────────────────────────
-class SmtpClient {
-  private conn: Deno.TcpConn | null = null;
-  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-  private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
-  private decoder = new TextDecoder();
-  private encoder = new TextEncoder();
-
-  async connect(host: string, port: number, secure: boolean = false) {
-    if (secure) {
-      this.conn = await Deno.connectTls({ hostname: host, port });
-    } else {
-      this.conn = await Deno.connect({ hostname: host, port });
-    }
-    const streams = this.conn.readable.tee();
-    this.reader = streams[0].getReader();
-    this.writer = this.conn.writable.getWriter();
-    const banner = await this.read();
-    if (!banner.startsWith("220")) throw new Error(`SMTP banner: ${banner}`);
-    return banner;
-  }
-
-  private async read(): Promise<string> {
-    const chunks: string[] = [];
-    while (true) {
-      const { value, done } = await this.reader!.read();
-      if (done) break;
-      chunks.push(this.decoder.decode(value));
-      const assembled = chunks.join("");
-      if (assembled.includes("\r\n")) break;
-    }
-    return chunks.join("").replace(/\r\n$/, "");
-  }
-
-  private async write(cmd: string): Promise<void> {
-    await this.writer!.write(this.encoder.encode(cmd + "\r\n"));
-  }
-
-  async ehlo(domain: string) {
-    await this.write(`EHLO ${domain}`);
-    return await this.read();
-  }
-
-  async startTls(host: string) {
-    await this.write("STARTTLS");
-    const resp = await this.read();
-    if (!resp.startsWith("220")) throw new Error(`STARTTLS failed: ${resp}`);
-    const transport = this.conn as unknown as { rid: number };
-    const tlsConn = await Deno.connectTls({ hostname: host, transport: { rid: transport.rid } as any });
-    const streams = tlsConn.readable.tee();
-    this.reader = streams[0].getReader();
-    this.writer = tlsConn.writable.getWriter();
-    this.conn = tlsConn;
-    return resp;
-  }
-
-  async auth(user: string, pass: string) {
-    const authString = btoa(`${user}:${pass}`);
-    await this.write(`AUTH PLAIN ${authString}`);
-    const resp = await this.read();
-    if (!resp.startsWith("235")) throw new Error(`AUTH failed: ${resp}`);
-    return resp;
-  }
-
-  async mail(from: string) {
-    await this.write(`MAIL FROM:<${from}>`);
-    const resp = await this.read();
-    if (!resp.startsWith("250")) throw new Error(`MAIL FROM failed: ${resp}`);
-    return resp;
-  }
-
-  async rcpt(to: string) {
-    await this.write(`RCPT TO:<${to}>`);
-    const resp = await this.read();
-    if (!resp.startsWith("250")) throw new Error(`RCPT TO failed: ${resp}`);
-    return resp;
-  }
-
-  async data(headers: string, body: string) {
-    await this.write("DATA");
-    const resp = await this.read();
-    if (!resp.startsWith("354")) throw new Error(`DATA failed: ${resp}`);
-    await this.write(headers + "\r\n" + body + "\r\n.");
-    const endResp = await this.read();
-    if (!endResp.startsWith("250")) throw new Error(`DATA send failed: ${endResp}`);
-    return endResp;
-  }
-
-  async quit() {
-    try { await this.write("QUIT"); } catch { /* ignore */ }
-    try { this.reader?.cancel(); } catch { /* ignore */ }
-    try { this.writer?.close(); } catch { /* ignore */ }
-    try { this.conn?.close(); } catch { /* ignore */ }
-  }
-}
+import { smtpDataBody } from "../_shared/email-safety.ts";
+import { openSecureSmtp } from "../_shared/smtp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +38,7 @@ serve(async (req) => {
       .select("id, first_name, email, created_at, ack_sent_at")
       .eq("email", email)
       .eq("source", "website")
+      .is("deleted_at", null)
       .gte("created_at", cutoff)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -179,7 +86,6 @@ serve(async (req) => {
     const smtpPass = cfg.smtp_password || "";
     const fromEmail = cfg.from_email || smtpUser || "info@hlektrismos.gr";
     const fromLabel = cfg.from_name || "Hlektrismos.gr";
-    const useTls = smtpPort === 465;
 
     // Audit fix: user-supplied values are escaped (HTML injection / phishing via our domain) and
     // stripped of CR/LF; `service` is also length-limited.
@@ -238,27 +144,21 @@ serve(async (req) => {
       `--${boundary}--`,
     ].join("\r\n");
 
-    const client = new SmtpClient();
+    // TLS or nothing (smtp.ts): the session opens before the password or the message is written.
+    let client: Awaited<ReturnType<typeof openSecureSmtp>> | null = null;
     try {
-      await client.connect(smtpHost, smtpPort, useTls);
-      await client.ehlo("hlektrismos.gr");
-      if (!useTls) {
-        try {
-          await client.startTls(smtpHost);
-          await client.ehlo("hlektrismos.gr");
-        } catch { /* server doesn't support STARTTLS */ }
-      }
+      client = await openSecureSmtp(smtpHost, smtpPort, "hlektrismos.gr");
       if (smtpUser && smtpPass) {
         await client.auth(smtpUser, smtpPass);
       }
       await client.mail(fromEmail);
       await client.rcpt(email);
-      await client.data(headers, body);
+      await client.data(smtpDataBody(headers + "\r\n\r\n" + body));
     } catch (sendErr) {
       await releaseClaim();
       throw sendErr;
     } finally {
-      await client.quit();
+      await client?.quit();
     }
 
     return new Response(JSON.stringify({ ok: true, message: "Confirmation email sent" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });

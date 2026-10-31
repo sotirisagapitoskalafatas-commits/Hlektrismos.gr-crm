@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
 import { configuredSecrets } from "../_shared/webhook-auth.ts";
 import { callerKey, durableLimit, rateLimited } from "../_shared/limits.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -22,12 +24,14 @@ serve(async (req) => {
   const denied = requireCapability(caller, "communications.voice.initiate");
   if (denied) return denied;
   if (rateLimited(`make-voice-call:${callerKey(caller)}`, 10, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
-  const overQuota = await durableLimit(supabase, `make-voice-call:${callerKey(caller)}`, 30, 3600);
+  const limits = outreachLimitsFromEnv();
+  if (!limits) return json(LIMITS_NOT_SET.status, { error: LIMITS_NOT_SET.error });
+  const overQuota = await admitRequest(supabase, callerKey(caller), "voice", limits);
   if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
   try {
     // Only the lead id is trusted from the request; the phone number and lead details come from the database.
-    const { lead_id } = await req.json();
+    const { lead_id } = await req.json().catch(() => ({} as { lead_id?: unknown }));
 
     // Central eligibility gate: AI voice prospecting is disabled by default and needs consent evidence,
     // a fresh opt-out register screening, contact hours, frequency limits and recorded legal approval.
@@ -91,6 +95,12 @@ serve(async (req) => {
     // Atomic: a double click or a retry cannot place two billable calls to one lead inside ten minutes.
     const once = await durableLimit(supabase, `voice-lead:${lead_id}`, 1, 600);
     if (once) return json(once.status === 429 ? 409 : once.status, { error: "A call to this lead was placed just now" });
+
+    // Per caller, per organisation and per person. The phone counter is the one SMS, Viber and WhatsApp use, so calls and messages add up.
+    const over = await reserveMessage(supabase, callerKey(caller), "voice", { phone }, limits);
+    if (over) return json(over.status, { error: over.error });
+    const entry = { action: "voice" as const, actor: caller, lead_id, contact: { phone } };
+    if (!(await logAttempt(supabase, entry))) return json(500, { error: "The call could not be recorded" });
 
     // Create voice_calls record
     const { data: voiceCall, error: voiceCallError } = await supabase
@@ -169,6 +179,7 @@ serve(async (req) => {
 
     if (vapiRes.ok) {
       const callData = await vapiRes.json();
+      await logResult(supabase, entry, "sent", { provider_status: vapiRes.status, provider_ref: typeof callData.id === "string" ? callData.id.slice(0, 200) : null });
 
       // Update voice_calls with Vapi call ID
       if (voiceCall?.id) {
@@ -182,7 +193,7 @@ serve(async (req) => {
       if (lead_id) {
         await supabase.from("lead_notes").insert({
           lead_id,
-          content: `📞 AI Voice call initiated to ${phone} (Vapi ID: ${callData.id})`,
+          content: `📞 AI Voice call initiated (Vapi ID: ${callData.id})`,
           author: "system",
           note_type: "ai_call",
         });
@@ -193,11 +204,12 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
-      const errText = await vapiRes.text();
+      await vapiRes.text().catch(() => ""); // drain; provider text is not stored (may contain personal data)
+      await logResult(supabase, entry, "failed", { provider_status: vapiRes.status });
       if (voiceCall?.id) {
         await supabase
           .from("voice_calls")
-          .update({ status: "failed", transcript: errText })
+          .update({ status: "failed" })
           .eq("id", voiceCall.id);
       }
       return new Response(

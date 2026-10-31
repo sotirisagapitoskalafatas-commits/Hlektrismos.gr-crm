@@ -205,7 +205,7 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any, ctx: 
   try {
     switch (fn) {
       case 'search_leads': {
-        let query = supabaseAdmin.from('hlektrismos_leads').select('*')
+        let query = supabaseAdmin.from('hlektrismos_leads').select('*').is('deleted_at', null)
         // Sales see only the leads assigned to them (hlektrismos_leads.assigned_to = auth user id).
         if (!isOffice(caller) && caller.kind === 'user') query = query.eq('assigned_to', caller.id)
         const q = filterText(args.query)
@@ -245,7 +245,7 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any, ctx: 
         if (allowed instanceof Response) return refusal(allowed)
 
         // Recipient comes from the database record only, never from the model/user.
-        const { data: lead, error: leadErr } = await supabaseAdmin.from('hlektrismos_leads').select('email,first_name,last_name').eq('id', args.lead_id).single()
+        const { data: lead, error: leadErr } = await supabaseAdmin.from('hlektrismos_leads').select('email,first_name,last_name').eq('id', args.lead_id).is('deleted_at', null).single()
         if (leadErr || !lead) return `❌ Lead ${args.lead_id} not found`
         if (!lead.email) return `❌ Lead has no email address`
 
@@ -320,7 +320,7 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any, ctx: 
       case 'get_lead_details': {
         const allowed = await authorizeRecord(supabaseAdmin, caller, 'legacy_lead', args.lead_id, null)
         if (allowed instanceof Response) return refusal(allowed)
-        const { data: lead, error } = await supabaseAdmin.from('hlektrismos_leads').select('*').eq('id', args.lead_id).single()
+        const { data: lead, error } = await supabaseAdmin.from('hlektrismos_leads').select('*').eq('id', args.lead_id).is('deleted_at', null).single()
         if (error || !lead) return `❌ Lead ${args.lead_id} not found`
         return JSON.stringify(lead, null, 0)
       }
@@ -448,6 +448,7 @@ async function executeFunctionCall(fn: any, args: any, supabaseAdmin: any, ctx: 
           .from('hlektrismos_leads')
           .select('id, first_name, last_name, email')
           .eq('id', args.lead_id)
+          .is('deleted_at', null)
           .single()
 
         if (!lead) return `❌ Lead ${args.lead_id} δεν βρέθηκε.`

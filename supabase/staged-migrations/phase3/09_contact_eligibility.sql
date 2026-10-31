@@ -10,7 +10,7 @@
 --
 -- Writes go only through the SECURITY DEFINER functions below (no write policies). Anyone on staff can RECORD an
 -- objection or a withdrawal (honouring a «no» must be easy); recording consent or a register screening needs
--- admin / manager / back_office and evidence; lifting an objection is admin-only with a reason.
+-- Admin and evidence; lifting an objection is Admin-only with a reason. Legacy manager / back_office profiles hold nothing here.
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- 1. Normalisation (same rules as _shared/contact-keys.ts — keep them identical)
@@ -27,7 +27,7 @@ as $$ select case when position('@' in btrim(coalesce(e, ''))) > 1 and lower(btr
 
 create or replace function public.contact_role()
 returns text language sql stable security definer set search_path = public
-as $$ select p.role from public.profiles p where p.id = auth.uid() and coalesce(p.is_active, true) $$;
+as $$ select p.role from public.profiles p where p.id = auth.uid() and p.is_active and p.role in ('admin', 'inside_sales', 'field_sales') $$; -- legacy roles hold nothing
 revoke all on function public.contact_role() from public, anon;
 grant execute on function public.contact_role() to authenticated;
 
@@ -105,13 +105,13 @@ grant all on public.contact_objections, public.contact_consents, public.article1
 
 drop policy if exists "contact managers read objections" on public.contact_objections;
 create policy "contact managers read objections" on public.contact_objections for select to authenticated
-  using (public.contact_role() in ('admin', 'manager', 'back_office'));
+  using (public.contact_role() = 'admin');
 drop policy if exists "contact managers read consents" on public.contact_consents;
 create policy "contact managers read consents" on public.contact_consents for select to authenticated
-  using (public.contact_role() in ('admin', 'manager', 'back_office'));
+  using (public.contact_role() = 'admin');
 drop policy if exists "contact managers read screenings" on public.article11_screenings;
 create policy "contact managers read screenings" on public.article11_screenings for select to authenticated
-  using (public.contact_role() in ('admin', 'manager', 'back_office'));
+  using (public.contact_role() = 'admin');
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- 3. Facts for one contact point (any active staff member: the person about to call must be able to see a «no»)
@@ -210,6 +210,28 @@ begin
 end;
 $$;
 
+-- A refusal spoken to the AI caller, recorded by vapi-webhook (service_role only: there is no signed-in person). Attaches to the phone number and covers
+-- every channel for marketing. Safe to repeat: the same number is not recorded twice. It stores no transcript text.
+create or replace function public.record_spoken_objection(p_phone text, p_lead_id uuid, p_voice_call_id uuid)
+returns boolean language plpgsql security definer set search_path = public
+as $$
+declare pk text := public.contact_phone_key(p_phone);
+begin
+  if pk is null then
+    raise exception 'record_spoken_objection: no phone number' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('objection|' || pk, 0));
+  if exists (select 1 from public.contact_objections o where o.address_kind = 'phone' and o.address_key = pk and o.lifted_at is null and o.channels is null) then
+    return false;
+  end if;
+  insert into public.contact_objections (address_kind, address_key, scope, channels, reason, source, lead_id)
+  values ('phone', pk, 'marketing', null, 'Προφορική άρνηση σε κλήση AI', 'customer_request', p_lead_id);
+  perform public.contact_log('contact_objection', p_lead_id, null,
+    jsonb_build_object('scope', 'marketing', 'source', 'spoken', 'voice_call', p_voice_call_id));
+  return true;
+end;
+$$;
+
 -- Admin only, with a reason (e.g. «νέα έγγραφη συγκατάθεση της 12/11, αρ. 0042»). Lifts the whole recorded «no»
 -- (phone and email rows of the same batch) and removes the suppression it created — not one from an unsubscribe link.
 create or replace function public.lift_contact_objection(p_id uuid, p_reason text)
@@ -239,7 +261,7 @@ begin
 end;
 $$;
 
--- Consent with evidence: admin / manager / back_office.
+-- Consent with evidence: Admin only.
 create or replace function public.record_contact_consent(
   p_phone text, p_email text, p_channel text, p_basis text, p_evidence_ref text, p_evidence_at timestamptz,
   p_text_version text default null, p_source text default 'manual', p_lead_id uuid default null, p_customer_id uuid default null)
@@ -250,7 +272,7 @@ declare
   k text := case when p_channel = 'email' then public.contact_email_key(p_email) else public.contact_phone_key(p_phone) end;
   v_id uuid;
 begin
-  if public.contact_role() is null or public.contact_role() not in ('admin', 'manager', 'back_office') then
+  if public.contact_role() is distinct from 'admin' then
     raise exception 'record_contact_consent: not allowed' using errcode = '42501';
   end if;
   if coalesce(p_channel, '') not in ('email', 'sms', 'whatsapp', 'viber', 'voice', 'call') then
@@ -319,7 +341,7 @@ begin
 end;
 $$;
 
--- Article 11 register screening result for a phone number: admin / manager / back_office. History is kept; the latest
+-- Article 11 register screening result for a phone number: Admin only. History is kept; the latest
 -- screening wins. The matching B2B prospects' phone_screening flag is updated when phase3/08 is present.
 create or replace function public.record_article11_screening(
   p_phone text, p_result text, p_register_source text, p_evidence_ref text default null,
@@ -330,7 +352,7 @@ declare
   pk text := public.contact_phone_key(p_phone);
   v_id uuid;
 begin
-  if public.contact_role() is null or public.contact_role() not in ('admin', 'manager', 'back_office') then
+  if public.contact_role() is distinct from 'admin' then
     raise exception 'record_article11_screening: not allowed' using errcode = '42501';
   end if;
   if coalesce(p_result, '') not in ('not_listed', 'listed') then
@@ -360,6 +382,8 @@ $$;
 
 revoke all on function public.contact_facts(text, text) from public, anon;
 revoke all on function public.record_contact_objection(text, text, text, text[], text, text, uuid, uuid) from public, anon;
+revoke all on function public.record_spoken_objection(text, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.record_spoken_objection(text, uuid, uuid) to service_role;
 revoke all on function public.lift_contact_objection(uuid, text) from public, anon;
 revoke all on function public.record_contact_consent(text, text, text, text, text, timestamptz, text, text, uuid, uuid) from public, anon;
 revoke all on function public.withdraw_contact_consent(text, text, text, text, uuid, uuid) from public, anon;
@@ -375,6 +399,7 @@ grant execute on function public.record_article11_screening(text, text, text, te
 --   drop function public.record_article11_screening(text, text, text, text, timestamptz, uuid, uuid);
 --   drop function public.withdraw_contact_consent(text, text, text, text, uuid, uuid);
 --   drop function public.record_contact_consent(text, text, text, text, text, timestamptz, text, text, uuid, uuid);
+--   drop function public.record_spoken_objection(text, uuid, uuid);
 --   drop function public.lift_contact_objection(uuid, text);
 --   drop function public.record_contact_objection(text, text, text, text[], text, text, uuid, uuid);
 --   drop function public.contact_log(text, uuid, uuid, jsonb);

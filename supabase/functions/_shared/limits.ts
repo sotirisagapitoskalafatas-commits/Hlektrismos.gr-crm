@@ -1,16 +1,18 @@
 // Input limits and rate limits for functions that send messages, place calls or spend paid quota.
-// rateLimited() is per function instance (in memory) and only a cheap first filter. durableLimit() is the shared limit: it
-// counts in the database (phase1/21b, public.consume_rate_limit), so every instance sees the same count, and it FAILS CLOSED.
-// The batch cap below, the consent / frequency gate (outreach-gate.ts) and the OUTREACH_ENABLED switches apply as well.
+// rateLimited() is per function instance (in memory) and only a cheap first filter. durableLimit() is a one-counter shared limit, used for
+// "once" locks: it counts in the database (phase1/21b, public.consume_rate_limit), so every instance sees the same count, and it FAILS CLOSED.
+// The volume limits are in outreach-limits.ts. The batch cap below, the consent / frequency gate (outreach-gate.ts) and the OUTREACH_ENABLED
+// switches apply as well.
 
-/** Largest number of recipients one request may name. */
+/** Hard ceiling on the recipients of one request, whatever OUTREACH_LIMITS says. */
 export const MAX_BATCH = 100;
 
-/** null when the batch is acceptable, otherwise the status and message to answer with. */
-export function badBatch(leads: unknown): { status: number; error: string } | null {
+/** null when the batch is acceptable, otherwise the status and message to answer with. `max` is the configured limit for this channel. */
+export function badBatch(leads: unknown, max: number = MAX_BATCH): { status: number; error: string } | null {
+  const cap = Math.min(max, MAX_BATCH);
   if (!Array.isArray(leads)) return { status: 400, error: "leads must be an array" };
   if (leads.length === 0) return { status: 400, error: "leads must not be empty" };
-  if (leads.length > MAX_BATCH) return { status: 413, error: `At most ${MAX_BATCH} recipients per request` };
+  if (leads.length > cap) return { status: 413, error: `At most ${cap} recipients per request` };
   return null;
 }
 
@@ -46,8 +48,14 @@ export function resetRateLimits(): void { buckets.clear(); }
 /** Minimal client shape: the service-role client of the calling function. */
 type RpcClient = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
 
+/** A stable, non-reversible key for "the same text": lets a once-lock tell a retry from a different message. */
+export async function textHash(...parts: unknown[]): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.map(String).join("\u0000")));
+  return [...new Uint8Array(digest)].slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /**
- * Shared per-caller limit. Returns null when the attempt may proceed, otherwise the status and message to answer with:
+ * Shared single-counter limit. Returns null when the attempt may proceed, otherwise the status and message to answer with:
  * 429 over the limit, 503 when the counter cannot be reached (nothing is sent when the limit cannot be checked).
  */
 export async function durableLimit(admin: RpcClient, bucket: string, limit: number, windowSeconds: number, cost = 1): Promise<{ status: number; error: string } | null> {

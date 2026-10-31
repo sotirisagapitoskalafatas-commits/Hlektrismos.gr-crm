@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { authorizeRecord, getCaller, json, requireCapability, serviceClient } from "../_shared/authz.ts";
-import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited } from "../_shared/limits.ts";
+import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -27,8 +29,8 @@ serve(async (req) => {
   if (denied) return denied;
   // Best-effort per-caller throttle (limits.ts): slows a runaway or compromised staff account.
   if (rateLimited(`send-sms:${callerKey(caller)}`, 10, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
-  const overQuota = await durableLimit(supabase, `send-sms:${callerKey(caller)}`, 60, 3600);
-  if (overQuota) return json(overQuota.status, { error: overQuota.error });
+  const limits = outreachLimitsFromEnv();
+  if (!limits) return json(LIMITS_NOT_SET.status, { error: LIMITS_NOT_SET.error });
 
   try {
     const body = await req.json().catch(() => null);
@@ -36,13 +38,13 @@ serve(async (req) => {
     const { campaign_id, leads, channel } = body as { campaign_id?: string; leads?: unknown; channel?: string };
     const text = cleanText((body as { message?: unknown }).message, 1, 1000);
     if (!text) return json(400, { error: "message must be 1-1000 characters" });
-    const bad = badBatch(leads);
+    const action = channel === "viber" || channel === "whatsapp" ? channel : "sms";
+    const bad = badBatch(leads, limits.actions[action].maxRecipients);
     if (bad) return json(bad.status, { error: bad.error });
     if (campaign_id !== undefined && campaign_id !== null && !isUuid(campaign_id)) return json(400, { error: "campaign_id must be a UUID" });
     if (!campaign_id && (leads as unknown[]).length > 1) return json(400, { error: "A batch needs a campaign_id" });
-    // Per recipient as well: the request limit alone would allow 100 recipients on every request.
-    const overRecipients = await durableLimit(supabase, `send-sms-recipients:${callerKey(caller)}`, 500, 3600, (leads as unknown[]).length);
-    if (overRecipients) return json(overRecipients.status, { error: overRecipients.error });
+    const overQuota = await admitRequest(supabase, callerKey(caller), action, limits);
+    if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
     const { data: settings } = await supabase
       .from("crm_settings")
@@ -80,8 +82,7 @@ serve(async (req) => {
         if (owned instanceof Response) return owned;
       }
     }
-    const gateChannel = channel === "viber" || channel === "whatsapp" ? channel : "sms";
-    const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), gateChannel, "promotional",
+    const gate = await gateRecipients(leads.map((l: { id?: string }) => l?.id), action, "promotional",
       supabaseLoaders(supabase), outreachConfigFromEnv());
     for (const d of gate.denied) {
       results.failed++;
@@ -110,6 +111,27 @@ serve(async (req) => {
         if (!claim || claim.length === 0) { results.skipped++; continue; }
       }
       const release = async () => { if (campaign_id) await supabase.from("campaign_sends").delete().eq("campaign_id", campaign_id).eq("lead_id", lead.id).eq("status", "queued"); };
+      // Without a campaign there is no claim row: a double click or a retry of the same text to the same person inside ten minutes stops here.
+      if (!campaign_id) {
+        const once = await durableLimit(supabase, `send-once:${action}:${lead.id}:${await textHash(text)}`, 1, 600);
+        if (once) { results.skipped++; continue; }
+      }
+      // Per caller, per organisation and per person, in one atomic step. The phone counter is shared with the other phone channels and with voice calls.
+      const over = await reserveMessage(supabase, callerKey(caller), action, { phone: lead.phone }, limits);
+      if (over) {
+        await release();
+        if (over.scope === "contact") { results.skipped++; results.errors.push(`${lead.id}: contact limit reached`); continue; }
+        results.failed++;
+        results.errors.push(`${lead.id}: ${over.error}`);
+        break; // the caller's or organisation's limit applies to everyone left in this batch too
+      }
+      const entry = { action, actor: caller, lead_id: lead.id, campaign_id: campaign_id ?? null, contact: { phone: lead.phone } };
+      if (!(await logAttempt(supabase, entry))) {
+        await release();
+        results.failed++;
+        results.errors.push(`${lead.id}: could not be recorded`);
+        continue;
+      }
 
       try {
         const personalizedMessage = text
@@ -163,6 +185,7 @@ serve(async (req) => {
           const data = await smsRes.json().catch(() => ({})); // the message WAS sent: a bad reply body must not lose that
           results.sent++;
           const externalId = data.bulkId || data.messages?.[0]?.messageId || "";
+          await logResult(supabase, entry, "sent", { provider_status: smsRes.status, provider_ref: externalId ? String(externalId).slice(0, 200) : null });
 
           if (campaign_id && lead.id) {
             await supabase.from("campaign_sends").update({ status: "sent", sent_at: new Date().toISOString(), external_id: externalId })
@@ -178,11 +201,13 @@ serve(async (req) => {
         } else {
           await smsRes.text().catch(() => ""); // drain; provider text is not returned (may contain PII)
           await release(); // nothing was sent, so a retry may try again
+          await logResult(supabase, entry, "failed", { provider_status: smsRes.status });
           results.failed++;
           console.error(`[send-sms] provider HTTP ${smsRes.status} for lead ${lead.id}`);
           results.errors.push(`${lead.id}: provider error ${smsRes.status}`);
         }
       } catch {
+        await logResult(supabase, entry, "failed"); // outcome unknown: the claim stays, so a retry cannot send a duplicate
         results.failed++;
         results.errors.push(`${lead.id}: send failed`);
       }

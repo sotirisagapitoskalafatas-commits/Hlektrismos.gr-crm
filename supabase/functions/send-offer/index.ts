@@ -2,6 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { prepareMarketingEmail } from "../_shared/email-compliance.ts";
 import { signExpiringLink } from "../_shared/signed-link.ts";
 import { callerKey, durableLimit, rateLimited } from "../_shared/limits.ts";
+import { logAttempt, logResult } from "../_shared/communication-log.ts";
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 
 /** The acceptance link stops working after this long (the offer must be re-sent). */
 const OFFER_LINK_TTL_SECONDS = 14 * 24 * 60 * 60;
@@ -43,7 +45,9 @@ Deno.serve(async (req: Request) => {
   const noCap = requireCapability(caller, "communications.email.send");
   if (noCap) return noCap;
   if (rateLimited(`send-offer:${callerKey(caller)}`, 20, 60_000)) return json(429, { error: "Too many requests. Try again in a minute." });
-  const overQuota = await durableLimit(supabase, `send-offer:${callerKey(caller)}`, 100, 3600);
+  const limits = outreachLimitsFromEnv();
+  if (!limits) return json(LIMITS_NOT_SET.status, { error: LIMITS_NOT_SET.error });
+  const overQuota = await admitRequest(supabase, callerKey(caller), "offer", limits);
   if (overQuota) return json(overQuota.status, { error: overQuota.error });
 
   try {
@@ -129,6 +133,15 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
 
 Ηλεκτρισμός.gr — Σας βοηθάμε να εξοικονομήστε! 🔋`;
 
+    // One channel, one message: limits and the record of the attempt come first, and a refusal skips this channel only.
+    const begin = async (contact: { phone?: string | null; email?: string | null }) => {
+      if (await reserveMessage(supabase, callerKey(caller), "offer", contact, limits)) return null;
+      const entry = { action: "offer" as const, actor: caller, lead_id: String(lead_id), contact };
+      return (await logAttempt(supabase, entry)) ? entry : null;
+    };
+    const finish = async (entry: NonNullable<Awaited<ReturnType<typeof begin>>>, res: Response) =>
+      await logResult(supabase, entry, res.ok ? "sent" : "failed", { provider_status: res.status });
+
     // 3. Send via Viber (if phone available and the caller may message phones)
     let viberResult = null;
     if (mayViber) {
@@ -136,7 +149,8 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
         const infobipApiKey = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "INFOBIP_API_KEY").single()).data?.setting_value;
         const infobipBaseUrl = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "INFOBIP_BASE_URL").single()).data?.setting_value;
 
-        if (infobipApiKey && infobipBaseUrl) {
+        const entry = infobipApiKey && infobipBaseUrl ? await begin({ phone: customer_phone }) : null;
+        if (entry) {
           viberResult = await fetch(`${infobipBaseUrl}/viber/1/send-message`, {
             method: "POST",
             headers: {
@@ -150,6 +164,7 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
               text: message,
             }),
           });
+          await finish(entry, viberResult);
           console.log(`[send-offer] Viber: ${viberResult.status}`);
         }
       } catch (err: unknown) {
@@ -165,7 +180,8 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
         const infobipBaseUrl = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "INFOBIP_BASE_URL").single()).data?.setting_value;
         const whatsappSenderId = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "WHATSAPP_SENDER_ID").single()).data?.setting_value;
 
-        if (infobipApiKey && infobipBaseUrl) {
+        const entry = infobipApiKey && infobipBaseUrl ? await begin({ phone: customer_phone }) : null;
+        if (entry) {
           whatsappResult = await fetch(`${infobipBaseUrl}/whatsapp/1/send-message`, {
             method: "POST",
             headers: {
@@ -179,6 +195,7 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
               text: { previewUrl: false, body: message },
             }),
           });
+          await finish(entry, whatsappResult);
           console.log(`[send-offer] WhatsApp: ${whatsappResult.status}`);
         }
       } catch (err: unknown) {
@@ -198,6 +215,8 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
         } else if (resendApiKey) {
           // Tariff names come from the database but still must not break out of the Subject header.
           const subject = assertHeaderSafe(`⚡ Νέα Προσφορά Ενέργειας — ${provider_name} ${program_name}`, "Subject");
+          const entry = await begin({ email: customer_email });
+          if (entry) {
           emailResult = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
@@ -212,7 +231,9 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
               headers: prepared.headers,
             }),
           });
+          await finish(entry, emailResult);
           console.log(`[send-offer] Email: ${emailResult.status}`);
+          }
         }
       } catch (err: unknown) {
         console.warn(`[send-offer] Email failed: ${err instanceof Error ? err.name : "unknown"}`);

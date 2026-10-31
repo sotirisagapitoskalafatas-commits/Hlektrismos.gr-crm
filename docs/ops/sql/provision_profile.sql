@@ -1,7 +1,7 @@
 -- Attach a CRM profile (+ canonical user_roles row) to an EXISTING Auth user. Idempotent and guarded.
 -- Never creates an Auth user, never touches a password, an identity, a session, crm_users, sales_agents or any lead. Edit the three values, nothing else.
 --   admin    -> role 'admin'       (the shared Admin / Back Office login; displayed as «Admin / Back Office»)
---   a sales  -> role 'field_sales' (displayed as «Sales Agent»)
+--   a sales  -> role 'sales_agent' (displayed as «Sales Agent»)
 -- Refuses unless ALL of these hold, because each one is a way to end with an account that looks provisioned but is not:
 --   * exactly one Auth user has that e-mail, confirmed and not banned (no duplicate, no guessing);
 --   * it has an identity row, i.e. it can actually sign in (a user with none cannot; it must be created through the Dashboard invitation);
@@ -12,11 +12,11 @@ do $$
 declare
   v_email text := 'CHANGE-ME@example.com';
   v_name  text := 'CHANGE ME';
-  v_role  text := 'field_sales';
+  v_role  text := 'sales_agent';
   v_id uuid; v_n int; v_role_id uuid; v_org uuid; v_existing text; v_legacy text; v_leads int;
 begin
   if v_email ilike 'CHANGE-ME%' or v_name = 'CHANGE ME' then raise exception 'edit the three values first'; end if;
-  if v_role not in ('admin', 'field_sales') then raise exception 'role % is not assignable (only admin or field_sales)', v_role; end if;
+  if v_role not in ('admin', 'sales_agent') then raise exception 'role % is not assignable (only admin or sales_agent)', v_role; end if;
   select count(*), (array_agg(id))[1] into v_n, v_id from auth.users
    where lower(email) = lower(v_email) and email_confirmed_at is not null and (banned_until is null or banned_until < now());
   if v_n <> 1 then raise exception 'expected exactly one confirmed, not-banned Auth user for %, found %', v_email, v_n; end if;

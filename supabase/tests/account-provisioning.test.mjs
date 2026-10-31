@@ -15,7 +15,7 @@ const U = { admin: 'a0000000-0000-4000-8000-000000000001', agent: 'a0000000-0000
   qaAdmin: 'a0000000-0000-4000-8000-0000000000b1', demo: 'a0000000-0000-4000-8000-0000000000b2', qaBo: 'a0000000-0000-4000-8000-0000000000b3', qaMgr: 'a0000000-0000-4000-8000-0000000000b4',
   qaField: 'a0000000-0000-4000-8000-0000000000b5', qaInside: 'a0000000-0000-4000-8000-0000000000b6', probe1: 'a0000000-0000-4000-8000-0000000000c1', probe2: 'a0000000-0000-4000-8000-0000000000c2' };
 const QA = [['demo@hlektrismos.gr', 'demo', 'admin'], ['qa.admin@hlektrismos.gr', 'qaAdmin', 'admin'], ['qa.backoffice@hlektrismos.gr', 'qaBo', 'back_office'],
-  ['qa.manager@hlektrismos.gr', 'qaMgr', 'manager'], ['qa.fieldsales@hlektrismos.gr', 'qaField', 'field_sales'], ['qa.insidesales@hlektrismos.gr', 'qaInside', 'inside_sales']];
+  ['qa.manager@hlektrismos.gr', 'qaMgr', 'manager'], ['qa.fieldsales@hlektrismos.gr', 'qaField', 'sales_agent'], ['qa.insidesales@hlektrismos.gr', 'qaInside', 'inside_sales']];
 
 async function build() {
   await db.exec(`
@@ -31,13 +31,13 @@ async function build() {
     create table public.hlektrismos_leads (id serial primary key, assigned_to uuid, status text default 'new');
     create table public.sales_agents (id serial primary key, email text, active boolean);
     insert into public.organizations values ('${ORG}');
-    insert into public.roles (key) values ('admin'), ('field_sales'), ('manager'), ('back_office'), ('inside_sales');`);
+    insert into public.roles (key) values ('admin'), ('sales_agent'), ('manager'), ('back_office'), ('inside_sales');`);
 }
 const user = (id, email, { confirmed = true, identity = true, signedIn = true, banned = false } = {}) => db.exec(`
   insert into auth.users values ('${id}', '${email}', ${confirmed ? 'now()' : 'null'}, ${banned ? "now() + interval '1 day'" : 'null'}, ${signedIn ? 'now()' : 'null'});
   ${identity ? `insert into auth.identities (user_id) values ('${id}');` : ''}`);
 const fill = (name, { email = 'new.owner@example.test', fullName = 'Test Owner', role = 'admin' } = {}) =>
-  script(name).replace("v_email text := 'CHANGE-ME@example.com'", `v_email text := '${email}'`).replace("v_name  text := 'CHANGE ME'", `v_name  text := '${fullName}'`).replace("v_role  text := 'field_sales'", `v_role  text := '${role}'`);
+  script(name).replace("v_email text := 'CHANGE-ME@example.com'", `v_email text := '${email}'`).replace("v_name  text := 'CHANGE ME'", `v_name  text := '${fullName}'`).replace("v_role  text := 'sales_agent'", `v_role  text := '${role}'`);
 const attempt = async (sql) => { try { await db.exec(sql); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } };
 const one = async (sql) => (await db.query(sql)).rows[0];
 const count = async (t, where = 'true') => Number((await one(`select count(*) n from ${t} where ${where}`)).n);
@@ -52,9 +52,9 @@ test('the placeholders are refused: the script does nothing until the three valu
   assert.equal(await count('public.profiles'), 0);
 });
 
-test('exactly two roles are assignable: admin and field_sales. inside_sales, manager, back_office and anything else are refused', async () => {
+test('exactly two roles are assignable: admin and sales_agent. inside_sales, field_sales, manager, back_office and anything else are refused', async () => {
   await user(U.admin, 'new.owner@example.test');
-  for (const role of ['inside_sales', 'manager', 'back_office', 'superuser', '']) {
+  for (const role of ['inside_sales', 'field_sales', 'manager', 'back_office', 'superuser', '']) {
     const r = await attempt(fill('provision_profile.sql', { role }));
     assert.equal(r.ok, false, role);
     assert.match(r.err, /not assignable/, role);
@@ -109,20 +109,20 @@ test('stale canonical role rows are replaced so exactly one effective role remai
   await user(U.agent, 'new.agent@example.test');
   const k = (await one(`select id from public.roles where key = 'manager'`)).id;
   await db.exec(`insert into public.user_roles (user_id, role_id, is_primary) values ('${U.agent}', '${k}', true)`);
-  assert.equal((await attempt(fill('provision_profile.sql', { email: 'new.agent@example.test', role: 'field_sales' }))).ok, true);
+  assert.equal((await attempt(fill('provision_profile.sql', { email: 'new.agent@example.test', role: 'sales_agent' }))).ok, true);
   const rows = (await db.query(`select k.key from public.user_roles ur join public.roles k on k.id = ur.role_id where ur.user_id = '${U.agent}'`)).rows;
-  assert.deepEqual(rows.map((r) => r.key), ['field_sales']);
+  assert.deepEqual(rows.map((r) => r.key), ['sales_agent']);
 });
 
 test('no silent role change and no self-promotion through this script: an account that already has another role is refused and left as it was', async () => {
   await user(U.agent, 'new.owner@example.test');
-  await db.exec(`insert into public.profiles (id, full_name, role, is_active, organization_id) values ('${U.agent}', 'Existing agent', 'field_sales', true, '${ORG}')`);
+  await db.exec(`insert into public.profiles (id, full_name, role, is_active, organization_id) values ('${U.agent}', 'Existing agent', 'sales_agent', true, '${ORG}')`);
   const r = await attempt(fill('provision_profile.sql', { role: 'admin' }));
   assert.equal(r.ok, false);
-  assert.match(r.err, /already has the role field_sales/);
-  assert.deepEqual(await one('select role, full_name from public.profiles'), { role: 'field_sales', full_name: 'Existing agent' });
+  assert.match(r.err, /already has the role sales_agent/);
+  assert.deepEqual(await one('select role, full_name from public.profiles'), { role: 'sales_agent', full_name: 'Existing agent' });
   await db.exec(`update public.profiles set role = 'manager'`);
-  assert.match((await attempt(fill('provision_profile.sql', { role: 'field_sales' }))).err, /already has the role manager/, 'a legacy role is not silently converted either');
+  assert.match((await attempt(fill('provision_profile.sql', { role: 'sales_agent' }))).err, /already has the role manager/, 'a legacy role is not silently converted either');
 });
 
 test('legacy records are reported, never touched: crm_users, the leads assigned to the account and a same-address sales_agents row stay exactly as they were', async () => {
@@ -223,7 +223,7 @@ test('probe cleanup is separate: it bans and revokes the two probe accounts only
 
 test('probe cleanup refuses when a probe has gained a CRM profile, or when a probe is missing', async () => {
   await qaWorld();
-  await db.exec(`insert into public.profiles (id, full_name, role, is_active, organization_id) values ('${U.probe1}', 'x', 'field_sales', true, '${ORG}')`);
+  await db.exec(`insert into public.profiles (id, full_name, role, is_active, organization_id) values ('${U.probe1}', 'x', 'sales_agent', true, '${ORG}')`);
   assert.match((await attempt(script('deactivate_probe_accounts.sql'))).err, /not a probe any more/);
   await build(); await qaWorld();
   await db.exec(`delete from auth.identities where user_id = '${U.probe2}'; delete from auth.users where id = '${U.probe2}'`);

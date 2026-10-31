@@ -106,8 +106,8 @@ test('role visibility: only the REAL admin role sees the card; a preview, a Sale
   assert.match(page, /const realRole = profile\?\.role \?\? null; \/\/ always the REAL assigned role, never the presentation preview/);
   const card = page.slice(page.indexOf('function EmailChangeCard'), page.indexOf('/* ───────── Προφίλ'));
   assert.ok(!/preview/.test(card), 'the card never reads the role preview');
-  // the gate is an exact match on 'admin': nothing else is accepted, so field_sales, inside_sales, manager and back_office are all out
-  for (const role of ['field_sales', 'inside_sales', 'manager', 'back_office', null, undefined, 'Admin', 'admin ']) assert.notEqual(role === 'admin', true, String(role));
+  // the gate is an exact match on 'admin': nothing else is accepted, so sales_agent, field_sales, inside_sales, manager and back_office are all out
+  for (const role of ['sales_agent', 'field_sales', 'inside_sales', 'manager', 'back_office', null, undefined, 'Admin', 'admin ']) assert.notEqual(role === 'admin', true, String(role));
 });
 
 test('the card shows the active address, a pending one separately, and re-reads the user from the server on open and on focus', () => {

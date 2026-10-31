@@ -1,5 +1,5 @@
 // HMAC-signed links + constant-time comparison for public, no-login endpoints.
-// Fails closed: without LINK_SIGNING_SECRET (min 16 chars) nothing validates.
+// Fails closed: without a strong LINK_SIGNING_SECRET (see isStrongSecret) nothing validates.
 
 const enc = new TextEncoder();
 
@@ -21,7 +21,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
 /** Token binds a purpose + parts, e.g. signLink("accept-offer", leadId, tariffId). */
 export async function signLink(purpose: string, ...parts: string[]): Promise<string> {
   const secret = Deno.env.get("LINK_SIGNING_SECRET") ?? "";
-  if (secret.length < 16) throw new Error("LINK_SIGNING_SECRET is not configured (min 16 chars)");
+  if (!isStrongSecret(secret)) throw new Error("LINK_SIGNING_SECRET is not configured (min 32 chars, 12 distinct)");
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return b64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode([purpose, ...parts].join("|")))));
 }
@@ -29,4 +29,38 @@ export async function signLink(purpose: string, ...parts: string[]): Promise<str
 export async function verifyLink(token: string | null, purpose: string, ...parts: string[]): Promise<boolean> {
   if (!token) return false;
   try { return timingSafeEqual(await signLink(purpose, ...parts), token); } catch { return false; }
+}
+
+/** Longest lifetime an expiring token may claim; anything further out is refused even with a valid signature. */
+export const MAX_LINK_TTL_SECONDS = 60 * 24 * 60 * 60;
+
+/** Expiring token `<exp>.<sig>`: the signature covers the purpose, the expiry and the parts, so the expiry cannot be edited. */
+export async function signExpiringLink(purpose: string, ttlSeconds: number, ...parts: string[]): Promise<string> {
+  const exp = Math.floor(Date.now() / 1000) + Math.min(Math.max(1, Math.floor(ttlSeconds)), MAX_LINK_TTL_SECONDS);
+  return `${exp}.${await signLink(purpose, String(exp), ...parts)}`;
+}
+
+export type LinkCheck = "ok" | "expired" | "invalid";
+
+/** Verifies an expiring token. "expired" is only reported for a token whose signature is otherwise valid. */
+export async function verifyExpiringLink(token: string | null, purpose: string, ...parts: string[]): Promise<LinkCheck> {
+  if (!token) return "invalid";
+  const dot = token.indexOf(".");
+  if (dot < 1) return "invalid";
+  const exp = Number(token.slice(0, dot));
+  const sig = token.slice(dot + 1);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isInteger(exp) || exp - now > MAX_LINK_TTL_SECONDS) return "invalid";
+  let expected: string;
+  try { expected = await signLink(purpose, String(exp), ...parts); } catch { return "invalid"; }
+  if (!timingSafeEqual(expected, sig)) return "invalid";
+  return exp < now ? "expired" : "ok";
+}
+
+/**
+ * A secret is usable only when it is at least 32 characters and uses at least 12 distinct characters. This does not prove randomness
+ * (generate secrets with a CSPRNG, e.g. `openssl rand -base64 48`); it refuses the obviously weak values: short, or one repeated pattern.
+ */
+export function isStrongSecret(s: string | null | undefined): s is string {
+  return typeof s === "string" && s.length >= 32 && new Set(s).size >= 12;
 }

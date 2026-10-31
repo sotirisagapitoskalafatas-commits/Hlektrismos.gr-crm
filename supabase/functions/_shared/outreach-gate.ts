@@ -48,6 +48,20 @@ export interface GateResult {
 
 const norm = (e: string) => e.trim().toLowerCase();
 
+/**
+ * For a single staff-written or confirmation email, which does not go through the campaign gate. Looks at the address and, when known, the person's phone
+ * number: a spoken refusal is recorded on the number. Marketing objections stop commercial mail; only a «stop all contact» objection stops a service message.
+ * "unknown" means the objections could not be read, and the caller must not send.
+ */
+export async function emailObjection(loaders: Pick<Loaders, "objections">, email: string, phone: string | null, purpose: Purpose): Promise<"objected" | "unknown" | null> {
+  try {
+    const found = (await loaders.objections([{ id: "recipient", email, phone }])).recipient ?? [];
+    return found.some((o) => (o.channels === null || o.channels.includes("email")) && (purpose !== "transactional" || o.scope === "all")) ? "objected" : null;
+  } catch {
+    return "unknown";
+  }
+}
+
 export async function gateRecipients(
   rawIds: unknown,
   channel: Channel,

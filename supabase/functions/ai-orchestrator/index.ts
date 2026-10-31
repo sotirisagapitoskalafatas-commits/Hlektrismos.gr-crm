@@ -88,7 +88,8 @@ async function executeTool(
       case "get_pipeline_summary": {
         let summaryQuery = supabase
           .from("hlektrismos_leads")
-          .select("status");
+          .select("status")
+          .is("deleted_at", null);
         if (ownOnly) summaryQuery = summaryQuery.eq("assigned_to", ownOnly);
         const { data, error } = await summaryQuery.order("status");
 
@@ -135,6 +136,7 @@ async function executeTool(
         let leadQuery = supabase
           .from("hlektrismos_leads")
           .select("*")
+          .is("deleted_at", null)
           .or(
             `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`
           );

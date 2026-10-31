@@ -15,6 +15,17 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 4. **One file at a time. After each file run its check query (below). If it is not `true`, stop and tell Claude** — do not continue down the list.
 5. The checks below are the quick one-liners. `pending_migrations_check.sql` runs all of them at once.
 
+## Deployment sequence: read before merging anything to `main`
+**A merge to `main` may itself deploy functions.** The rollout checklist records that the GitHub integration deploys the functions declared in `supabase/config.toml`. PR #137 adds `vapi-webhook`, `accept-offer` and `receive-lead-webhook` to that file, so merging it to `main` could ship them before their SQL exists. Then every ad lead would answer 500 and every offer acceptance would fail. Confirm the integration's behaviour first, and pause it or apply the SQL before that merge.
+
+Required before the hardened functions run, in this order:
+1. `phase2/06` (step 8): `deleted_at` on `leads` and `customers`. Without it every lead, customer and case reference is refused for everyone, Admin included, and `send-lead-confirmation` answers 500.
+2. `phase1/21b` (0b), `phase1/21c` (0c).
+3. `phase1/02` (step 5), `phase3/09` (step 18). Without `phase3/09` staff email answers 503 and confirmations are skipped.
+4. `phase3/10`, `phase3/11` (18b, 18c, PR #139).
+5. Secrets: `OUTREACH_LIMITS`, `LINK_SIGNING_SECRET`, `VAPI_WEBHOOK_SECRET`, `LEAD_WEBHOOK_SECRET`, `UNSUBSCRIBE_SECRET`, `SITE_URL`.
+6. Only then deploy the functions.
+
 ## Not SQL, but part of the same window
 - **Rotate the leaked service-role key** with steps 1–2 ([`SECURITY_HOTFIX_RUNBOOK.md`](SECURITY_HOTFIX_RUNBOOK.md)). Until then it bypasses every policy below.
 - **Step 3 (phase2/05):** deploy the edge function `admin-users` (`supabase functions deploy admin-users`; needs `SUPABASE_SERVICE_ROLE_KEY`, `SITE_URL`; invites need Auth e-mail/SMTP).
@@ -30,6 +41,20 @@ Written 18/10/2026 from the repository, **not from the live database**: nothing 
 - **After it:** only an active `admin` reads or writes the table; anon and every other role are denied; `service_role` unchanged. No rollback to the open state is provided on purpose.
 - **Check:** `select exists (select 1 from pg_policies where schemaname='public' and tablename='crm_integrations' and policyname='phase1/20 anon denied') and not has_table_privilege('anon','public.crm_integrations','SELECT') as applied;`
 - **Credentials:** treat `crm_integrations.config` values as potentially exposed until the access logs are reviewed; rotation decision is in the private rollout report.
+
+## 0b. `phase1/21b_function_rate_limits.sql` — required BEFORE the hardened outbound Edge Functions are deployed
+- **Why:** a shared, database-backed rate limit for functions that send messages, place calls or spend paid quota, and the insert-only `communication_log`.
+- **Depends on:** `is_role()` (present on production). The functions that use it also need `phase2/06`: see the sequence above.
+- **After it:** no visible change. Only `service_role` can call the counters; an active Admin can read the log.
+- **Order matters:** the hardened `send-sms`, `send-campaign-email`, `make-voice-call`, `send-offer` and `send-email` answer 503 and send nothing while this file is missing. They also refuse without the secret `OUTREACH_LIMITS` ([`OUTREACH_LIMITS.md`](OUTREACH_LIMITS.md)).
+- **Check:** see `pending_migrations_check.sql` row `phase1/21b_function_rate_limits`. Rollback: `rollback_phase1_21b_function_rate_limits.sql`.
+
+## 0c. `phase1/21c_lead_webhook_idempotency.sql` — required BEFORE the hardened `receive-lead-webhook` is deployed
+- **Why:** one delivery creates one lead, even when two arrive at once; lead, event and audit row are one transaction.
+- **Depends on:** `leads`, `activity_log` (present on production).
+- **After it:** no visible change. Only `service_role` can call `ingest_webhook_lead`.
+- **Order matters:** the hardened function answers 500 and stores nothing while this file is missing.
+- **Check:** see `pending_migrations_check.sql` row `phase1/21c_lead_webhook_idempotency`. Rollback: `rollback_phase1_21c_lead_webhook_idempotency.sql`.
 
 ## 1. `phase1/16_storage_docs_lockdown.sql` — security
 - **Depends on:** nothing.

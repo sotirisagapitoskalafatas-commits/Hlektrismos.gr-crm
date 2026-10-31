@@ -36,8 +36,10 @@ test('legacy manager and back_office hold NO capability — not by default and n
     for (const c of perms.CAPABILITIES) {
       assert.equal(perms.hasCapability(role, c), false, `${role} default ${c}`);
       assert.equal(perms.hasCapability(role, c, grantEverything), false, `${role} override ${c}`);
+      assert.equal(perms.hasCapability(role, c, { [role]: [c] }), false, `${role} unparsed override ${c}`); // parseOverrides already drops these
     }
   }
+  assert.deepEqual(grantEverything, {}, 'an override for a legacy role is dropped when it is parsed');
   assert.equal(perms.hasCapability('admin', 'users.manage_roles', grantEverything), true, 'admin unaffected');
 });
 

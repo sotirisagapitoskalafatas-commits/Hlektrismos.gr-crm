@@ -39,7 +39,7 @@ export function parseOverrides(raw: unknown): Overrides {
   if (!v || typeof v !== "object") return {};
   const out: Overrides = {};
   for (const [role, caps] of Object.entries(v as Record<string, unknown>)) {
-    if (!isRole(role) || !Array.isArray(caps)) continue;
+    if (!isRole(role) || LEGACY_ROLES.includes(role) || !Array.isArray(caps)) continue;
     out[role] = caps.filter(isCap);
   }
   return out;

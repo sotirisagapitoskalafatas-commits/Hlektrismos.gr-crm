@@ -188,7 +188,7 @@ ${savings !== null && savings > 0 ? `✅ Εξοικονόμηση: €${savings.
 
     // 5. Send via Email (if the lead has a valid stored email)
     let emailResult = null;
-    if (mayEmail) {
+    if (mayEmail && customer_email) {
       try {
         const resendApiKey = (await supabase.from("crm_settings").select("setting_value").eq("setting_key", "RESEND_API_KEY").single()).data?.setting_value;
 

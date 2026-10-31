@@ -3,7 +3,7 @@ import { authorizeRecord, getCaller, json, requireCapability, serviceClient } fr
 import { badBatch, callerKey, cleanText, durableLimit, isUuid, rateLimited, textHash } from "../_shared/limits.ts";
 import { isOffice } from "../_shared/access.ts";
 import { logAttempt, logResult } from "../_shared/communication-log.ts";
-import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
+import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage, type OutboundAction } from "../_shared/outreach-limits.ts";
 import { gateRecipients } from "../_shared/outreach-gate.ts";
 import { outreachConfigFromEnv, supabaseLoaders } from "../_shared/outreach-loaders.ts";
 
@@ -38,7 +38,7 @@ serve(async (req) => {
     const { campaign_id, leads, channel } = body as { campaign_id?: string; leads?: unknown; channel?: string };
     const text = cleanText((body as { message?: unknown }).message, 1, 1000);
     if (!text) return json(400, { error: "message must be 1-1000 characters" });
-    const action = channel === "viber" || channel === "whatsapp" ? channel : "sms";
+    const action: OutboundAction = channel === "viber" ? "viber" : channel === "whatsapp" ? "whatsapp" : "sms";
     const bad = badBatch(leads, limits.actions[action].maxRecipients);
     if (bad) return json(bad.status, { error: bad.error });
     if (campaign_id !== undefined && campaign_id !== null && !isUuid(campaign_id)) return json(400, { error: "campaign_id must be a UUID" });

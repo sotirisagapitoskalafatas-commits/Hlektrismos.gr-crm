@@ -115,12 +115,12 @@ test('the store subscribes to hashchange only while something listens', () => {
 });
 
 test('7. a Sales Agent opening a restricted URL is still denied by the page guard (the URL decides nothing)', () => {
-  const adminOnly = ['admin', 'revenue', 'automations'].filter((p) => !R.canOpenPage(p, 'field_sales'));
+  const adminOnly = ['admin', 'revenue', 'automations'].filter((p) => !R.canOpenPage(p, 'sales_agent'));
   assert.ok(adminOnly.length >= 1, 'at least one page is closed to a Sales Agent');
   for (const p of adminOnly) {
     const view = open(tab(`#/dashboard?view=${p}`)).get();
     assert.equal(view.page, p, 'the URL names the page');
-    assert.equal(R.canOpenPage(view.page, 'field_sales'), false, 'and the guard still refuses it');
+    assert.equal(R.canOpenPage(view.page, 'sales_agent'), false, 'and the guard still refuses it');
     assert.equal(R.canOpenPage(view.page, 'manager'), false, 'legacy manager too');
     assert.equal(R.canOpenPage(view.page, 'back_office'), false, 'legacy back_office too');
   }

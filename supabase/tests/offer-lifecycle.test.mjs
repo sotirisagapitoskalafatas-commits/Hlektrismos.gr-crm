@@ -15,7 +15,7 @@ const bundle = (entry) => {
   const out = buildSync({ stdin: { contents: entry, resolveDir: fnDir + '_shared', loader: 'ts' }, bundle: true, write: false, format: 'esm', platform: 'neutral', logLevel: 'silent' });
   return import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
 };
-const L = await bundle(`export * from './signed-link.ts'; export { phoneKey, emailKey } from './contact-keys.ts';`);
+const L = await bundle(`export * from './signed-link.ts'; export { phoneKey, emailKey } from './contact-keys.ts'; export { emailObjection } from './outreach-gate.ts';`);
 
 const SECRET = 'link-signing-secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa';
 const SITE = 'https://crm.example.test';
@@ -195,6 +195,37 @@ test('offer_mark_sent and offer_mark_failed on an offer that does not exist retu
   assert.equal((await pg.query('select public.offer_mark_sent($1, $2, null) r', [ghost, ['email']])).rows[0].r, false);
   assert.equal((await pg.query('select public.offer_mark_failed($1, null) r', [ghost])).rows[0].r, false);
   assert.equal((await one('select count(*)::int n from public.crm_tasks'))[0].n, before);
+});
+
+test('offer_mark_sent returns false, and writes nothing, when the offer row disappears between the two selects', async () => {
+  // The lookup finds the row, the locking read does not (here: an update policy that hides it, the same effect as a concurrent removal).
+  const id = await seeded({ state: 'created' });
+  const tasks = (await one('select count(*)::int n from public.crm_tasks'))[0].n;
+  await as(null);
+  await pg.exec(`do $$ begin if not exists (select 1 from pg_roles where rolname = 'race_tester') then create role race_tester nologin; end if; end $$;
+    grant usage on schema public to race_tester; grant all on all tables in schema public to race_tester; grant execute on all functions in schema public to race_tester;
+
+    create policy race_sel on public.offers for select to race_tester using (true);
+    create policy race_upd on public.offers for update to race_tester using (false);`);
+  try {
+    await as('race_tester');
+    assert.equal((await pg.query('select public.offer_mark_sent($1, $2, null) r', [id, ['email']])).rows[0].r, false);
+  } finally {
+    await as(null);
+    await pg.exec('drop policy race_sel on public.offers; drop policy race_upd on public.offers; drop owned by race_tester; drop role race_tester;');
+  }
+  assert.equal((await one('select status from public.offers where id = $1', [id]))[0].status, 'created');
+  assert.equal((await one('select count(*)::int n from public.crm_tasks'))[0].n, tasks);
+  assert.equal((await one('select count(*)::int n from public.offer_events where offer_id = $1', [id]))[0].n, 0);
+});
+
+test('emailObjection: a marketing objection stops a promotional or requested message, and only a stop-all objection stops a transactional one', async () => {
+  const loaders = (scope, channels = null) => ({ objections: async () => ({ recipient: [{ scope, channels }] }) });
+  for (const purpose of ['promotional', 'requested']) assert.equal(await L.emailObjection(loaders('marketing'), 'a@example.gr', null, purpose), 'objected', purpose);
+  assert.equal(await L.emailObjection(loaders('marketing'), 'a@example.gr', null, 'transactional'), null);
+  for (const purpose of ['promotional', 'requested', 'transactional']) assert.equal(await L.emailObjection(loaders('all'), 'a@example.gr', null, purpose), 'objected', purpose);
+  assert.equal(await L.emailObjection(loaders('all', ['sms']), 'a@example.gr', null, 'requested'), null, 'an objection on another channel does not apply');
+  assert.equal(await L.emailObjection({ objections: async () => { throw new Error('down'); } }, 'a@example.gr', null, 'requested'), 'unknown');
 });
 
 test('lock order: the lead is locked before any offer row in create, mark_sent, mark_failed and accept, so they cannot deadlock each other', async () => {

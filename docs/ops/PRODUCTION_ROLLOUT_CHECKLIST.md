@@ -74,12 +74,14 @@ Apply one file at a time in the SQL editor; run its check (`APPLY_ORDER.md`) aft
 | E1 | 👤 Dashboard invitation of the Admin; owner chooses a password on the CRM page | 🚫 blocked by G4 + approval |
 | E2 | Claude verifies the Auth user, then runs `docs/ops/sql/provision_profile.sql` (`admin`) | ⏳ after E1 |
 | E3 | Recovery e-mail to the Sales Agent (public Auth API; no secret) | 🚫 needs G4, SQL step 24–25 installed **and verified** (C2) |
-| E4 | `provision_profile.sql` (`field_sales`) after the owner controls the password | ⏳ after E3 |
+| E4 | `provision_profile.sql` (`sales_agent`) after the owner controls the password | ⏳ after E3 |
+| E1b | `admin_identity_report.sql` before E2: exactly one Auth user, an identity row, signed in | ⏳ after E1 |
 | E5 | `deactivate_qa_accounts.sql` (the script refuses unless the real admin has signed in) | ⏳ after E2 + successful sign-in |
+| E5b | `deactivate_probe_accounts.sql` (the two verification probe logins; same guard) | ⏳ after E5 |
 
 **Hardened functions (PRs #137, #138, #139):** follow "Deployment sequence" in `APPLY_ORDER.md`. phase1/21b, phase1/21c, phase3/10 and phase3/11 must exist, and the secrets be set, before these functions are deployed, by hand or by the integration.
 
 Deployment-integration facts: production has **27 Edge Functions and no `admin-users`**; the GitHub integration deploys only the 6 functions declared in `supabase/config.toml` (`agent-worker`, `ai-developer`, `chat`, `orchestrator`, `scrape-b2b`, `unsubscribe`). Merging #130 deploys the **frontend** to production at once — so it follows the SQL.
 
 ## 5. Account onboarding (template — the filled-in table with real addresses is kept privately)
-For each of the two accounts (Admin / Back Office `admin`; Sales Agent `field_sales`) record: Auth user exists · e-mail confirmed · invitation/recovery e-mail generated · link opens the CRM origin · link reaches «Νέος κωδικός» · password set by the user only · CRM profile + role · successful login with the new password · permissions verified · password reset works · an unprovisioned or inactive account cannot read CRM data. A row is marked done only when the check has actually passed; an account is never reported ready before all applicable rows pass.
+For each of the two accounts (Admin / Back Office `admin`; Sales Agent `sales_agent`) record: Auth user exists · e-mail confirmed · invitation/recovery e-mail generated · link opens the CRM origin · link reaches «Νέος κωδικός» · password set by the user only · CRM profile + role · successful login with the new password · permissions verified · password reset works · an unprovisioned or inactive account cannot read CRM data. A row is marked done only when the check has actually passed; an account is never reported ready before all applicable rows pass.

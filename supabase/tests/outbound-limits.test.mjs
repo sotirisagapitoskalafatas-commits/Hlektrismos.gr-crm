@@ -202,6 +202,10 @@ test('confirmation mail: after DATA the claim stays, so an unknown outcome canno
   const f = await loadFunction('send-lead-confirmation', { db: database, smtpMode: 'reject-data' });
   assert.equal((await f.call({ body: { email: 'new@example.gr' } })).status, 500);
   assert.ok(database.rows('leads')[0].ack_sent_at, 'claim kept');
+  assert.deepEqual(database.rows('communication_log').map((r) => r.result), ['attempt', 'unknown'], 'an explicit unknown outcome is recorded for reconciliation');
+  const again = await f.call({ body: { email: 'new@example.gr' } });
+  assert.equal(again.json.skipped, 'already confirmed', 'a retry cannot send a second mail');
+  assert.equal(f.smtp.filter((x) => x.data).length, 0);
   f.restore();
 });
 

@@ -171,7 +171,8 @@ serve(async (req) => {
       dataStarted = true;
       await client.data(smtpDataBody(headers + "\r\n\r\n" + body));
     } catch (sendErr) {
-      await logResult(adminClient, entry, "failed");
+      // Before DATA nothing was delivered. After DATA the server may have accepted the mail: record "unknown" for reconciliation and keep the claim.
+      await logResult(adminClient, entry, dataStarted ? "unknown" : "failed");
       if (!dataStarted) await releaseClaim();
       throw sendErr;
     } finally {

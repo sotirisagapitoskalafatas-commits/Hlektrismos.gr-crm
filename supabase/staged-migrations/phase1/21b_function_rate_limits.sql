@@ -119,7 +119,7 @@ grant execute on function public.consume_rate_limits(jsonb) to service_role;
 create table if not exists public.communication_log (
   id              bigint generated always as identity primary key,
   action          text not null check (action in ('sms', 'viber', 'whatsapp', 'voice', 'email_campaign', 'email_direct', 'email_confirmation', 'offer')),
-  result          text not null check (result in ('attempt', 'sent', 'failed')),
+  result          text not null check (result in ('attempt', 'sent', 'failed', 'unknown')), -- unknown: the provider may have accepted it; a person reconciles
   actor_kind      text not null check (actor_kind in ('user', 'service')),
   actor_id        uuid,
   lead_id         uuid,
@@ -133,6 +133,8 @@ create table if not exists public.communication_log (
 );
 -- an earlier version of this file created the table with a shorter list of actions
 alter table public.communication_log drop constraint if exists communication_log_action_check;
+alter table public.communication_log drop constraint if exists communication_log_result_check;
+alter table public.communication_log add constraint communication_log_result_check check (result in ('attempt', 'sent', 'failed', 'unknown'));
 alter table public.communication_log add constraint communication_log_action_check
   check (action in ('sms', 'viber', 'whatsapp', 'voice', 'email_campaign', 'email_direct', 'email_confirmation', 'offer'));
 create index if not exists communication_log_lead_idx on public.communication_log (lead_id, created_at desc) where result = 'sent';

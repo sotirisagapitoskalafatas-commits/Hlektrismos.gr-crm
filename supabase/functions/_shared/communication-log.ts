@@ -39,7 +39,7 @@ export async function logAttempt(admin: Insert, e: CommunicationEntry): Promise<
 }
 
 /** The outcome. `provider_status` is the HTTP status only; `provider_ref` is the provider's message id, never its reply text. */
-export async function logResult(admin: Insert, e: CommunicationEntry, result: "sent" | "failed", detail: { provider_status?: number; provider_ref?: string | null } = {}) {
+export async function logResult(admin: Insert, e: CommunicationEntry, result: "sent" | "failed" | "unknown", detail: { provider_status?: number; provider_ref?: string | null } = {}) {
   try {
     const { error } = await admin.from("communication_log").insert(await row(e, result, { provider_status: detail.provider_status ?? null, provider_ref: detail.provider_ref ?? null }));
     if (error) console.error(JSON.stringify({ event: "communication_log_failed", action: e.action, result }));

@@ -203,3 +203,14 @@ test('a spoken refusal: service_role only, one row however often it is delivered
   const log = (await db.query("select details from public.activity_log where action = 'contact_objection' order by created_at desc limit 1")).rows[0].details;
   assert.equal(log.voice_call, CALL);
 });
+
+test('rollback_phase3_09 removes every object the migration created, and the migration can be applied again', async () => {
+  await su();
+  await db.exec(read('../../docs/ops/rollback_phase3_09_contact_eligibility.sql'));
+  const left = (await db.query(`select
+    (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('contact_phone_key', 'contact_email_key', 'contact_role', 'contact_facts', 'contact_log', 'record_contact_objection', 'record_spoken_objection', 'lift_contact_objection', 'record_contact_consent', 'withdraw_contact_consent', 'record_article11_screening')) f,
+    (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname in ('contact_objections', 'contact_consents', 'article11_screenings')) t`)).rows[0];
+  assert.deepEqual(left, { f: 0, t: 0 });
+  await db.exec(read('../staged-migrations/phase3/09_contact_eligibility.sql'));
+  assert.equal((await db.query("select count(*)::int n from pg_class where relname = 'contact_objections'")).rows[0].n, 1);
+});

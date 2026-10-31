@@ -276,7 +276,7 @@ select to_regclass('public.b2b_prospects') is not null as applied;
 ## 18. `phase3/09_contact_eligibility.sql` — compliance
 - **Depends on:** steps 1–6 and step 17 (08). Must come before any outreach.
 - **Unlocks on screen:** «Επικοινωνία & συγκαταθέσεις» works (today it shows a developer sentence); the «μπορώ να καλέσω;» answer; outreach functions fail closed until it exists.
-- **Rollback:** end of the file; it drops the recorded objections, consents and screenings, so **export them first**.
+- **Rollback:** [`rollback_phase3_09_contact_eligibility.sql`](rollback_phase3_09_contact_eligibility.sql), after `rollback_phase3_11_contact_service_requests.sql`. It drops the recorded objections, consents and screenings, so **export them first**; while it is applied the hardened senders refuse to send.
 - **Check:**
 ```sql
 select to_regclass('public.contact_objections') is not null as applied;
@@ -292,6 +292,7 @@ select to_regclass('public.contact_objections') is not null as applied;
 ## 18c. `phase3/11_contact_service_requests.sql` — separates a customer's request from marketing consent
 - **Depends on:** step 18 (`contact_role`, `contact_log`).
 - **After it:** nothing changes until the owner sets `SERVICE_COMMS_APPROVED`. Do not set it without counsel's advice.
+- **Rollback:** [`rollback_phase3_11_contact_service_requests.sql`](rollback_phase3_11_contact_service_requests.sql) (export the table first; offers then go through the full promotional gate).
 
 ## 19. `phase5/17_customer_supply_points.sql`
 - **Depends on:** nothing new (uses `customers`, `cases`, `case_documents`, `profiles`, `is_staff()`, `is_role()`, `activity_log`). The legacy `supply_points` / `customer_meters` are not touched.

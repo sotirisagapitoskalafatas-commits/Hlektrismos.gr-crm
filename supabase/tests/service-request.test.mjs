@@ -75,3 +75,12 @@ test('no direct writes for anyone; anon cannot reach the functions', async () =>
   await db.exec('reset role'); await db.exec('set role anon');
   assert.ok(!(await run('select public.withdraw_service_request($1)', [reqId])).ok);
 });
+
+test('rollback_phase3_11 removes the table and both functions, and the migration can be applied again', async () => {
+  await db.exec('reset role');
+  await db.exec(read('../../docs/ops/rollback_phase3_11_contact_service_requests.sql'));
+  const left = (await db.query(`select (select count(*)::int from pg_proc where proname in ('record_service_request', 'withdraw_service_request')) f, (select count(*)::int from pg_class where relname = 'contact_service_requests') t`)).rows[0];
+  assert.deepEqual(left, { f: 0, t: 0 });
+  await db.exec(read('../staged-migrations/phase3/11_contact_service_requests.sql'));
+  assert.equal((await db.query("select count(*)::int n from pg_class where relname = 'contact_service_requests'")).rows[0].n, 1);
+});

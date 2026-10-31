@@ -346,6 +346,19 @@ select to_regclass('public.user_preferences') is not null
 ```
 - **Required staging tests:** user A cannot read/write user B's row or avatar; anon denied; admin/Back Office can read (not write) avatars; a non-JPEG or other-path upload is rejected.
 
+## 24b. `phase6/24_avatars_admin_only_read.sql` — profile photos under the two-role model (follow-up to step 24; apply in the same window)
+- **Why:** step 24 lets the legacy `back_office` role read every staff photo. This replaces that policy with an Admin-only one and re-asserts the private bucket (512 KB, JPEG). Production has **no `avatars` bucket today**, so the profile-photo button says it is unavailable until 20 and 24 are applied.
+- **Depends on:** `is_staff()`, `is_role(text)`, the `storage` schema. Storage part is self-contained; `user_preferences` still comes from step 24.
+- **Effect:** own photo upload/replace/remove and read only; the active Admin may read staff photos; legacy roles, inactive accounts and anonymous visitors nothing. Reads are signed URLs; the bucket is never public.
+- **Rollback:** [`rollback_phase6_24_avatars_admin_only_read.sql`](rollback_phase6_24_avatars_admin_only_read.sql) (removes the Admin read; never restores the back_office read).
+- **Check (must be true):**
+```sql
+select exists (select 1 from storage.buckets where id = 'avatars' and not public)
+  and exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'avatars read admin')
+  and not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'avatars read office') as applied;
+```
+- **Tests:** `node --test supabase/tests/avatars-storage.test.mjs` (local PGlite: private bucket, own upload/replace/remove, cross-user denial, legacy and inactive denial, Admin read). Staging: repeat with real JWTs.
+
 ## 25. `phase6/21_two_role_model.sql` — exactly two account categories (supersedes phase4/17 and phase4/20)
 - **Depends on:** phase2/05 (staff functions, audit table, `profiles_guard_privileged`). Replace, do not replay, 17/20.
 - **Effect:** only the active `admin` (the shared Admin / Back Office login) can create, edit, (de)activate, reset or delete Sales Agent accounts and read the staff directory / audit; new accounts are `field_sales` only; `manager` / `back_office` can never be assigned again (existing rows stay, can be deactivated); an inactive account can no longer edit even its own profile row.

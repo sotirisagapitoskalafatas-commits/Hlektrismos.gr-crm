@@ -63,11 +63,24 @@ Changes (staged `phase7/01_standalone_field_visits.sql`, additive, `NOT VALID` c
 ## 3. Application (`energy_applications`)
 
 ```
-draft ──submit──▶ submitted ──▶ in_review ──▶ completed
-  │                  │              │
-  │                  └──▶ needs_documents ◀┘      (Back Office asks; agent adds a document version → back to submitted)
-  └──▶ cancelled (any state before completed)
+draft ──submit──▶ submitted ──▶ in_review ──┬─▶ processing ──▶ approved ──▶ completed
+  │                   ▲             │         └─▶ needs_documents ──(new document version)──▶ submitted
+  │                   └─────────────┘
+  ├─▶ withdrawn   (by the agent or the customer, any state before completed; reason required)
+  └─▶ rejected    (Back Office decision; reason required)
 ```
+
+Statuses: `draft`, `submitted`, `in_review` (Under Review), `needs_documents` (Waiting for Documents), `processing`, `approved`, `rejected`, `withdrawn`, `completed`. The entity is new, so there is nothing to map or overwrite; the Case workflow keeps its own stages. A transition guard (trigger) allows only the arrows above; `rejected`, `withdrawn` and `completed` are terminal; a reason is required for `needs_documents`, `rejected` and `withdrawn`.
+
+| Entity | Lifecycle shown to users | Stored as |
+|---|---|---|
+| Lead | Νέο → Επικοινωνία → Ειδικευμένο → Μετατράπηκε / Χάθηκε | existing `leads.status` (display mapping in `lead-status.ts`, unchanged) |
+| Visit | Προγραμματισμένη → Σε εξέλιξη → Ολοκληρώθηκε / Ακυρώθηκε / Δεν εμφανίστηκε / Επαναπρογραμματίστηκε | `planned → in_progress → completed / cancelled / no_show`; *rescheduled* = cancelled + `status_reason='rescheduled'` + the new visit's `rescheduled_from_id` (see §2) |
+| Application | above | new `energy_applications.status` |
+| Case | existing stages | unchanged |
+| Supply Point | Ενεργή / Προς έλεγχο / Αρχειοθετημένη | existing `needs_review`, `archived_at` |
+| Document | Παραλήφθηκε → Τρέχουσα → Αντικαταστάθηκε | `application_documents.is_current` + `superseded_at` |
+
 
 - **Origin:** an existing Customer **or** an eligible Lead (`num_nonnulls(customer_id, lead_id) >= 1`). A Customer is never created in the wizard on its own; a Lead is converted through the existing `convert_lead_to_case()` at submission (no parallel customer path).
 - **Supply Point:** required to submit, optional in a draft. It must belong to the same customer / lead. The 11-digit ΔΕΔΔΗΕ number rules and the duplicate signal are the existing `customer_supply_points` ones (flag, never a block).
@@ -75,6 +88,7 @@ draft ──submit──▶ submitted ──▶ in_review ──▶ completed
 - **Draft:** a real row (status `draft`, `wizard_step`, `service_details`). Closing the browser loses nothing; the wizard reloads the draft. Drafts need no documents.
 - **Submit (`submit_energy_application`)**, one transaction: validate → resolve the Customer (lead conversion if needed) → create the Case (stage `new`, like every conversion; **the Case stage workflow is untouched**) with `cases.application_id` and `cases.supply_point_id` → assign the default Back Office assignee (`phase4/12`) → set `submitted_at/by`, `primary_case_id` → audit. If the lead conversion took the *duplicate branch* of `phase5/18` (the supply row stayed on the lead and the case was linked to the customer's existing connection) the application's, the visits' and the documents' `supply_point_id` are **re-pointed** to that connection.
 - **Case relation:** one Application → one *primary* Case created at submission. `cases.application_id` is not unique, so a later, separate operational Case (e.g. a re-submission after rejection) can legitimately point to the same Application. A Case is never created for a draft.
+- **Navigation:** one new page `applications` («Αιτήσεις»): for a Sales Agent *My Applications* (drafts, submitted, create), for Admin / Back Office the *Application inbox*. It is added to `PageKey`, `nav-url.ts`, the nav tree and the `page-guard` matrix.
 - **Missing documents** are a checklist and a warning (`documents.ts`, the existing indicative per-service list), never a block on submit or on any stage move.
 
 ## 4. Documents and version history (`application_documents`)

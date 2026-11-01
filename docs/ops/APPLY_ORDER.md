@@ -426,3 +426,10 @@ select exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_o
 - **Depends on:** step 27, [`sql/deactivate_qa_accounts.sql`](sql/deactivate_qa_accounts.sql). It names no account and refuses unless exactly one active admin exists and can really sign in.
 - **Note:** the shared login is one identity. Audit rows name that account, not the employee using it.
 - **Rollback:** [`rollback_phase6_26_single_active_admin.sql`](rollback_phase6_26_single_active_admin.sql).
+
+## 29. `phase6/27_credentials_write_only.sql` — integration credentials are write-only from the browser
+- **Depends on:** phase2/05 (`crm_setting_is_credential`, `staff_admin_audit`) and phase6/25.
+- **Order matters:** deploy the frontend that contains the write-only settings panel FIRST (it is in `main`). The earlier panel upserts every setting, credentials included, and would fail silently once this file is applied.
+- **Changes:** the table policy lets an Admin read and write only non-credential settings and never write `role_permissions` directly. Credentials are set with `crm_set_credential(key, value)` (returns nothing) and their presence is read with `crm_credential_status()` (yes/no and date). `role_permissions` changes only through `crm_set_role_permissions(json)`, which accepts only known capabilities for `sales_agent`. Each set is audited with the KEY NAME only. Edge Functions are unaffected (service role). No stored value is changed.
+- **Rollback:** [`rollback_phase6_27_credentials_write_only.sql`](rollback_phase6_27_credentials_write_only.sql).
+- **Check:** see `pending_migrations_check.sql` row `phase6/27_credentials_write_only`.

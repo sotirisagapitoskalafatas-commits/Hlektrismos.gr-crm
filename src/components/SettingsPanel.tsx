@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { CREDENTIAL_MASK, credentialToSave, isCredentialKey, loadCredentialStatus, saveCredential } from '@/lib/credential-settings';
 import {
   LayoutDashboard, Bot, Users, Radar, TrendingUp, MessageSquare,
   Settings, BarChart3, Shield, Globe, Palette, Zap, Phone, Database,
@@ -85,6 +86,7 @@ export default function SettingsPanel({ toast, setToast }: { toast: any; setToas
   const [activePage, setActivePage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  const [writeOnly, setWriteOnly] = useState(false);
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
@@ -92,6 +94,10 @@ export default function SettingsPanel({ toast, setToast }: { toast: any; setToas
     const { data } = await supabase.from('crm_settings').select('*');
     const map: Record<string, any> = {};
     (data || []).forEach((e: SettingEntry) => { map[e.setting_key] = e.setting_value; });
+    // Credentials are write-only (phase6/27): the database never returns them, so a field only shows that a value exists.
+    const status = await loadCredentialStatus();
+    setWriteOnly(status !== null);
+    if (status) for (const [k, configured] of Object.entries(status)) if (configured) map[k] = CREDENTIAL_MASK;
     setSettings(map);
     setLoading(false);
   };
@@ -103,13 +109,23 @@ export default function SettingsPanel({ toast, setToast }: { toast: any; setToas
 
   const saveAll = async () => {
     setSaving(true);
-    const updates = Object.entries(settings).map(([key, value]) =>
+    // With phase6/27 a credential is sent only through crm_set_credential, and only when the Admin typed a new value.
+    const direct = Object.entries(settings).filter(([key]) => !writeOnly || !isCredentialKey(key));
+    const updates = direct.map(([key, value]) =>
       supabase.from('crm_settings').upsert({ setting_key: key, setting_value: value, category: key.split('_')[0] }, { onConflict: 'setting_key' })
     );
+    const credentialResults = writeOnly
+      ? await Promise.all(Object.entries(settings).filter(([key]) => isCredentialKey(key)).map(async ([key, value]) => {
+          const typed = credentialToSave(value);
+          return typed === null ? true : saveCredential(key, typed);
+        }))
+      : [];
     await Promise.all(updates);
     setSaving(false);
-    setDirty(false);
-    setToast({ msg: 'Settings saved!', type: 'success' });
+    const failed = credentialResults.some((ok) => !ok);
+    setDirty(failed);
+    setToast(failed ? { msg: 'Κάποια κλειδιά δεν αποθηκεύτηκαν. Δοκιμάστε ξανά.', type: 'error' } : { msg: 'Settings saved!', type: 'success' });
+    if (writeOnly) void loadSettings();
   };
 
   // Search across all pages
@@ -1062,6 +1078,7 @@ function CampaignSettings({ settings, update }: { settings: Record<string, any>;
     try {
       const apiKey = getVal('RESEND_API_KEY');
       if (!apiKey) { setResult({ ok: false, msg: 'Enter Resend API key first' }); setTesting(false); return; }
+      if (apiKey === CREDENTIAL_MASK) { setResult({ ok: false, msg: 'Το αποθηκευμένο κλειδί δεν εμφανίζεται. Πληκτρολογήστε το για να το δοκιμάσετε.' }); setTesting(false); return; }
       const res = await fetch('https://api.resend.com/domains', {
         headers: { Authorization: `Bearer ${apiKey}` },
       });

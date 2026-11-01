@@ -281,7 +281,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-compare__art" data-reveal="2">
-              <img src="/images/landing/compare-providers.webp" alt="Μετρητής ρεύματος και λογαριασμός, δίπλα σε κάρτες παρόχων ενέργειας" width={1408} height={948} loading="lazy" decoding="async" />
+              <img src="/images/landing/compare-providers.webp" alt="Μετρητής ρεύματος και λογαριασμός, δίπλα σε κάρτες παρόχων ενέργειας" width={3912} height={1920} loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="lp-wrap">
@@ -334,35 +334,37 @@ export default function LandingPage() {
         {/* ── E. How it works ── */}
         <section id="how-it-works" className="lp-process lp-wave-host" aria-labelledby="lp-process-title">
           <WaveDivider fill="#f6f9fc" edge="top" size="md" />
-          <img className="lp-process__art" src="/images/landing/process-phone.webp" alt="" width={1312} height={696} loading="lazy" decoding="async" />
+          <img className="lp-process__photo" src="/images/landing/process-terrace.jpg" alt="" width={1200} height={677} loading="lazy" decoding="async" />
+          <div className="lp-process__glow" aria-hidden="true" />
           <div className="lp-wrap lp-process__grid">
-            <div>
-              <div data-reveal>
-                <span className="lp-eyebrow">ΠΩΣ ΛΕΙΤΟΥΡΓΕΙ</span>
-                <h2 id="lp-process-title" className="lp-h2">Απλά. Προσωπικά. Χωρίς περιττή πολυπλοκότητα.</h2>
-                <p className="lp-lead">Τρία ξεκάθαρα βήματα, με τον προσωπικό σου σύμβουλο δίπλα σου σε καθένα από αυτά.</p>
-              </div>
-              <ol className="lp-steps">
-                {steps.map((s, i) => {
-                  const Icon = s.icon;
-                  return (
-                    <li key={s.num} className="lp-step" data-reveal={String(i + 1)}>
-                      <span className="lp-step__badge" aria-hidden="true"><Icon size={24} /></span>
-                      <span className="lp-step__num" aria-hidden="true">{s.num}</span>
-                      <h3><span className="lp-visually-hidden">Βήμα {i + 1}: </span>{s.title}</h3>
-                      <p>{s.text}</p>
-                    </li>
-                  );
-                })}
-              </ol>
+            <div data-reveal>
+              <span className="lp-eyebrow lp-eyebrow--light">ΠΩΣ ΛΕΙΤΟΥΡΓΕΙ</span>
+              <h2 id="lp-process-title" className="lp-h2">Απλά. Προσωπικά. Χωρίς περιττή πολυπλοκότητα.</h2>
+              <p className="lp-lead">Τρία ξεκάθαρα βήματα, με τον προσωπικό σου σύμβουλο δίπλα σου σε καθένα από αυτά.</p>
             </div>
+            <ol className="lp-steps">
+              {steps.map((s, i) => {
+                const Icon = s.icon;
+                return (
+                  <li key={s.num} className="lp-step" data-reveal={String(i + 1)}>
+                    <div className="lp-step__top">
+                      <span className="lp-step__num" aria-hidden="true">{s.num}</span>
+                      <Icon className="lp-step__icon" size={30} aria-hidden="true" />
+                    </div>
+                    <h3><span className="lp-visually-hidden">Βήμα {i + 1}: </span>{s.title}</h3>
+                    <p>{s.text}</p>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
-          <WaveDivider fill="#0b2547" edge="bottom" size="md" />
+          <WaveDivider fill="#ffffff" edge="bottom" size="md" />
         </section>
 
         {/* ── F. Personal energy advisor ── */}
-        <section id="advisor" className="lp-advisor" aria-labelledby="lp-advisor-title">
-          <img className="lp-advisor__photo" src="/images/landing/advisor-band.webp" alt="Σύμβουλος ενέργειας με tablet" width={2292} height={672} loading="lazy" decoding="async" />
+        <section id="advisor" className="lp-advisor lp-wave-host" aria-labelledby="lp-advisor-title">
+          <WaveDivider fill="#ffffff" edge="top" size="sm" />
+          <img className="lp-advisor__photo" src="/images/landing/advisor-band.webp" alt="Σύμβουλος ενέργειας με tablet" width={4032} height={1920} loading="lazy" decoding="async" />
           <div className="lp-wrap lp-advisor__grid">
             <div className="lp-advisor__copy" data-reveal>
               <span className="lp-eyebrow lp-eyebrow--light">Ο ΠΡΟΣΩΠΙΚΟΣ ΣΟΥ ΣΥΜΒΟΥΛΟΣ</span>

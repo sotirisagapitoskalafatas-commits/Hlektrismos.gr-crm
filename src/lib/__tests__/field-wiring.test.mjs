@@ -84,3 +84,10 @@ test('the offline queue retries transport errors instead of treating them as a m
   assert.match(replay, /res\.code === 'OUTCOME_CONFLICT'/);
   assert.match(replay, /return 'retry';/);
 });
+
+test('all check-in/check-out RPC failures stay retryable instead of being mislabelled as missing visits', () => {
+  const api = noComments(read('lib/api.ts'));
+  assert.match(api, /fieldCheckin\([\s\S]*?code: 'RPC_ERROR'/);
+  assert.match(api, /fieldCheckout\([\s\S]*?code: 'RPC_ERROR'/);
+  assert.match(api, /fieldCheckoutWithOutcome\([\s\S]*?code: 'RPC_ERROR'/);
+});

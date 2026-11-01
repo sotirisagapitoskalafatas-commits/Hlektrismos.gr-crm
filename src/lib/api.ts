@@ -1252,7 +1252,7 @@ export async function fieldCheckin(
   coords?: { lat: number; lng: number; accuracy?: number },
   opts?: { radius_m?: number; notes?: string },
 ): Promise<FieldCheckinResult> {
-  if (!supabase) return { accepted: false, code: 'NO_VISIT', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  if (!supabase) return { accepted: false, code: 'RPC_ERROR', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
   const { data, error } = await supabase.rpc('field_checkin', {
     p_visit_id: visitId,
     p_lat: coords?.lat ?? null,
@@ -1261,8 +1261,8 @@ export async function fieldCheckin(
     p_radius_m: opts?.radius_m ?? null,
     p_notes: opts?.notes ?? '',
   });
-  if (error) { logError('fieldCheckin', error); return { accepted: false, code: 'NO_VISIT', message: 'Σφάλμα κλήσης Check-in.' }; }
-  return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
+  if (error) { logError('fieldCheckin', error); return { accepted: false, code: 'RPC_ERROR', message: 'Σφάλμα κλήσης Check-in.' }; }
+  return (data as FieldCheckinResult) ?? { accepted: false, code: 'RPC_ERROR' };
 }
 
 /** Radius for the «Φτάσατε;» prompt (crm_settings.arrival_prompt_radius_m, staged phase4/10). null = not set / not readable. */
@@ -1279,7 +1279,7 @@ export async function fieldCheckout(
   coords?: { lat: number; lng: number; accuracy?: number },
   notes?: string,
 ): Promise<FieldCheckinResult> {
-  if (!supabase) return { accepted: false, code: 'NO_VISIT', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  if (!supabase) return { accepted: false, code: 'RPC_ERROR', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
   const { data, error } = await supabase.rpc('field_checkout', {
     p_visit_id: visitId,
     p_lat: coords?.lat ?? null,
@@ -1287,8 +1287,8 @@ export async function fieldCheckout(
     p_accuracy_m: coords?.accuracy ?? null,
     p_notes: notes ?? '',
   });
-  if (error) { logError('fieldCheckout', error); return { accepted: false, code: 'NO_VISIT', message: 'Σφάλμα κλήσης Check-out.' }; }
-  return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
+  if (error) { logError('fieldCheckout', error); return { accepted: false, code: 'RPC_ERROR', message: 'Σφάλμα κλήσης Check-out.' }; }
+  return (data as FieldCheckinResult) ?? { accepted: false, code: 'RPC_ERROR' };
 }
 
 

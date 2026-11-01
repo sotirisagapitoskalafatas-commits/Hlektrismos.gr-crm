@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarPlus, LogIn, LogOut, MapPin, Phone } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { createLead, fieldCheckin, fieldCheckout } from '@/lib/api';
+import { createLead, fieldCheckin, fieldCheckout, updateVisitNotes } from '@/lib/api';
 import { fetchDefaultBackofficeAssignee } from '@/lib/lead-intake';
 import { cancelFieldVisit, createVisitFollowUp, fetchFieldVisits, linkVisitToLead, markVisitNoShow, rescheduleFieldVisit, saveVisitOutcome, visitsExtendedAvailable } from '@/lib/field-api';
 import type { FieldVisit } from '@/lib/field-api';
@@ -63,6 +63,7 @@ export default function StandaloneVisitsPanel() {
     if (!isOnline()) { enqueue('check_out', queuePayload({ visitId: v.id, lat: c?.lat, lng: c?.lng, accuracy: c?.accuracy, notes: note })); setQueued(countQueue()); setBusy(null); setOpenId(null); toast('Εκτός σύνδεσης: το Check Out θα σταλεί αργότερα. Το follow-up δεν αποθηκεύτηκε· καταχωρήστε το όταν έχετε σύνδεση.', 'warn'); return; }
     const r = await fieldCheckout(v.id, c, note);
     if (!r.accepted) { setBusy(null); toast(r.message ?? 'Το Check Out απέτυχε. Δοκιμάστε ξανά.', 'bad'); return; }
+    await updateVisitNotes(v.id, form.notes.trim(), out.reasons ? `${form.outcome} — ${form.reason}` : form.outcome);   // the same readable result every visit has
     await saveVisitOutcome(v.id, out.key, out.reasons ? form.reason : undefined);
     let msg = 'Check Out ✓ — η επίσκεψη ολοκληρώθηκε.';
     if (step.kind === 'followup') { const f = await createVisitFollowUp(v, { reason: form.fuReason, assigneeId: user?.id ?? null, dueAt: form.fuAt }); msg += f.ok ? ' Το follow-up αποθηκεύτηκε.' : ' Το follow-up δεν αποθηκεύτηκε.'; }
@@ -134,7 +135,7 @@ export default function StandaloneVisitsPanel() {
           <div className="rounded-xl border border-line p-3 space-y-2" role="group" aria-label={dialog.kind === 'reschedule' ? 'Επαναπρογραμματισμός' : dialog.kind === 'cancel' ? 'Ακύρωση' : 'Δεν εμφανίστηκε'}>
             {dialog.kind === 'reschedule' && <label className="block text-sm">Νέα ημερομηνία και ώρα<input type="datetime-local" className="field mt-1" value={dialog.when} onChange={(e) => setDialog({ ...dialog, when: e.target.value })} /></label>}
             <label className="block text-sm">Λόγος (απαιτείται)<input className="field mt-1" value={dialog.reason} onChange={(e) => setDialog({ ...dialog, reason: e.target.value })} /></label>
-            <div className="flex gap-2"><Btn onClick={() => void confirmDialog()} disabled={busy === v.id || (dialog.kind === 'reschedule' && !dialog.when)}>Επιβεβαίωση</Btn><Btn variant="outline" onClick={() => setDialog(null)}>Άκυρο</Btn></div>
+            <div className="flex gap-2"><Btn onClick={() => void confirmDialog()} disabled={busy === v.id || !!reasonError(dialog.reason) || (dialog.kind === 'reschedule' && !dialog.when)}>Επιβεβαίωση</Btn><Btn variant="outline" onClick={() => setDialog(null)}>Άκυρο</Btn></div>
           </div>
         )}
 

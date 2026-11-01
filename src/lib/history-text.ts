@@ -46,14 +46,16 @@ export function historyDescription(e: EventLike): string {
 export const visibleHistory = <T extends EventLike>(events: T[]) => events.filter(e => !isDuplicateStageEntry(e));
 
 /* ---- Team of an entry (D6): the filter and the grey label use the same value: who recorded it. ---- */
-export const TEAM_IDS = ['inside_sales', 'field_sales', 'back_office'] as const;
+export const TEAM_IDS = ['sales_agent', 'back_office'] as const;
 const ROLE_TEXT: Record<string, string> = {
-  inside_sales: 'Inside Sales', field_sales: 'Field Sales', back_office: 'Back Office',
+  sales_agent: 'Sales Agent', inside_sales: 'Inside Sales', field_sales: 'Field Sales', back_office: 'Back Office',
   admin: 'Διαχειριστής', manager: 'Διευθυντής',
 };
-/** Filter id an entry belongs to: the recording role (admin/manager entries have no team button and show
- *  under «Όλα» only); «system» when nobody recorded it. */
-export const entryTeam = (e: EventLike) => (ROLE_TEXT[e.role ?? ''] ? (e.role as string) : 'system');
+/** Rows keep the role that recorded them (history is never rewritten), but the filter has one button per account type: every Sales Agent spelling,
+ *  old or new, is «sales_agent»; the shared Admin / Back Office login and the old back_office rows are «back_office». */
+const TEAM_OF: Record<string, string> = { sales_agent: 'sales_agent', inside_sales: 'sales_agent', field_sales: 'sales_agent', admin: 'back_office', back_office: 'back_office' };
+/** Filter id an entry belongs to; a retired manager row has no button and shows under «Όλα» only; «system» when nobody recorded it. */
+export const entryTeam = (e: EventLike) => (ROLE_TEXT[e.role ?? ''] ? (TEAM_OF[e.role as string] ?? (e.role as string)) : 'system');
 /** Grey label: the recording role; «Σύστημα» when nobody recorded it. */
 export const entryTeamLabel = (e: EventLike) => ROLE_TEXT[e.role ?? ''] ?? 'Σύστημα';
 

@@ -51,9 +51,16 @@ test('D6: the grey label and the team filter use the same value (who recorded it
   assert.equal(H.entryTeam(ev('system')), 'system');
   assert.equal(H.entryTeamLabel(ev('system')), 'Σύστημα');
   assert.equal(H.entryTeamLabel(ev(null)), 'Σύστημα');
-  // admin/manager entries are labelled with the role and have no team button (shown under «Όλα» only)
-  assert.equal(H.entryTeam(ev('admin')), 'admin');
+  // one button per account type: every Sales Agent spelling, old or new, is «sales_agent»; the shared Admin login is Back Office
+  for (const r of ['sales_agent', 'inside_sales', 'field_sales']) assert.equal(H.entryTeam(ev(r)), 'sales_agent', r);
+  assert.equal(H.entryTeamLabel(ev('sales_agent')), 'Sales Agent');
+  assert.equal(H.entryTeamLabel(ev('field_sales')), 'Field Sales', 'history keeps the role that recorded it');
+  assert.equal(H.entryTeam(ev('admin')), 'back_office');
+  assert.equal(H.entryTeamLabel(ev('admin')), 'Διαχειριστής');
+  // a retired manager row has no team button (shown under «Όλα» only)
+  assert.equal(H.entryTeam(ev('manager')), 'manager');
   assert.equal(H.entryTeamLabel(ev('manager')), 'Διευθυντής');
+  assert.deepEqual([...H.TEAM_IDS], ['sales_agent', 'back_office']);
 });
 
 test('W3: every lead action code the app or the staged SQL writes has Greek text; unknown codes never show raw', () => {

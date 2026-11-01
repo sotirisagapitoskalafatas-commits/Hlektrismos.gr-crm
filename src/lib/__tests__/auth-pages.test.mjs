@@ -59,7 +59,7 @@ test('e-mailed links: the type is noted (never the tokens); app routes and error
 });
 
 test('invite and recovery links land on the site root and are routed to «choose a password»; boot capture runs first', () => {
-  assert.match(read('../auth.tsx'), /event === 'SIGNED_IN' && takeAuthLink\(\) === 'invite'\) window\.location\.hash = '\/reset'/);
+  assert.match(read('../auth.tsx'), /event === 'SIGNED_IN'[\s\S]{0,200}type === 'invite'\) window\.location\.hash = '\/reset'/);
   const edge = read('../../../supabase/functions/admin-users/index.ts');
   assert.equal((edge.match(/redirectTo: `\$\{site\}\/`/g) || []).length, 2, 'invite and reset use the site root (a #/route would collide with the token fragment)');
   assert.doesNotMatch(edge, /redirectTo: `\$\{site\}\/#/);

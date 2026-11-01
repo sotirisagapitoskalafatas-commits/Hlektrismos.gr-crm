@@ -31,7 +31,7 @@ const COMPARE_ROWS = [
   { label: 'Διάρκεια σύμβασης', icon: CalendarRange }, { label: 'Βασικοί όροι', icon: FileCheck },
 ];
 /* The artwork of each service, and where its icon sits on it (a share of the image's width). */
-const SCENES = [{ img: 'power', w: 687, ix: '17%' }, { img: 'gas', w: 693, ix: '18.8%' }, { img: 'solar', w: 759, ix: '13.6%' }, { img: 'ev', w: 774, ix: '10.6%' }];
+const SCENES = [{ img: 'power', w: 916, ix: '17%' }, { img: 'gas', w: 924, ix: '18.8%' }, { img: 'solar', w: 1012, ix: '13.6%' }, { img: 'ev', w: 1032, ix: '10.6%' }];
 
 const steps = [
   { num: '01', icon: MessageSquareText, title: 'Μας λες τις ανάγκες σου', text: 'Συμπληρώνεις τη φόρμα ή μας καλείς και μας λες τι χρειάζεσαι για το σπίτι ή την επιχείρησή σου.' },
@@ -281,7 +281,7 @@ export default function LandingPage() {
             </div>
 
             <div className="lp-compare__art" data-reveal="2">
-              <img src="/images/landing/compare-providers.webp" alt="Μετρητής ρεύματος και λογαριασμός, δίπλα σε κάρτες παρόχων ενέργειας" width={1056} height={711} loading="lazy" decoding="async" />
+              <img src="/images/landing/compare-providers.webp" alt="Μετρητής ρεύματος και λογαριασμός, δίπλα σε κάρτες παρόχων ενέργειας" width={1408} height={948} loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="lp-wrap">
@@ -318,7 +318,7 @@ export default function LandingPage() {
                 return (
                   <article key={item.title} className="lp-svc" data-reveal={String((i % 3) + 1)}>
                     <div className="lp-svc__scene" style={{ '--ix': SCENES[i].ix } as CSSProperties}>
-                      <img src={`/images/landing/service-${SCENES[i].img}.webp`} alt="" width={SCENES[i].w} height={282} loading="lazy" decoding="async" />
+                      <img src={`/images/landing/service-${SCENES[i].img}.webp`} alt="" width={SCENES[i].w} height={376} loading="lazy" decoding="async" />
                       <span className="lp-svc__icon" aria-hidden="true"><Icon size={24} /></span>
                     </div>
                     <h3>{item.title}</h3>
@@ -334,7 +334,7 @@ export default function LandingPage() {
         {/* ── E. How it works ── */}
         <section id="how-it-works" className="lp-process lp-wave-host" aria-labelledby="lp-process-title">
           <WaveDivider fill="#f6f9fc" edge="top" size="md" />
-          <img className="lp-process__art" src="/images/landing/process-phone.webp" alt="" width={984} height={522} loading="lazy" decoding="async" />
+          <img className="lp-process__art" src="/images/landing/process-phone.webp" alt="" width={1312} height={696} loading="lazy" decoding="async" />
           <div className="lp-wrap lp-process__grid">
             <div>
               <div data-reveal>
@@ -362,7 +362,7 @@ export default function LandingPage() {
 
         {/* ── F. Personal energy advisor ── */}
         <section id="advisor" className="lp-advisor" aria-labelledby="lp-advisor-title">
-          <img className="lp-advisor__photo" src="/images/landing/advisor-band.webp" alt="Σύμβουλος ενέργειας με tablet" width={1719} height={504} loading="lazy" decoding="async" />
+          <img className="lp-advisor__photo" src="/images/landing/advisor-band.webp" alt="Σύμβουλος ενέργειας με tablet" width={2292} height={672} loading="lazy" decoding="async" />
           <div className="lp-wrap lp-advisor__grid">
             <div className="lp-advisor__copy" data-reveal>
               <span className="lp-eyebrow lp-eyebrow--light">Ο ΠΡΟΣΩΠΙΚΟΣ ΣΟΥ ΣΥΜΒΟΥΛΟΣ</span>

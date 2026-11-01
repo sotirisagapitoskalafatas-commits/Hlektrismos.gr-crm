@@ -9,7 +9,7 @@ Companion of [`FIELD_VISITS_AND_APPLICATIONS.md`](FIELD_VISITS_AND_APPLICATIONS.
 | Visits without a Case; no-show; reschedule link; reasons | yes | yes | **yes** (20 tests) | no | **no** |
 | Check-in / check-out with no Case, idempotent, NOT_OPEN | yes | yes | **yes** | no | **no** |
 | Ownership, cross-agent isolation, duplicate signal, ownership requests | yes | yes | **yes** | no | **no** |
-| Application lifecycle, drafts, versioned documents, submit → one Case | yes | yes | **yes** (12 tests + 81-pair parity) | no | **no** |
+| Application lifecycle, drafts, versioned documents, submit → one Case | yes | yes | **yes** (17 tests + 81-pair parity) | no | **no** |
 | Storage: read / write own application files only, no deletes | yes | n/a | **yes** (policy functions and `storage.objects` stand-in) | no | **no** |
 | Rollbacks keep data and are re-appliable | yes | n/a | **yes** | no | **no** |
 | Screens (wizard, visit panel, scheduler, detail, queue, Customer 360) | yes | yes (21 + 8) | n/a | **driven in a browser against an in-memory fake backend**, synthetic data; never the real signed-in app | **no** |

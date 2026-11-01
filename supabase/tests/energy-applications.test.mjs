@@ -213,13 +213,17 @@ test('missing documents become WORK: Back Office asks, the agent gets a follow-u
   await su(); assert.equal((await one('select status from public.energy_applications where id = $1::uuid', [id]))[0].status, 'submitted', 'back in the Back Office queue');
 });
 
-test('withdrawing needs a reason and ends the application; a closed application accepts no documents', async () => {
-  const id = (await draft(A, {})).rows[0].id; await as(A);
+test('withdrawing needs a reason and ends the application; a closed application accepts no documents or resubmission', async () => {
+  const id = (await draft(A, { supply_point_id: ids.SPA, service_type_code: 'energy' })).rows[0].id; await as(A);
+  const submitted = await run('select public.submit_energy_application($1::uuid)', [id]);
+  assert.equal(submitted.ok, true, submitted.error);
   assert.equal((await run("select public.withdraw_energy_application($1::uuid, '')", [id])).ok, false);
   assert.equal((await run("select public.withdraw_energy_application($1::uuid, 'ο πελάτης άλλαξε γνώμη') as ok", [id])).rows[0].ok, true);
   assert.equal((await run("select public.withdraw_energy_application($1::uuid, 'ξανά') as ok", [id])).rows[0].ok, false);
   assert.equal((await run('select public.add_application_document($1::uuid, $2, $3, $4, $5, 10, null)', [id, 'x', path(id, 'x.pdf'), 'x', 'a'])).ok, false);
   await su(); assert.equal((await one('select status, status_reason from public.energy_applications where id = $1::uuid', [id]))[0].status, 'withdrawn');
+  await as(A);
+  assert.equal((await run('select public.submit_energy_application($1::uuid)', [id])).ok, false, 'a withdrawn submission cannot be replayed as successful');
 });
 
 /* ───────── a lead is converted through the existing operation, never a parallel path ───────── */

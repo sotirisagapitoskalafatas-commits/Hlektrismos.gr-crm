@@ -46,7 +46,8 @@ from (values
   ('phase6/21_two_role_model',                   exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_office' and not tgisinternal), 'legacy manager/back_office roles cannot be assigned; admin-only account matrix'),
   ('phase6/22_crm_integrations_status_invoker', coalesce('security_invoker=true' = any (select unnest(reloptions) from pg_class where oid = to_regclass('public.crm_integrations_status')), false), 'view crm_integrations_status security_invoker'),
   ('phase6/25_exact_two_roles', exists (select 1 from pg_constraint where conname = 'profiles_role_check' and pg_get_constraintdef(oid) like '%sales_agent%'), 'profiles.role allows only admin and sales_agent'),
-  ('phase6/26_single_active_admin', to_regclass('public.profiles_single_active_admin') is not null, 'one active admin enforced by a unique index')
+  ('phase6/26_single_active_admin', to_regclass('public.profiles_single_active_admin') is not null, 'one active admin enforced by a unique index'),
+  ('phase6/27_credentials_write_only', to_regprocedure('public.crm_set_credential(text,text)') is not null and to_regprocedure('public.crm_credential_status()') is not null, 'credentials are write-only from the browser')
 ) as f(file, applied, marker)
 order by f.file;
 

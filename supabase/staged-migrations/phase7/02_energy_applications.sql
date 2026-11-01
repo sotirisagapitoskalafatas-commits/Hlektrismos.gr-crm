@@ -412,7 +412,7 @@ create policy "application files are not deleted (restrictive)" on storage.objec
 -- ───────────────────────── operations ─────────────────────────
 create or replace function public.submit_energy_application(p_id uuid)
 returns jsonb language plpgsql security definer set search_path = public
-as $
+as $$
 declare
   a public.energy_applications%rowtype;
   v_lead public.leads%rowtype;
@@ -546,7 +546,7 @@ begin
   return jsonb_build_object('application_id', a.id, 'application_no', a.application_no, 'case_id', v_case,
     'customer_id', v_customer, 'service_type_code', v_service, 'backoffice_assignee', v_assignee,
     'current_documents', v_docs, 'idempotent', false);
-end $;
+end $$;
 
 create or replace function public.withdraw_energy_application(p_id uuid, p_reason text)
 returns boolean language plpgsql security definer set search_path = public

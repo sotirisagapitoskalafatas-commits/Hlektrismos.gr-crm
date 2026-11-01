@@ -429,7 +429,7 @@ begin
 
   -- Network retries return the original submission; they do not create or attach another Case.
   if a.status <> 'draft' then
-    if a.submitted_at is not null and a.primary_case_id is not null
+    if a.status not in ('rejected', 'withdrawn') and a.submitted_at is not null and a.primary_case_id is not null
        and exists (select 1 from public.cases c where c.id = a.primary_case_id and c.application_id = a.id) then
       return jsonb_build_object('application_id', a.id, 'application_no', a.application_no, 'case_id', a.primary_case_id,
         'customer_id', a.customer_id, 'status', a.status, 'idempotent', true);

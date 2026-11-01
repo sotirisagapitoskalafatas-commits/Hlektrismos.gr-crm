@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, FormEvent, ChangeEvent, RefObject } from 'react';
+import { useState, useEffect, useRef, CSSProperties, FormEvent, ChangeEvent, RefObject } from 'react';
 import {
   ArrowRight, Phone, Mail, MapPin, FileText, Upload, X, Lock, Camera,
   Zap, Flame, Sun, CarFront, ChevronDown, CheckCircle2, MessageSquareText, Search,
-  Compass, Headset, Sparkles, LifeBuoy, Gauge,
+  Compass, Headset, Sparkles, LifeBuoy, Gauge, Tags, Receipt, CalendarRange, FileCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { classifyUpload, MAX_FORM_FILES, prepareForUpload, PUBLIC_FORM_ACCEPT, PUBLIC_FORM_KINDS } from '@/lib/upload-files';
@@ -24,6 +24,14 @@ const serviceCards = [
   { icon: Sun, title: 'Φωτοβολταϊκά', desc: 'Λύσεις ηλιακής ενέργειας, όπου ταιριάζουν στο ακίνητο και στις ανάγκες σου.' },
   { icon: CarFront, title: 'Ηλεκτροκίνηση', desc: 'Επιλογές φόρτισης και ηλεκτρικής μετακίνησης για σπίτι και επιχείρηση.' },
 ];
+
+/* What the comparison looks at: real text, not a table of prices. */
+const COMPARE_ROWS = [
+  { label: 'Τύπος τιμολογίου', icon: Tags }, { label: 'Χρέωση ενέργειας', icon: Zap }, { label: 'Πάγιο', icon: Receipt },
+  { label: 'Διάρκεια σύμβασης', icon: CalendarRange }, { label: 'Βασικοί όροι', icon: FileCheck },
+];
+/* The artwork of each service, and where its icon sits on it (a share of the image's width). */
+const SCENES = [{ img: 'power', w: 687, ix: '17%' }, { img: 'gas', w: 693, ix: '18.8%' }, { img: 'solar', w: 759, ix: '13.6%' }, { img: 'ev', w: 774, ix: '10.6%' }];
 
 const steps = [
   { num: '01', icon: MessageSquareText, title: 'Μας λες τις ανάγκες σου', text: 'Συμπληρώνεις τη φόρμα ή μας καλείς και μας λες τι χρειάζεσαι για το σπίτι ή την επιχείρησή σου.' },
@@ -272,37 +280,19 @@ export default function LandingPage() {
               <a href="#contact" className="lp-btn lp-btn--primary">Ζήτησε εξατομικευμένη πρόταση <ArrowRight size={17} aria-hidden="true" /></a>
             </div>
 
-            <div className="lp-cmp" data-reveal="2">
-              <div className="lp-cmp__art" aria-hidden="true">
-                <div className="lp-bill lp-bill--back">
-                  <span className="lp-bill__tag">ΠΡΟΓΡΑΜΜΑ</span>
-                  <div className="lp-lines"><span /><span /><span /></div>
-                </div>
-                <div className="lp-meter">
-                  <div className="lp-meter__screen">kWh<span className="lp-meter__digits">· · · · ·</span></div>
-                  <div className="lp-meter__dial"><span /><span /><span /></div>
-                  <div className="lp-meter__foot" />
-                </div>
-                <div className="lp-bill lp-bill--front">
-                  <span className="lp-bill__tag">ΛΟΓΑΡΙΑΣΜΟΣ</span>
-                  <div className="lp-bars">{[38, 62, 48, 80, 58, 92].map((h, i) => <span key={i} style={{ height: `${h}%` }} />)}</div>
-                  <div className="lp-lines"><span /><span /></div>
-                </div>
-              </div>
-
-              <div className="lp-panel">
-                <div className="lp-panel__tabs" aria-hidden="true">
-                  <span className="lp-panel__tab is-on"><Zap size={14} />Ρεύμα</span>
-                  <span className="lp-panel__tab"><Flame size={14} />Φυσικό αέριο</span>
-                </div>
-                <p className="lp-panel__title"><Gauge size={17} aria-hidden="true" />Τι συγκρίνουμε για σένα</p>
-                <div className="lp-panel__rows">
-                  {['Τύπος τιμολογίου', 'Χρέωση ενέργειας', 'Πάγιο', 'Διάρκεια σύμβασης', 'Βασικοί όροι'].map((row) => (
-                    <div key={row} className="lp-panel__row"><b>{row}</b><i aria-hidden="true" /></div>
-                  ))}
-                </div>
-                <p className="lp-panel__note">Ενδεικτική απεικόνιση. Τιμές και όροι δίνονται στην εξατομικευμένη πρότασή σου.</p>
-              </div>
+            <div className="lp-compare__art" data-reveal="2">
+              <img src="/images/landing/compare-providers.webp" alt="Μετρητής ρεύματος και λογαριασμός, δίπλα σε κάρτες παρόχων ενέργειας" width={1056} height={711} loading="lazy" decoding="async" />
+            </div>
+          </div>
+          <div className="lp-wrap">
+            <div className="lp-panel" data-reveal>
+              <p className="lp-panel__title"><Gauge size={17} aria-hidden="true" />Τι συγκρίνουμε για σένα</p>
+              <ul className="lp-panel__tiles">
+                {COMPARE_ROWS.map(({ label, icon: Icon }) => (
+                  <li key={label} className="lp-tile"><span className="lp-tile__icon" aria-hidden="true"><Icon size={17} /></span><b>{label}</b></li>
+                ))}
+              </ul>
+              <p className="lp-panel__note">Ενδεικτική απεικόνιση. Τιμές και όροι δίνονται στην εξατομικευμένη πρότασή σου.</p>
             </div>
           </div>
           <WaveDivider fill="#f6f9fc" edge="bottom" size="sm" accent="#9fd8f6" />
@@ -322,16 +312,15 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="lp-services__photo" data-reveal>
-              <img src="/images/landing/services-home.jpg" alt="Σύγχρονη μεσογειακή κατοικία με φωτοβολταϊκά στη στέγη και φορτιστή ηλεκτρικού αυτοκινήτου" width={1671} height={546} loading="lazy" decoding="async" />
-            </div>
-
             <div className="lp-svc-list">
               {serviceCards.map((item, i) => {
                 const Icon = item.icon;
                 return (
                   <article key={item.title} className="lp-svc" data-reveal={String((i % 3) + 1)}>
-                    <span className="lp-svc__icon" aria-hidden="true"><Icon size={24} /></span>
+                    <div className="lp-svc__scene" style={{ '--ix': SCENES[i].ix } as CSSProperties}>
+                      <img src={`/images/landing/service-${SCENES[i].img}.webp`} alt="" width={SCENES[i].w} height={282} loading="lazy" decoding="async" />
+                      <span className="lp-svc__icon" aria-hidden="true"><Icon size={24} /></span>
+                    </div>
                     <h3>{item.title}</h3>
                     <p>{item.desc}</p>
                     <a href="#/services" className="lp-link" aria-label={`Μάθε περισσότερα για: ${item.title}`}>Μάθε περισσότερα <ArrowRight size={15} aria-hidden="true" /></a>
@@ -345,48 +334,44 @@ export default function LandingPage() {
         {/* ── E. How it works ── */}
         <section id="how-it-works" className="lp-process lp-wave-host" aria-labelledby="lp-process-title">
           <WaveDivider fill="#f6f9fc" edge="top" size="md" />
-          <img className="lp-process__photo" src="/images/landing/process-terrace.jpg" alt="" width={1200} height={677} loading="lazy" decoding="async" />
-          <div className="lp-process__glow" aria-hidden="true" />
+          <img className="lp-process__art" src="/images/landing/process-phone.webp" alt="" width={984} height={522} loading="lazy" decoding="async" />
           <div className="lp-wrap lp-process__grid">
-            <div data-reveal>
-              <span className="lp-eyebrow lp-eyebrow--light">ΠΩΣ ΛΕΙΤΟΥΡΓΕΙ</span>
-              <h2 id="lp-process-title" className="lp-h2">Απλά. Προσωπικά. Χωρίς περιττή πολυπλοκότητα.</h2>
-              <p className="lp-lead">Τρία ξεκάθαρα βήματα, με τον προσωπικό σου σύμβουλο δίπλα σου σε καθένα από αυτά.</p>
-            </div>
-            <ol className="lp-steps">
-              {steps.map((s, i) => {
-                const Icon = s.icon;
-                return (
-                  <li key={s.num} className="lp-step" data-reveal={String(i + 1)}>
-                    <div className="lp-step__top">
+            <div>
+              <div data-reveal>
+                <span className="lp-eyebrow">ΠΩΣ ΛΕΙΤΟΥΡΓΕΙ</span>
+                <h2 id="lp-process-title" className="lp-h2">Απλά. Προσωπικά. Χωρίς περιττή πολυπλοκότητα.</h2>
+                <p className="lp-lead">Τρία ξεκάθαρα βήματα, με τον προσωπικό σου σύμβουλο δίπλα σου σε καθένα από αυτά.</p>
+              </div>
+              <ol className="lp-steps">
+                {steps.map((s, i) => {
+                  const Icon = s.icon;
+                  return (
+                    <li key={s.num} className="lp-step" data-reveal={String(i + 1)}>
+                      <span className="lp-step__badge" aria-hidden="true"><Icon size={24} /></span>
                       <span className="lp-step__num" aria-hidden="true">{s.num}</span>
-                      <Icon className="lp-step__icon" size={30} aria-hidden="true" />
-                    </div>
-                    <h3><span className="lp-visually-hidden">Βήμα {i + 1}: </span>{s.title}</h3>
-                    <p>{s.text}</p>
-                  </li>
-                );
-              })}
-            </ol>
+                      <h3><span className="lp-visually-hidden">Βήμα {i + 1}: </span>{s.title}</h3>
+                      <p>{s.text}</p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
           </div>
-          <WaveDivider fill="#ffffff" edge="bottom" size="md" />
+          <WaveDivider fill="#0b2547" edge="bottom" size="md" />
         </section>
 
         {/* ── F. Personal energy advisor ── */}
         <section id="advisor" className="lp-advisor" aria-labelledby="lp-advisor-title">
+          <img className="lp-advisor__photo" src="/images/landing/advisor-band.webp" alt="Σύμβουλος ενέργειας με tablet" width={1719} height={504} loading="lazy" decoding="async" />
           <div className="lp-wrap lp-advisor__grid">
-            <div className="lp-advisor__media" data-reveal>
-              <img src="/images/landing/advisor.jpg" alt="Σύμβουλος ενέργειας εξηγεί τις επιλογές σε δύο πελάτες, με φορητό υπολογιστή και tablet" width={680} height={400} loading="lazy" decoding="async" />
-              <div className="lp-advisor__badge" aria-hidden="true"><span><Phone size={18} /></span>Εξατομικευμένη συμβουλευτική</div>
-            </div>
-            <div data-reveal="2">
-              <span className="lp-eyebrow">Ο ΠΡΟΣΩΠΙΚΟΣ ΣΟΥ ΣΥΜΒΟΥΛΟΣ</span>
+            <div className="lp-advisor__copy" data-reveal>
+              <span className="lp-eyebrow lp-eyebrow--light">Ο ΠΡΟΣΩΠΙΚΟΣ ΣΟΥ ΣΥΜΒΟΥΛΟΣ</span>
               <h2 id="lp-advisor-title" className="lp-h2">Δεν χρειάζεται να το ψάχνεις μόνος σου.</h2>
               <p className="lp-lead">Ο προσωπικός σου σύμβουλος είναι δίπλα σου για να κατανοήσεις τις επιλογές σου και να βρεις την ενεργειακή λύση που σου ταιριάζει.</p>
               <ul className="lp-benefits">
-                {benefits.map((b) => { const Icon = b.icon; return <li key={b.label} className="lp-benefit"><Icon size={20} aria-hidden="true" />{b.label}</li>; })}
+                {benefits.map((b) => { const Icon = b.icon; return <li key={b.label} className="lp-benefit"><span aria-hidden="true"><Icon size={18} /></span>{b.label}</li>; })}
               </ul>
-              <a href="#contact" className="lp-btn lp-btn--primary">Μίλησε με σύμβουλο <ArrowRight size={17} aria-hidden="true" /></a>
+              <a href="#contact" className="lp-btn lp-btn--light">Μίλησε με σύμβουλο <ArrowRight size={17} aria-hidden="true" /></a>
             </div>
           </div>
         </section>

@@ -15,8 +15,14 @@ export const STATUS_TEXT: Record<Status, string> = {
 };
 
 /** Where the STATUS was established. 'none' = nobody has looked at the real system (local tests may still exist: see `local`). */
-export type Env = 'production' | 'staging' | 'local' | 'none';
-export const ENV_TEXT: Record<Env, string> = { production: 'Production (ζωντανά)', staging: 'Staging / άλλο περιβάλλον', local: 'Τοπικά', none: 'Δεν έχει ελεγχθεί σε πραγματικό σύστημα' };
+export type Env = 'production' | 'preview' | 'staging' | 'local' | 'none';
+export const ENV_TEXT: Record<Env, string> = {
+  production: 'Production (ζωντανά)',
+  preview: 'Preview (δοκιμαστική έκδοση της εφαρμογής)',
+  staging: 'Staging / άλλη βάση',
+  local: 'Τοπικά (υπολογιστής προγραμματιστή)',
+  none: 'Δεν έχει ελεγχθεί σε πραγματικό σύστημα',
+};
 export type Method = 'automated' | 'manual';
 export const METHOD_TEXT: Record<Method, string> = { automated: 'Αυτόματος έλεγχος από αυτόν τον browser', manual: 'Χειροκίνητη επαλήθευση / καταγραφή' };
 
@@ -56,13 +62,21 @@ export interface Check {
 }
 
 export const PRODUCTION_REF = 'nonaymiwdayfuulccxrl';
-/** Which system the browser is talking to. Preview deployments or a dev server can point elsewhere; a result must say so. */
-export function environmentOf(url: string | undefined | null): Env {
-  const u = (url ?? '').toLowerCase();
+export const PRODUCTION_HOST = 'hlektrismos-crm.vercel.app';
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/;
+/**
+ * WHERE a result comes from = the database the browser talks to AND the app that ran the probe.
+ * Production needs both: the Production project reached from the Production address. A Preview build of the app that talks to the Production database,
+ * or a dev server that does, reports what it saw but is labelled «preview» / «local» and can never verify anything.
+ */
+export function environmentOf(authUrl: string | undefined | null, appHost?: string | null): Env {
+  const u = (authUrl ?? '').toLowerCase();
   if (!u) return 'none';
-  if (u.includes(PRODUCTION_REF)) return 'production';
-  if (/localhost|127\.0\.0\.1|\[::1\]/.test(u)) return 'local';
-  return 'staging';
+  if (!u.includes(PRODUCTION_REF)) return /localhost|127\.0\.0\.1|\[::1\]/.test(u) ? 'local' : 'staging';
+  const h = (appHost ?? '').trim().toLowerCase();
+  if (h === PRODUCTION_HOST) return 'production';
+  if (LOCAL_HOST.test(h)) return 'local';
+  return h ? 'preview' : 'none';
 }
 
 /** The same patterns as public.crm_setting_is_credential (phase2/05). A key whose NAME matches is treated as a credential. */
@@ -104,6 +118,8 @@ export function summarize(checks: Check[]): Record<Status, number> {
 type Err = { code?: string; message?: string } | null;
 export interface ProbeDeps {
   authUrl: string; anonKey: string; fetcher: typeof fetch; now: () => string;
+  /** window.location.hostname of the app that runs the probes. */
+  appHost: string;
   /** The browser WITHOUT a session. */
   anon: {
     from(t: string): { select(c: string): { limit(n: number): PromiseLike<{ data: unknown[] | null; error: Err }> } };
@@ -280,6 +296,15 @@ const none = (m: Meta, status: Status, detail: string, action: string, owner: Ch
   ({ ...m, status, detail, at: null, env: 'none', method, action, owner, ...extra });
 
 export const STATIC_CHECKS: Check[] = [
+  none({ id: 'roles-password-policy', area: 'roles', label: 'Πολιτική κωδικών στο Auth (Dashboard)', tests: 'Είναι ενεργά: απαίτηση τρέχοντος κωδικού κατά την αλλαγή, ασφαλής αλλαγή κωδικού, ελάχιστο μήκος 12, προστασία από διαρρεύσαντες κωδικούς;',
+    evidence: 'Οι ρυθμίσεις δεν εκτίθενται από το /auth/v1/settings ούτε από κανένα API που μπορεί να καλέσει η εφαρμογή· φαίνονται μόνο στο Dashboard. Οδηγίες: docs/ops/PASSWORD_CHANGE.md.' },
+    'manual', 'Δεν μπορεί να ελεγχθεί από την εφαρμογή. Χωρίς το «Require current password when updating», ο Auth ΑΓΝΟΕΙ τον τρέχοντα κωδικό της φόρμας αλλαγής κωδικού· ο κώδικας ζητά και στέλνει το πεδίο, αλλά η απόρριψη λάθος κωδικού γίνεται μόνο αν η ρύθμιση είναι ενεργή.',
+    'Dashboard → Authentication → Sign In / Providers → Email: ενεργοποίηση «Require current password when updating» και «Secure password change», ελάχιστο μήκος 12, leaked-password protection (αν το επιτρέπει το πλάνο)· μετά δοκιμή με λάθος τρέχοντα κωδικό σε έναν Sales Agent και καταγραφή εδώ.', SQL_OWNER),
+  none({ id: 'migrations-applied', area: 'roles', label: 'Ποια staged migrations έχουν εφαρμοστεί στο Production', tests: 'Είναι εγκατεστημένα τα αρχεία που κλείνουν τα ευρήματα (phase1/18, phase2/05, phase4/18, phase4/21, phase6/21, 6/25, 6/26, 6/27);',
+    evidence: 'Μόνο ο κατάλογος της βάσης το λέει: docs/ops/pending_migrations_check.sql (μόνο ανάγνωση). Μερικές ενδείξεις δίνουν οι ζωντανοί έλεγχοι παραπάνω· καμία δεν αποδεικνύει όλη τη λίστα.',
+    local: 'Τοπικά, η αλυσίδα του docs/ops/APPLY_ORDER.md περνά το release gate (23 έλεγχοι). Αυτό δεν σημαίνει ότι τα αρχεία έχουν εφαρμοστεί στο Production.' },
+    'manual', 'Δεν έχει γίνει ούτε καταγραφεί έλεγχος του καταλόγου του Production μετά το τελευταίο αντίγραφο. Τα ευρήματα (αυτοπροβιβασμός σε Admin, διαπιστευτήρια στον browser, ορατότητα Sales Agents) παραμένουν ανοιχτά μέχρι να εφαρμοστούν και να επαληθευτούν τα αρχεία.',
+    'Εκτέλεση του pending_migrations_check.sql στο Production και καταγραφή αποτελέσματος· εφαρμογή με τη σειρά και τους ελέγχους του docs/ops/SECURITY_REMEDIATION_CHECKLIST.md (πρώτα staging, με αντίγραφο).', SQL_OWNER),
   none({ id: 'workflow-doc-warnings', area: 'workflow', label: 'Οι ελλείψεις εγγράφων είναι προειδοποίηση, όχι φραγμός', tests: 'Μπλοκάρει ο server τη μετάβαση σταδίου ή τη μεταφορά στο Back Office όταν λείπουν έγγραφα;',
     evidence: 'Απόφαση ιδιοκτήτη 17/10/2026 (supabase/staged-migrations/phase2/README.md, 07a)· τοπικός έλεγχος: υπόθεση χωρίς κανένα έγγραφο προχωρά (final-state-role-isolation.test.mjs).' },
     'accepted', 'Σκόπιμη επιλογή, όχι ευπάθεια: οι ελλείψεις (και οι ρυθμίσεις ανά πάροχο) εμφανίζονται ως προειδοποιήσεις και ο χρήστης μπορεί να προχωρήσει· δεν υπάρχει λειτουργία φραγμού ούτε παράκαμψης. Απόφαση ιδιοκτήτη 17/10/2026.',
@@ -338,7 +363,7 @@ export function buildChecks(liveResults: Check[] | null): Check[] {
 export interface LiveRun { at: string; env: Env; results: Check[] }
 /** Runs every live probe. A probe that throws never turns into a pass: it becomes «Δεν έχει επαληθευτεί ζωντανά». */
 export async function runLiveChecks(d: ProbeDeps): Promise<LiveRun> {
-  const env = environmentOf(d.authUrl);
+  const env = environmentOf(d.authUrl, d.appHost);
   const results: Check[] = [];
   const guard = async (ids: string[], f: () => Promise<Check | Check[]>) => {
     try { const r = await f(); results.push(...(Array.isArray(r) ? r : [r])); }

@@ -15,6 +15,7 @@ const STORE = 'atlas.admin.security.live.v2';
 export async function runSecurityChecks(): Promise<LiveRun> {
   const deps: ProbeDeps = {
     authUrl: AUTH_URL, anonKey: ANON_KEY, fetcher: (...a) => fetch(...a), now: () => new Date().toISOString(),
+    appHost: typeof window === 'undefined' ? '' : window.location.hostname,
     anon: anonymousClient() as unknown as ProbeDeps['anon'],
     user: supabase as unknown as ProbeDeps['user'],
   };

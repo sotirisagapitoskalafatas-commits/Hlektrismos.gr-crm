@@ -22,7 +22,7 @@ const TIME = '2026-11-01T10:54:17.000Z';
 const jwt = (role) => `h.${Buffer.from(JSON.stringify({ role })).toString('base64url')}.s`;
 
 /** A fake Supabase that records every call and refuses anything that is not a read. */
-function fakeDeps({ url = PROD, anonRows = false, signupOpen = false, anonymous = false, scope = 'enabled', staff = 'ok', settings = [], integrations = [], mfa = 'full', key = jwt('anon'), throwOn = null } = {}) {
+function fakeDeps({ url = PROD, appHost = 'hlektrismos-crm.vercel.app', anonRows = false, signupOpen = false, anonymous = false, scope = 'enabled', staff = 'ok', settings = [], integrations = [], mfa = 'full', key = jwt('anon'), throwOn = null } = {}) {
   const calls = [];
   const strict = (name, t) => new Proxy(t, { get: (o, k) => (k in o ? o[k] : () => { throw new Error(`${name}.${String(k)} is not a read`); }) });
   const anonFrom = (t) => ({ select: (c) => ({ limit: async () => { calls.push(['anon.select', t, c]); if (throwOn === 'anon') throw new Error('boom'); return anonRows ? { data: [{ id: 1 }], error: null } : { data: null, error: { code: '42501', message: 'permission denied for table ' + t } }; } }) });
@@ -51,7 +51,7 @@ function fakeDeps({ url = PROD, anonRows = false, signupOpen = false, anonymous 
     if (throwOn === 'fetch') throw new Error('offline');
     return { ok: true, status: 200, json: async () => ({ disable_signup: !signupOpen, external: { anonymous_users: anonymous } }) };
   };
-  return { calls, deps: { authUrl: url, anonKey: key, fetcher, now: () => TIME,
+  return { calls, deps: { authUrl: url, appHost, anonKey: key, fetcher, now: () => TIME,
     anon: strict('anon', { from: anonFrom, storage: { from: () => ({ list: async () => { calls.push(['anon.storage.list']); return anonRows ? { data: [{ name: 'x' }], error: null } : { data: [], error: null }; } }) } }),
     user: strict('user', { from: userFrom, rpc, auth: { mfa: { listFactors: factors, getAuthenticatorAssuranceLevel: aal } } }) } };
 }
@@ -110,10 +110,15 @@ test('every claim the static lines make about the code is pinned by a test of th
 
 /* ───────── environments, keys ───────── */
 test('the environment is read from the URL the browser really talks to', () => {
-  assert.equal(E.environmentOf(PROD), 'production');
-  assert.equal(E.environmentOf('http://localhost:54321'), 'local');
-  assert.equal(E.environmentOf('https://other-project.supabase.co'), 'staging');
-  assert.equal(E.environmentOf(''), 'none'); assert.equal(E.environmentOf(undefined), 'none');
+  const H = 'hlektrismos-crm.vercel.app';
+  assert.equal(E.environmentOf(PROD, H), 'production', 'the Production database reached from the Production address');
+  assert.equal(E.environmentOf(PROD, 'hlektrismos-crm-git-feat-x-upper-acre.vercel.app'), 'preview', 'a Preview build that talks to the Production database is PREVIEW evidence');
+  assert.equal(E.environmentOf(PROD, 'localhost'), 'local'); assert.equal(E.environmentOf(PROD, '127.0.0.1'), 'local');
+  assert.equal(E.environmentOf(PROD, ''), 'none', 'an unknown address is never assumed to be Production'); assert.equal(E.environmentOf(PROD), 'none');
+  assert.equal(E.environmentOf('http://localhost:54321', H), 'local');
+  assert.equal(E.environmentOf('https://other-project.supabase.co', H), 'staging', 'another database is staging even from the Production address');
+  assert.equal(E.environmentOf('', H), 'none'); assert.equal(E.environmentOf(undefined, H), 'none');
+  assert.equal(new Set(Object.keys(E.ENV_TEXT)).size, 5); assert.notEqual(E.ENV_TEXT.preview, E.ENV_TEXT.production);
 });
 test('the anon key role is read without trusting or showing the key; credential key names use the same patterns as the database', () => {
   assert.equal(E.jwtRole(jwt('anon')), 'anon'); assert.equal(E.jwtRole(jwt('service_role')), 'service_role'); assert.equal(E.jwtRole('not-a-jwt'), null); assert.equal(E.jwtRole(undefined), null);
@@ -166,14 +171,20 @@ test('MFA: a factor on an aal1 session is still an open item; no factor is an op
   assert.equal(byId(await E.runLiveChecks(fakeDeps({ mfa: 'error' }).deps))['mfa-admin-factor'].status, 'unverified');
 });
 
-test('a non-Production build can show what it saw, but never «verified»', async () => {
-  for (const url of ['https://other-project.supabase.co', 'http://localhost:54321']) {
-    const run = await E.runLiveChecks(fakeDeps({ url, settings: ['theme'] }).deps);
-    assert.notEqual(run.env, 'production');
+test('Production, Preview, staging and local stay distinguishable, and only Production can verify', async () => {
+  const cases = [['https://other-project.supabase.co', 'hlektrismos-crm.vercel.app', 'staging'], ['http://localhost:54321', 'localhost', 'local'],
+    [PROD, 'hlektrismos-crm-git-feat-x-upper-acre.vercel.app', 'preview'], [PROD, 'localhost', 'local']];
+  for (const [url, appHost, expected] of cases) {
+    const run = await E.runLiveChecks(fakeDeps({ url, appHost, settings: ['theme'] }).deps);
+    assert.equal(run.env, expected, `${url} from ${appHost}`);
+    for (const r of run.results) assert.equal(r.env, expected, r.id);
     assert.equal(run.results.filter((r) => r.status === 'verified').length, 0, url);
     for (const r of run.results) assert.deepEqual(E.validateCheck(r), [], r.id);
     assert.match(byId(run)['anon-leads'].detail, /δεν μετράει ως επαλήθευση/);
+    assert.match(byId(run)['anon-leads'].detail, new RegExp(E.ENV_TEXT[expected].split(' (')[0]), 'the result names where it came from');
   }
+  const prod = await E.runLiveChecks(fakeDeps({ settings: ['theme'] }).deps);
+  assert.equal(prod.env, 'production'); assert.ok(prod.results.some((r) => r.status === 'verified'), 'the same probes DO verify from the Production address');
 });
 
 test('a probe that throws becomes «Δεν έχει επαληθευτεί ζωντανά», never a pass', async () => {
@@ -216,4 +227,19 @@ test('the overview no longer reads the old static findings, and the old claims a
   assert.ok(!/Χωρίς θέματα/.test(center), 'the overview never says «no issues»');
   assert.match(checks, /validateCheck/, 'a stored result that breaks the rules is dropped on load');
   assert.ok(!/Ο Διευθυντής/.test(read('lib/security-evidence.ts')), 'no Manager role in the wording');
+});
+
+test('what only the Dashboard or the catalogue can prove is on the page as a manual line, with an owner and the exact step', () => {
+  const pw = E.STATIC_CHECKS.find((x) => x.id === 'roles-password-policy');
+  assert.equal(pw.status, 'manual'); assert.match(pw.detail, /ΑΓΝΟΕΙ τον τρέχοντα κωδικό/); assert.match(pw.action, /Require current password when updating/); assert.match(pw.action, /12/); assert.ok(pw.owner);
+  const mg = E.STATIC_CHECKS.find((x) => x.id === 'migrations-applied');
+  assert.equal(mg.status, 'manual'); assert.match(mg.action, /pending_migrations_check\.sql/); assert.match(mg.action, /SECURITY_REMEDIATION_CHECKLIST\.md/);
+  assert.match(mg.local, /δεν σημαίνει ότι τα αρχεία έχουν εφαρμοστεί στο Production/, 'a passing local gate is not a statement about Production');
+  for (const id of ['roles-password-policy', 'migrations-applied', 'mfa-enforcement', 'backups-platform', 'functions-versions', 'functions-secrets']) assert.notEqual(E.STATIC_CHECKS.find((x) => x.id === id).status, 'verified', id);
+});
+test('the page says local evidence does not mean the problem is fixed in Production', () => {
+  const ui = read('components/admin/AdminSecurity.tsx');
+  assert.match(ui, /Τοπικά τεκμήρια \(δεν αντικαθιστούν τον ζωντανό έλεγχο και ΔΕΝ σημαίνουν ότι το πρόβλημα έχει διορθωθεί στο Production\)/);
+  assert.match(ui, /Ανοίξτε την εφαρμογή Production για να επαληθευτούν/);
+  assert.match(read('lib/admin-checks.ts'), /appHost: typeof window === 'undefined' \? '' : window\.location\.hostname/, 'the page tells the model which address the app runs from');
 });

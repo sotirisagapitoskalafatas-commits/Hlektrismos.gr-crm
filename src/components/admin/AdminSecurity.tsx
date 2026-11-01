@@ -43,7 +43,7 @@ export function CheckCard({ c }: { c: Check }) {
           <dl className="mt-1 space-y-1">
             <div><dt className="inline font-medium">Τι ελέγχεται: </dt><dd className="inline" data-field="tests">{c.tests}</dd></div>
             <div><dt className="inline font-medium">Τεκμήριο: </dt><dd className="inline" data-field="evidence">{c.evidence}</dd></div>
-            {c.local && <div><dt className="inline font-medium">Τοπικά τεκμήρια (δεν αντικαθιστούν τον ζωντανό έλεγχο): </dt><dd className="inline" data-field="local">{c.local}</dd></div>}
+            {c.local && <div><dt className="inline font-medium">Τοπικά τεκμήρια (δεν αντικαθιστούν τον ζωντανό έλεγχο και ΔΕΝ σημαίνουν ότι το πρόβλημα έχει διορθωθεί στο Production): </dt><dd className="inline" data-field="local">{c.local}</dd></div>}
           </dl>
         </details>
       </span>
@@ -81,7 +81,7 @@ export default function AdminSecurity() {
         <p className="px-4 pb-3 text-[12.5px] text-[var(--atx-muted)]" data-testid="security-lastrun">
           {last ? `Τελευταίοι ζωντανοί έλεγχοι: ${when(last.at)} · ${ENV_TEXT[last.env]}` : 'Δεν έχουν εκτελεστεί ζωντανοί έλεγχοι από αυτόν τον browser: όλες οι γραμμές που τους χρειάζονται εμφανίζονται ως «Δεν έχει επαληθευτεί ζωντανά».'}
         </p>
-        {nonProd && <p className="mx-4 mb-3 text-[12.5px] rounded-lg border border-[var(--atx-line)] px-3 py-2" role="status">Αυτή η εκτέλεση έγινε σε περιβάλλον που δεν είναι το Production ({ENV_TEXT[last.env]}): τα αποτελέσματα φαίνονται, αλλά δεν μετράνε ως επαλήθευση.</p>}
+        {nonProd && <p className="mx-4 mb-3 text-[12.5px] rounded-lg border border-[var(--atx-line)] px-3 py-2" role="status">Αυτή η εκτέλεση έγινε σε περιβάλλον που δεν είναι το Production ({ENV_TEXT[last.env]}): τα αποτελέσματα φαίνονται, αλλά δεν μετράνε ως επαλήθευση. Ανοίξτε την εφαρμογή Production για να επαληθευτούν.</p>}
       </div>
       {AREAS.map((a) => {
         const items = checks.filter((c) => c.area === a.id);

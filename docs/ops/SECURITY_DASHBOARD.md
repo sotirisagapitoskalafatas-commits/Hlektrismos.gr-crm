@@ -15,6 +15,19 @@ Code: `src/lib/security-evidence.ts` (rules and probes, tested without a browser
 
 `validateCheck()` enforces this and the page drops any stored result that breaks it. A run from a Preview deployment or a dev server (not the Production project) is shown but **never counts as verification**.
 
+## Where a result comes from (four environments, never mixed)
+| Shown as | Meaning | Can it verify? |
+|---|---|---|
+| **Production (ζωντανά)** | The Production database, reached from the Production address `hlektrismos-crm.vercel.app` | **Yes**, and only this |
+| **Preview** | A Vercel Preview build of the app (any other `*.vercel.app` address), **even when it talks to the Production database** | No: it is a different build of the app |
+| **Staging / άλλη βάση** | Any Supabase project that is not Production | No |
+| **Τοπικά** | A dev server on `localhost`, or a local test | No |
+| **Δεν έχει ελεγχθεί σε πραγματικό σύστημα** | Nothing real was consulted | No |
+
+The environment is computed from **both** the Supabase URL the browser uses and the address of the page (`environmentOf`). Every live result carries it, a result that would be green from anything but Production is downgraded to «Δεν έχει επαληθευτεί ζωντανά» with the reason, and the header says where the last run came from.
+
+**Local tests are evidence, not status.** The PGlite release gate (PR #151) and the unit tests appear on a line as «Τοπικά τεκμήρια», in their own field, labelled as **not meaning the problem is fixed in Production**. They never change a line's status. Two lines exist only to say what no browser can see: the Auth password policy (Dashboard) and which staged migrations are applied (the catalogue; `pending_migrations_check.sql`, `SECURITY_REMEDIATION_CHECKLIST.md`).
+
 ## The eight areas and what is proven how
 | Area | Live (Production, automated, read-only) | Not provable from a browser |
 |---|---|---|

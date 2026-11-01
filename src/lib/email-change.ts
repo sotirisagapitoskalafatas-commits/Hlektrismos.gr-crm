@@ -8,9 +8,9 @@ import { looksLikeEmail } from './password-rules';
 export const CRM_ORIGIN = 'https://hlektrismos-crm.vercel.app';
 export const EMAIL_REDIRECT_TO = `${CRM_ORIGIN}/`;
 
-export type EmailChangeOutcome = 'invalid' | 'unchanged' | 'pending' | 'resent' | 'duplicate' | 'cooldown' | 'provider_limit' | 'not_authorized' | 'rate_limited' | 'failed';
+export type EmailChangeOutcome = 'invalid' | 'unchanged' | 'pending' | 'resent' | 'duplicate' | 'cooldown' | 'provider_limit' | 'not_authorized' | 'recipient_rejected' | 'rate_limited' | 'failed';
 /** What an attempt did, plus the number of seconds the server said to wait when it said so. */
-export interface EmailChangeResult { outcome: EmailChangeOutcome; retryAfter: number | null }
+export interface EmailChangeResult { outcome: EmailChangeOutcome; retryAfter: number | null; /** Only for 'recipient_rejected': the address Auth refused to mail. */ address?: string }
 
 type AuthError = { code?: string; status?: number; message?: string } | null;
 export interface AuthLike {
@@ -42,6 +42,7 @@ export function retryAfterSeconds(error: NonNullable<AuthError>): number | null 
  */
 export function classifyEmailChangeError(error: NonNullable<AuthError>): EmailChangeOutcome {
   const text = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
+  if (error.code === 'email_address_invalid') return 'recipient_rejected'; // GoTrue: the mailer's recipient validation failed. No mail was sent.
   if (error.code === 'email_exists' || /already (been )?registered|already exists|email.*exists|user.*exists/.test(text)) return 'duplicate';
   if (error.code === 'email_address_not_authorized' || /email address not authorized|not authorized/.test(text)) return 'not_authorized';
   if (retryAfterSeconds(error) !== null) return 'cooldown';
@@ -51,7 +52,43 @@ export function classifyEmailChangeError(error: NonNullable<AuthError>): EmailCh
   return 'failed';
 }
 
-const toResult = (error: NonNullable<AuthError>): EmailChangeResult => ({ outcome: classifyEmailChangeError(error), retryAfter: retryAfterSeconds(error) });
+/** GoTrue words it «Email address "x" is invalid»; the address is only echoed back to the Admin who owns this account. */
+export function rejectedAddress(error: NonNullable<AuthError>): string | null {
+  const m = /email address\s+"([^"\s]{3,254})"\s+is invalid/i.exec(error.message ?? '');
+  return m ? m[1] : null;
+}
+const toResult = (error: NonNullable<AuthError>): EmailChangeResult => {
+  const outcome = classifyEmailChangeError(error);
+  const address = outcome === 'recipient_rejected' ? rejectedAddress(error) : null;
+  return { outcome, retryAfter: retryAfterSeconds(error), ...(address ? { address } : {}) };
+};
+
+/**
+ * One user action is ONE request, and a refusal never starts another. After every attempt the form locks for as long as the server named, or, when it
+ * named nothing, for a safeguard of OUR OWN (said so on screen, never presented as the provider's time). Persisted, so a reload does not unlock it.
+ */
+export const SEND_FLOOR_MS = 60_000; // after an accepted request: the same pause Auth itself applies per account
+export const REFUSED_LOCK_MS = 15 * 60_000; // after a refusal that retrying cannot fix quickly (quota, recipient, sender restriction)
+export type EmailChangeLock = { until: number; kind: 'server' | 'app' };
+export function lockAfter(r: EmailChangeResult, now: number): EmailChangeLock {
+  if (r.retryAfter) return { until: now + r.retryAfter * 1000, kind: 'server' };
+  if (r.outcome === 'pending' || r.outcome === 'resent' || r.outcome === 'failed' || r.outcome === 'cooldown') return { until: now + SEND_FLOOR_MS, kind: 'app' };
+  if (r.outcome === 'invalid' || r.outcome === 'unchanged' || r.outcome === 'duplicate') return { until: now, kind: 'app' }; // a typo is not an Auth request: nothing to protect
+  return { until: now + REFUSED_LOCK_MS, kind: 'app' };
+}
+/** The only gate to an Auth e-mail request: nothing in flight and no lock running. Every click, tab and retry goes through it. */
+export const mayRequest = (lock: EmailChangeLock | null, inFlight: boolean, now: number): boolean => !inFlight && !(lock && now < lock.until);
+type KV = { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void };
+export const lockKey = (activeEmail: string) => `atlas.email-change.lock:${activeEmail.trim().toLowerCase()}`;
+export function readLock(store: KV | null, key: string, now: number): EmailChangeLock | null {
+  try {
+    const v = JSON.parse(store?.getItem(key) ?? 'null') as Partial<EmailChangeLock> | null;
+    return v && typeof v.until === 'number' && v.until > now && v.until <= now + 24 * 3_600_000 && (v.kind === 'server' || v.kind === 'app') ? { until: v.until, kind: v.kind } : null;
+  } catch { return null; }
+}
+export function writeLock(store: KV | null, key: string, lock: EmailChangeLock, now: number): void {
+  try { if (lock.until > now) store?.setItem(key, JSON.stringify(lock)); else store?.removeItem(key); } catch { /* storage unavailable: the in-memory lock still holds */ }
+}
 
 /** What to do for the address the Admin typed, given what Auth already holds. One request in flight at a time is the caller's job; this decides WHICH call. */
 export type EmailChangePlan = 'new' | 'resend' | 'replace';
@@ -118,6 +155,10 @@ export const EMAIL_CHANGE_TEXT: Record<EmailChangeOutcome, { tone: 'ok' | 'err';
     tone: 'err',
     text: 'Ο ενσωματωμένος αποστολέας δοκιμών στέλνει μόνο σε διευθύνσεις μελών της ομάδας του έργου. Η διεύθυνση πρέπει να προστεθεί στην ομάδα ή να ρυθμιστεί δικός μας SMTP διακομιστής.',
   },
+  recipient_rejected: {
+    tone: 'err',
+    text: 'Η υπηρεσία ταυτοποίησης (Supabase Auth) απέρριψε μία διεύθυνση ως παραλήπτη (κωδικός email_address_invalid) και δεν έστειλε κανένα email. Δεν είναι πρόβλημα της φόρμας ούτε όριο αποστολής. Με ενεργή την ασφαλή αλλαγή email χρειάζεται επιβεβαίωση και από την τρέχουσα διεύθυνση σύνδεσης· όσο εκείνη δεν μπορεί να λάβει email, η αλλαγή δεν ολοκληρώνεται. Το εκκρεμές αίτημα δεν χάθηκε.',
+  },
   rate_limited: { tone: 'err', text: 'Πάρα πολλές προσπάθειες. Δοκιμάστε ξανά σε λίγα λεπτά.' },
   resent: {
     tone: 'ok',
@@ -133,5 +174,9 @@ export const EMAIL_CHANGE_TEXT: Record<EmailChangeOutcome, { tone: 'ok' | 'err';
 /** The text for a result: the server's own wait is quoted when it gave one, and nothing is made up when it did not. */
 export function emailChangeMessage(r: EmailChangeResult): { tone: 'ok' | 'err'; text: string } {
   if (r.outcome === 'cooldown' && r.retryAfter) return { tone: 'err', text: `Ζητήσατε επιβεβαίωση πολύ πρόσφατα. Δοκιμάστε ξανά σε ${r.retryAfter} δευτερόλεπτα.` };
+  if (r.outcome === 'recipient_rejected' && r.address) return { tone: 'err', text: EMAIL_CHANGE_TEXT.recipient_rejected.text.replace('μία διεύθυνση', `τη διεύθυνση ${r.address}`) };
   return EMAIL_CHANGE_TEXT[r.outcome];
 }
+
+/** Said before a re-send, because Auth issues NEW links and resets the confirmations already given (GoTrue sendEmailChange). */
+export const RESEND_WARNING = 'Η επαναποστολή δημιουργεί νέους συνδέσμους και ακυρώνει τους προηγούμενους. Ό,τι έχει ήδη επιβεβαιωθεί μηδενίζεται: θα χρειαστεί ξανά επιβεβαίωση και στις δύο διευθύνσεις. Πατήστε ξανά μόνο αν δεν έχετε κανένα έγκυρο email επιβεβαίωσης.';

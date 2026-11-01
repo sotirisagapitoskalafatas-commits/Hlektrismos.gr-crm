@@ -150,11 +150,12 @@ declare
   v_sc uuid; v_sl uuid;
   v_known text[] := array['planned', 'in_progress', 'completed', 'cancelled', 'no_show'];
 begin
+  -- The guard binds what a SIGNED-IN USER does directly (current_user = 'authenticated'). The service role and the SECURITY DEFINER operations
+  -- (check-in, application submit that re-points a supply reference, trash / purge) run as the owner and are reviewed separately.
+  if current_user <> 'authenticated' or v_uid is null then return case when tg_op = 'DELETE' then old else new end; end if;
   if tg_op = 'DELETE' then
-    if v_uid is not null then raise exception 'visit: a visit is never deleted; cancel it with a reason' using errcode = '42501'; end if;
-    return old;
+    raise exception 'visit: a visit is never deleted; cancel it with a reason' using errcode = '42501';
   end if;
-  if v_uid is null then return new; end if;   -- service role / internal jobs
   v_sales := coalesce(public.is_sales_agent(), false);
   v_app_new := nullif(to_jsonb(new) ->> 'application_id', '')::uuid;
   v_app_old := case when v_ins then null else nullif(to_jsonb(old) ->> 'application_id', '')::uuid end;
@@ -206,7 +207,7 @@ returns trigger language plpgsql set search_path = public
 as $$
 declare v_sales boolean;
 begin
-  if auth.uid() is null then return new; end if;
+  if current_user <> 'authenticated' or auth.uid() is null then return new; end if;
   v_sales := coalesce(public.is_sales_agent(), false);
   if tg_op = 'INSERT' then new.created_by := coalesce(new.created_by, auth.uid()); end if;
   if v_sales then

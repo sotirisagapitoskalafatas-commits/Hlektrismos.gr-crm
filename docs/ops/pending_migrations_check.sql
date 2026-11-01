@@ -47,7 +47,9 @@ from (values
   ('phase6/22_crm_integrations_status_invoker', coalesce('security_invoker=true' = any (select unnest(reloptions) from pg_class where oid = to_regclass('public.crm_integrations_status')), false), 'view crm_integrations_status security_invoker'),
   ('phase6/25_exact_two_roles', exists (select 1 from pg_constraint where conname = 'profiles_role_check' and pg_get_constraintdef(oid) like '%sales_agent%'), 'profiles.role allows only admin and sales_agent'),
   ('phase6/26_single_active_admin', to_regclass('public.profiles_single_active_admin') is not null, 'one active admin enforced by a unique index'),
-  ('phase6/27_credentials_write_only', to_regprocedure('public.crm_set_credential(text,text)') is not null and to_regprocedure('public.crm_credential_status()') is not null, 'credentials are write-only from the browser')
+  ('phase6/27_credentials_write_only', to_regprocedure('public.crm_set_credential(text,text)') is not null and to_regprocedure('public.crm_credential_status()') is not null, 'credentials are write-only from the browser'),
+  ('phase7/01_standalone_field_visits', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'case_visits' and column_name = 'prospect') and to_regprocedure('public.field_prospect_matches(text,text,text)') is not null, 'visits can exist without a Case; prospect, no_show, reschedule links'),
+  ('phase7/02_energy_applications', to_regclass('public.energy_applications') is not null and to_regclass('public.application_documents') is not null and to_regprocedure('public.submit_energy_application(uuid)') is not null, 'energy applications with versioned documents')
 ) as f(file, applied, marker)
 order by f.file;
 

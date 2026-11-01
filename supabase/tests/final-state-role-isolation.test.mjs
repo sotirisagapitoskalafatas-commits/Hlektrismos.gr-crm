@@ -13,10 +13,11 @@ const ALREADY_LIVE = ['phase1/20_crm_integrations_emergency_hotfix', 'phase1/03_
 // The rollout, in the order of docs/ops/APPLY_ORDER.md (steps 0b, 0c, 1, 2, 2b, 2c, 2d, 2e, 3, 25, 5, 8, 9, 10, 16, 17, 18, 18b, 18c, 22, 22b, 27, 28, 29).
 // Files the document lists but this gate does not need (cron, import, saved routes, preferences …) are left out; a test below proves the order is the document's.
 const ROLLOUT = ['phase1/21b_function_rate_limits', 'phase1/21c_lead_webhook_idempotency', ...STAGE1_FILES, 'phase2/05_staff_admin_and_role_preview', 'phase6/21_two_role_model',
-  'phase1/02_outreach_decisions_audit', 'phase2/06_trash_leads_customers', 'phase2/07a_document_checklist_and_return', 'phase2/07b_case_stage_guard_and_set_stage', 'phase4/14_follow_up_kind',
+  'phase1/02_outreach_decisions_audit', 'phase2/06_trash_leads_customers', 'phase2/07a_document_checklist_and_return', 'phase2/07b_case_stage_guard_and_set_stage', 'phase4/10_field_checkin_manual_flag', 'phase4/12_default_backoffice_assignee', 'phase4/14_follow_up_kind',
   'phase3/08_b2b_prospects_review_distribution', 'phase3/09_contact_eligibility', 'phase3/10_offer_lifecycle', 'phase3/11_contact_service_requests', 'phase4/18_sales_own_records_scope', 'phase4/21_sales_isolation_completion'];
 const BEFORE_ROLES = [...ALREADY_LIVE, ...ROLLOUT];
-const FINAL = ['phase6/25_exact_two_roles', 'phase6/26_single_active_admin', 'phase6/27_credentials_write_only']; // steps 27, 28, 29
+const FINAL = ['phase6/25_exact_two_roles', 'phase6/26_single_active_admin', 'phase6/27_credentials_write_only', // steps 27, 28, 29
+  'phase7/01_standalone_field_visits', 'phase7/02_energy_applications']; // steps 30, 31: Field Visits and Energy Applications (docs/product/FIELD_VISITS_AND_APPLICATIONS.md)
 
 const U = (n) => `cccccccc-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const ADMIN = U(1), A = U(2), B = U(3), NEWBIE = U(9);

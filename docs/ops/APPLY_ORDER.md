@@ -1,6 +1,6 @@
 # Apply order — every staged SQL file not yet on live
 
-**One list, in the exact order to run them.** 28 files (23 numbered steps, plus 2b, 2c, 2d, 3b and 3c added by the security audit, the live API hardening hotfix, account/visibility work and Field Sales route planning), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
+**One list, in the exact order to run them.** 30 files (25 numbered steps, plus 2b, 2c, 2d, 3b and 3c added by the security audit, the live API hardening hotfix, account/visibility work and Field Sales route planning), security first, ending with the supply points (phase5/17, phase5/18) and then the legacy-leads import (phase4/16, PR #79 and its v2).
 Written 18/10/2026 from the repository, **not from the live database**: nothing in `supabase/staged-migrations/` has been applied by Claude Code, on staging or live. The files sit outside `supabase/migrations/`, so GitHub never applies them; each is run by hand in the Supabase SQL editor.
 
 ## Corrections found on 30 Oct 2026 (rehearsal on a restored copy of production)
@@ -433,3 +433,19 @@ select exists (select 1 from pg_trigger where tgname = 'profiles_no_new_legacy_o
 - **Changes:** the table policy lets an Admin read and write only non-credential settings and never write `role_permissions` directly. Credentials are set with `crm_set_credential(key, value)` (returns nothing) and their presence is read with `crm_credential_status()` (yes/no and date). `role_permissions` changes only through `crm_set_role_permissions(json)`, which accepts only known capabilities for `sales_agent`. Each set is audited with the KEY NAME only. Edge Functions are unaffected (service role). No stored value is changed.
 - **Rollback:** [`rollback_phase6_27_credentials_write_only.sql`](rollback_phase6_27_credentials_write_only.sql).
 - **Check:** see `pending_migrations_check.sql` row `phase6/27_credentials_write_only`.
+
+## 30. `phase7/01_standalone_field_visits.sql` — field visits that exist before any Case
+- **Depends on:** phase4/18 (`sales_owns_*` helpers), phase5/17 and phase5/18 (supply points on customers and leads), phase4/10 (check-in review flag: step 12). It stops with a clear message when one is missing.
+- **Changes (additive, every new CHECK is NOT VALID):** `case_visits.case_id` and `follow_ups.case_id` become nullable; visits gain `lead_id`, `customer_id`, `supply_point_id`, `application_id`, `prospect`, `outcome_key`, `outcome_reason`, `status_reason`, `rescheduled_from_id`; the only new stored visit status is `no_show`; `field_checkin` / `field_checkout` are replaced (same signatures, case-bound behaviour identical to phase4/10, idempotent, standalone-aware); guard and audit triggers; `sales_owns_entity` is extended (all branches kept) with `visit` and `application`; `field_prospect_matches`, `reschedule_field_visit`, `cancel_field_visit`, `mark_visit_no_show`, `ownership_requests` with `request_lead_ownership` / `decide_ownership_request`.
+- **Not touched:** `timeline_events.case_id` stays NOT NULL (standalone events go to `activity_log`), `contact_service_requests`, every Storage policy.
+- **Order matters:** merging the frontend is safe BEFORE this file (every read of a new column is behind an availability probe). Apply this file, then step 31.
+- **Rollback:** [`rollback_phase7_01_standalone_field_visits.sql`](rollback_phase7_01_standalone_field_visits.sql). Tested locally (PGlite): `supabase/tests/field-visits-standalone.test.mjs`.
+- **Check:** see `pending_migrations_check.sql` row `phase7/01_standalone_field_visits`.
+
+## 31. `phase7/02_energy_applications.sql` — the energy-service Application, versioned documents and the submit operation
+- **Depends on:** step 30, phase4/12 (default Back Office assignee: step 14), phase4/21 (storage helpers: step 22b), phase5/17 and phase5/18.
+- **Changes (additive):** `application_service_types` (admin-editable), `energy_applications` (+ `cases.application_id`, the FK of `case_visits.application_id`), `application_documents` (one row per version; written only by `add_application_document`), `submit_energy_application`, `withdraw_energy_application`, `request_application_documents`, `set_application_document_status`; `sales_can_read_object` / `sales_can_write_object` get an application branch (every earlier branch kept); a RESTRICTIVE policy forbids deleting `client_documents/applications/…` objects for everybody signed in.
+- **Not touched:** `case_documents`, the Case stage workflow, `contact_service_requests`, existing Storage policies.
+- **Owner check (not in the repository):** the bucket `client_documents` is created in the dashboard; its MIME / size limits and permissive policies are unknown. Run `FIELD_APPLICATIONS_LIVE_CHECK.sql` first.
+- **Rollback:** [`rollback_phase7_02_energy_applications.sql`](rollback_phase7_02_energy_applications.sql). Tested locally (PGlite): `supabase/tests/energy-applications.test.mjs`.
+- **Check:** see `pending_migrations_check.sql` row `phase7/02_energy_applications`.

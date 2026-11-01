@@ -48,7 +48,7 @@ function fakeAuth(user, { password = CUR, requireCurrent = true, requireReauth =
 test('the installed auth-js (>= 2.98.0) types and sends `current_password` exactly like this', async () => {
   const pkg = JSON.parse(readFileSync(repo + 'node_modules/@supabase/auth-js/package.json', 'utf8'));
   const [maj, min] = pkg.version.split('.').map(Number);
-  assert.ok(maj === 2 && min >= 98, `auth-js ${pkg.version} must be 2.98.0 or later (first release whose UserAttributes has current_password)`);
+  assert.ok(maj === 2 && min >= 102, `auth-js ${pkg.version} must be 2.102.0 or later: the release the official password guide documents (the typing itself exists from 2.98.0)`);
   const types = readFileSync(repo + 'node_modules/@supabase/auth-js/dist/main/lib/types.d.ts', 'utf8');
   assert.match(types, /current_password\?: string;/, 'snake_case, as typed by the SDK');
   assert.ok(!/currentPassword/.test(types), 'there is no camelCase variant to use');
@@ -56,7 +56,7 @@ test('the installed auth-js (>= 2.98.0) types and sends `current_password` exact
   const sdk = JSON.parse(readFileSync(repo + 'node_modules/@supabase/supabase-js/package.json', 'utf8'));
   assert.equal(sdk.dependencies['@supabase/auth-js'], pkg.version, 'supabase-js and auth-js resolve to the same release');
   const wanted = JSON.parse(readFileSync(repo + 'package.json', 'utf8')).dependencies['@supabase/supabase-js'].replace('^', '').split('.').map(Number);
-  assert.ok(wanted[0] === 2 && wanted[1] >= 98, 'package.json asks for at least 2.98.0');
+  assert.ok(wanted[0] === 2 && wanted[1] >= 102, 'package.json asks for at least 2.102.0, the documented minimum');
 });
 
 function realClient(reply) {
@@ -207,6 +207,15 @@ test('no password reaches a log, a table, storage, an audit record or the page t
   assert.ok(!P.passwordChangeMessage(weak).text.includes(NEW), 'only known reasons are used');
 });
 
+test('the minimum length is ONE policy (12), shared by the reset page and this card, and the docs say Auth is the final authority', () => {
+  assert.equal(readFileSync(root + 'lib/password-rules.ts', 'utf8').match(/MIN_PASSWORD_LENGTH = (\d+)/)[1], '12');
+  assert.ok(!P.canSubmitPassword(CUR, 'Abcdef12345', 'Abcdef12345'), '11 characters are refused before sending');
+  assert.ok(P.canSubmitPassword(CUR, 'Abcdef123456', 'Abcdef123456'), '12 are accepted');
+  const doc = readFileSync(repo + 'docs/ops/PASSWORD_CHANGE.md', 'utf8');
+  assert.match(doc, /Minimum password length[^\n]*\*\*12\*\*/, 'the documented Dashboard policy names the same 12');
+  assert.match(doc, /last word|final authority/i);
+});
+
 test('asking for the reauthentication code reports what happened and never throws', async () => {
   const failing = (error, throws = false) => ({ reauthenticate: async () => { if (throws) throw new Error('offline'); return { error }; } });
   assert.equal(await P.requestReauthCode(failing(null)), 'sent');
@@ -214,6 +223,8 @@ test('asking for the reauthentication code reports what happened and never throw
   assert.equal(await P.requestReauthCode(failing({ code: 'session_not_found', status: 403, message: 'x' })), 'session');
   assert.equal(await P.requestReauthCode(failing({ code: 'unexpected', status: 500, message: 'x' })), 'failed');
   assert.equal(await P.requestReauthCode(failing(null, true)), 'network');
+  for (const code of ['email_address_not_authorized', 'email_address_invalid']) assert.equal(await P.requestReauthCode(failing({ code, status: 400, message: 'x' })), 'undeliverable', code);
+  assert.match(P.REAUTH_TEXT.undeliverable.text, /αποσυνδεθείτε και συνδεθείτε ξανά/, 'the built-in sender can not reach every address: the answer is the no-email route');
   assert.match(P.REAUTH_TEXT.rate_limited.text, /Συνδεθείτε ξανά \(χωρίς email\)/, 'the no-email way out is offered when the quota is gone');
   assert.ok(P.lockMsAfter('sent') >= 60_000, 'one code at a time');
 });
@@ -237,4 +248,27 @@ test('the card: Greek labels, show/hide, strength, requirements, and it is avail
   assert.match(page, /<PasswordChangeCard \/>/); assert.ok(!/realRole === 'admin'[^\n]*<PasswordChangeCard/.test(page), 'not limited to Admin');
   assert.match(card, /new_email/, 'warns when a pending e-mail change would be invalidated');
   assert.ok(!/profiles?\b.*\bpassword|\.from\('/.test(stripComments(card)), 'no table access');
+});
+
+test('the shared Admin login: the consequence for the whole office is stated before, asked for with a second click, and repeated after', () => {
+  const card = read('components/app/PasswordChangeCard.tsx');
+  assert.match(card, /const shared = profile\?\.role === 'admin'/);
+  assert.match(card, /shared && !confirmShared[\s\S]{0,120}SHARED_ADMIN_CONFIRM/, 'a second click is needed for the shared login');
+  assert.match(card, /data-testid="password-shared-note"/);
+  for (const t of [P.SHARED_ADMIN_NOTICE, P.SHARED_ADMIN_CONFIRM, P.SHARED_ADMIN_DONE]) assert.match(t, /ΟΛΕΣ οι άλλες συσκευές/);
+  assert.match(P.SHARED_ADMIN_NOTICE, /κοινός/);
+  const done = P.passwordChangeMessage({ outcome: 'changed' }, { shared: true });
+  assert.equal(done.tone, 'ok'); assert.match(done.text, /ΟΛΕΣ οι άλλες συσκευές του γραφείου αποσυνδέθηκαν/); assert.match(done.text, /ασφαλή τρόπο/);
+  assert.ok(!/ΟΛΕΣ οι άλλες/.test(P.passwordChangeMessage({ outcome: 'changed' }).text), 'a Sales Agent account is individual: no office-wide warning');
+  assert.deepEqual(P.passwordChangeMessage({ outcome: 'current_wrong' }, { shared: true }), P.passwordChangeMessage({ outcome: 'current_wrong' }), 'errors are the same for both');
+});
+
+test('re-authentication never depends on e-mail: a sign-out and sign-in route is always offered next to the code request', () => {
+  const card = read('components/app/PasswordChangeCard.tsx');
+  assert.match(card, /data-testid="password-signout-route"/);
+  assert.match(card, /void signOut\(\); window\.location\.hash = '\/'/);
+  const i = card.indexOf('password-signout-route'); const j = card.indexOf('sendCode()', i);
+  assert.ok(i > 0 && j > i, 'the no-email route comes first');
+  assert.match(card, /r === 'failed' \|\| r === 'session' \|\| r === 'undeliverable'/);
+  assert.match(P.PASSWORD_CHANGE_TEXT.reauth_needed.text, /Συνδεθείτε ξανά ή ζητήστε κωδικό/);
 });

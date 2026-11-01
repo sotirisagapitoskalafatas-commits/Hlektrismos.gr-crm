@@ -1,6 +1,7 @@
 // Rules for choosing a new password (reset page). The real policy is enforced by Supabase Auth; this only gives the
 // person clear Greek feedback before the request is sent. Returns [] when the password may be submitted.
-export const MIN_PASSWORD_LENGTH = 10;
+// 12 = the minimum length recommended for the Auth project (docs/ops/PASSWORD_CHANGE.md). Auth enforces its own configured minimum and has the last word.
+export const MIN_PASSWORD_LENGTH = 12;
 
 export function passwordIssues(password: string, confirm: string): string[] {
   const issues: string[] = [];

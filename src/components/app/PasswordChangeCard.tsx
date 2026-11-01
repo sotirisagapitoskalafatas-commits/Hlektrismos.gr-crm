@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { Btn, Card, CardHeader } from '@/lib/ui';
 import {
-  REAUTH_TEXT, canSubmitPassword, changePassword, lockMsAfter, maySubmit, passwordChangeMessage, passwordRequirements, passwordStrength, requestReauthCode,
+  REAUTH_TEXT, SHARED_ADMIN_CONFIRM, SHARED_ADMIN_NOTICE, canSubmitPassword, changePassword, lockMsAfter, maySubmit, passwordChangeMessage, passwordRequirements, passwordStrength, requestReauthCode,
 } from '@/lib/password-change';
 
 type Msg = { tone: 'ok' | 'err'; text: string } | null;
@@ -47,7 +47,10 @@ function useLock() {
 const BAR_TONE = ['bg-bad-600', 'bg-bad-600', 'bg-warn-600', 'bg-ok-600', 'bg-ok-600'];
 
 export default function PasswordChangeCard() {
-  const { user } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  // The Admin / Back Office login is ONE account shared by the office: changing its password signs every other office device out.
+  const shared = profile?.role === 'admin';
+  const [confirmShared, setConfirmShared] = useState(false);
   const uid = useId();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -63,6 +66,7 @@ export default function PasswordChangeCard() {
   const save = useLock();
   const code = useLock();
 
+  const touch = <T,>(set: (v: T) => void) => (v: T) => { setConfirmShared(false); set(v); };
   const strength = passwordStrength(next, [user?.email?.split('@')[0] ?? '']);
   const reqs = passwordRequirements(current, next, confirm);
   const ready = canSubmitPassword(current, next, confirm) && (!needReauth || nonce.trim().length > 0);
@@ -71,10 +75,13 @@ export default function PasswordChangeCard() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !ready || !maySubmit(inFlight.current, save.until.current, Date.now())) return;
+    // The shared Admin login: say what will happen to the rest of the office once, and ask for a second click.
+    if (shared && !confirmShared) { setConfirmShared(true); setMsg({ tone: 'err', text: SHARED_ADMIN_CONFIRM }); return; }
+    setConfirmShared(false);
     inFlight.current = true; setBusy(true); setMsg(null);
     const result = await changePassword(supabase.auth, { current, next, nonce: needReauth ? nonce : undefined });
     inFlight.current = false; setBusy(false); save.lockFor(lockMsAfter(result.outcome));
-    setMsg(passwordChangeMessage(result));
+    setMsg(passwordChangeMessage(result, { shared }));
     if (result.outcome === 'changed') { setCurrent(''); setNext(''); setConfirm(''); setNonce(''); setNeedReauth(false); setReauthMsg(null); } // only now, after Auth confirmed
     else if (result.outcome === 'reauth_needed' || result.outcome === 'reauth_invalid') setNeedReauth(true);
   };
@@ -86,7 +93,7 @@ export default function PasswordChangeCard() {
     const r = await requestReauthCode(supabase.auth);
     inFlight.current = false; setBusy(false);
     setReauthMsg(REAUTH_TEXT[r]);
-    if (r === 'failed' || r === 'session') code.lockFor(lockMsAfter('failed')); // nothing was sent: a short pause is enough. After 'sent', 'network' and 'rate_limited' the 60 s lock stays.
+    if (r === 'failed' || r === 'session' || r === 'undeliverable') code.lockFor(lockMsAfter('failed')); // nothing was sent: a short pause is enough. After 'sent', 'network' and 'rate_limited' the 60 s lock stays.
   };
 
   return (
@@ -95,14 +102,17 @@ export default function PasswordChangeCard() {
       <p className="text-xs text-ink/55 mb-3">
         Ο κωδικός αφορά μόνο τον δικό σας λογαριασμό και δεν είναι ορατός σε κανέναν, ούτε στους διαχειριστές. Μετά την αλλαγή παραμένετε συνδεδεμένοι σε αυτή τη συσκευή· οι υπόλοιπες συσκευές θα ζητήσουν νέα σύνδεση.
       </p>
+      {shared && (
+        <p className="text-xs mb-3 rounded-lg border border-line px-3 py-2 text-warn-600" role="note" data-testid="password-shared-note">{SHARED_ADMIN_NOTICE}</p>
+      )}
       {pendingEmail && (
         <p className="text-xs mb-3 text-warn-600" role="status" data-testid="password-pending-email-note">
           Υπάρχει εκκρεμές αίτημα αλλαγής email προς {pendingEmail}. Η αλλαγή κωδικού ακυρώνει τους συνδέσμους επιβεβαίωσης που έχουν ήδη σταλεί· θα χρειαστεί νέα επιβεβαίωση.
         </p>
       )}
       <form onSubmit={(e) => void submit(e)} noValidate className="space-y-3" aria-label="Αλλαγή κωδικού πρόσβασης">
-        <PasswordInput id={`${uid}-cur`} label="Τρέχων κωδικός πρόσβασης" value={current} onChange={setCurrent} autoComplete="current-password" />
-        <PasswordInput id={`${uid}-new`} label="Νέος κωδικός πρόσβασης" value={next} onChange={setNext} autoComplete="new-password" hint="Προτείνεται 12 χαρακτήρες ή περισσότεροι, με γράμματα, αριθμούς και σύμβολα." />
+        <PasswordInput id={`${uid}-cur`} label="Τρέχων κωδικός πρόσβασης" value={current} onChange={touch(setCurrent)} autoComplete="current-password" />
+        <PasswordInput id={`${uid}-new`} label="Νέος κωδικός πρόσβασης" value={next} onChange={touch(setNext)} autoComplete="new-password" hint="Τουλάχιστον 12 χαρακτήρες, με γράμματα και αριθμούς. Προτιμήστε μεγαλύτερο, με σύμβολα." />
         <div aria-live="polite">
           {next.length > 0 && (
             <div data-testid="password-strength">
@@ -113,7 +123,7 @@ export default function PasswordChangeCard() {
             </div>
           )}
         </div>
-        <PasswordInput id={`${uid}-cfm`} label="Επιβεβαίωση νέου κωδικού πρόσβασης" value={confirm} onChange={setConfirm} autoComplete="new-password" />
+        <PasswordInput id={`${uid}-cfm`} label="Επιβεβαίωση νέου κωδικού πρόσβασης" value={confirm} onChange={touch(setConfirm)} autoComplete="new-password" />
         <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1" aria-label="Απαιτήσεις κωδικού">
           {reqs.map((r) => (
             <li key={r.id} className={`flex items-center gap-1.5 text-[11px] ${r.met ? 'text-ok-600' : 'text-ink/45'}`} data-met={r.met}>
@@ -128,7 +138,8 @@ export default function PasswordChangeCard() {
             <p className="flex items-start gap-2 text-xs text-ink/70"><ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-ink/40" aria-hidden="true" />
               <span>Η σύνδεσή σας είναι παλαιότερη από 24 ώρες, οπότε η υπηρεσία ζητά νέα επαλήθευση. Η πιο απλή λύση: αποσυνδεθείτε και συνδεθείτε ξανά (δεν στέλνεται email). Εναλλακτικά, ζητήστε κωδικό επαλήθευσης στο email του λογαριασμού σας.</span></p>
             <div className="flex flex-wrap items-center gap-2">
-              <Btn variant="outline" onClick={() => void sendCode()} disabled={busy || code.locked}>Αποστολή κωδικού επαλήθευσης</Btn>
+              <span data-testid="password-signout-route"><Btn variant="outline" onClick={() => { void signOut(); window.location.hash = '/'; }}>Αποσύνδεση και νέα σύνδεση (χωρίς email)</Btn></span>
+              <Btn variant="outline" onClick={() => void sendCode()} disabled={busy || code.locked}>Αποστολή κωδικού επαλήθευσης στο email</Btn>
             </div>
             <PasswordInput id={`${uid}-nonce`} label="Κωδικός επαλήθευσης από το email" value={nonce} onChange={setNonce} autoComplete="one-time-code" />
             <p className={`text-xs min-h-[1rem] ${reauthMsg?.tone === 'err' ? 'text-bad-600' : 'text-ink/60'}`} role="status">{reauthMsg?.text ?? ''}</p>

@@ -56,12 +56,14 @@ export async function changePassword(auth: PasswordAuthLike, input: { current: s
   }
 }
 
-export type ReauthOutcome = 'sent' | 'session' | 'rate_limited' | 'network' | 'failed';
+export type ReauthOutcome = 'sent' | 'session' | 'rate_limited' | 'undeliverable' | 'network' | 'failed';
 /** Asks Auth to e-mail a one-time code. A single, explicit action: the caller locks the button before this runs. */
 export async function requestReauthCode(auth: PasswordAuthLike): Promise<ReauthOutcome> {
   try {
     const { error } = await auth.reauthenticate();
     if (!error) return 'sent';
+    // The built-in test sender only mails project team members, and refuses addresses its validator dislikes: neither is a fault of the person.
+    if (error.code === 'email_address_not_authorized' || error.code === 'email_address_invalid') return 'undeliverable';
     const o = classifyPasswordError(error);
     return o === 'session' || o === 'rate_limited' || o === 'network' ? o : 'failed';
   } catch {
@@ -136,7 +138,13 @@ export const PASSWORD_CHANGE_TEXT: Record<PasswordChangeOutcome, { tone: 'ok' | 
   network: { tone: 'err', text: 'Δεν λάβαμε επιβεβαίωση από την υπηρεσία (πρόβλημα σύνδεσης). Αν ο κωδικός δεν άλλαξε, δοκιμάστε ξανά· αν η νέα δοκιμή πει ότι ο τρέχων κωδικός είναι λάθος, ίσως άλλαξε ήδη, οπότε δοκιμάστε τον νέο.' },
   failed: { tone: 'err', text: 'Ο κωδικός δεν άλλαξε. Δοκιμάστε ξανά.' },
 };
-export function passwordChangeMessage(r: PasswordChangeResult): { tone: 'ok' | 'err'; text: string } {
+export const SHARED_ADMIN_NOTICE = 'Ο λογαριασμός Admin / Back Office είναι κοινός για το γραφείο. Όταν αλλάξει ο κωδικός, ΟΛΕΣ οι άλλες συσκευές που έχουν συνδεθεί με αυτόν τον λογαριασμό αποσυνδέονται και χρειάζονται νέα σύνδεση με τον νέο κωδικό.';
+export const SHARED_ADMIN_CONFIRM = `${SHARED_ADMIN_NOTICE} Ενημερώστε πρώτα τους συναδέλφους σας. Πατήστε ξανά το κουμπί μόνο αν θέλετε να συνεχίσετε.`;
+export const SHARED_ADMIN_DONE = 'Ο κωδικός του κοινού λογαριασμού Admin άλλαξε. Παραμένετε συνδεδεμένοι σε αυτή τη συσκευή· ΟΛΕΣ οι άλλες συσκευές του γραφείου αποσυνδέθηκαν και θα χρειαστούν νέα σύνδεση με τον νέο κωδικό. Δώστε τον νέο κωδικό στους συναδέλφους με ασφαλή τρόπο (όχι σε ανοιχτό chat ή email).';
+
+/** `shared`: the shared Admin / Back Office login, where a change signs the whole office out. */
+export function passwordChangeMessage(r: PasswordChangeResult, opts: { shared?: boolean } = {}): { tone: 'ok' | 'err'; text: string } {
+  if (r.outcome === 'changed' && opts.shared) return { tone: 'ok', text: SHARED_ADMIN_DONE };
   const base = PASSWORD_CHANGE_TEXT[r.outcome];
   if (r.outcome !== 'weak' || !r.reasons?.length) return base;
   const why = r.reasons.map((x) => WEAK_REASON[x]).filter(Boolean);
@@ -146,6 +154,7 @@ export const REAUTH_TEXT: Record<ReauthOutcome, { tone: 'ok' | 'err'; text: stri
   sent: { tone: 'ok', text: 'Στείλαμε κωδικό επαλήθευσης στο email του λογαριασμού σας. Χρησιμοποιήστε το πιο πρόσφατο email (κάθε νέος κωδικός ακυρώνει τον προηγούμενο).' },
   session: { tone: 'err', text: 'Η σύνδεσή σας έληξε. Συνδεθείτε ξανά και δοκιμάστε πάλι.' },
   rate_limited: { tone: 'err', text: 'Το όριο αποστολής email έχει εξαντληθεί προσωρινά. Συνδεθείτε ξανά (χωρίς email) ή δοκιμάστε αργότερα.' },
+  undeliverable: { tone: 'err', text: 'Ο ενσωματωμένος αποστολέας email δεν μπορεί να στείλει κωδικό σε αυτή τη διεύθυνση. Δεν χρειάζεται email: αποσυνδεθείτε και συνδεθείτε ξανά, και μετά αλλάξτε τον κωδικό.' },
   network: { tone: 'err', text: 'Δεν υπάρχει σύνδεση με την υπηρεσία. Δοκιμάστε ξανά.' },
   failed: { tone: 'err', text: 'Δεν στάλθηκε κωδικός επαλήθευσης. Συνδεθείτε ξανά ή δοκιμάστε αργότερα.' },
 };

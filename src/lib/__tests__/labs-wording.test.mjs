@@ -63,13 +63,13 @@ test('pending text: admins see which update it waits for, everybody else a neutr
 });
 
 // Source scan: no string shown to users mentions a «migration» or «εκκρεμεί έγκριση».
-// Excluded on purpose: the admin-only security findings (admin-checks.ts, Ασφάλεια tab) and the unrouted legacy DashboardPage.
+// Excluded on purpose: the admin-only security findings (admin-checks.ts and security-evidence.ts, Ασφάλεια tab: they name the migrations the owner has to apply) and the unrouted legacy DashboardPage.
 test('no developer wording in user-facing strings', () => {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const files = [];
   const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) { if (f !== '__tests__') walk(p); } else if (/\.(ts|tsx)$/.test(f)) files.push(p); } };
   walk(root);
-  const skip = /[\\/](admin-checks\.ts|DashboardPage\.tsx)$/;
+  const skip = /[\\/](admin-checks\.ts|security-evidence\.ts|DashboardPage\.tsx)$/;
   const hits = [];
   for (const f of files.filter((x) => !skip.test(x))) {
     const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

@@ -28,6 +28,7 @@ import { isOpenFollowUpFor } from '@/lib/work';
 import { formatWhen } from '@/lib/work-format';
 import { stageText } from '@/lib/case-flow';
 import NavigationButton from '@/components/navigation/NavigationButton';
+import StandaloneVisitsPanel from '@/components/visits/StandaloneVisitsPanel';
 
 type Fallback = { visitId: string; message: string; reason: string };
 
@@ -188,10 +189,11 @@ export default function MyDayPage() {
 
   const sync = async () => {
     setSyncing(true);
-    const { done, failed } = await flushQueue();
+    const { done, failed, conflicts } = await flushQueue();
     setQueued(countQueue()); setSyncing(false);
     if (done) toast(`Στάλθηκαν ${done} ενέργειες.`, 'ok');
     if (failed) toast(`${failed} ενέργειες απέτυχαν και παραμένουν στην ουρά.`, 'warn');
+    if (conflicts) toast(`${conflicts} ενέργειες αφορούσαν επίσκεψη που ακυρώθηκε ή αφαιρέθηκε και δεν εφαρμόστηκαν.`, 'warn');
     void load();
   };
 
@@ -309,6 +311,9 @@ export default function MyDayPage() {
       </div>
 
       {loading && <div className="atx-panel mt-5">{[0, 1, 2].map(i => <div key={i} className="atx-skeleton" />)}</div>}
+
+      {/* Visits that do not belong to a Case (staged phase7/01): renders nothing until the SQL is applied. */}
+      {!loading && can(role, 'check_in') && <StandaloneVisitsPanel />}
 
       {sale && (
         <div className="atx-panel mt-4 grid gap-2" style={{ padding: 16 }} data-new-sale>

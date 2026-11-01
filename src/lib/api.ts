@@ -145,7 +145,7 @@ export type CaseVisit = {
   case_id: string;
   user_id: string | null;
   purpose: string;
-  status: 'planned' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'planned' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
   scheduled_at: string | null;
   started_at: string | null;
   ended_at: string | null;
@@ -871,6 +871,7 @@ export async function fetchVisits(opts?: { caseId?: string; user?: boolean }): P
     let q = supabase
       .from('case_visits')
       .select(`*, case:cases(id, case_no, title, customer:customers(id, full_name, phone))`)
+      .not('case_id', 'is', null)      // visits without a Case (staged phase7/01) are shown by the standalone-visits panel, never by this case-centred loader
       .order('created_at', { ascending: false });
     if (opts?.caseId) q = q.eq('case_id', opts.caseId);
     if (profile) q = q.eq('user_id', profile.id);

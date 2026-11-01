@@ -114,9 +114,18 @@ export function followUpRow(v: VisitLinks & { id: string }, i: FollowUpInput, ki
 /* ───────── offline queue: only what a replay needs ───────── */
 /** The payload that may be kept in the browser's offline queue: the visit id, the position and the outcome TEXT. Never a prospect's name, phone or address, never a document. */
 export function queuePayload(p: { visitId: string; lat?: number; lng?: number; accuracy?: number; notes?: string }): Record<string, unknown> {
-  const out: Record<string, unknown> = { visitId: p.visitId };
-  if (typeof p.lat === 'number' && typeof p.lng === 'number') { out.lat = p.lat; out.lng = p.lng; if (typeof p.accuracy === 'number') out.accuracy = p.accuracy; }
+  const out: Record<string, unknown> = { visitId: p.visitId };       // the shape lib/offline/sync.ts replays: { visitId, coords?, notes? }
+  if (typeof p.lat === 'number' && typeof p.lng === 'number') out.coords = { lat: p.lat, lng: p.lng, ...(typeof p.accuracy === 'number' ? { accuracy: p.accuracy } : {}) };
   if (p.notes) out.notes = p.notes.slice(0, 500);
   return out;
+}
+/** What to do with a replayed offline action, from the server's answer. The server is idempotent, so a repeat is simply done. A visit that was cancelled / marked
+ *  no-show / removed meanwhile can never succeed: it is a CONFLICT, dropped from the queue and reported, never retried forever. Anything else is retried later. */
+export type ReplayVerdict = 'done' | 'conflict' | 'retry';
+export function classifyReplay(res: { accepted?: boolean; code?: string } | null | undefined): ReplayVerdict {
+  if (!res) return 'retry';
+  if (res.accepted || res.code === 'IDEMPOTENT') return 'done';
+  if (res.code === 'NOT_OPEN' || res.code === 'NO_VISIT') return 'conflict';
+  return 'retry';
 }
 export const QUEUE_FORBIDDEN_KEYS = ['prospect', 'name', 'phone', 'email', 'address', 'file', 'document', 'storage_path'] as const;

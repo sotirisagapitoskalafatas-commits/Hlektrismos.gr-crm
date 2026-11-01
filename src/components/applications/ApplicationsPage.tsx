@@ -33,7 +33,7 @@ export default function ApplicationsPage() {
   const [editing, setEditing] = useState<WizardDraft | null>(null);
 
   const load = async () => { const ok = await applicationsAvailable(); setAvailable(ok); setRows(ok ? await listApplications() : null); };
-  useEffect(() => { void load(); }, [f.app, f.new]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [f.app, f.new]);
 
   const shown = useMemo(() => (rows ?? []).filter((r) => (FILTERS.find((x) => x.id === filter) ?? FILTERS[0]).match(r.status)), [rows, filter]);
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((x) => [x.id, (rows ?? []).filter((r) => x.match(r.status)).length])), [rows]);
@@ -50,7 +50,7 @@ export default function ApplicationsPage() {
   if (editing) return <div>{header}<ApplicationWizard initial={editing} onClose={() => { setEditing(null); void load(); }} onDone={(id) => { setEditing(null); go('applications', { app: id }); }} /></div>;
   if (f.new) {
     const init: WizardDraft = { ...emptyWizard(), ...(f.customer ? { customerId: f.customer } : {}), ...(f.lead && !f.customer ? { leadId: f.lead } : {}) };
-    return <div>{header}<ApplicationWizard initial={init} onClose={() => go('applications')} onDone={(id) => go('applications', { app: id })} /></div>;
+    return <div>{header}<ApplicationWizard initial={init} visitId={f.visit ?? null} onClose={() => go('applications')} onDone={(id) => go('applications', { app: id })} /></div>;
   }
   if (f.app) {
     return <div>{header}<ApplicationDetail id={f.app} onBack={() => go('applications')}

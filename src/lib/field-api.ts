@@ -98,6 +98,12 @@ export async function linkVisitToLead(visitId: string, leadId: string): Promise<
   const { error } = await supabase.from('case_visits').update({ lead_id: leadId }).eq('id', visitId);
   return error ? fail(error) : { ok: true };
 }
+/** A visit that led to an application points at it (the guard checks the agent owns both). Best effort: the application is valid without the link. */
+export async function linkVisitToApplication(visitId: string, applicationId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase) return NOT_AVAILABLE;
+  const { error } = await supabase.from('case_visits').update({ application_id: applicationId }).eq('id', visitId);
+  return error ? fail(error) : { ok: true };
+}
 export async function createVisitFollowUp(visit: VisitLinks & { id: string }, input: FollowUpInput, kind?: 'manager'): Promise<{ ok: boolean; error?: string }> {
   if (!supabase) return NOT_AVAILABLE;
   const { error } = await supabase.from('follow_ups').insert(followUpRow(visit, input, kind));

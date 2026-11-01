@@ -108,10 +108,19 @@ test('a follow-up needs a reason, a responsible agent and a date; without a Case
 
 test('offline queue: only the visit id, the position and the outcome text; never a prospect name, phone, address or file', () => {
   const p = V.queuePayload({ visitId: 'v', lat: 1, lng: 2, accuracy: 5, notes: 'x'.repeat(900), prospect: { name: 'Μυστικό' }, phone: '210', file: 'a.pdf', address: 'Οδός' });
-  assert.deepEqual(Object.keys(p).sort(), ['accuracy', 'lat', 'lng', 'notes', 'visitId']);
+  assert.deepEqual(Object.keys(p).sort(), ['coords', 'notes', 'visitId']); assert.deepEqual(p.coords, { lat: 1, lng: 2, accuracy: 5 });
   assert.equal(p.notes.length, 500);
   for (const k of V.QUEUE_FORBIDDEN_KEYS) assert.ok(!(k in p), k);
   assert.deepEqual(V.queuePayload({ visitId: 'v' }), { visitId: 'v' });
+});
+
+test('offline replay: a repeat is done, a visit cancelled meanwhile is a conflict (dropped and reported), anything else is retried', () => {
+  assert.equal(V.classifyReplay({ accepted: true, code: 'INSIDE_RADIUS' }), 'done');
+  assert.equal(V.classifyReplay({ accepted: true, code: 'IDEMPOTENT' }), 'done');
+  assert.equal(V.classifyReplay({ accepted: false, code: 'IDEMPOTENT' }), 'done');
+  for (const code of ['NOT_OPEN', 'NO_VISIT']) assert.equal(V.classifyReplay({ accepted: false, code }), 'conflict', code);
+  for (const code of ['OUTSIDE_RADIUS', 'GPS_UNCERTAIN', undefined]) assert.equal(V.classifyReplay({ accepted: false, code }), 'retry', String(code));
+  assert.equal(V.classifyReplay(null), 'retry');
 });
 
 test('the existing day grouping still understands every status it is given (no_show is simply closed)', () => {

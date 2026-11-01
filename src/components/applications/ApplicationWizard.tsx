@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { Check, FileUp, Plus } from 'lucide-react';
 import { createLeadSupplyPoint, createSupplyPoint, fetchCustomers, fetchLeadSupplyPoints, fetchLeads, fetchSupplyPoints, findSupplyDuplicates } from '@/lib/api';
 import type { Customer, Lead, SupplyDuplicate } from '@/lib/api';
-import { applicationDocumentUrl, fetchApplicationDocuments, fetchServiceTypes, saveApplicationDraft, submitApplication, uploadApplicationDocument } from '@/lib/field-api';
+import { applicationDocumentUrl, fetchApplicationDocuments, fetchServiceTypes, linkVisitToApplication, saveApplicationDraft, submitApplication, uploadApplicationDocument } from '@/lib/field-api';
 import {
   DEFAULT_SERVICES, STEPS, canSaveDraft, canSubmit, checkUpload, checklistFor, checklistSummary, fieldsFor, groupDocuments, stepErrors, versionLabel, wizardReducer,
 } from '@/lib/applications';
@@ -22,7 +22,7 @@ const OPEN_LEAD = (l: Lead) => !['converted', 'lost', 'unqualified', 'duplicate'
 const leadName = (l: Lead) => l.full_name || l.client_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || 'Lead';
 const supplyLine = (p: SupplyPoint, i: number) => `Παροχή ${i + 1} — ${USAGE_LABEL[p.usage]}${p.property_address ? ` · ${p.property_address}` : ''}${p.supply_number ? ` · ${p.supply_number}` : ''}`;
 
-export default function ApplicationWizard({ initial, onClose, onDone }: { initial: WizardDraft; onClose: () => void; onDone: (id: string) => void }) {
+export default function ApplicationWizard({ initial, onClose, onDone, visitId }: { initial: WizardDraft; onClose: () => void; onDone: (id: string) => void; visitId?: string | null }) {
   const { toast } = useToast();
   const [d, dispatch] = useReducer(wizardReducer, initial);
   const [busy, setBusy] = useState(false);
@@ -69,8 +69,9 @@ export default function ApplicationWizard({ initial, onClose, onDone }: { initia
     const r = await saveApplicationDraft(draft);
     if (!r.ok) { setErr(r.error); return null; }
     dispatch({ t: 'saved', id: r.id }); setSavedAt(new Date().toISOString()); setErr(null);
+    if (!draft.id && visitId) void linkVisitToApplication(visitId, r.id);     // the visit that led here points at the new application
     return r.id;
-  }, [d]);
+  }, [d, visitId]);
 
   const go = async (step: number) => {
     setErr(null);

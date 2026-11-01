@@ -72,3 +72,15 @@ test('standalone visit outcomes use one atomic RPC and offline replay preserves 
   assert.match(noComments(read('lib/offline/sync.ts')), /fieldCheckoutWithOutcome[\s\S]*outcomeKey/);
   assert.match(noComments(read('lib/field-visits.ts')), /outcomeKey/);
 });
+
+test('the offline queue retries transport errors instead of treating them as a missing visit', () => {
+  const api = noComments(read('lib/api.ts'));
+  assert.match(api, /fieldCheckoutWithOutcome[\s\S]*code: 'RPC_ERROR'/);
+  const field = noComments(read('lib/field-visits.ts'));
+  const start = field.indexOf('export function classifyReplay');
+  const end = field.indexOf('export const QUEUE_FORBIDDEN_KEYS', start);
+  const replay = field.slice(start, end);
+  assert.match(replay, /res\.code === 'NO_VISIT'/);
+  assert.match(replay, /res\.code === 'OUTCOME_CONFLICT'/);
+  assert.match(replay, /return 'retry';/);
+});

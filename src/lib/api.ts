@@ -1235,7 +1235,7 @@ export type FieldCheckinResult = {
   accepted: boolean;
   // phase4/10: every check-in is accepted; FAR_FROM_ADDRESS / NO_GPS / GPS_UNCERTAIN / NO_TARGET carry a review flag.
   // OUTSIDE_RADIUS (and accepted:false for GPS_UNCERTAIN / NO_TARGET) come only from the older live server.
-  code: 'INSIDE_RADIUS' | 'OUTSIDE_RADIUS' | 'FAR_FROM_ADDRESS' | 'NO_GPS' | 'GPS_UNCERTAIN' | 'NO_TARGET' | 'NO_VISIT' | 'IDEMPOTENT' | 'CHECKOUT' | 'OUTCOME_CONFLICT';
+  code: 'INSIDE_RADIUS' | 'OUTSIDE_RADIUS' | 'FAR_FROM_ADDRESS' | 'NO_GPS' | 'GPS_UNCERTAIN' | 'NO_TARGET' | 'NO_VISIT' | 'IDEMPOTENT' | 'CHECKOUT' | 'OUTCOME_CONFLICT' | 'RPC_ERROR';
   flag?: 'far_from_address' | 'gps_uncertain' | 'no_gps' | 'no_target' | null;
   visitId?: string;
   caseId?: string;
@@ -1300,7 +1300,7 @@ export async function fieldCheckoutWithOutcome(
   outcomeReason?: string,
   result?: string,
 ): Promise<FieldCheckinResult> {
-  if (!supabase) return { accepted: false, code: 'NO_VISIT', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
+  if (!supabase) return { accepted: false, code: 'RPC_ERROR', message: 'Η σύνδεση δεν είναι διαθέσιμη.' };
   const { data, error } = await supabase.rpc('field_checkout_with_outcome', {
     p_visit_id: visitId,
     p_lat: coords?.lat ?? null,
@@ -1311,8 +1311,8 @@ export async function fieldCheckoutWithOutcome(
     p_outcome_reason: outcomeReason ?? null,
     p_result: result ?? null,
   });
-  if (error) { logError('fieldCheckoutWithOutcome', error); return { accepted: false, code: 'NO_VISIT', message: 'Σφάλμα αποθήκευσης αποτελέσματος επίσκεψης.' }; }
-  return (data as FieldCheckinResult) ?? { accepted: false, code: 'NO_VISIT' };
+  if (error) { logError('fieldCheckoutWithOutcome', error); return { accepted: false, code: 'RPC_ERROR', message: 'Σφάλμα αποθήκευσης αποτελέσματος επίσκεψης.' }; }
+  return (data as FieldCheckinResult) ?? { accepted: false, code: 'RPC_ERROR' };
 }
 
 /* ---------------- Field Sales — travel metrics (slice 8) ---------------- */

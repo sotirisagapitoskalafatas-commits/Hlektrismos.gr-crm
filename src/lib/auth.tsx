@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { takeAuthLink } from './auth-link';
+import { NOTICE_EMAIL_CHANGED, pushAuthNotice } from './auth-notice';
 import { Role, DEFAULT_ROLE, canonicalRole } from './roles';
 import { fetchUserRoles } from './api';
 import { previewAllowed, ROLE_PREVIEW_HARD_STOP, setPreviewActive } from './role-preview';
@@ -86,7 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The e-mailed reset link signs the person in with a recovery session: send them to the choose-a-new-password page.
       if (event === 'PASSWORD_RECOVERY') window.location.hash = '/reset';
       // An invitation signs the person in with no password yet: the same page lets them choose one.
-      else if (event === 'SIGNED_IN' && takeAuthLink() === 'invite') window.location.hash = '/reset';
+      else if (event === 'SIGNED_IN') {
+        const type = takeAuthLink();
+        if (type === 'invite') window.location.hash = '/reset';
+        // The e-mail-change link signs the person in only after Supabase has accepted it: success is shown now, never earlier, and they land in the CRM.
+        else if (type === 'email_change') { pushAuthNotice(NOTICE_EMAIL_CHANGED); window.location.hash = '/app'; }
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);

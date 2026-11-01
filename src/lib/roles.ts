@@ -426,7 +426,7 @@ export type CaseAction =
 
 export const PERMS: Record<Role, CaseAction[]> = {
   admin: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'verify_document', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature', 'create_application', 'submit_provider', 'change_stage', 'assign', 'delete'],
-  sales_agent: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'change_stage', 'assign', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature'],
+  sales_agent: ['create_case', 'edit_case', 'log_call', 'log_email', 'log_sms', 'log_whatsapp', 'create_offer', 'send_offer', 'create_followup', 'complete_followup', 'add_note', 'add_document', 'change_stage', 'schedule_visit', 'check_in', 'check_out', 'photo', 'meeting', 'capture_signature'],
 };
 
 export function can(role: Role, action: CaseAction): boolean {
@@ -495,8 +495,7 @@ export type { Role as UserRole };
 /* ---------------- Timeline / team filters ---------------- */
 export const TEAM_FILTERS: { id: string; label: string }[] = [
   { id: 'all', label: 'Όλα' },
-  { id: 'inside_sales', label: 'Inside Sales' },
-  { id: 'field_sales', label: 'Field Sales' },
+  { id: 'sales_agent', label: 'Sales Agent' },
   { id: 'back_office', label: 'Back Office' },
   { id: 'system', label: 'Σύστημα' },
 ];/* ---------------- Org role predicates (Phase 1.1) ----------------

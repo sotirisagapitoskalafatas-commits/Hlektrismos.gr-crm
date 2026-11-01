@@ -8,6 +8,7 @@ import { ToastProvider } from '@/lib/toast';
 import { lazy, Suspense } from 'react';
 import { JarvisWidget } from '@/components/jarvis/JarvisWidget';
 import ConsentBanner from '@/components/ConsentBanner';
+import AuthNoticeBanner from '@/components/app/AuthNoticeBanner';
 // Each route is its own chunk: a visitor on the website does not download the CRM, and a signed-in user does not download the website.
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const LoginPage = lazy(() => import('@/components/LoginPage'));
@@ -105,6 +106,7 @@ export default function App() {
         </NavProvider>
       </AuthProvider>
       <ConsentBanner />
+      <AuthNoticeBanner />
     </DeviceProvider>
   );
 }

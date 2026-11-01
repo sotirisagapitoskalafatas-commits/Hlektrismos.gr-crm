@@ -161,6 +161,9 @@ begin
   v_app_old := case when v_ins then null else nullif(to_jsonb(old) ->> 'application_id', '')::uuid end;
 
   if v_ins then
+    if new.outcome_key is not null or new.outcome_reason is not null then
+      raise exception 'visit: structured outcomes are written only by the checkout operation' using errcode = '42501';
+    end if;
     if new.status is null then new.status := 'planned'; end if;
     if new.status <> all (v_known) then raise exception 'visit: unknown status %', new.status using errcode = '23514'; end if;
     if v_sales then
@@ -168,6 +171,9 @@ begin
       if new.status <> 'planned' then raise exception 'visit: a new visit starts as planned' using errcode = '23514'; end if;
     end if;
   else
+    if new.outcome_key is distinct from old.outcome_key or new.outcome_reason is distinct from old.outcome_reason then
+      raise exception 'visit: structured outcomes are written only by the checkout operation' using errcode = '42501';
+    end if;
     if new.user_id is distinct from old.user_id and v_sales then
       raise exception 'visit: only Admin / Back Office reassigns a visit' using errcode = '42501';
     end if;

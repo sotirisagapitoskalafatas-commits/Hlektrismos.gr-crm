@@ -50,7 +50,7 @@ Changes (staged `phase7/01_standalone_field_visits.sql`, additive, `NOT VALID` c
 
 **Follow-ups and timeline are case-bound too** (found in review, not in the brief): `follow_ups.case_id` and `timeline_events.case_id` are `NOT NULL`. A "follow-up required" outcome on a visit without a Case needs a follow-up row. So `phase7/01` also makes `follow_ups.case_id` nullable and adds `lead_id`, `customer_id`, `visit_id` (anchor check as above). Existing consumers already read `f.case?.…`; the TypeScript type is widened and every use is guarded. Events of standalone visits are written to `activity_log` against the strongest parent (lead / customer / visit), not to `timeline_events`.
 
-**Check-in / check-out RPCs.** `field_checkin` / `field_checkout` read the Case for coordinates and write `timeline_events(case_id)`. They are replaced (same signatures) by versions that: take the target point from the Case, else the visit's own `location`, else the supply point / lead / customer address; skip the `timeline_events` insert when there is no Case and log to `activity_log` instead; stay **idempotent** (a replayed offline request never creates a second check-in). The behaviour for case-bound visits is exactly that of staged `phase4/10`, so `phase7/01` **requires `phase4/10` to be applied first** and says so with a clear error otherwise.
+**Check-in / check-out RPCs.** `field_checkin` / `field_checkout` retain their existing signatures and work for visits with or without a Case: they use the Case location, else the visit location, supply point, Lead or Customer address; standalone activity goes to `activity_log` instead of the Case-bound `timeline_events`. Case-bound behaviour remains aligned with staged `phase4/10`, so `phase7/01` requires `phase4/10` first. For structured outcomes, the standalone panel uses a separate `field_checkout_with_outcome` SECURITY DEFINER transaction: it locks the visit, completes the visit and writes `outcome_key`, `outcome_reason` and result in one transaction. Same-result retries are idempotent; a different result conflicts rather than overwriting. A trigger rejects direct authenticated writes to the structured outcome columns, leaving the checkout operation as their write path.
 
 **Ownership.**
 - A Sales Agent's visit has `user_id = auth.uid()` forced by trigger; the lead / customer / case / supply point / application it links to must be the agent's own (`sales_owns_*`).
@@ -106,7 +106,7 @@ Statuses: `draft`, `submitted`, `in_review` (Under Review), `needs_documents` (W
 - **Customer 360:** the existing `CustomerDetail` gains *Αιτήσεις* and *Επισκέψεις* sections (per supply point); documents and cases keep their `supply_point_id`, so nothing from different supplies is mixed.
 - **Back Office:** the existing Διεκπεραίωση page gains a queue «Αιτήσεις & επισκέψεις»: submitted / incomplete applications, missing documents, ownership requests, manager follow-ups, visits needing attention. The Case workflow below is unchanged.
 - **Access model:** exactly two roles. The shared Admin / Back Office login cannot identify the individual employee; audit rows record `actor_id` of the shared profile and the UI never claims personal attribution.
-- **Offline:** the existing queue (check-in, check-out, photo, note) is reused; replays are idempotent server-side. Prospect names, phones and documents are **never** queued locally; creating a prospect needs a connection.
+- **Offline:** check-in and check-out are replayed through idempotent RPCs. Standalone check-out queues the controlled outcome key/reason with visit ID, position and short notes; transient RPC errors remain queued for retry, while cancelled/missing visits and conflicting outcomes are reported as conflicts. Follow-up and manager outcomes require a connection before completion, so the visit remains open when the required follow-up cannot be saved. Prospect names, phones and documents are **never** queued locally; prospect creation, Application drafts and documents remain online-only.
 - **Production safety:** merging ships code, not SQL. Every read of a new column or table is behind an availability probe (as `stageSetAvailable`), so My Day, the Map and Customer pages behave exactly as today until the owner applies the staged files.
 
 ## 6. ERD
@@ -142,7 +142,9 @@ erDiagram
 | `supabase/staged-migrations/phase7/01_standalone_field_visits.sql` | visits, follow-ups, check-in RPCs, ownership helpers, duplicate signal, ownership requests |
 | `supabase/staged-migrations/phase7/02_energy_applications.sql` | applications, service types, documents + versions, storage helpers, submit RPC |
 | `docs/ops/rollback_phase7_*.sql` | additive rollbacks |
-| `supabase/tests/field-visits-applications.test.mjs` | PGlite gate: the whole chain + phase7, four identities |
+| `supabase/tests/field-visits-standalone.test.mjs` | PGlite coverage for standalone visits, outcome atomicity, replay and ownership |
+| `supabase/tests/energy-applications.test.mjs` | PGlite coverage for Application lifecycle, documents, converted Lead submission and Case links |
+| `supabase/tests/phase7-rollback.test.mjs` | rollback and re-application checks |
 | `docs/ops/APPLY_ORDER.md`, `pending_migrations_check.sql` | steps 30–31 and probes |
 | `docs/ops/FIELD_APPLICATIONS_LIVE_CHECK.sql` | read-only introspection for the owner |
 

@@ -133,6 +133,26 @@ test('standalone check-out stores completion and structured outcome atomically; 
   assert.equal((await one("select count(*)::int n from public.field_checkins where visit_id = $1::uuid and result = 'CHECKOUT'", [v]))[0].n, 1);
 });
 
+test('authenticated users cannot bypass atomic check-out by writing structured outcomes directly', async () => {
+  const directInsert = await visitAs(A, {
+    prospect: prospect('Αποτέλεσμα απευθείας insert'),
+    outcome_key: 'no_sale',
+    outcome_reason: 'Τιμή / κόστος',
+  });
+  assert.equal(directInsert.ok, false, 'a visit insert cannot carry a pre-set outcome');
+
+  const v = (await visitAs(A, { prospect: prospect('Αποτέλεσμα απευθείας update') })).rows[0].id;
+  await as(A);
+  const directUpdate = await run(
+    "update public.case_visits set outcome_key = 'no_sale', outcome_reason = 'Τιμή / κόστος' where id = $1::uuid",
+    [v],
+  );
+  assert.equal(directUpdate.ok, false, 'structured outcomes are only persisted by the SECURITY DEFINER checkout operation');
+  await su();
+  const saved = (await one('select outcome_key, outcome_reason, status from public.case_visits where id = $1::uuid', [v]))[0];
+  assert.deepEqual([saved.outcome_key, saved.outcome_reason, saved.status], [null, null, 'planned']);
+});
+
 test('invalid structured outcome reason is rejected before the visit is completed', async () => {
   const v = (await visitAs(A, { prospect: prospect('Μη έγκυρη αιτία') })).rows[0].id;
   await as(A);

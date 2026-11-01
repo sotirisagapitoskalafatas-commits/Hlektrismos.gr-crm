@@ -6,10 +6,10 @@ Companion of [`FIELD_VISITS_AND_APPLICATIONS.md`](FIELD_VISITS_AND_APPLICATIONS.
 
 | Claim | Implemented in code | Local unit / source tests | Isolated database (PGlite) | Authenticated app | Production |
 |---|---|---|---|---|---|
-| Visits without a Case; no-show; reschedule link; reasons | yes | yes | **yes** (20 tests) | no | **no** |
+| Visits without a Case; no-show; reschedule link; reasons | yes | yes | **yes** (23 tests) | no | **no** |
 | Check-in / check-out with no Case, idempotent, NOT_OPEN | yes | yes | **yes** | no | **no** |
 | Ownership, cross-agent isolation, duplicate signal, ownership requests | yes | yes | **yes** | no | **no** |
-| Application lifecycle, drafts, versioned documents, submit → one Case | yes | yes | **yes** (17 tests + 81-pair parity) | no | **no** |
+| Application lifecycle, drafts, versioned documents, submit → one Case | yes | yes | **yes** (18 tests + 81-pair parity) | no | **no** |
 | Storage: read / write own application files only, no deletes | yes | n/a | **yes** (policy functions and `storage.objects` stand-in) | no | **no** |
 | Rollbacks keep data and are re-appliable | yes | n/a | **yes** | no | **no** |
 | Screens (wizard, visit panel, scheduler, detail, queue, Customer 360) | yes | yes (21 + 8) | n/a | **driven in a browser against an in-memory fake backend**, synthetic data; never the real signed-in app | **no** |
@@ -21,7 +21,7 @@ Nothing here is "verified in Production". The gate (`final-state-role-isolation.
 
 **F-1 (fixed in the design).** `follow_ups.case_id` and `timeline_events.case_id` are NOT NULL: a "follow-up required" outcome on a visit with no Case was impossible. `phase7/01` makes `follow_ups.case_id` nullable and anchors a follow-up to a lead, customer or visit; standalone events go to `activity_log`. `timeline_events` is deliberately left case-bound.
 
-**F-2 (fixed in the design).** `field_checkin` / `field_checkout` read the Case and write `timeline_events(case_id)`. Replaced (same signatures) with versions that work without a Case; case-bound behaviour is exactly `phase4/10`'s (a test replays it). **Consequence for the owner:** applying `phase7/01` requires `phase4/10`, i.e. the 15/10 decision that a manual check-in is always accepted and flagged; the older live geofence refusal does not return.
+**F-2 (fixed in the design and hardened in this branch).** `field_checkin` / `field_checkout` keep their existing signatures and work without a Case; standalone events go to `activity_log`, while case-bound behaviour remains aligned with `phase4/10`. Structured standalone outcomes use the separate `field_checkout_with_outcome` SECURITY DEFINER transaction: it locks the visit, performs check-out and stores the structured outcome atomically, accepts same-result retries, and refuses a different result. The guard also blocks authenticated direct inserts/updates of `outcome_key` / `outcome_reason`, so clients cannot bypass the atomic operation. Applying `phase7/01` still requires `phase4/10`; the manual check-in policy remains accepted-and-flagged, not the older geofence refusal.
 
 **F-3 (fixed in the design).** Storage access follows `case_documents` (`phase4/21`). Application files would have been unreadable to agents, or exposed if loosened. `phase7/02` extends `sales_can_read_object` / `sales_can_write_object` with an application branch (all earlier branches kept; a test calls the old branches) and adds a RESTRICTIVE delete policy: nobody signed in can delete `client_documents/applications/…` (history is evidence; `service_role` is unaffected).
 
@@ -33,6 +33,9 @@ Nothing here is "verified in Production". The gate (`final-state-role-isolation.
 
 **F-7 (found by the parity test, fixed).** The screen did not offer Back Office "withdraw" on a draft although the database allows it. The 81-pair test now keeps the screen and the guard identical in both directions.
 
+**F-8 (found during branch handover and fixed).** Submitting an Application from an already-converted Lead could reuse its Case without confirming that the Case matched the Application service and ownership, or overwrite a Case already linked to another Application. Converted-Lead Applications also needed a narrowly scoped path to select Customer-owned supply points and documents after conversion. Phase 7/02 now reuses only a matching, unclaimed Case; otherwise it creates a separate Case without changing the old Case or the Lead's conversion pointer. It uses the selected Application service, resolves converted-Lead supply ownership through the converted Case, scopes duplicate-supply repointing to this Application's linked records, and returns the original Case on a valid submission retry. Withdrawn/rejected Applications remain closed. PGlite regression tests cover the converted-Lead/document path and non-overwrite behaviour.
+
+
 ## 3. Residual risks and limitations (not hidden)
 1. **Live schema unread.** Constraint names, existing policies, the `client_documents` bucket (MIME / size limits, permissive policies are dashboard-defined) and which staged files are live are **unverified**. Run `FIELD_APPLICATIONS_LIVE_CHECK.sql`.
 2. **Guards bind direct client writes.** They test `current_user = 'authenticated'`; the SECURITY DEFINER operations (check-in, submit, request documents, ownership decision, audit) run as the owner by design. Each checks the caller (`is_staff`, `is_role('admin')`, `sales_owns_*`, or `auth.uid()`); the gate's tripwire lists none as unreviewed.
@@ -41,6 +44,6 @@ Nothing here is "verified in Production". The gate (`final-state-role-isolation.
 5. **No timeline of audit events in the UI.** `activity_log` has no permissive read policy for signed-in users (only a restrictive one), so the screens do not show an application / visit history feed; Back Office reads status, reasons and dates from the rows. Surfacing the audit needs a reviewed read function: not done.
 6. **Shared Admin login.** Audit rows record the shared profile as `actor_id`. The screens say so; no individual office employee is ever named.
 7. **NOT VALID constraints** (`case_visits_anchor`, `case_visits_prospect_shape`, `follow_ups_anchor`) protect new and updated rows only; validating them against legacy data is a separate, reviewed step.
-8. **Offline.** Only check-in, check-out (visit id, position, outcome text) are queued; a replay is idempotent and a conflict (cancelled / removed visit) is dropped and reported. Prospect creation, application drafts and documents are online-only, and nothing sensitive is stored in the browser.
-9. **Application → Case.** One primary Case is created at submission, at stage «Νέο» like every conversion; the Case stage workflow is unchanged. A re-submission after a rejection would be a new Application (the model allows several Cases per Application; no UI creates a second one).
+8. **Offline.** Check-in and standalone check-out (visit ID, position, controlled outcome/reason and short notes) are queued and replayed idempotently. Transient RPC errors retry; cancelled/missing visits and outcome conflicts are dropped and reported. Outcomes requiring a follow-up stay open while offline, since the follow-up write is online-only. Prospect creation, Application drafts and documents are online-only; sensitive identity files and prospect details are not queued.
+9. **Application → Case.** Submission creates or safely reuses one primary Case at stage «Νέο» like every conversion; only an unclaimed Case with matching service and supply can be reused. An already-claimed or mismatched converted-Lead Case is not overwritten: a separate Case is created for the new Application. Same-submission network retries return the original Case; withdrawn/rejected Applications remain terminal.
 10. **Not built:** a screen for editing the service-type list (the table is admin-editable in SQL / the Dashboard), a "ready to visit" geofence (derived from time only), photographs on visits, reassigning a visit from the UI (the database allows Admin to), and Learning Centre guides for the new screens.

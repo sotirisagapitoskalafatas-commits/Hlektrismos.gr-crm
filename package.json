@@ -21,7 +21,7 @@
   "dependencies": {
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/supabase-js": "^2.98.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "gsap": "^3.15.0",

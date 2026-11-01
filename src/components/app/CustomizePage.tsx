@@ -18,6 +18,7 @@ import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navi
 import type { NavigationApp } from '@/lib/navigation/external-maps';
 import { labsEnabled, setLabsEnabled } from '@/lib/labs';
 import ShellAvatar from '@/components/shell/ShellAvatar';
+import PasswordChangeCard from './PasswordChangeCard';
 
 export type CustomizeSection = 'profile' | 'appearance' | 'home';
 
@@ -258,6 +259,8 @@ function ProfileSection() {
           </div>
         </div>
       </Card>
+
+      <PasswordChangeCard />
     </>
   );
 }

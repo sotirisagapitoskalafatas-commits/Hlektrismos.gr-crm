@@ -11,7 +11,7 @@ import { THEMES } from '@/lib/theme';
 import { HOME_EDIT_FLAG } from '@/lib/home-widgets';
 import { usePreferences } from '@/lib/preferences';
 import { supabase } from '@/lib/supabase';
-import { EMAIL_CHANGE_TEXT, readIdentity, requestEmailChange } from '@/lib/email-change';
+import { emailChangeMessage, planEmailChange, readIdentity, resendEmailChange, startEmailChange } from '@/lib/email-change';
 import { checkAvatarFile, cropToAvatarBlob, forgetAvatar, removeAvatar, uploadAvatar } from '@/lib/avatar';
 import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
 import type { NavigationApp } from '@/lib/navigation/external-maps';
@@ -51,6 +51,11 @@ function EmailChangeCard({ current }: { current: string }) {
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  // The wait the server itself named (never invented); the button is off until then. Ticks once a second only while it runs.
+  const [waitUntil, setWaitUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const inFlight = useRef(false);
   // What the Auth server says right now: the ACTIVE address, and a change that still waits for confirmation (never shown as active).
   const [identity, setIdentity] = useState<{ email: string; pendingEmail: string | null } | null>(null);
   const { refreshProfile } = useAuth();
@@ -75,14 +80,25 @@ function EmailChangeCard({ current }: { current: string }) {
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); };
   }, [reread]);
 
+  const pending = identity?.pendingEmail ?? null;
+  const plan = planEmailChange(pending, next);
+  const waiting = waitUntil !== null && now < waitUntil;
+  useEffect(() => {
+    if (waitUntil === null) return;
+    const id = window.setInterval(() => { const t = Date.now(); setNow(t); if (t >= waitUntil) { setWaitUntil(null); window.clearInterval(id); } }, 1000);
+    return () => window.clearInterval(id);
+  }, [waitUntil]);
+
   const submit = async () => {
-    setMsg(null);
-    if (!supabase) return;
-    setBusy(true);
-    const outcome = await requestEmailChange(supabase.auth, activeEmail, next);
-    setBusy(false);
-    setMsg(EMAIL_CHANGE_TEXT[outcome]);
-    if (outcome === 'pending') { setNext(''); void reread(); }
+    if (!supabase || inFlight.current || waiting) return; // one request at a time, and none while the server's own wait is running
+    // A different address while one is pending REPLACES it: say so once and ask for a second click.
+    if (plan === 'replace' && !confirmReplace) { setConfirmReplace(true); setMsg({ tone: 'err', text: `Υπάρχει εκκρεμές αίτημα προς ${pending}. Η νέα διεύθυνση θα το αντικαταστήσει και θα σταλούν νέα email. Πατήστε ξανά για να συνεχίσετε.` }); return; }
+    inFlight.current = true; setConfirmReplace(false); setMsg(null); setBusy(true);
+    const result = plan === 'resend' ? await resendEmailChange(supabase.auth, activeEmail) : await startEmailChange(supabase.auth, activeEmail, next);
+    inFlight.current = false; setBusy(false);
+    setMsg(emailChangeMessage(result));
+    if (result.retryAfter) { const t = Date.now(); setNow(t); setWaitUntil(t + result.retryAfter * 1000); }
+    if (result.outcome === 'pending' || result.outcome === 'resent') { setNext(''); void reread(); }
   };
   return (
     <Card>
@@ -95,8 +111,8 @@ function EmailChangeCard({ current }: { current: string }) {
       )}
       <p className="text-xs text-ink/55 mb-3">Για παράδοση στο επίσημο email της εταιρείας. Ο λογαριασμός, το ιστορικό και οι αναθέσεις παραμένουν ίδια: αλλάζει μόνο η διεύθυνση σύνδεσης. Θα σταλεί email επιβεβαίωσης και η αλλαγή ισχύει μόνο μετά την επιβεβαίωση.</p>
       <div className="flex flex-col sm:flex-row gap-2">
-        <input type="email" className="field flex-1" value={next} onChange={(e) => setNext(e.target.value)} placeholder="νέο.email@εταιρεία.gr" aria-label="Νέο email" autoComplete="off" />
-        <Btn onClick={() => void submit()} disabled={busy || !next.trim()}>{busy ? 'Αποστολή…' : 'Αποστολή επιβεβαίωσης'}</Btn>
+        <input type="email" className="field flex-1" value={next} onChange={(e) => { setNext(e.target.value); setConfirmReplace(false); }} placeholder="νέο.email@εταιρεία.gr" aria-label="Νέο email" autoComplete="off" />
+        <Btn onClick={() => void submit()} disabled={busy || waiting || (plan !== 'resend' && !next.trim())}>{busy ? 'Αποστολή…' : waiting && waitUntil ? `Περιμένετε ${Math.max(1, Math.ceil((waitUntil - now) / 1000))}δ` : plan === 'resend' ? 'Επαναποστολή επιβεβαίωσης' : plan === 'replace' ? 'Αντικατάσταση αιτήματος' : 'Αποστολή επιβεβαίωσης'}</Btn>
       </div>
       <p className={`text-xs mt-2 ${msg?.tone === 'err' ? 'text-bad-600' : 'text-ink/60'}`} role="status">{msg?.text ?? ''}</p>
     </Card>

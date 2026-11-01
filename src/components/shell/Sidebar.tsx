@@ -23,7 +23,7 @@ function Item({ item, page, counts, compact, onGo }: { item: ModuleItem; page: A
   const active = item.pages.includes(page);
   const n = item.badge ? counts[item.badge] : 0;
   return (
-    <button className="shell-item" aria-current={active ? 'page' : undefined} onClick={() => onGo(item.page)}
+    <button className="shell-item" data-tour={`nav:${item.key}`} aria-current={active ? 'page' : undefined} onClick={() => onGo(item.page)}
       title={compact ? item.label : undefined} aria-label={compact ? item.label : undefined}>
       <span className="shell-item__tile"><item.icon className="w-[18px] h-[18px]" strokeWidth={STROKE} aria-hidden="true" /></span>
       <span className="shell-item__text">{item.label}</span>

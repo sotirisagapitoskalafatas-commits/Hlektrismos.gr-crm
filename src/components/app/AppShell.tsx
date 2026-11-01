@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import TourHost from '@/components/guide/TourHost';
+import PageIntro from '@/components/guide/PageIntro';
 import { preferencesStore } from '@/lib/preferences';
 import { useDeviceContext } from '@/lib/device-context';
 import { useNav } from '@/lib/nav';
@@ -45,11 +47,12 @@ const MyDayPage = lazy(() => import('./MyDayPage'));
 const MapPage = lazy(() => import('./MapPage'));
 const BackOfficePage = lazy(() => import('./BackOfficePage'));
 const FieldModePage = lazy(() => import('@/components/field-sales/FieldModePage'));
+const GuidePage = lazy(() => import('@/components/guide/GuidePage'));
 
 /* The shell chrome lives in components/shell (TopBar, Sidebar, ModuleMap). This file composes it with the page body
    and the ⌘K palette. Every page draws its own visible title; the ones below draw an H1 themselves, and for the
    rest the shell adds a visually hidden H1 so each screen still has exactly one top-level heading. */
-const OWN_HEADING = new Set<string>(['admin', 'cases', 'leads', 'account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting']);
+const OWN_HEADING = new Set<string>(['admin', 'cases', 'leads', 'account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting', 'guide']);
 
 /* ---------------- ⌘K palette + global search ---------------- */
 function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -275,6 +278,7 @@ export default function AppShell() {
       case 'admin': return <SettingsPage />;
       case 'automations': return <AutomationBuilderPage />;
       case 'aiworkforce': return <AIWorkforcePage />;
+      case 'guide': return <GuidePage />;
       default: return <HomePage />;
     }
   })();
@@ -299,7 +303,8 @@ export default function AppShell() {
         <Sidebar module={sidebarModule} page={labsBlocked ? 'home' : view.page} counts={counts} mode={mode}
           onToggleCompact={desktop ? toggleCompact : undefined} />
         <main className={`shell-main ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+84px)]' : ''}`}>
-          <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein">
+          <div key={view.page === 'case' ? `case-${view.caseId}` : view.page} className="animate-fadein" data-tour="page">
+            {!pageDenied && <PageIntro />}
             {!ownHeading && <h1 className="sr-only">{PAGE_TITLES[view.page as PageKey] ?? 'ATLAS'}</h1>}
             <Suspense fallback={<div className="flex items-center justify-center py-24"><Spinner /></div>}>
               {body}
@@ -310,6 +315,7 @@ export default function AppShell() {
       {isMobile && <MobileShell current={view.page} counts={counts} />}
       <Palette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <CrmAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      <TourHost />
     </div>
   );
 }

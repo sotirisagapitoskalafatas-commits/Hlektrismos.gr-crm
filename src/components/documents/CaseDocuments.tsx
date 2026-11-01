@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Check, FileText, FolderOpen, Globe, Plus, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import HelpTip from '@/components/guide/HelpTip';
 import { can, DOC_STATUSES } from '@/lib/roles';
 import { addDocument, fetchDocuments, getDocumentUrl, getLeadFileUrl, setDocumentStatus, uploadDocumentFile } from '@/lib/api';
 import { fileSizeText, leadFileRef, unfiledLeadFiles } from '@/lib/lead-files';
@@ -184,6 +185,7 @@ export default function CaseDocuments({ c, onChanged, leadFiles = [] }: { c: Cas
       </Card>
 
       <Modal open={picker.open} onClose={closePicker} title={picker.fromLead ? `Τι έγγραφο είναι το «${picker.fromLead.name}»;` : 'Τι έγγραφο ανεβάζετε;'} micro={picker.fromLead ? 'Αρχείο από την ιστοσελίδα' : 'Βήμα 1 από 2'} wide>
+        <div className="flex items-center text-xs text-ink/55 mb-2">Επιλέξτε τον τύπο του εγγράφου<HelpTip id="doc-type" /></div>
         <div className="space-y-4 max-h-[52vh] overflow-y-auto pr-1" role="radiogroup" aria-label="Τύπος εγγράφου">
           {groups.map(([g, types]) => (
             <div key={g}>

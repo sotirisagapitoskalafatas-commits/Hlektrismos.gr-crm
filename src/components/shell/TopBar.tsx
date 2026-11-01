@@ -3,7 +3,7 @@
 // PWA install, role preview switcher), in the v2 layout.
 import { useEffect, useRef, useState } from 'react';
 import {
-  Bell, ChevronDown, CircleHelp, Download, LogOut, Search, Settings, SlidersHorizontal, Sparkles, UserCircle, Zap,
+  BookOpen, Bell, ChevronDown, CircleHelp, Download, LogOut, Search, Settings, SlidersHorizontal, Sparkles, UserCircle, Zap,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
@@ -85,7 +85,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
 
       <nav className="shell-seg" aria-label="Ενότητες">
         {modules.map((m) => (
-          <button key={m.id} className="shell-seg__link" aria-current={m.id === activeId ? 'page' : undefined}
+          <button key={m.id} className="shell-seg__link" data-tour={`topbar:module:${m.id}`} aria-current={m.id === activeId ? 'page' : undefined}
             onClick={() => go(firstPage(m))}>
             {m.label}
           </button>
@@ -94,7 +94,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
 
       <div className="shell-spacer" />
 
-      <button className="shell-search" onClick={onOpenPalette} aria-label="Αναζήτηση (⌘K)">
+      <button className="shell-search" data-tour="topbar:search" onClick={onOpenPalette} aria-label="Αναζήτηση (⌘K)">
         <Search className="w-4 h-4 shrink-0" strokeWidth={STROKE} aria-hidden="true" />
         <span className="truncate">Αναζήτηση…</span>
         <kbd className="shell-kbd">⌘K</kbd>
@@ -102,7 +102,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
 
       <QuickAdd />
 
-      <button className="shell-icon" onClick={onOpenAssistant} title="Atlas AI — βοηθός CRM" aria-label="Atlas AI βοηθός">
+      <button className="shell-icon" data-tour="topbar:assistant" onClick={onOpenAssistant} title="Atlas AI — βοηθός CRM" aria-label="Atlas AI βοηθός">
         <Sparkles className="w-[19px] h-[19px]" strokeWidth={STROKE} aria-hidden="true" />
       </button>
 
@@ -113,7 +113,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
       )}
 
       <div className="relative">
-        <button ref={bellRef} className="shell-icon" onClick={toggleNotifs} title="Ειδοποιήσεις" aria-label={unread > 0 ? `Ειδοποιήσεις, ${unread} νέες` : 'Ειδοποιήσεις'}
+        <button ref={bellRef} className="shell-icon" data-tour="topbar:bell" onClick={toggleNotifs} title="Ειδοποιήσεις" aria-label={unread > 0 ? `Ειδοποιήσεις, ${unread} νέες` : 'Ειδοποιήσεις'}
           aria-haspopup="dialog" aria-expanded={open === 'notifs'}>
           <Bell className="w-[19px] h-[19px]" strokeWidth={STROKE} aria-hidden="true" />
           {unread > 0 && <span className="shell-dot" aria-hidden="true" />}
@@ -149,12 +149,16 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
         )}
       </div>
 
+      <button className="shell-icon" data-tour="topbar:guide" onClick={() => go('guide')} title="Οδηγός ATLAS" aria-label="Οδηγός ATLAS">
+        <BookOpen className="w-[19px] h-[19px]" strokeWidth={STROKE} aria-hidden="true" />
+      </button>
+
       <button className="shell-icon shell-hide-narrow" onClick={() => go('preferences')} title="Προσαρμογή CRM" aria-label="Προσαρμογή CRM">
         <SlidersHorizontal className="w-[19px] h-[19px]" strokeWidth={STROKE} aria-hidden="true" />
       </button>
 
       <div className="relative">
-        <button ref={acctRef} className="shell-user" onClick={() => setOpen(open === 'acct' ? null : 'acct')}
+        <button ref={acctRef} className="shell-user" data-tour="topbar:account" onClick={() => setOpen(open === 'acct' ? null : 'acct')}
           aria-haspopup="menu" aria-expanded={open === 'acct'} aria-label="Λογαριασμός">
           <ShellAvatar name={profile?.full_name} path={profile?.avatar_url} />
           <span className="shell-user__text text-left">
@@ -190,6 +194,9 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
                   <Settings className="w-4 h-4" strokeWidth={STROKE} aria-hidden="true" /> Διαχείριση
                 </button>
               )}
+              <button role="menuitem" className="shell-menu__item" onClick={() => goAndClose(() => go('guide'))}>
+                <BookOpen className="w-4 h-4" strokeWidth={STROKE} aria-hidden="true" /> Οδηγός ATLAS
+              </button>
               <button role="menuitem" className="shell-menu__item" onClick={() => goAndClose(() => { window.location.hash = '/faq'; })}>
                 <CircleHelp className="w-4 h-4" strokeWidth={STROKE} aria-hidden="true" /> Κέντρο βοήθειας
               </button>

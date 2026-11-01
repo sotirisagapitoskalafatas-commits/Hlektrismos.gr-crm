@@ -43,7 +43,7 @@ const LAYOUT: LayoutModule[] = [
 
 const SETTINGS_LAYOUT: LayoutModule = {
   id: 'settings', label: 'Ο λογαριασμός μου', groups: [
-    { keys: ['account', 'preferences', 'homelayout'] },
+    { keys: ['account', 'preferences', 'homelayout', 'guide'] },
     { label: 'Μόνο για διαχειριστές', keys: ['settings'] },
   ],
 };

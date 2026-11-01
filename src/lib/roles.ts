@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Building2, Bot, Map as MapIcon, Compass, Briefcase,
   CalendarDays, Gauge, Settings, Home, ChevronRight, Bell, Plus, Search,
   UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
-  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar, Boxes,
+  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar, Boxes, BookOpen,
 } from 'lucide-react';
 import { labsVisible } from './labs';
 import { DOC_STATUS_TEXT } from './status-text';
@@ -207,7 +207,7 @@ export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
   | 'home' | 'mywork' | 'leads' | 'prospecting' | 'providers' | 'cases' | 'followups' | 'customers'
   | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
-  | 'automations' | 'aiworkforce' | 'account' | 'preferences' | 'homelayout';
+  | 'automations' | 'aiworkforce' | 'account' | 'preferences' | 'homelayout' | 'guide';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice' | 'cases' | 'customers';
 
@@ -336,6 +336,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { key: 'preferences', label: 'Προτιμήσεις', icon: SlidersHorizontal, page: 'preferences', roles: ALL, maturity: 'live' },
       { key: 'homelayout', label: 'Αρχική σελίδα', icon: LayoutDashboard, page: 'homelayout', roles: ALL, maturity: 'live' },
       { key: 'account', label: 'Λογαριασμός', icon: UserCircle, page: 'account', roles: ALL, maturity: 'live' },
+      { key: 'guide', label: 'Οδηγός ATLAS', icon: BookOpen, page: 'guide', roles: ALL, maturity: 'live' },
       { key: 'settings', label: 'Διαχείριση', icon: Settings, page: 'admin', roles: ['admin'], maturity: 'live' },
     ],
   },
@@ -406,6 +407,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   account: 'Λογαριασμός',
   preferences: 'Προτιμήσεις',
   homelayout: 'Αρχική σελίδα',
+  guide: 'Οδηγός ATLAS',
 };
 
 export const MATURITY_LABEL: Record<ModuleMaturity, { label: string; dot: string }> = {

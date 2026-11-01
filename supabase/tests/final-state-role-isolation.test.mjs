@@ -8,11 +8,15 @@ import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { replayMigrations, applyStaged, STAGE1_FILES, identity, attempt, readRepo } from './helpers/replay-migrations.mjs';
 
-// docs/ops/APPLY_ORDER.md, in order, ending with the two-role conversion (6/25), the single active Admin (6/26) and write-only credentials (6/27).
-const BEFORE_ROLES = [...STAGE1_FILES, 'phase2/05_staff_admin_and_role_preview', 'phase6/21_two_role_model', 'phase2/06_trash_leads_customers', 'phase1/02_outreach_decisions_audit',
-  'phase3/08_b2b_prospects_review_distribution', 'phase3/09_contact_eligibility', 'phase3/11_contact_service_requests', 'phase1/21b_function_rate_limits', 'phase1/21c_lead_webhook_idempotency',
-  'phase3/10_offer_lifecycle', 'phase2/07a_document_checklist_and_return', 'phase2/07b_case_stage_guard_and_set_stage', 'phase4/14_follow_up_kind', 'phase4/18_sales_own_records_scope', 'phase4/21_sales_isolation_completion'];
-const FINAL = ['phase6/25_exact_two_roles', 'phase6/26_single_active_admin', 'phase6/27_credentials_write_only'];
+// Production BEFORE the rollout: docs/ops/APPLY_ORDER.md, «Corrections found on 30 Oct 2026», says these are already live (phase1/20 applied on 30 Oct).
+const ALREADY_LIVE = ['phase1/20_crm_integrations_emergency_hotfix', 'phase1/03_drop_exec_sql', 'phase5/17_customer_supply_points', 'phase5/18_lead_supply_points'];
+// The rollout, in the order of docs/ops/APPLY_ORDER.md (steps 0b, 0c, 1, 2, 2b, 2c, 2d, 2e, 3, 25, 5, 8, 9, 10, 16, 17, 18, 18b, 18c, 22, 22b, 27, 28, 29).
+// Files the document lists but this gate does not need (cron, import, saved routes, preferences …) are left out; a test below proves the order is the document's.
+const ROLLOUT = ['phase1/21b_function_rate_limits', 'phase1/21c_lead_webhook_idempotency', ...STAGE1_FILES, 'phase2/05_staff_admin_and_role_preview', 'phase6/21_two_role_model',
+  'phase1/02_outreach_decisions_audit', 'phase2/06_trash_leads_customers', 'phase2/07a_document_checklist_and_return', 'phase2/07b_case_stage_guard_and_set_stage', 'phase4/14_follow_up_kind',
+  'phase3/08_b2b_prospects_review_distribution', 'phase3/09_contact_eligibility', 'phase3/10_offer_lifecycle', 'phase3/11_contact_service_requests', 'phase4/18_sales_own_records_scope', 'phase4/21_sales_isolation_completion'];
+const BEFORE_ROLES = [...ALREADY_LIVE, ...ROLLOUT];
+const FINAL = ['phase6/25_exact_two_roles', 'phase6/26_single_active_admin', 'phase6/27_credentials_write_only']; // steps 27, 28, 29
 
 const U = (n) => `cccccccc-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const ADMIN = U(1), A = U(2), B = U(3), NEWBIE = U(9);
@@ -71,6 +75,21 @@ test('the chain ends in exactly two roles, one active Admin, and the guard in pl
   assert.deepEqual(Object.keys(r).sort(), ['admin', 'sales_agent'], 'no manager, back_office, inside_sales or field_sales is left');
   assert.equal(r.admin, 1);
   assert.equal((await one("select count(*)::int n from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_guard_privileged' and not tgisinternal"))[0].n, 1);
+});
+
+test('the chain is the order of docs/ops/APPLY_ORDER.md, not an improvised one', () => {
+  const doc = readRepo('docs/ops/APPLY_ORDER.md');
+  const order = [...doc.matchAll(/^## [0-9a-z]+\. `((?:phase\d)\/[a-z0-9_]+)\.sql`/gm)].map((m) => m[1]);
+  assert.ok(order.length >= 28, `parsed ${order.length} steps from the document`);
+  // The document's own correction (30 Oct): phase6/21 is applied immediately after phase2/05 (step 3), not at its numbered place.
+  const pos = (f) => (f === 'phase6/21_two_role_model' ? order.indexOf('phase2/05_staff_admin_and_role_preview') + 0.5 : order.indexOf(f));
+  const chain = [...ROLLOUT, ...FINAL];
+  assert.deepEqual(chain.filter((f) => pos(f) < 0), [], 'every file of the chain is a step of the document');
+  const positions = chain.map(pos);
+  assert.deepEqual(positions, [...positions].sort((x, y) => x - y), 'the files are applied in the document order');
+  assert.match(doc, /Apply 25 \*\*immediately after step 3\*\*/, 'the correction the order relies on is still in the document');
+  for (const f of ['phase1/03_drop_exec_sql', 'phase5/17_customer_supply_points', 'phase5/18_lead_supply_points']) assert.ok(doc.includes('`' + f + '`') && /Already live on production/.test(doc), `${f} is documented as already live`);
+  assert.match(doc, /phase1\/20_crm_integrations_emergency_hotfix.sql`[^\n]*APPLIED to production 30 Oct 2026/);
 });
 
 /* ───────── 1. nobody promotes themselves, or anyone, by any route ───────── */

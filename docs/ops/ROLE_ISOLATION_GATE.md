@@ -1,8 +1,10 @@
 # Role isolation gate (LOCAL evidence for the two-role model)
 
-`node --test supabase/tests/final-state-role-isolation.test.mjs` (22 tests, about 25 s).
+> **This is a test and documentation gate. It applies NO database fix.** The fixes are the staged SQL files listed in [`SECURITY_REMEDIATION_CHECKLIST.md`](SECURITY_REMEDIATION_CHECKLIST.md), in the order of [`APPLY_ORDER.md`](APPLY_ORDER.md). **Passing tests do not mean Production is protected**: they prove the staged files work on embedded Postgres, not what the live database contains.
 
-**What it is.** The repository's own `supabase/migrations/` plus the STAGED files in the documented apply order (`APPLY_ORDER.md`), ending in the **final** two-role state:
+`node --test supabase/tests/final-state-role-isolation.test.mjs` (23 tests, about 25 s).
+
+**What it is.** The repository's own `supabase/migrations/` plus the STAGED files in the order of `APPLY_ORDER.md` (a test fails if it drifts from that document), ending in the **final** two-role state:
 `phase6/21` (two account types) → `phase4/18` + `phase4/21` (Sales Agents see only their own records) → `phase6/25` (exactly `admin` / `sales_agent`) → `phase6/26` (one active Admin) → `phase6/27` (credentials write-only).
 It runs on embedded Postgres (PGlite) and is exercised from **four separate sessions**: the Admin, Sales Agent A, Sales Agent B and an anonymous visitor. Anonymous denial alone proves nothing about isolation between signed-in users, so none of the checks rely on it.
 
@@ -24,7 +26,7 @@ It runs on embedded Postgres (PGlite) and is exercised from **four separate sess
 ## Negative control (why a passing gate means something)
 The same attacks run against `supabase/migrations/` alone, which is what auto-applies today. They **succeed**: an `inside_sales` user turns themselves into `admin` with one UPDATE (migration `20260910103000`, line 586), an agent reads colleagues' leads, and the Admin session reads the raw `SERPAPI_API_KEY`. Six deliberate regressions (re-opening line 586; re-granting the column privilege; removing every profile guard layer; opening `crm_settings`; opening `leads`; adding an unguarded definer function) each fail the gate.
 
-## Where the fixes live (all STAGED, none applied by Claude Code)
+## Where the fixes live (all STAGED, none applied by Claude Code; step numbers are those of `APPLY_ORDER.md`)
 | Finding | File | Note |
 |---|---|---|
 | Self-promotion (migration `20260910103000:586`) | `phase1/18_live_api_privilege_hardening.sql` (guard trigger, column privileges, hardened policy), restated by `phase2/05` and `phase6/21` | `phase1/18` is step 4 of the core sequence. |

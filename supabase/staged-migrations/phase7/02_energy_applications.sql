@@ -125,7 +125,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_sales boolean;
-  v_sc uuid; v_sl uuid;
+  v_sc uuid; v_sl uuid; v_converted_customer uuid;
   v_ok boolean;
   v_open text[] := array['draft', 'needs_documents'];
 begin
@@ -189,10 +189,20 @@ begin
   if new.service_type_code is not null and not exists (select 1 from public.application_service_types t where t.code = new.service_type_code and (t.active or (tg_op = 'UPDATE' and new.service_type_code is not distinct from old.service_type_code))) then
     raise exception 'application: unknown or inactive service type %', new.service_type_code using errcode = '23514';
   end if;
-  if new.supply_point_id is not null and (tg_op = 'INSERT' or new.supply_point_id is distinct from old.supply_point_id) then
+  if new.supply_point_id is not null and (tg_op = 'INSERT' or new.supply_point_id is distinct from old.supply_point_id
+      or new.customer_id is distinct from old.customer_id or new.lead_id is distinct from old.lead_id) then
     select s.customer_id, s.lead_id into v_sc, v_sl from public.customer_supply_points s where s.id = new.supply_point_id;
     if not found then raise exception 'application: the supply point does not exist or is not visible to you' using errcode = '23514'; end if;
-    if not ((v_sc is not null and v_sc is not distinct from new.customer_id) or (v_sl is not null and v_sl is not distinct from new.lead_id)) then
+    v_converted_customer := null;
+    if new.lead_id is not null then
+      select c.customer_id into v_converted_customer
+        from public.leads l join public.cases c on c.id = l.converted_case_id
+       where l.id = new.lead_id;
+    end if;
+    if not ((v_sc is not null and v_sc is not distinct from new.customer_id)
+        or (v_sl is not null and v_sl is not distinct from new.lead_id)
+        or (v_converted_customer is not null and v_sc = v_converted_customer
+            and (new.customer_id is null or new.customer_id = v_converted_customer))) then
       raise exception 'application: the supply point belongs to another customer or lead' using errcode = '23514';
     end if;
     if v_sales then
@@ -291,7 +301,18 @@ begin
   if nullif(btrim(coalesce(p_doc_type, '')), '') is null then raise exception 'document: the document type is required' using errcode = '22023'; end if;
   if p_storage_path is null or p_storage_path not like 'applications/' || a.id::text || '/%' then raise exception 'document: the file must be stored under applications/<application>/' using errcode = '22023'; end if;
   if p_supply is not null and p_supply is distinct from a.supply_point_id then
-    if not exists (select 1 from public.customer_supply_points s where s.id = p_supply and ((s.customer_id is not null and s.customer_id = a.customer_id) or (s.lead_id is not null and s.lead_id = a.lead_id))) then
+    if not exists (
+      select 1 from public.customer_supply_points s
+       where s.id = p_supply
+         and (
+           (s.customer_id is not null and s.customer_id = a.customer_id)
+           or (s.lead_id is not null and s.lead_id = a.lead_id)
+           or exists (
+             select 1 from public.leads l join public.cases c on c.id = l.converted_case_id
+              where l.id = a.lead_id and c.customer_id = s.customer_id and s.customer_id is not null
+           )
+         )
+    ) then
       raise exception 'document: the supply point does not belong to this application''s customer' using errcode = '23514';
     end if;
   end if;
@@ -391,58 +412,119 @@ create policy "application files are not deleted (restrictive)" on storage.objec
 -- ───────────────────────── operations ─────────────────────────
 create or replace function public.submit_energy_application(p_id uuid)
 returns jsonb language plpgsql security definer set search_path = public
-as $$
+as $
 declare
   a public.energy_applications%rowtype;
+  v_lead public.leads%rowtype;
+  v_existing_case public.cases%rowtype;
   v_sales boolean := coalesce(public.is_sales_agent(), false);
-  v_case uuid; v_customer uuid; v_lead public.leads%rowtype;
-  v_service text; v_title text; v_assignee uuid; v_new_sp uuid; v_case_sp uuid;
-  v_docs integer;
+  v_case uuid; v_customer uuid; v_service text; v_title text; v_assignee uuid;
+  v_target_sp uuid; v_case_supply uuid; v_docs integer;
+  v_fresh_conversion boolean := false;
 begin
   if not public.is_staff() then raise exception 'application: staff only' using errcode = '42501'; end if;
   select * into a from public.energy_applications where id = p_id for update;
   if a.id is null then raise exception 'application: not found' using errcode = 'P0002'; end if;
   if v_sales and not public.sales_owns_entity('application', a.id) then raise exception 'application: not yours' using errcode = '42501'; end if;
-  if a.status <> 'draft' then raise exception 'application: only a draft is submitted (it is %)', a.status using errcode = '23514'; end if;
+
+  -- Network retries return the original submission; they do not create or attach another Case.
+  if a.status <> 'draft' then
+    if a.submitted_at is not null and a.primary_case_id is not null
+       and exists (select 1 from public.cases c where c.id = a.primary_case_id and c.application_id = a.id) then
+      return jsonb_build_object('application_id', a.id, 'application_no', a.application_no, 'case_id', a.primary_case_id,
+        'customer_id', a.customer_id, 'status', a.status, 'idempotent', true);
+    end if;
+    raise exception 'application: only a draft is submitted (it is %)', a.status using errcode = '23514';
+  end if;
   if a.supply_point_id is null then raise exception 'Επιλέξτε την παροχή της αίτησης πριν την υποβολή.' using errcode = '23514'; end if;
   if a.service_type_code is null then raise exception 'Επιλέξτε την υπηρεσία της αίτησης πριν την υποβολή.' using errcode = '23514'; end if;
 
+  v_service := a.service_type_code;
   v_customer := a.customer_id;
-  if v_customer is null then
-    select * into v_lead from public.leads where id = a.lead_id;
-    if v_lead.converted_case_id is not null then
-      v_case := v_lead.converted_case_id;
-    else
-      v_case := public.convert_lead_to_case(a.lead_id);       -- the existing conversion: customer + case, supply rows moved by the phase5/18 trigger
+  v_target_sp := a.supply_point_id;
+
+  if a.lead_id is not null then
+    select * into v_lead from public.leads where id = a.lead_id for update;
+    if v_lead.id is null then raise exception 'application: lead not found' using errcode = 'P0002'; end if;
+    if v_lead.converted_case_id is null then
+      v_case := public.convert_lead_to_case(a.lead_id);
+      v_fresh_conversion := true;
+      select * into v_lead from public.leads where id = a.lead_id;
     end if;
-    select customer_id into v_customer from public.cases where id = v_case;
-    -- phase5/18 duplicate branch: the supply row stayed on the lead and the case was linked to the customer's existing connection.
-    select supply_point_id into v_case_sp from public.cases where id = v_case;
-    if v_case_sp is not null and v_case_sp is distinct from a.supply_point_id
-       and exists (select 1 from public.customer_supply_points s where s.id = a.supply_point_id and s.customer_id is null) then
-      v_new_sp := v_case_sp;
-      update public.energy_applications set supply_point_id = v_new_sp where id = a.id;
-      update public.case_visits set supply_point_id = v_new_sp where supply_point_id = a.supply_point_id;
-      update public.application_documents set supply_point_id = v_new_sp where supply_point_id = a.supply_point_id and application_id = a.id;
+    if v_lead.converted_case_id is null then raise exception 'application: the Lead has no converted Case' using errcode = '23514'; end if;
+
+    select * into v_existing_case from public.cases where id = v_lead.converted_case_id for update;
+    if v_existing_case.id is null then raise exception 'application: the converted Case no longer exists' using errcode = '23514'; end if;
+    if v_customer is not null and v_customer is distinct from v_existing_case.customer_id then
+      raise exception 'application: the selected Customer does not match the converted Lead' using errcode = '23514';
+    end if;
+    v_customer := v_existing_case.customer_id;
+    if v_customer is null then raise exception 'application: the converted Case has no Customer' using errcode = '23514'; end if;
+
+    -- phase5/18 duplicate branch: repoint only this Application and its linked visit/documents.
+    if v_existing_case.supply_point_id is not null
+       and v_existing_case.supply_point_id is distinct from a.supply_point_id
+       and exists (select 1 from public.customer_supply_points s where s.id = a.supply_point_id and s.lead_id = a.lead_id and s.customer_id is null)
+       and exists (select 1 from public.customer_supply_points s where s.id = v_existing_case.supply_point_id and s.customer_id = v_customer) then
+      v_target_sp := v_existing_case.supply_point_id;
+      update public.energy_applications set supply_point_id = v_target_sp where id = a.id;
+      update public.case_visits set supply_point_id = v_target_sp
+       where application_id = a.id and supply_point_id = a.supply_point_id;
+      update public.application_documents set supply_point_id = v_target_sp
+       where application_id = a.id and supply_point_id = a.supply_point_id;
       insert into public.activity_log (entity_type, entity_id, action, details)
-      values ('application', a.id, 'application_supply_repointed', jsonb_build_object('actor_id', auth.uid(), 'from', a.supply_point_id, 'to', v_new_sp));
+      values ('application', a.id, 'application_supply_repointed', jsonb_build_object('actor_id', auth.uid(), 'from', a.supply_point_id, 'to', v_target_sp));
+    end if;
+
+    update public.application_documents set customer_id = v_customer where application_id = a.id and customer_id is null;
+    update public.case_visits set customer_id = v_customer where application_id = a.id and customer_id is null;
+
+    if v_fresh_conversion then
+      -- The existing conversion created this Case for this Application: use the selected service code.
+      v_case := v_existing_case.id;
+      update public.cases set service_type = v_service
+       where id = v_case and lead_id = a.lead_id and application_id is null;
+    elsif v_existing_case.application_id is null
+       and v_existing_case.service_type is not distinct from v_service
+       and (v_existing_case.supply_point_id is null or v_existing_case.supply_point_id is not distinct from v_target_sp) then
+      -- Reuse only a matching, unclaimed Case. Never overwrite another Application or different service.
+      v_case := v_existing_case.id;
+    else
+      v_case := null;
+    end if;
+
+    if v_case is null then
+      select coalesce(nullif(btrim(full_name), ''), 'Πελάτης') into v_title from public.customers where id = v_customer;
+      insert into public.cases (title, customer_id, source, service_type, property_type, current_stage, status, lead_id,
+        owner_id, inside_sales_owner, created_by, stage_entered_at, notes)
+      values (v_title, v_customer, coalesce(v_lead.source, 'field_sales'), v_service, v_lead.property_type, 'new', 'open', a.lead_id,
+        auth.uid(), coalesce(v_lead.assigned_to_user_id, auth.uid()), auth.uid(), now(),
+        coalesce(nullif(coalesce(v_lead.comments, v_lead.notes), ''), '') || E'\nΑίτηση ' || a.application_no)
+      returning id into v_case;
+      insert into public.timeline_events (case_id, role, activity_type, title, description, user_id, metadata)
+      values (v_case, 'system', 'created', 'Case δημιουργήθηκε από Αίτηση', 'Υποβολή αίτησης ' || a.application_no, auth.uid(),
+        jsonb_build_object('application_id', a.id, 'application_no', a.application_no, 'lead_id', a.lead_id));
     end if;
   else
-    v_service := case when a.service_type_code in ('energy', 'gas', 'solar', 'ev', 'insurance', 'web') then a.service_type_code else 'energy' end;
     select coalesce(nullif(btrim(full_name), ''), 'Πελάτης') into v_title from public.customers where id = v_customer;
     insert into public.cases (title, customer_id, source, service_type, current_stage, status, owner_id, inside_sales_owner, created_by, stage_entered_at, notes)
     values (v_title, v_customer, 'field_sales', v_service, 'new', 'open', auth.uid(), coalesce(a.assigned_to_user_id, auth.uid()), auth.uid(), now(),
-            'Αίτηση ' || a.application_no)
+      'Αίτηση ' || a.application_no)
     returning id into v_case;
     insert into public.timeline_events (case_id, role, activity_type, title, description, user_id, metadata)
     values (v_case, 'system', 'created', 'Case δημιουργήθηκε από Αίτηση', 'Υποβολή αίτησης ' || a.application_no, auth.uid(),
-            jsonb_build_object('application_id', a.id, 'application_no', a.application_no));
+      jsonb_build_object('application_id', a.id, 'application_no', a.application_no));
   end if;
 
-  update public.cases set application_id = a.id, supply_point_id = coalesce(v_new_sp, a.supply_point_id), next_action = 'Παραλαβή από Sales — Αίτηση ' || a.application_no
-   where id = v_case;
+  -- A Case can only receive its Customer-owned supply point. Duplicate Lead rows remain Lead-owned.
+  select s.id into v_case_supply from public.customer_supply_points s where s.id = v_target_sp and s.customer_id = v_customer;
+  update public.cases set application_id = a.id, supply_point_id = coalesce(v_case_supply, supply_point_id),
+    next_action = 'Παραλαβή από Sales — Αίτηση ' || a.application_no
+   where id = v_case and application_id is null;
+  if not found and not exists (select 1 from public.cases c where c.id = v_case and c.application_id = a.id) then
+    raise exception 'application: selected Case is already linked to another Application' using errcode = '23514';
+  end if;
 
-  -- Default Back Office assignee (a setting, never a hardcoded person). Nothing is changed when it is not set.
   select nullif(setting_value #>> '{}', '')::uuid into v_assignee from public.crm_settings where setting_key = 'default_backoffice_assignee';
   if v_assignee is not null and exists (select 1 from public.profiles p where p.id = v_assignee and p.role = 'admin' and coalesce(p.is_active, true)) then
     update public.cases set back_office_owner = v_assignee where id = v_case;
@@ -452,14 +534,19 @@ begin
     v_assignee := null;
   end if;
 
-  update public.energy_applications
-     set status = 'submitted', status_reason = null, customer_id = v_customer, primary_case_id = v_case, submitted_at = now(), submitted_by = auth.uid(), wizard_step = 5
+  update public.energy_applications set status = 'submitted', status_reason = null, customer_id = v_customer,
+    primary_case_id = v_case, submitted_at = now(), submitted_by = auth.uid(), wizard_step = 5
    where id = a.id;
+  update public.application_documents set customer_id = v_customer where application_id = a.id and customer_id is null;
   select count(*)::int into v_docs from public.application_documents where application_id = a.id and is_current;
   insert into public.activity_log (entity_type, entity_id, action, details)
-  values ('application', a.id, 'application_submitted', jsonb_build_object('actor_id', auth.uid(), 'case_id', v_case, 'customer_id', v_customer, 'current_documents', v_docs, 'backoffice_assignee', v_assignee));
-  return jsonb_build_object('application_id', a.id, 'application_no', a.application_no, 'case_id', v_case, 'customer_id', v_customer, 'backoffice_assignee', v_assignee, 'current_documents', v_docs);
-end $$;
+  values ('application', a.id, 'application_submitted',
+    jsonb_build_object('actor_id', auth.uid(), 'case_id', v_case, 'customer_id', v_customer, 'service_type', v_service,
+      'current_documents', v_docs, 'backoffice_assignee', v_assignee));
+  return jsonb_build_object('application_id', a.id, 'application_no', a.application_no, 'case_id', v_case,
+    'customer_id', v_customer, 'service_type_code', v_service, 'backoffice_assignee', v_assignee,
+    'current_documents', v_docs, 'idempotent', false);
+end $;
 
 create or replace function public.withdraw_energy_application(p_id uuid, p_reason text)
 returns boolean language plpgsql security definer set search_path = public

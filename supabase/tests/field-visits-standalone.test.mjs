@@ -107,6 +107,41 @@ test('check-in and check-out work for a visit with no Case; the events go to act
   assert.equal((await one("select count(*)::int n from public.field_checkins where visit_id = $1::uuid and result <> 'IDEMPOTENT' and result <> 'CHECKOUT'", [ids.V1]))[0].n, 1);
 });
 
+test('standalone check-out stores completion and structured outcome atomically; retry is idempotent and conflict cannot overwrite', async () => {
+  const v = (await visitAs(A, { prospect: prospect('Ατομικό αποτέλεσμα') })).rows[0].id;
+  await as(A);
+  const args = [v, 37.9801, 23.7201, 20, 'Αποτέλεσμα: Χωρίς πώληση — Τιμή / κόστος\\nΣημειώσεις', 'no_sale', 'Τιμή / κόστος', 'Χωρίς πώληση — Τιμή / κόστος'];
+  const sql = 'select public.field_checkout_with_outcome($1::uuid, $2::double precision, $3::double precision, $4::integer, $5, $6, $7, $8) as r';
+  const first = await run(sql, args);
+  assert.equal(first.ok, true, first.error);
+  assert.equal(first.rows[0].r.accepted, true);
+  assert.equal(first.rows[0].r.code, 'CHECKOUT');
+  await su();
+  const saved = (await one('select status, outcome_key, outcome_reason, result from public.case_visits where id = $1::uuid', [v]))[0];
+  assert.deepEqual([saved.status, saved.outcome_key, saved.outcome_reason, saved.result], ['completed', 'no_sale', 'Τιμή / κόστος', 'Χωρίς πώληση — Τιμή / κόστος']);
+  await as(A);
+  const retry = await run(sql, args);
+  assert.equal(retry.ok, true, retry.error);
+  assert.equal(retry.rows[0].r.code, 'IDEMPOTENT');
+  const conflict = await run(sql, [v, null, null, null, '', 'not_interested', 'Δεν θέλει αλλαγή τώρα', 'Δεν ενδιαφέρεται']);
+  assert.equal(conflict.ok, true, conflict.error);
+  assert.equal(conflict.rows[0].r.accepted, false);
+  assert.equal(conflict.rows[0].r.code, 'OUTCOME_CONFLICT');
+  await su();
+  const after = (await one('select status, outcome_key, outcome_reason from public.case_visits where id = $1::uuid', [v]))[0];
+  assert.deepEqual([after.status, after.outcome_key, after.outcome_reason], ['completed', 'no_sale', 'Τιμή / κόστος']);
+  assert.equal((await one("select count(*)::int n from public.field_checkins where visit_id = $1::uuid and result = 'CHECKOUT'", [v]))[0].n, 1);
+});
+
+test('invalid structured outcome reason is rejected before the visit is completed', async () => {
+  const v = (await visitAs(A, { prospect: prospect('Μη έγκυρη αιτία') })).rows[0].id;
+  await as(A);
+  const r = await run("select public.field_checkout_with_outcome($1::uuid, null, null, null, '', 'no_sale', 'άγνωστη αιτία', 'Χωρίς πώληση')", [v]);
+  assert.equal(r.ok, false);
+  await su();
+  assert.equal((await one('select status from public.case_visits where id = $1::uuid', [v]))[0].status, 'planned');
+});
+
 test('no GPS is allowed (flagged for review, not refused); a visit with no stored point says so', async () => {
   const v = (await visitAs(A, { prospect: prospect('Χωρίς σημείο') })).rows[0].id;
   await as(A);

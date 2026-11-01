@@ -1,4 +1,6 @@
 -- ROLLBACK for staged phase7/01 (standalone field visits). Review before running; staging first. Tested locally by supabase/tests/field-visits-standalone.test.mjs' file checks.
+drop function if exists public.field_checkout_with_outcome(uuid, double precision, double precision, integer, text, text, text, text);
+
 -- OPTION A (recommended): switch the feature off and KEEP all data. Visits that were created without a Case stay in the table (case_id null); the app, which probes for the
 -- new columns, keeps working. The guard, audit and helper objects are removed and the check-in functions go back to their phase4/10 / geofence versions.
 drop trigger if exists case_visits_guard_trg on public.case_visits;

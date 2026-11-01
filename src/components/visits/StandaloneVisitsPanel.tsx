@@ -5,9 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarPlus, LogIn, LogOut, MapPin, Phone } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
-import { createLead, fieldCheckin, fieldCheckout, updateVisitNotes } from '@/lib/api';
+import { createLead, fieldCheckin, fieldCheckoutWithOutcome } from '@/lib/api';
 import { fetchDefaultBackofficeAssignee } from '@/lib/lead-intake';
-import { cancelFieldVisit, createVisitFollowUp, fetchFieldVisits, linkVisitToLead, markVisitNoShow, rescheduleFieldVisit, saveVisitOutcome, visitsExtendedAvailable } from '@/lib/field-api';
+import { cancelFieldVisit, createVisitFollowUp, fetchFieldVisits, linkVisitToLead, markVisitNoShow, rescheduleFieldVisit, visitsExtendedAvailable } from '@/lib/field-api';
 import type { FieldVisit } from '@/lib/field-api';
 import { OUTCOMES, checkoutNote, checkoutReady, groupVisits, outcomeByLabel } from '@/lib/field-day';
 import { SUBJECT_CHIP, isReadyToVisit, isRescheduled, nextStepFor, queuePayload, reasonError, reasonOf, validateFollowUp, visitStateText, visitSubject } from '@/lib/field-visits';
@@ -58,21 +58,55 @@ export default function StandaloneVisitsPanel() {
   const fuErrors = step.needs.includes('due') ? validateFollowUp({ reason: form.fuReason, assigneeId: user?.id ?? null, dueAt: form.fuAt }) : {};
   const checkOut = async (v: FieldVisit) => {
     if (!out || !checkoutReady(form.outcome, form.reason) || Object.keys(fuErrors).length) return;
-    setBusy(v.id); const c = await coords();
-    const note = checkoutNote(form.outcome, form.notes, out.reasons ? form.reason : undefined);
-    if (!isOnline()) { enqueue('check_out', queuePayload({ visitId: v.id, lat: c?.lat, lng: c?.lng, accuracy: c?.accuracy, notes: note })); setQueued(countQueue()); setBusy(null); setOpenId(null); toast('Εκτός σύνδεσης: το Check Out θα σταλεί αργότερα. Το follow-up δεν αποθηκεύτηκε· καταχωρήστε το όταν έχετε σύνδεση.', 'warn'); return; }
-    const r = await fieldCheckout(v.id, c, note);
-    if (!r.accepted) { setBusy(null); toast(r.message ?? 'Το Check Out απέτυχε. Δοκιμάστε ξανά.', 'bad'); return; }
-    await updateVisitNotes(v.id, form.notes.trim(), out.reasons ? `${form.outcome} — ${form.reason}` : form.outcome);   // the same readable result every visit has
-    await saveVisitOutcome(v.id, out.key, out.reasons ? form.reason : undefined);
-    let msg = 'Check Out ✓ — η επίσκεψη ολοκληρώθηκε.';
-    if (step.kind === 'followup') { const f = await createVisitFollowUp(v, { reason: form.fuReason, assigneeId: user?.id ?? null, dueAt: form.fuAt }); msg += f.ok ? ' Το follow-up αποθηκεύτηκε.' : ' Το follow-up δεν αποθηκεύτηκε.'; }
-    if (step.kind === 'manager') {
-      const bo = await fetchDefaultBackofficeAssignee(); const due = new Date(); due.setDate(due.getDate() + 1); due.setHours(10, 0, 0, 0);
-      const f = await createVisitFollowUp(v, { reason: form.notes.trim() || 'Από επίσκεψη πεδίου', assigneeId: bo?.id ?? null, dueAt: due.toISOString() }, 'manager');
-      msg += f.ok ? ` Follow-up για υπεύθυνο${bo ? ` (${bo.full_name})` : ''} στη Διεκπεραίωση.` : ' Το follow-up για υπεύθυνο δεν αποθηκεύτηκε.';
+    setBusy(v.id);
+    const c = await coords();
+    const reason = out.reasons ? form.reason : undefined;
+    const note = checkoutNote(form.outcome, form.notes, reason);
+    const result = reason ? `${form.outcome} — ${reason}` : form.outcome;
+
+    // Follow-up creation is an online-only write. Do not complete the visit and lose the required follow-up.
+    if (!isOnline() && (step.kind === 'followup' || step.kind === 'manager')) {
+      setBusy(null);
+      toast('Απαιτείται σύνδεση για να αποθηκευτεί και το follow-up. Η επίσκεψη παραμένει ανοιχτή.', 'warn');
+      return;
     }
-    setBusy(null); setOpenId(null); toast(msg, 'ok'); void load();
+    if (!isOnline()) {
+      enqueue('check_out', queuePayload({
+        visitId: v.id, lat: c?.lat, lng: c?.lng, accuracy: c?.accuracy,
+        notes: note, outcomeKey: out.key, outcomeReason: reason, result,
+      }));
+      setQueued(countQueue());
+      setBusy(null);
+      setOpenId(null);
+      toast('Εκτός σύνδεσης: το Check Out και το αποτέλεσμα μπήκαν στην ουρά για συγχρονισμό.', 'warn');
+      return;
+    }
+
+    const r = await fieldCheckoutWithOutcome(v.id, c, note, out.key, reason, result);
+    if (!r.accepted) {
+      setBusy(null);
+      toast(r.message ?? 'Το Check Out και το αποτέλεσμα δεν αποθηκεύτηκαν. Δοκιμάστε ξανά.', 'bad');
+      return;
+    }
+
+    let msg = 'Check Out ✓ — η επίσκεψη και το αποτέλεσμα αποθηκεύτηκαν.';
+    let followUpFailed = false;
+    if (step.kind === 'followup') {
+      const f = await createVisitFollowUp(v, { reason: form.fuReason, assigneeId: user?.id ?? null, dueAt: form.fuAt });
+      msg += f.ok ? ' Το follow-up αποθηκεύτηκε.' : ' Το follow-up δεν αποθηκεύτηκε — απαιτείται καταχώριση από τη Διεκπεραίωση.';
+      followUpFailed = !f.ok;
+    }
+    if (step.kind === 'manager') {
+      const bo = await fetchDefaultBackofficeAssignee();
+      const due = new Date(); due.setDate(due.getDate() + 1); due.setHours(10, 0, 0, 0);
+      const f = await createVisitFollowUp(v, { reason: form.notes.trim() || 'Από επίσκεψη πεδίου', assigneeId: bo?.id ?? null, dueAt: due.toISOString() }, 'manager');
+      msg += f.ok ? ` Follow-up για υπεύθυνο${bo ? ` (${bo.full_name})` : ''} στη Διεκπεραίωση.` : ' Το follow-up για υπεύθυνο δεν αποθηκεύτηκε — απαιτείται καταχώριση από τη Διεκπεραίωση.';
+      followUpFailed = !f.ok;
+    }
+    setBusy(null);
+    setOpenId(null);
+    toast(msg, followUpFailed ? 'warn' : 'ok');
+    void load();
   };
 
   const confirmDialog = async () => {
@@ -94,7 +128,7 @@ export default function StandaloneVisitsPanel() {
     const l = await linkVisitToLead(v.id, r.lead.id); setBusy(null);
     toast(l.ok ? 'Δημιουργήθηκε Lead. Η επίσκεψη και το ιστορικό της συνδέθηκαν.' : (l.error ?? 'Η σύνδεση δεν έγινε.'), l.ok ? 'ok' : 'bad'); void load();
   };
-  const sync = async () => { const { done, failed, conflicts } = await flushQueue(); setQueued(countQueue()); if (done) toast(`Στάλθηκαν ${done} ενέργειες.`, 'ok'); if (failed) toast(`${failed} ενέργειες απέτυχαν και παραμένουν στην ουρά.`, 'warn'); if (conflicts) toast(`${conflicts} ενέργειες αφορούσαν επίσκεψη που ακυρώθηκε ή αφαιρέθηκε και δεν εφαρμόστηκαν.`, 'warn'); void load(); };
+  const sync = async () => { const { done, failed, conflicts } = await flushQueue(); setQueued(countQueue()); if (done) toast(`Στάλθηκαν ${done} ενέργειες.`, 'ok'); if (failed) toast(`${failed} ενέργειες απέτυχαν και παραμένουν στην ουρά.`, 'warn'); if (conflicts) toast(`${conflicts} ενέργειες είχαν σύγκρουση: η επίσκεψη ακυρώθηκε/αφαιρέθηκε ή είχε ήδη διαφορετικό αποτέλεσμα.`, 'warn'); void load(); };
 
   if (!available) return null;
   const card = (v: FieldVisit) => {

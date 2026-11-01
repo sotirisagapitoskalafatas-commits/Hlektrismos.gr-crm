@@ -17,7 +17,7 @@ test('rollback 02 then 01: the data stays, the new objects go, the previous chec
   assert.equal((await one('select count(*)::int n from public.energy_applications where id = $1::uuid', [app]))[0].n, 1, 'the application survives');
   assert.equal((await one('select count(*)::int n from public.case_visits where id = $1::uuid', [visit]))[0].n, 1, 'the visit without a Case survives');
   const gone = await one(`select p.proname from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('submit_energy_application', 'withdraw_energy_application', 'request_application_documents',
-    'add_application_document', 'reschedule_field_visit', 'cancel_field_visit', 'mark_visit_no_show', 'field_prospect_matches', 'request_lead_ownership', 'decide_ownership_request', 'case_visits_guard')`);
+    'add_application_document', 'field_checkout_with_outcome', 'reschedule_field_visit', 'cancel_field_visit', 'mark_visit_no_show', 'field_prospect_matches', 'request_lead_ownership', 'decide_ownership_request', 'case_visits_guard')`);
   assert.deepEqual(gone, [], 'every phase7 function was dropped');
   assert.equal((await one("select count(*)::int n from pg_trigger where not tgisinternal and tgname in ('case_visits_guard_trg', 'energy_applications_guard_trg', 'follow_ups_link_guard_trg')"))[0].n, 0);
   await as(A);

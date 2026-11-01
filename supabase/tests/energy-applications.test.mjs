@@ -168,7 +168,11 @@ test('submitting validates, then creates the Case once, links everything, assign
   const ap = (await one('select status, primary_case_id, submitted_by, submitted_at from public.energy_applications where id = $1::uuid', [ids.P1]))[0];
   assert.deepEqual([ap.status, ap.primary_case_id, ap.submitted_by], ['submitted', out.case_id, A]); assert.ok(ap.submitted_at);
   assert.equal((await one("select count(*)::int n from public.app_notifications where user_id = $1::uuid and case_id = $2::uuid", [ADMIN, out.case_id]))[0].n, 1);
-  await as(A); assert.equal((await run('select public.submit_energy_application($1::uuid)', [ids.P1])).ok, false, 'a submitted application is not submitted twice');
+  await as(A);
+  const retry = await run('select public.submit_energy_application($1::uuid) as r', [ids.P1]);
+  assert.equal(retry.ok, true, retry.error);
+  assert.equal(retry.rows[0].r.idempotent, true, 'a retry returns the original submission');
+  assert.equal(retry.rows[0].r.case_id, out.case_id, 'a retry never creates another Case');
   assert.equal((await one('select id from public.cases where id = $1::uuid', [out.case_id])).length, 1, 'the agent owns the Case that was created');
   const acts = (await actions(ids.P1)).map((x) => x.action);
   for (const a of ['application_created', 'application_document_added', 'application_document_replaced', 'application_submitted']) assert.ok(acts.includes(a), a);
@@ -220,7 +224,7 @@ test('withdrawing needs a reason and ends the application; a closed application 
 
 /* ───────── a lead is converted through the existing operation, never a parallel path ───────── */
 test('an application from a LEAD converts it with convert_lead_to_case at submission; the supply row moves with the lead (same id), no duplicate customer', async () => {
-  const id = (await draft(A, { customer_id: null, lead_id: ids.LA, supply_point_id: ids.SPLA, service_type_code: 'energy' })).rows[0].id;
+  const id = (await draft(A, { customer_id: null, lead_id: ids.LA, supply_point_id: ids.SPLA, service_type_code: 'gas' })).rows[0].id;
   await su(); const cu0 = (await one('select count(*)::int n from public.customers'))[0].n;
   await as(A);
   const r = await run('select public.submit_energy_application($1::uuid) as r', [id]); assert.equal(r.ok, true, r.error);
@@ -233,7 +237,34 @@ test('an application from a LEAD converts it with convert_lead_to_case at submis
   assert.equal(sp.customer_id, out.customer_id, 'the same supply row moved to the new customer: ids, document tags and history stay');
   const ap = (await one('select customer_id, supply_point_id, primary_case_id from public.energy_applications where id = $1::uuid', [id]))[0];
   assert.deepEqual([ap.customer_id, ap.supply_point_id, ap.primary_case_id], [out.customer_id, ids.SPLA, out.case_id]);
-  assert.equal((await one('select application_id, supply_point_id from public.cases where id = $1::uuid', [out.case_id]))[0].application_id, id);
+  const convertedCase = (await one('select application_id, supply_point_id, service_type from public.cases where id = $1::uuid', [out.case_id]))[0];
+  assert.deepEqual([convertedCase.application_id, convertedCase.service_type], [id, 'gas'], 'the Case uses the Application service');
+});
+
+test('a converted Lead application uses its selected service and never reuses a Case claimed by another Application', async () => {
+  await su();
+  const original = (await one('select c.id, c.customer_id, c.service_type, c.application_id from public.cases c where c.id = (select converted_case_id from public.leads where id = $1::uuid)', [ids.LA]))[0];
+  assert.ok(original);
+  assert.equal(original.service_type, 'gas');
+  const secondary = (await db.query("insert into public.customer_supply_points (customer_id, usage, property_address, supply_number, created_by) values ($1::uuid, 'residential', 'Δεύτερη παροχή', '77777777777', $2::uuid) returning id", [original.customer_id, A])).rows[0].id;
+  const second = (await draft(A, { customer_id: null, lead_id: ids.LA, supply_point_id: ids.SPLA, service_type_code: 'solar' })).rows[0].id;
+  await as(A);
+  const doc = await run('select public.add_application_document($1::uuid, $2, $3, $4, $5, 10, $6::uuid) as id',
+    [second, 'identity_front', path(second, 'converted-lead.pdf'), 'converted-lead.pdf', 'application/pdf', secondary]);
+  assert.equal(doc.ok, true, doc.error, 'converted Lead documents can use its Customer supply point');
+  const submitted = await run('select public.submit_energy_application($1::uuid) as r', [second]);
+  assert.equal(submitted.ok, true, submitted.error);
+  const newCase = submitted.rows[0].r.case_id;
+  assert.notEqual(newCase, original.id, 'a Case claimed by a different Application is not reused');
+  await su();
+  const oldAfter = (await one('select service_type, application_id from public.cases where id = $1::uuid', [original.id]))[0];
+  assert.deepEqual([oldAfter.service_type, oldAfter.application_id], ['gas', original.application_id], 'the old Case is unchanged');
+  const newAfter = (await one('select service_type, application_id, customer_id from public.cases where id = $1::uuid', [newCase]))[0];
+  assert.deepEqual([newAfter.service_type, newAfter.application_id, newAfter.customer_id], ['solar', second, original.customer_id]);
+  const savedDoc = (await one('select customer_id, supply_point_id from public.application_documents where application_id = $1::uuid and is_current', [second]))[0];
+  assert.deepEqual([savedDoc.customer_id, savedDoc.supply_point_id], [original.customer_id, secondary]);
+  const lead = (await one('select converted_case_id from public.leads where id = $1::uuid', [ids.LA]))[0];
+  assert.equal(lead.converted_case_id, original.id);
 });
 
 test('phase5/18 duplicate branch: the supply stayed on the lead and the case was linked to the customer\'s existing connection; the application follows', async () => {
@@ -245,7 +276,7 @@ test('phase5/18 duplicate branch: the supply stayed on the lead and the case was
   const spL = (await db.query("insert into public.customer_supply_points (lead_id, usage, property_address, supply_number, created_by) values ($1::uuid, 'residential', 'Δ 1', '55555555555', $2::uuid) returning id", [lead, A])).rows[0].id;
   const id = (await draft(A, { customer_id: null, lead_id: lead, supply_point_id: spL, service_type_code: 'energy' })).rows[0].id;
   await as(A);
-  const v = await run("insert into public.case_visits (lead_id, supply_point_id, scheduled_at) values ($1::uuid, $2::uuid, now()) returning id", [lead, spL]); assert.equal(v.ok, true, v.error);
+  const v = await run("insert into public.case_visits (lead_id, supply_point_id, application_id, scheduled_at) values ($1::uuid, $2::uuid, $3::uuid, now()) returning id", [lead, spL, id]); assert.equal(v.ok, true, v.error);
   const r = await run('select public.submit_energy_application($1::uuid) as r', [id]); assert.equal(r.ok, true, r.error);
   await su();
   const caseSp = (await one('select supply_point_id, customer_id from public.cases where id = $1::uuid', [r.rows[0].r.case_id]))[0];

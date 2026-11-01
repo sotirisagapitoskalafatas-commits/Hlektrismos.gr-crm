@@ -62,3 +62,13 @@ test('the wizard never creates a customer, and the submit goes through the one d
 test('only the shared Admin login claims no individual identity: the screens say the decision is recorded as the shared account', () => {
   assert.match(read('components/field-sales/FieldApplicationsQueue.tsx'), /κοινό λογαριασμό Admin \/ Back Office/);
 });
+
+
+test('standalone visit outcomes use one atomic RPC and offline replay preserves the structured result', () => {
+  const panel = noComments(read('components/visits/StandaloneVisitsPanel.tsx'));
+  assert.match(panel, /fieldCheckoutWithOutcome/);
+  assert.doesNotMatch(panel, /await updateVisitNotes|await saveVisitOutcome/);
+  assert.match(noComments(read('lib/api.ts')), /rpc\('field_checkout_with_outcome'/);
+  assert.match(noComments(read('lib/offline/sync.ts')), /fieldCheckoutWithOutcome[\s\S]*outcomeKey/);
+  assert.match(noComments(read('lib/field-visits.ts')), /outcomeKey/);
+});

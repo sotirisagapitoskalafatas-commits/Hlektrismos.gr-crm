@@ -469,6 +469,72 @@ begin
 end;
 $$;
 
+
+-- Standalone Field Visits use one atomic operation for completion + structured outcome.
+-- Keep the original field_checkout signature unchanged for existing Case-bound My Day.
+create or replace function public.field_checkout_with_outcome(
+    p_visit_id uuid,
+    p_lat double precision default null,
+    p_lng double precision default null,
+    p_accuracy_m integer default null,
+    p_notes text default '',
+    p_outcome_key text default null,
+    p_outcome_reason text default null,
+    p_result text default null
+)
+returns jsonb language plpgsql security definer set search_path = public
+as $$
+declare
+    v_actor uuid := auth.uid();
+    v_visit public.case_visits%rowtype;
+    v_reason text := nullif(btrim(coalesce(p_outcome_reason, '')), '');
+    v_result jsonb;
+begin
+    if v_actor is null then raise exception 'auth.uid() is null'; end if;
+    if not public.is_staff() then raise exception 'forbidden: staff only' using errcode = '42501'; end if;
+    select * into v_visit from public.case_visits where id = p_visit_id for update;
+    if v_visit.id is null then
+        return jsonb_build_object('accepted', false, 'code', 'NO_VISIT', 'message', 'Η επίσκεψη δεν βρέθηκε.');
+    end if;
+    if v_visit.user_id is not null and v_visit.user_id <> v_actor and not public.is_role('admin') then
+        raise exception 'forbidden: not your visit' using errcode = '42501';
+    end if;
+    if coalesce(p_outcome_key, '') not in ('new_sale', 'interested', 'documents', 'revisit', 'manager', 'no_sale', 'not_interested', 'not_found') then
+        raise exception 'visit outcome: unknown outcome' using errcode = '22023';
+    end if;
+    if p_outcome_key = 'no_sale' and (v_reason is null or v_reason <> all(array['Τιμή / κόστος', 'Δέσμευση με τον τρέχοντα πάροχο', 'Λείπουν στοιχεία ή έγγραφα', 'Δεν αποφασίζει ο ίδιος', 'Άλλο'])) then
+        raise exception 'visit outcome: choose a valid no-sale reason' using errcode = '22023';
+    elsif p_outcome_key = 'not_interested' and (v_reason is null or v_reason <> all(array['Ικανοποιημένος με τον πάροχο', 'Δεν θέλει αλλαγή τώρα', 'Κακή προηγούμενη εμπειρία', 'Δεν θέλει επικοινωνία', 'Άλλο'])) then
+        raise exception 'visit outcome: choose a valid not-interested reason' using errcode = '22023';
+    elsif p_outcome_key not in ('no_sale', 'not_interested') and v_reason is not null then
+        raise exception 'visit outcome: this outcome does not accept a reason' using errcode = '22023';
+    end if;
+    if v_visit.status in ('cancelled', 'no_show') then
+        return jsonb_build_object('accepted', false, 'code', 'NOT_OPEN', 'visitId', v_visit.id, 'status', v_visit.status,
+            'message', 'Η επίσκεψη δεν είναι ανοιχτή (' || v_visit.status || ').');
+    end if;
+    if v_visit.status = 'completed' then
+        if v_visit.outcome_key is not distinct from p_outcome_key and v_visit.outcome_reason is not distinct from v_reason then
+            return jsonb_build_object('accepted', true, 'code', 'IDEMPOTENT', 'already', true, 'visitId', v_visit.id,
+                'outcome_key', v_visit.outcome_key, 'outcome_reason', v_visit.outcome_reason,
+                'message', 'Η επίσκεψη έχει ήδη ολοκληρωθεί με το ίδιο αποτέλεσμα.');
+        end if;
+        return jsonb_build_object('accepted', false, 'code', 'OUTCOME_CONFLICT', 'visitId', v_visit.id,
+            'message', 'Η επίσκεψη έχει ήδη ολοκληρωθεί με διαφορετικό αποτέλεσμα.');
+    end if;
+    v_result := public.field_checkout(p_visit_id, p_lat, p_lng, p_accuracy_m, p_notes);
+    if not coalesce((v_result ->> 'accepted')::boolean, false) then return v_result; end if;
+    update public.case_visits
+       set outcome_key = p_outcome_key,
+           outcome_reason = v_reason,
+           result = coalesce(nullif(left(btrim(coalesce(p_result, '')), 500), ''), result)
+     where id = p_visit_id;
+    return v_result || jsonb_build_object('outcome_key', p_outcome_key, 'outcome_reason', v_reason);
+end;
+$$;
+revoke all on function public.field_checkout_with_outcome(uuid, double precision, double precision, integer, text, text, text, text) from public, anon;
+grant execute on function public.field_checkout_with_outcome(uuid, double precision, double precision, integer, text, text, text, text) to authenticated, service_role;
+
 revoke all on function public.field_checkin(uuid, double precision, double precision, integer, integer, text) from public, anon;
 grant execute on function public.field_checkin(uuid, double precision, double precision, integer, integer, text) to authenticated, service_role;
 revoke all on function public.field_checkout(uuid, double precision, double precision, integer, text) from public, anon;

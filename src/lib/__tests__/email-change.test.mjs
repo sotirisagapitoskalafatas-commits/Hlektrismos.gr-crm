@@ -59,7 +59,8 @@ test('failure states: duplicate address, rate limit, invalid-address answer from
   assert.equal(await run({ code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' }), 'provider_limit', 'the project quota of the built-in sender');
   assert.equal(await run({ status: 429, code: 'over_email_send_rate_limit', message: 'For security purposes, you can only request this after 59 seconds.' }), 'cooldown', 'this account asked too soon');
   assert.equal(await run({ status: 400, code: 'email_address_not_authorized', message: 'Email address not authorized' }), 'not_authorized');
-  assert.equal(await run({ code: 'email_address_invalid', message: 'x' }), 'invalid');
+  assert.equal(await run({ code: 'email_address_invalid', message: 'x' }), 'recipient_rejected', 'the Auth mailer refused a recipient: not a typo in the form');
+  assert.equal(await run({ status: 400, message: 'Unable to validate email address: invalid format' }), 'invalid', 'a malformed typed address stays a form error');
   assert.equal(await run({ status: 500, message: 'boom' }), 'failed');
   assert.equal(await E.requestEmailChange(fakeAuth({ throws: true }).auth, OLD, NEW), 'failed', 'a network error is a failure, not an exception');
   for (const o of ['duplicate', 'rate_limited', 'cooldown', 'provider_limit', 'not_authorized', 'invalid', 'unchanged', 'failed']) assert.equal(E.EMAIL_CHANGE_TEXT[o].tone, 'err', o);
@@ -186,11 +187,11 @@ test('production target: both calls ask for the CRM origin, and nothing in the f
 
 test('the card: one request at a time, a button per state, a replace needs a second click, and the wait is the server\'s own', () => {
   const card = read('components/app/CustomizePage.tsx');
-  assert.match(card, /inFlight\.current \|\| waiting/, 'no second request while one is running or while the server-named wait runs');
+  assert.match(card, /!mayRequest\(lock, inFlight\.current, Date\.now\(\)\)/, 'every request goes through the one gate: nothing in flight and no lock running');
   assert.match(card, /plan === 'resend'[\s\S]{0,80}resendEmailChange\(supabase\.auth, activeEmail\)/, 'resend uses the active (current) address');
   assert.match(card, /plan === 'replace' && !confirmReplace/, 'replacing a pending request needs a second click');
   assert.match(card, /Επαναποστολή επιβεβαίωσης/);
-  assert.match(card, /setWaitUntil\(t \+ result\.retryAfter \* 1000\)/, 'a countdown only from a wait the server named');
+  assert.match(card, /lock\?\.kind === 'server'/, 'a countdown is shown only for a wait the server named');
   assert.ok(!/setInterval\([^)]*(resend|startEmailChange|updateUser)/.test(card), 'no background resend loop');
 });
 
@@ -199,4 +200,79 @@ test('a confirmed change keeps the same user: the id, the session and the role a
   const id = await E.readIdentity(f.auth);
   assert.equal(id.email, NEW); assert.equal(id.pendingEmail, null); assert.equal(id.id, UID);
   assert.ok(!/role|profiles|user_roles/.test(read('lib/email-change.ts').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')), 'the module never touches roles or profiles');
+});
+
+// ───────────── Production evidence (Auth logs, 1 Nov): email_address_invalid on /resend, then six /resend 429s within four seconds ─────────────
+const REJECT = { status: 400, code: 'email_address_invalid', message: 'Email address "qa.admin@hlektrismos.gr" is invalid' };
+
+test('email_address_invalid is a refused RECIPIENT: not a typo in the form, not a rate limit, and the pending request is left alone', async () => {
+  assert.equal(E.classifyEmailChangeError(REJECT), 'recipient_rejected');
+  assert.equal(E.classifyEmailChangeError({ status: 400, code: 'validation_failed', message: 'Unable to validate email address: invalid format' }), 'invalid', 'a malformed typed address stays a form error');
+  const f = fakeAuth({ resendError: REJECT }); f.user.new_email = NEW;
+  const r = await E.resendEmailChange(f.auth, OLD);
+  assert.deepEqual(r, { outcome: 'recipient_rejected', retryAfter: null, address: 'qa.admin@hlektrismos.gr' });
+  const text = E.emailChangeMessage(r).text;
+  assert.match(text, /qa\.admin@hlektrismos\.gr/); assert.match(text, /email_address_invalid/); assert.match(text, /δεν έστειλε κανένα email/);
+  assert.ok(!/Συμπληρώστε μια έγκυρη/.test(text) && !/Πάρα πολλές προσπάθειες|εξαντληθεί/.test(text), 'neither the form-typo nor the rate-limit wording');
+  assert.equal((await E.readIdentity(f.auth)).pendingEmail, NEW, 'the pending target survives the refusal');
+  assert.deepEqual(f.calls.filter((c) => c[0] === 'resend').map((c) => c[1].email), [OLD], 'the account is looked up by the CURRENT address, as GoTrue resend does');
+});
+
+test('six clicks in four seconds after a 429 produce exactly one Auth request', async () => {
+  const f = fakeAuth({ resendError: { status: 429, code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' } });
+  let lock = null, inFlight = false, t = 1_000_000;
+  const click = async () => { // what the card's submit does, in order
+    if (!E.mayRequest(lock, inFlight, t)) return 'blocked';
+    inFlight = true; lock = { until: t + 60_000, kind: 'app' };
+    const r = await E.resendEmailChange(f.auth, OLD); inFlight = false; lock = E.lockAfter(r, t); return r.outcome;
+  };
+  const seen = []; for (let i = 0; i < 6; i++) { seen.push(await click()); t += 700; }
+  assert.deepEqual(seen, ['provider_limit', 'blocked', 'blocked', 'blocked', 'blocked', 'blocked']);
+  assert.equal(f.calls.filter((c) => c[0] === 'resend').length, 1);
+  t += 15 * 60_000; assert.equal(await click(), 'provider_limit', 'after the safeguard a single new attempt is allowed'); assert.equal(f.calls.filter((c) => c[0] === 'resend').length, 2);
+});
+
+test('concurrent clicks while one request is in flight are blocked; a refusal never retries by itself', async () => {
+  assert.equal(E.mayRequest(null, true, 5), false);
+  assert.equal(E.mayRequest({ until: 10, kind: 'app' }, false, 5), false);
+  assert.equal(E.mayRequest({ until: 10, kind: 'app' }, false, 10), true);
+  const f = fakeAuth({ resendError: REJECT }); await E.resendEmailChange(f.auth, OLD);
+  assert.equal(f.calls.length, 1, 'one call, no hidden retry inside the library');
+  const card = read('components/app/CustomizePage.tsx') + read('lib/email-change.ts');
+  assert.ok(!/setTimeout\([^)]*(resend|startEmailChange|updateUser)|setInterval\([^)]*(resend|startEmailChange|updateUser)/.test(card), 'no timer that sends mail');
+  assert.equal((read('components/app/CustomizePage.tsx').match(/resendEmailChange\(/g) || []).length, 1, 'a single call site for the re-send');
+  assert.equal((read('components/app/CustomizePage.tsx').match(/startEmailChange\(/g) || []).length, 1, 'a single call site for a new request');
+});
+
+test('the lock: the server wait when it gave one, a labelled safeguard of our own otherwise, and none for a typo', () => {
+  const now = 1_000;
+  assert.deepEqual(E.lockAfter({ outcome: 'cooldown', retryAfter: 12 }, now), { until: now + 12_000, kind: 'server' });
+  assert.deepEqual(E.lockAfter({ outcome: 'provider_limit', retryAfter: null }, now), { until: now + E.REFUSED_LOCK_MS, kind: 'app' });
+  assert.deepEqual(E.lockAfter({ outcome: 'recipient_rejected', retryAfter: null }, now), { until: now + E.REFUSED_LOCK_MS, kind: 'app' });
+  assert.deepEqual(E.lockAfter({ outcome: 'resent', retryAfter: null }, now), { until: now + E.SEND_FLOOR_MS, kind: 'app' });
+  assert.equal(E.lockAfter({ outcome: 'invalid', retryAfter: null }, now).until, now, 'a typo never reached Auth: nothing to protect');
+  const card = read('components/app/CustomizePage.tsx');
+  assert.match(card, /Προστασία της εφαρμογής από επαναλαμβανόμενα αιτήματα \(δεν είναι χρόνος της υπηρεσίας email\)/, 'the safeguard says it is ours');
+  const i = card.indexOf('writeLock(store, key, pendingLock, t0)'); const j = card.indexOf('await resendEmailChange') >= 0 ? card.indexOf('resendEmailChange(supabase.auth') : -1;
+  assert.ok(i > 0 && j > i, 'the lock is taken before the request is sent');
+});
+
+test('the lock survives a reload, ignores junk and expired values, and never throws when storage is blocked', () => {
+  const mem = new Map(); const kv = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
+  const key = E.lockKey(' Office@Example.test '); assert.equal(key, E.lockKey('office@example.test'));
+  E.writeLock(kv, key, { until: 5_000, kind: 'app' }, 1_000);
+  assert.deepEqual(E.readLock(kv, key, 2_000), { until: 5_000, kind: 'app' });
+  assert.equal(E.readLock(kv, key, 5_000), null, 'expired');
+  kv.setItem(key, '{not json'); assert.equal(E.readLock(kv, key, 1), null);
+  kv.setItem(key, JSON.stringify({ until: 9e15, kind: 'app' })); assert.equal(E.readLock(kv, key, 1), null, 'an absurd value cannot lock the Admin out for good');
+  E.writeLock(kv, key, { until: 500, kind: 'app' }, 1_000); assert.equal(mem.has(key), false, 'an empty lock clears the entry');
+  const blocked = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }, removeItem() { throw new Error('denied'); } };
+  assert.equal(E.readLock(blocked, key, 1), null); assert.doesNotThrow(() => E.writeLock(blocked, key, { until: 9, kind: 'app' }, 1)); assert.equal(E.readLock(null, key, 1), null);
+});
+
+test('a re-send warns first, because Auth issues new links and resets the confirmations already given', () => {
+  const card = read('components/app/CustomizePage.tsx');
+  assert.match(card, /plan === 'resend' && !confirmReplace[\s\S]{0,120}RESEND_WARNING/, 'a second click is needed to re-send');
+  assert.match(E.RESEND_WARNING, /νέους συνδέσμους/); assert.match(E.RESEND_WARNING, /μηδενίζεται/);
+  assert.match(card, /δεν δείχνει ποιο από τα δύο email έχει ήδη επιβεβαιωθεί/, 'the card does not pretend to know which mail was confirmed');
 });

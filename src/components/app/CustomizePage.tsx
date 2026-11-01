@@ -11,7 +11,8 @@ import { THEMES } from '@/lib/theme';
 import { HOME_EDIT_FLAG } from '@/lib/home-widgets';
 import { usePreferences } from '@/lib/preferences';
 import { supabase } from '@/lib/supabase';
-import { emailChangeMessage, planEmailChange, readIdentity, resendEmailChange, startEmailChange } from '@/lib/email-change';
+import { RESEND_WARNING, emailChangeMessage, lockAfter, lockKey, mayRequest, planEmailChange, readIdentity, readLock, resendEmailChange, startEmailChange, writeLock } from '@/lib/email-change';
+import type { EmailChangeLock } from '@/lib/email-change';
 import { checkAvatarFile, cropToAvatarBlob, forgetAvatar, removeAvatar, uploadAvatar } from '@/lib/avatar';
 import { getNavigationPreference, setNavigationPreference, NAV_APP_OPTIONS, navigationAppLabel } from '@/lib/navigation/external-maps';
 import type { NavigationApp } from '@/lib/navigation/external-maps';
@@ -51,8 +52,11 @@ function EmailChangeCard({ current }: { current: string }) {
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
-  // The wait the server itself named (never invented); the button is off until then. Ticks once a second only while it runs.
-  const [waitUntil, setWaitUntil] = useState<number | null>(null);
+  // After EVERY attempt the form locks: for the wait the server named, else for a safeguard of our own (labelled as ours). Persisted, so a reload or a
+  // second tab cannot fire a second request. Ticks once a second only while it runs.
+  const store = typeof window === 'undefined' ? null : (() => { try { return window.localStorage; } catch { return null; } })();
+  const key = lockKey(current);
+  const [lock, setLock] = useState<EmailChangeLock | null>(() => readLock(store, key, Date.now()));
   const [now, setNow] = useState(() => Date.now());
   const [confirmReplace, setConfirmReplace] = useState(false);
   const inFlight = useRef(false);
@@ -82,22 +86,29 @@ function EmailChangeCard({ current }: { current: string }) {
 
   const pending = identity?.pendingEmail ?? null;
   const plan = planEmailChange(pending, next);
-  const waiting = waitUntil !== null && now < waitUntil;
+  const waiting = lock !== null && now < lock.until;
   useEffect(() => {
-    if (waitUntil === null) return;
-    const id = window.setInterval(() => { const t = Date.now(); setNow(t); if (t >= waitUntil) { setWaitUntil(null); window.clearInterval(id); } }, 1000);
+    if (lock === null) return;
+    const id = window.setInterval(() => { const t = Date.now(); setNow(t); if (t >= lock.until) { setLock(null); window.clearInterval(id); } }, 1000);
     return () => window.clearInterval(id);
-  }, [waitUntil]);
+  }, [lock]);
+  const clock = (ms: number) => new Date(ms).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
 
   const submit = async () => {
-    if (!supabase || inFlight.current || waiting) return; // one request at a time, and none while the server's own wait is running
-    // A different address while one is pending REPLACES it: say so once and ask for a second click.
+    if (!supabase || !mayRequest(lock, inFlight.current, Date.now())) return; // one request at a time, and none while the lock runs
+    // A different address while one is pending REPLACES it, and a re-send RESETS the confirmations already given: say so once and ask for a second click.
     if (plan === 'replace' && !confirmReplace) { setConfirmReplace(true); setMsg({ tone: 'err', text: `Υπάρχει εκκρεμές αίτημα προς ${pending}. Η νέα διεύθυνση θα το αντικαταστήσει και θα σταλούν νέα email. Πατήστε ξανά για να συνεχίσετε.` }); return; }
+    if (plan === 'resend' && !confirmReplace) { setConfirmReplace(true); setMsg({ tone: 'err', text: RESEND_WARNING }); return; }
     inFlight.current = true; setConfirmReplace(false); setMsg(null); setBusy(true);
+    const t0 = Date.now();
+    // The lock is taken BEFORE the answer arrives: whatever happens next (an error, a slow answer, a second tab) no second request can start from here.
+    const pendingLock: EmailChangeLock = { until: t0 + 60_000, kind: 'app' };
+    setLock(pendingLock); setNow(t0); writeLock(store, key, pendingLock, t0);
     const result = plan === 'resend' ? await resendEmailChange(supabase.auth, activeEmail) : await startEmailChange(supabase.auth, activeEmail, next);
     inFlight.current = false; setBusy(false);
     setMsg(emailChangeMessage(result));
-    if (result.retryAfter) { const t = Date.now(); setNow(t); setWaitUntil(t + result.retryAfter * 1000); }
+    const t1 = Date.now(); const after = lockAfter(result, t1);
+    setNow(t1); setLock(after.until > t1 ? after : null); writeLock(store, key, after, t1);
     if (result.outcome === 'pending' || result.outcome === 'resent') { setNext(''); void reread(); }
   };
   return (
@@ -106,15 +117,18 @@ function EmailChangeCard({ current }: { current: string }) {
       <p className="text-sm mb-1">Τρέχον email σύνδεσης: <strong data-testid="active-email">{activeEmail}</strong></p>
       {identity?.pendingEmail && (
         <p className="text-xs mb-2 text-warn-600" role="status" data-testid="pending-email">
-          Σε αναμονή επιβεβαίωσης: <strong>{identity.pendingEmail}</strong>. Δεν είναι ακόμη ενεργή: η σύνδεση γίνεται με την τρέχουσα διεύθυνση μέχρι να επιβεβαιωθεί η αλλαγή.
+          Σε αναμονή επιβεβαίωσης: <strong>{identity.pendingEmail}</strong>. Δεν είναι ακόμη ενεργή: η σύνδεση γίνεται με την τρέχουσα διεύθυνση μέχρι να επιβεβαιωθεί η αλλαγή. Η υπηρεσία δεν δείχνει ποιο από τα δύο email έχει ήδη επιβεβαιωθεί.
         </p>
       )}
       <p className="text-xs text-ink/55 mb-3">Για παράδοση στο επίσημο email της εταιρείας. Ο λογαριασμός, το ιστορικό και οι αναθέσεις παραμένουν ίδια: αλλάζει μόνο η διεύθυνση σύνδεσης. Θα σταλεί email επιβεβαίωσης και η αλλαγή ισχύει μόνο μετά την επιβεβαίωση.</p>
       <div className="flex flex-col sm:flex-row gap-2">
         <input type="email" className="field flex-1" value={next} onChange={(e) => { setNext(e.target.value); setConfirmReplace(false); }} placeholder="νέο.email@εταιρεία.gr" aria-label="Νέο email" autoComplete="off" />
-        <Btn onClick={() => void submit()} disabled={busy || waiting || (plan !== 'resend' && !next.trim())}>{busy ? 'Αποστολή…' : waiting && waitUntil ? `Περιμένετε ${Math.max(1, Math.ceil((waitUntil - now) / 1000))}δ` : plan === 'resend' ? 'Επαναποστολή επιβεβαίωσης' : plan === 'replace' ? 'Αντικατάσταση αιτήματος' : 'Αποστολή επιβεβαίωσης'}</Btn>
+        <Btn onClick={() => void submit()} disabled={busy || waiting || (plan !== 'resend' && !next.trim())}>{busy ? 'Αποστολή…' : waiting && lock?.kind === 'server' ? `Περιμένετε ${Math.max(1, Math.ceil((lock.until - now) / 1000))}δ` : waiting ? 'Κλειδωμένο προσωρινά' : plan === 'resend' ? 'Επαναποστολή επιβεβαίωσης' : plan === 'replace' ? 'Αντικατάσταση αιτήματος' : 'Αποστολή επιβεβαίωσης'}</Btn>
       </div>
       <p className={`text-xs mt-2 ${msg?.tone === 'err' ? 'text-bad-600' : 'text-ink/60'}`} role="status">{msg?.text ?? ''}</p>
+      {waiting && lock?.kind === 'app' && !busy && (
+        <p className="text-[11px] mt-1 text-ink/50" data-testid="email-change-lock">Προστασία της εφαρμογής από επαναλαμβανόμενα αιτήματα (δεν είναι χρόνος της υπηρεσίας email): νέο αίτημα δεν θα σταλεί πριν από τις {clock(lock.until)}.</p>
+      )}
     </Card>
   );
 }

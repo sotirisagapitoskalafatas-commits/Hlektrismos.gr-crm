@@ -36,3 +36,6 @@ test-invoke.cjs
 test-chat.mjs
 seed-agents.mjs
 !.env.example
+
+# Rendered Auth e-mail templates are reviewed source: they are installed into Supabase by hand
+!emails/dist/

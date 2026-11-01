@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import HelpTip from '@/components/guide/HelpTip';
 import { useNav } from '@/lib/nav';
 import { ACCESS_GROUPS, roleLabel } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
@@ -109,7 +110,7 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
         </button>
         {(role === 'admin') && (
           <button type="button" className="atx-ov" data-testid="sales-scope" onClick={() => onOpen('users')}>
-            <span className="atx-ov-k">Ορατότητα πωλητών</span>
+            <span className="atx-ov-k">Ορατότητα πωλητών<HelpTip id="agent-visibility" /></span>
             <span className={`atx-ov-v ${scope === 'loading' ? '' : scope?.enabled ? 'is-ok' : 'is-warn'}`}>{scope === 'loading' ? '…' : scope === null ? 'Εκκρεμεί' : scope.enabled ? 'Μόνο τα δικά τους' : 'Βλέπουν όλα'}</span>
             <span className="atx-ov-s">{scope === 'loading' ? ' ' : scope === null
               ? pendingText(role, 'Εκκρεμεί η ενημέρωση βάσης «Ορατότητα πωλητών» (phase4/18): μέχρι τότε οι πωλητές βλέπουν όλα τα leads, cases και πελάτες.')

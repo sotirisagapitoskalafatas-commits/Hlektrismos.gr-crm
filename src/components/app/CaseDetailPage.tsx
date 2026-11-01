@@ -12,6 +12,7 @@ import { STAGE_SET_MIN_REASON, canReopenCase, canUseStageSet, checkJump, reopenT
 import { stageText, visitedStages } from '@/lib/case-flow';
 import { reopenAvailable, reopenCompletedCase, setCaseStage, stageSetAvailable } from '@/lib/api';
 import ContactEligibility from '@/components/contact/ContactEligibility';
+import HelpTip from '@/components/guide/HelpTip';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
 import { canOpenFolder, folderTabs } from '@/lib/folder';
 import type { FolderTab } from '@/lib/folder';
@@ -569,7 +570,7 @@ function StageSetControl({ c, reload }: { c: Case; reload: () => void }) {
   };
   return (
     <div className="p-3 rounded-xl bg-paper border border-line" data-stage-set>
-      <div className="text-[13px] font-medium text-ink">Αλλαγή σταδίου (Back Office)</div>
+      <div className="text-[13px] font-medium text-ink">Αλλαγή σταδίου (Back Office)<HelpTip id="stage-change" /></div>
       <p className="text-xs text-ink/55 mt-1 mb-2">
         Για case που πρέπει να συνεχίσει από άλλο στάδιο, π.χ. ήρθε με πλήρη φάκελο ή γυρίζει πίσω για διόρθωση. Καταγράφεται με την αιτιολογία και τον χρήστη.
         Δεν αλλάζει τα έγγραφα και τα στάδια που παραλείπονται δεν θεωρούνται ολοκληρωμένα.

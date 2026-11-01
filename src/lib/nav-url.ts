@@ -13,7 +13,7 @@ export type AppView = { page: PageKey | 'case'; caseId: string | null; filters?:
 export const PAGE_KEYS: readonly PageKey[] = [
   'home', 'mywork', 'leads', 'prospecting', 'providers', 'cases', 'followups', 'customers',
   'map', 'myday', 'field', 'backoffice', 'reports', 'revenue', 'admin',
-  'automations', 'aiworkforce', 'account', 'preferences', 'homelayout',
+  'automations', 'aiworkforce', 'account', 'preferences', 'homelayout', 'guide',
 ];
 const PAGES = new Set<string>(PAGE_KEYS);
 

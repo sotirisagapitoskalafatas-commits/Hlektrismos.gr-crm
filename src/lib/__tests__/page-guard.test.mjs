@@ -32,6 +32,7 @@ const EXPECTED = {
   account: ['admin', 'sales_agent', 'sales_agent'],
   preferences: ['admin', 'sales_agent', 'sales_agent'],
   homelayout: ['admin', 'sales_agent', 'sales_agent'],
+  guide: ['admin', 'sales_agent', 'sales_agent'], // Οδηγός ATLAS: explains only, never reads or changes CRM data
   leads: ['admin', 'sales_agent'],
   map: ['admin', 'sales_agent'],
   myday: ['admin', 'sales_agent'],

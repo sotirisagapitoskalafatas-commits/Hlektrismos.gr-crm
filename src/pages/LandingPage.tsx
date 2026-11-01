@@ -376,6 +376,7 @@ export default function LandingPage() {
               <a href="#contact" className="lp-btn lp-btn--light">Μίλησε με σύμβουλο <ArrowRight size={17} aria-hidden="true" /></a>
             </div>
           </div>
+          <WaveDivider fill="#f8f5f0" edge="bottom" size="md" accent="#9fd8f6" />
         </section>
 
         {/* ── G. Contact ── */}

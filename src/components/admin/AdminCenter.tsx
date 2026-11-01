@@ -15,7 +15,7 @@ import { fetchStaffAudit, listStaff } from '@/lib/staff-admin';
 import type { StaffAuditRow, StaffMember, StaffSource } from '@/lib/staff-admin';
 import StaffAdmin from './StaffAdmin';
 import AdminSecurity, { CheckList } from './AdminSecurity';
-import { SOURCE_FINDINGS, lastAnonChecks } from '@/lib/admin-checks';
+import { buildChecks, lastLiveChecks, summarize } from '@/lib/admin-checks';
 import { fetchSalesScope } from '@/lib/sales-scope';
 import type { SalesScope } from '@/lib/sales-scope';
 import { DocumentsTab, PermissionsTab, WorkflowTab } from './AdminReference';
@@ -88,8 +88,11 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
     return () => { alive = false; };
   }, [role]);
   const byGroup = useMemo(() => ACCESS_GROUPS.map(group => ({ group, n: staff?.rows.filter(s => group.roles.includes(s.role) && s.is_active).length ?? 0 })), [staff]);
-  const last = lastAnonChecks();
-  const issues = last?.results.filter(r => r.status === 'action').length ?? 0;
+  const last = lastLiveChecks();
+  const checks = buildChecks(last?.results ?? null);
+  const counts = summarize(checks);
+  const issues = counts.action;
+  const open = counts.manual + counts.unverified;
 
   return (
     <div className="space-y-4">
@@ -116,8 +119,8 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
         )}
         {role === 'admin' && (
           <button type="button" className="atx-ov" onClick={() => onOpen('security')}>
-            <span className="atx-ov-k">Έλεγχοι ανώνυμης πρόσβασης</span>
-            <span className={`atx-ov-v ${!last ? '' : issues ? 'is-warn' : 'is-ok'}`}>{!last ? 'Δεν έχουν εκτελεστεί' : issues ? `${issues} θέματα` : 'Χωρίς θέματα'}</span>
+            <span className="atx-ov-k">Κατάσταση ασφάλειας</span>
+            <span className={`atx-ov-v ${!last || issues || open ? 'is-warn' : 'is-ok'}`}>{!last ? 'Δεν έχουν εκτελεστεί ζωντανοί έλεγχοι' : issues ? `${issues} χρειάζονται ενέργεια` : `Καμία ενέργεια· ${open} εκκρεμούν`}</span>
             <span className="atx-ov-s">{last ? `Τελευταίος έλεγχος ${new Date(last.at).toLocaleString('el-GR')}` : 'Εκτελέστε τους από «Ασφάλεια & Έλεγχοι».'}</span>
           </button>
         )}
@@ -131,8 +134,8 @@ function Overview({ role, onOpen }: { role: Role | null; onOpen: (t: Tab) => voi
       </div>
       {role === 'admin' && (
         <div className="atx-panel">
-          <div className="atx-card-head"><h2 className="atx-section-title">Εκκρεμότητες ασφαλείας από τον κώδικα</h2><button className="atx-link" onClick={() => onOpen('security')}>Όλοι οι έλεγχοι →</button></div>
-          <CheckList items={SOURCE_FINDINGS} />
+          <div className="atx-card-head"><h2 className="atx-section-title">Εκκρεμότητες ασφαλείας (χρειάζονται ενέργεια)</h2><button className="atx-link" onClick={() => onOpen('security')}>Όλοι οι έλεγχοι →</button></div>
+          <CheckList items={checks.filter(c => c.status === 'action').slice(0, 6)} />
         </div>
       )}
     </div>

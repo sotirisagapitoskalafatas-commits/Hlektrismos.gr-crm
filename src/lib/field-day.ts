@@ -5,7 +5,7 @@ import { distanceKm } from './geo/distance';
 
 export interface VisitLike {
   id: string;
-  status: 'planned' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'planned' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
   scheduled_at: string | null;
   started_at: string | null;
   ended_at: string | null;

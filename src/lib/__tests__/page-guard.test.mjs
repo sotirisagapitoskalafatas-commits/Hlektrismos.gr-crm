@@ -33,6 +33,7 @@ const EXPECTED = {
   preferences: ['admin', 'sales_agent', 'sales_agent'],
   homelayout: ['admin', 'sales_agent', 'sales_agent'],
   guide: ['admin', 'sales_agent', 'sales_agent'], // Οδηγός ATLAS: explains only, never reads or changes CRM data
+  applications: ['admin', 'sales_agent', 'sales_agent'], // Αιτήσεις: row-level security decides which applications a Sales Agent sees
   leads: ['admin', 'sales_agent'],
   map: ['admin', 'sales_agent'],
   myday: ['admin', 'sales_agent'],

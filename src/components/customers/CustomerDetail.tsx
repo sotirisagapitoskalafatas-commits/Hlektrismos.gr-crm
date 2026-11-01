@@ -31,6 +31,8 @@ import { useToast } from '@/lib/toast';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
 import ContactEligibility from '@/components/contact/ContactEligibility';
 import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
+import CustomerWork from '@/components/customers/CustomerWork';
+import { applicationsAvailable, visitsExtendedAvailable } from '@/lib/field-api';
 import { fmtDate, fmtDateTime, fmtMoney } from '@/lib/ui';
 
 const DOC_TONE: Record<string, string> = { verified: 't-success', received: 't-warning', rejected: 't-danger' };
@@ -46,6 +48,9 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [docs, setDocs] = useState<Record<string, CaseDocument[]>>({});
   const [events, setEvents] = useState<(TimelineEvent & { case_no: string })[]>([]);
   const [tab, setTab] = useState<FolderTab>('overview');
+  // «Αιτήσεις & επισκέψεις» appears only once the staged SQL (phase7) is applied: until then the folder is exactly what it was.
+  const [workAvail, setWorkAvail] = useState(false);
+  useEffect(() => { void Promise.all([applicationsAvailable(), visitsExtendedAvailable()]).then(([a, v]) => setWorkAvail(a || v)); }, []);
   const [picked, setPicked] = useState<string | null>(null);
   const [leads, setLeads] = useState<Record<string, Lead | null>>({});
   const [leadActs, setLeadActs] = useState<Record<string, ActivityLogRow[] | null>>({});
@@ -143,7 +148,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const allDocs = cases.flatMap(k => (docs[k.id] ?? []).map(d => ({ ...d, case_no: k.case_no })));
   const counts: Partial<Record<FolderTab, number>> = { cases: cases.length, docs: allDocs.length, history: history.length, ...(supplyPoints ? { supply: supplyPoints.filter(p => !p.archived_at).length } : {}) };
   const shownHistory = histTeam === 'all' ? history : history.filter(e => e.team === histTeam);
-  const tabs = folderTabs({ backOffice: can(role, 'create_application'), supply: true });
+  const tabs = folderTabs({ backOffice: can(role, 'create_application'), supply: true, work: workAvail });
   const badge = folderBadge({ isLead: false, cases });
   const subtitle = folderSubtitle({ city: cust.city, since: cust.created_at, cases, fmtDate, staffName: id => staff.find(x => x.id === id)?.full_name ?? null });
   const scopedTab = tabs.find(t => t.id === tab)?.scoped ?? false;
@@ -317,6 +322,8 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
       )}
 
       {tab === 'supply' && <SupplyPointsTab owner={{ customerId: cust.id }} points={supplyPoints} tariffs={tariffs} cases={cases} docs={allDocs} leadFiles={Object.values(leads).flatMap(l => (l ? toLeadFiles(l.attached_files).filter(f => f.supply_point_id) : []))} canEdit={!cust.deleted_at} reload={() => void load()} />}
+
+      {tab === 'work' && <CustomerWork customerId={cust.id} points={supplyPoints ?? null} />}
 
       {tab === 'cases' && (
         <div className="atx-panel">

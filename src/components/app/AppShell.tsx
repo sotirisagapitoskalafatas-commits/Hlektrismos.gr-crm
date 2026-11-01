@@ -48,11 +48,12 @@ const MapPage = lazy(() => import('./MapPage'));
 const BackOfficePage = lazy(() => import('./BackOfficePage'));
 const FieldModePage = lazy(() => import('@/components/field-sales/FieldModePage'));
 const GuidePage = lazy(() => import('@/components/guide/GuidePage'));
+const ApplicationsPage = lazy(() => import('@/components/applications/ApplicationsPage'));
 
 /* The shell chrome lives in components/shell (TopBar, Sidebar, ModuleMap). This file composes it with the page body
    and the ⌘K palette. Every page draws its own visible title; the ones below draw an H1 themselves, and for the
    rest the shell adds a visually hidden H1 so each screen still has exactly one top-level heading. */
-const OWN_HEADING = new Set<string>(['admin', 'cases', 'leads', 'account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting', 'guide']);
+const OWN_HEADING = new Set<string>(['admin', 'cases', 'leads', 'account', 'preferences', 'homelayout', 'home', 'mywork', 'followups', 'backoffice', 'case', 'customers', 'myday', 'prospecting', 'guide', 'applications']);
 
 /* ---------------- ⌘K palette + global search ---------------- */
 function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -279,6 +280,7 @@ export default function AppShell() {
       case 'automations': return <AutomationBuilderPage />;
       case 'aiworkforce': return <AIWorkforcePage />;
       case 'guide': return <GuidePage />;
+      case 'applications': return <ApplicationsPage />;
       default: return <HomePage />;
     }
   })();

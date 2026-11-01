@@ -18,6 +18,7 @@ import { StageChangeDialog } from '@/components/cases/CaseOverview';
 import CheckinReview from '@/components/field-sales/CheckinReview';
 import BackofficeLeads from '@/components/leads/BackofficeLeads';
 import ManagerFollowUps from '@/components/field-sales/ManagerFollowUps';
+import FieldApplicationsQueue from '@/components/field-sales/FieldApplicationsQueue';
 
 type Filter = 'all' | 'mine' | 'from_sales' | 'exceptions' | 'blocked' | 'ready';
 const matches = (f: Filter, i: { mine: boolean; blockers: string[]; exception: string | null; fromSales: boolean }) =>
@@ -126,6 +127,8 @@ export default function BackOfficePage() {
         )}
       </div>
       <p className="text-[12px] text-[var(--atx-faint)] mt-3">Οι εκκρεμότητες εγγράφων βασίζονται στην ενδεικτική λίστα δικαιολογητικών· επιβεβαιώστε με τον πάροχο.</p>
+
+      <FieldApplicationsQueue />
 
       <CheckinReview />
 

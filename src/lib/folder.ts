@@ -15,12 +15,13 @@ export function folderBadge(input: { isLead: boolean; cases: CaseLike[] }): Fold
   return { id: 'none', label: 'Χωρίς ενεργό case' };
 }
 
-export type FolderTab = 'overview' | 'supply' | 'cases' | 'docs' | 'history' | 'followups' | 'visits' | 'offers' | 'signatures' | 'backoffice';
+export type FolderTab = 'overview' | 'supply' | 'work' | 'cases' | 'docs' | 'history' | 'followups' | 'visits' | 'offers' | 'signatures' | 'backoffice';
 /** Same order everywhere. `needsCase`: shown as «Διαθέσιμο μετά τη μετατροπή σε Case» for an unconverted lead;
  *  `scoped`: shows the selected case. */
 export const FOLDER_TABS: { id: FolderTab; label: string; needsCase: boolean; scoped: boolean }[] = [
   { id: 'overview', label: 'Σύνοψη', needsCase: false, scoped: false },
   { id: 'supply', label: 'Παροχές', needsCase: false, scoped: false },
+  { id: 'work', label: 'Αιτήσεις & επισκέψεις', needsCase: false, scoped: false },
   { id: 'docs', label: 'Έγγραφα', needsCase: false, scoped: true },
   { id: 'cases', label: 'Υποθέσεις', needsCase: true, scoped: false },
   { id: 'history', label: 'Ιστορικό', needsCase: false, scoped: false },
@@ -33,8 +34,8 @@ export const FOLDER_TABS: { id: FolderTab; label: string; needsCase: boolean; sc
 export const NEEDS_CASE_TEXT = 'Διαθέσιμο μετά τη μετατροπή σε Case';
 
 /** Tabs a role sees: Back Office only for the roles that have it on the case today (create_application). «Παροχές» belongs to a customer, so only the customer folder asks for it (`supply`); an unconverted lead has no such tab. */
-export const folderTabs = (opts: { backOffice: boolean; supply?: boolean }) =>
-  FOLDER_TABS.filter(t => (t.id !== 'backoffice' || opts.backOffice) && (t.id !== 'supply' || !!opts.supply));
+export const folderTabs = (opts: { backOffice: boolean; supply?: boolean; work?: boolean }) =>
+  FOLDER_TABS.filter(t => (t.id !== 'backoffice' || opts.backOffice) && (t.id !== 'supply' || !!opts.supply) && (t.id !== 'work' || !!opts.work));
 
 /** The most urgent open case: earliest follow-up, then the one untouched longest. */
 export function mostUrgentCase<T extends CaseLike>(cases: T[]): T | null {

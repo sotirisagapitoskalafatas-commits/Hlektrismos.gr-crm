@@ -33,7 +33,7 @@ const LAYOUT: LayoutModule[] = [
   { id: 'home', label: 'Αρχική', groups: [{ keys: ['dashboard', 'mywork'] }] },
   { id: 'crm', label: 'CRM', groups: [
     { label: 'Πελάτες', keys: ['leads', 'customers'] },
-    { label: 'Δουλειά', keys: ['cases', 'backoffice'] },
+    { label: 'Δουλειά', keys: ['cases', 'applications', 'backoffice'] },
     { label: 'Κατάλογος', keys: ['providers', 'prospecting'] },
   ] },
   { id: 'field', label: 'Πεδίο', groups: [{ keys: ['myday', 'map'] }] },

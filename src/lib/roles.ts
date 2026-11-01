@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Building2, Bot, Map as MapIcon, Compass, Briefcase,
   CalendarDays, Gauge, Settings, Home, ChevronRight, Bell, Plus, Search,
   UserPlus, Sun, MonitorCog, Cog, BarChart3, UsersRound, ShoppingBag, Navigation,
-  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar, Boxes, BookOpen,
+  UserCircle, SlidersHorizontal, Smartphone, Inbox, Wallet, Radar, Boxes, BookOpen, ClipboardList,
 } from 'lucide-react';
 import { labsVisible } from './labs';
 import { DOC_STATUS_TEXT } from './status-text';
@@ -207,7 +207,7 @@ export type ModuleMaturity = 'live' | 'beta' | 'planned' | 'blocked';
 export type PageKey =
   | 'home' | 'mywork' | 'leads' | 'prospecting' | 'providers' | 'cases' | 'followups' | 'customers'
   | 'map' | 'myday' | 'field' | 'backoffice' | 'reports' | 'revenue' | 'admin'
-  | 'automations' | 'aiworkforce' | 'account' | 'preferences' | 'homelayout' | 'guide';
+  | 'automations' | 'aiworkforce' | 'account' | 'preferences' | 'homelayout' | 'guide' | 'applications';
 
 export type NavBadge = 'leads' | 'followups' | 'backoffice' | 'cases' | 'customers';
 
@@ -288,6 +288,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: ShoppingBag,
     children: [
       { key: 'cases', label: 'Cases', icon: Briefcase, page: 'cases', roles: ALL, maturity: 'live', badge: 'cases' },
+      { key: 'applications', label: 'Αιτήσεις', icon: ClipboardList, page: 'applications', roles: ALL, maturity: 'beta' },
       { key: 'prospecting', label: 'B2B Prospecting', icon: Radar, page: 'prospecting', roles: ['admin', 'sales_agent'], maturity: 'beta', labs: true },
       { key: 'providers', label: 'Πάροχοι', icon: Boxes, page: 'providers', roles: ['admin', 'sales_agent'], maturity: 'live' },
     ],
@@ -408,6 +409,7 @@ export const PAGE_TITLES: Record<PageKey, string> = {
   preferences: 'Προτιμήσεις',
   homelayout: 'Αρχική σελίδα',
   guide: 'Οδηγός ATLAS',
+  applications: 'Αιτήσεις',
 };
 
 export const MATURITY_LABEL: Record<ModuleMaturity, { label: string; dot: string }> = {

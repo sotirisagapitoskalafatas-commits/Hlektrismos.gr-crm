@@ -117,7 +117,8 @@ test('send-lead-confirmation: the same transport rule; a failed upgrade releases
   });
   const body = { body: { email: 'new@example.gr', first_name: 'Νέος' } };
   const bad = await loadFunction('send-lead-confirmation', { db: lead(), smtpMode: 'no-starttls' });
-  assert.equal((await bad.call(body)).status, 500);
+  const refused = await bad.call(body);
+  assert.equal(refused.status, 500, JSON.stringify(refused.json));
   assert.equal(bad.smtp[0].data, null);
   assert.ok(!bad.smtp[0].commands.some((c) => /^(AUTH|MAIL|RCPT)/.test(c)));
   assert.equal(bad.db.rows('leads')[0].ack_sent_at, null, 'a genuine retry still works');

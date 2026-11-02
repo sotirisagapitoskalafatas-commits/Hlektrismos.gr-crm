@@ -56,11 +56,16 @@ export default function StandaloneVisitsPanel() {
   const reassign = async (visitId: string, agentId: string) => {
     if (!isAdmin || !agentId) return;
     setBusy(visitId);
-    const result = await assignFieldVisit(visitId, agentId);
-    setBusy(null);
-    if (!result.ok) { toast(result.error, 'bad'); return; }
-    toast('Η επίσκεψη ανατέθηκε στον Sales Agent. Η ενέργεια καταγράφηκε στο ιστορικό.', 'ok');
-    void load();
+    try {
+      const result = await assignFieldVisit(visitId, agentId);
+      if (!result.ok) { toast(result.error, 'bad'); return; }
+      toast('Η επίσκεψη ανατέθηκε στον Sales Agent. Η ενέργεια καταγράφηκε στο ιστορικό.', 'ok');
+      void load();
+    } catch {
+      toast('Η ανάθεση απέτυχε λόγω προβλήματος σύνδεσης. Δοκιμάστε ξανά.', 'bad');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const checkIn = async (v: FieldVisit) => {

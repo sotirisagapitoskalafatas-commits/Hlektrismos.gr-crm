@@ -13,7 +13,7 @@ import { smtpDataBody } from "../_shared/email-safety.ts";
 import { outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { emailObjection } from "../_shared/outreach-gate.ts";
 import { supabaseLoaders } from "../_shared/outreach-loaders.ts";
-import { openSecureSmtp } from "../_shared/smtp.ts";
+import { isSupabaseEdgeSmtpPort, openSecureSmtp } from "../_shared/smtp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -101,11 +101,11 @@ serve(async (req) => {
       await releaseClaim();
       return new Response(JSON.stringify({ ok: false, error: "Transactional email is not configured" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    // Supabase Edge Functions cannot reach SMTP port 587. Require implicit TLS
-    // on 465; other ports need an explicitly reviewed provider/network setup.
-    if (smtpPort !== 465) {
+    // Supabase Edge Functions cannot reach outbound ports 25 or 587.
+    // Use implicit TLS on 465 or a provider-supported STARTTLS port such as SES 2587.
+    if (!isSupabaseEdgeSmtpPort(smtpPort)) {
       await releaseClaim();
-      return new Response(JSON.stringify({ ok: false, error: "Configure SMTP with implicit TLS on port 465" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: false, error: "Use SMTP port 465 (TLS) or 2587 (STARTTLS). Ports 25 and 587 are not reachable from Supabase Edge Functions." }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const fromEmail = cfg.from_email || smtpUser || "info@hlektrismos.gr";
     const fromLabel = cfg.from_name || "Hlektrismos.gr";

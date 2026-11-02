@@ -51,7 +51,7 @@ export function trashError(message: string | undefined, fallback: string): strin
   const m = message ?? '';
   const refs = /referenced by (\{.*\})/.exec(m);
   if (refs) {
-    try { return `Δεν επιτρέπεται οριστική διαγραφή: συνδέεται με ${describeReferences(JSON.parse(refs[1]))}. Τα συνδεδεμένα δεδομένα διατηρούνται.`; }
+    try { return `Δεν επιτρέπεται οριστική διαγραφή: συνδέεται με ${describeReferences(JSON.parse(refs[1]))}. Το ιστορικό του CRM διατηρείται.`; }
     catch { /* fall through */ }
   }
   const open = /has (\d+) open case/.exec(m);

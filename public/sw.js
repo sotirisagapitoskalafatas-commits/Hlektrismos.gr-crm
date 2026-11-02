@@ -3,7 +3,7 @@ const SHELL = 'atlas-crm-shell-v2';
 
 const SHELL_URLS = ['/', '/manifest.webmanifest', '/app-icon.svg', '/app-icon-maskable.svg'];
 const STATIC_DESTINATIONS = new Set(['script', 'style', 'image', 'font', 'manifest']);
-const STATIC_EXTENSIONS = /\\.(?:js|mjs|css|woff2?|ttf|otf|svg|png|jpe?g|webp|ico|webmanifest)$/i;
+const STATIC_EXTENSIONS = /\.(?:js|mjs|css|woff2?|ttf|otf|svg|png|jpe?g|webp|ico|webmanifest)$/i;
 
 self.addEventListener('install', event => {
   event.waitUntil(

@@ -1,4 +1,5 @@
 -- STAGED — run in a controlled Supabase SQL Editor release after confirming a fresh backup.
+begin;
 -- Repairs only the staff-management authorization RPCs after the database was normalized to the exact
 -- two-role model (admin / sales_agent) but staff_admin_can and staff_update still contained legacy role names.
 -- No profile rows, Auth users, role grants, leads, customers, assignments or audit history are modified.
@@ -11,9 +12,16 @@ begin
     select 1 from pg_constraint
     where conrelid = 'public.profiles'::regclass
       and contype = 'c'
+      and conkey @> array[(
+        select attnum from pg_attribute
+        where attrelid = 'public.profiles'::regclass and attname = 'role' and not attisdropped
+      )]::smallint[]
       and pg_get_constraintdef(oid) like '%admin%'
       and pg_get_constraintdef(oid) like '%sales_agent%'
       and pg_get_constraintdef(oid) not like '%field_sales%'
+      and pg_get_constraintdef(oid) not like '%inside_sales%'
+      and pg_get_constraintdef(oid) not like '%manager%'
+      and pg_get_constraintdef(oid) not like '%back_office%'
   ) then
     raise exception 'staff-admin hotfix requires profiles.role to be limited to admin and sales_agent';
   end if;
@@ -107,3 +115,5 @@ comment on function public.staff_admin_can(uuid, text, text) is
   'Two-role staff administration: only the active Admin account creates/manages Sales Agent accounts.';
 comment on function public.staff_update(uuid, text, text, text) is
   'Audited profile updates for the exact admin / sales_agent account model.';
+
+commit;

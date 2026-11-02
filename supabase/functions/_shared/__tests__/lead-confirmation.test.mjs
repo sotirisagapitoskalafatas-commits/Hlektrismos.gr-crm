@@ -23,3 +23,18 @@ test('the public caller never receives internal error text', () => {
   assert.ok(!/error: err\.message/.test(src), 'no err.message in a response');
   assert.ok(/console\.error\("send-lead-confirmation error:", err instanceof Error \? err\.name : "error"\)/.test(src), 'only the error name is logged');
 });
+
+test('lead confirmation SMTP credentials come only from dedicated Edge Function secrets, never crm_settings', () => {
+  for (const key of [
+    'LEAD_CONFIRMATION_SMTP_HOST',
+    'LEAD_CONFIRMATION_SMTP_PORT',
+    'LEAD_CONFIRMATION_SMTP_USER',
+    'LEAD_CONFIRMATION_SMTP_PASSWORD',
+    'LEAD_CONFIRMATION_FROM_EMAIL',
+    'LEAD_CONFIRMATION_FROM_NAME',
+  ]) assert.ok(src.includes(`Deno.env.get("${key}")`), key + ' is read from the function environment');
+  assert.ok(!src.includes('from("crm_settings")'), 'the public mailer does not read SMTP credentials from a browser-readable settings row');
+  assert.ok(src.includes('parseRecipient('), 'the configured sender address is validated');
+  assert.ok(src.includes('safeDisplayName('), 'the configured sender display name is sanitised');
+  assert.ok(src.includes('buildHeaders({'), 'mail headers are built with the shared safety helpers');
+});

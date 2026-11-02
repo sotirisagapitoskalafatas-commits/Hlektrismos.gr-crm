@@ -9,7 +9,7 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, secretKey } from "../_shared/keys.ts";
 import { logAttempt, logResult } from "../_shared/communication-log.ts";
-import { smtpDataBody } from "../_shared/email-safety.ts";
+import { buildHeaders, parseRecipient, safeDisplayName, smtpDataBody } from "../_shared/email-safety.ts";
 import { outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { emailObjection } from "../_shared/outreach-gate.ts";
 import { supabaseLoaders } from "../_shared/outreach-loaders.ts";
@@ -86,17 +86,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: "not sent" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: setting } = await adminClient
-      .from("crm_settings")
-      .select("setting_value")
-      .eq("setting_key", "email_config")
-      .single();
-
-    const cfg = setting?.setting_value ?? {};
-    const smtpHost = String(cfg.smtp_host ?? "").trim();
-    const smtpPort = Number(cfg.smtp_port || 465);
-    const smtpUser = String(cfg.smtp_user ?? "").trim();
-    const smtpPass = String(cfg.smtp_password ?? "");
+    // Dedicated project secrets keep this public transactional sender's credentials out of crm_settings.
+    // Supabase Auth SMTP is a separate mailer and does not configure this function.
+    const smtpHost = Deno.env.get("LEAD_CONFIRMATION_SMTP_HOST")?.trim() ?? "";
+    const smtpPort = Number(Deno.env.get("LEAD_CONFIRMATION_SMTP_PORT")?.trim() || "465");
+    const smtpUser = Deno.env.get("LEAD_CONFIRMATION_SMTP_USER")?.trim() ?? "";
+    const smtpPass = Deno.env.get("LEAD_CONFIRMATION_SMTP_PASSWORD") ?? "";
     if (!smtpHost || !smtpUser || !smtpPass || !Number.isInteger(smtpPort)) {
       await releaseClaim();
       return new Response(JSON.stringify({ ok: false, error: "Transactional email is not configured" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -107,8 +102,14 @@ serve(async (req) => {
       await releaseClaim();
       return new Response(JSON.stringify({ ok: false, error: "Use SMTP port 465 (TLS) or 2587 (STARTTLS). Ports 25 and 587 are not reachable from Supabase Edge Functions." }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const fromEmail = cfg.from_email || smtpUser || "info@hlektrismos.gr";
-    const fromLabel = cfg.from_name || "Hlektrismos.gr";
+    let fromEmail: string;
+    try {
+      fromEmail = parseRecipient(Deno.env.get("LEAD_CONFIRMATION_FROM_EMAIL")?.trim() || smtpUser);
+    } catch {
+      await releaseClaim();
+      return new Response(JSON.stringify({ ok: false, error: "Transactional sender address is not configured correctly" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const fromLabel = safeDisplayName(Deno.env.get("LEAD_CONFIRMATION_FROM_NAME") || "Hlektrismos.gr", "Hlektrismos.gr");
 
     // Audit fix: user-supplied values are escaped (HTML injection / phishing via our domain) and
     // stripped of CR/LF; `service` is also length-limited.
@@ -143,15 +144,18 @@ serve(async (req) => {
     ].join("\r\n");
 
     const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const headers = [
-      `From: ${fromLabel} <${fromEmail}>`,
-      `To: ${email}`,
-      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-      `MIME-Version: 1.0`,
-      `Date: ${new Date().toUTCString()}`,
-      `X-Mailer: Hlektrismos-CRM/1.0`,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    ].join("\r\n");
+    const headers = buildHeaders({
+      from: fromEmail,
+      fromName: fromLabel,
+      to: email,
+      subject,
+      extra: {
+        "MIME-Version": "1.0",
+        "Date": new Date().toUTCString(),
+        "X-Mailer": "Hlektrismos-CRM/1.0",
+        "Content-Type": `multipart/alternative; boundary="${boundary}"`,
+      },
+    });
 
     const body = [
       `--${boundary}`,

@@ -2,8 +2,8 @@
 // written on a TLS connection. There is no plain-text mode and no setting that enables one.
 //   port 465                implicit TLS (certificate checked for `host` by Deno)
 //   any other port          the server must advertise STARTTLS and the upgrade must succeed, otherwise SmtpSecurityError and nothing is sent
-// Supabase blocks outbound 25 and 587 from Edge Functions (docs: guides/functions/limits), so a working configuration here is 465, or a
-// provider's alternative STARTTLS port.
+// Supabase blocks outbound ports 25 and 587 from Edge Functions. Common working choices are
+// implicit TLS on 465 or a provider-supported STARTTLS alternative such as Amazon SES on 2587.
 // The session uses conn.read/conn.write rather than the streams: a TcpConn whose streams are locked cannot be handed to Deno.startTls.
 
 /** Secure transport was required and is not available. Never caught to continue: the send is abandoned. */
@@ -13,6 +13,9 @@ export class SmtpSecurityError extends Error {
     this.name = "SmtpSecurityError";
   }
 }
+
+/** SMTP ports intentionally supported by the CRM's Supabase Edge Function senders. */
+export const isSupabaseEdgeSmtpPort = (port: number): boolean => Number.isInteger(port) && (port === 465 || port === 2587);
 
 const MAX_REPLY_BYTES = 64 * 1024;
 const enc = new TextEncoder();

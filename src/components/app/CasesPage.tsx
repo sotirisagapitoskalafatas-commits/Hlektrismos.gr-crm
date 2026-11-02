@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { canTrash, trashCases } from '@/lib/trash';
+import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { ACTIVE_STAGES, SERVICES, serviceLabel, stageLabel } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';
@@ -7,10 +10,44 @@ import { Case, createCase, fetchAllCaseStats, fetchCases } from '@/lib/api';
 import { Btn, EmptyState, Field, Micro, Modal, Spinner, fmtDate, fmtMoney } from '@/lib/ui';
 import { pillClass, toneForStage } from '@/lib/status-style';
 import PipelineBoard from './PipelineBoard';
-import { Briefcase, KanbanSquare, List, Plus, Search } from 'lucide-react';
+import { Briefcase, KanbanSquare, List, Plus, Search, Trash2 } from 'lucide-react';
 
 const VIEW_KEY = 'atlas.cases.view';
 const PROPERTY_TYPES = ['Διαμέρισμα', 'Μονοκατοικία', 'Κατάστημα', 'Γραφείο', 'Άλλο'];
+
+function BulkTrashDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () => void; onDone: () => void }) {
+  const { toast } = useToast();
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (busy || ids.length === 0) return;
+    setBusy(true); setError(null);
+    const result = await trashCases(ids, reason);
+    setBusy(false);
+    if (result.error) { setError(result.error); return; }
+    toast('Μεταφέρθηκαν στον κάδο ' + (result.count ?? ids.length) + ' cases.', 'ok');
+    onDone();
+    onClose();
+  };
+  return (
+    <Modal open onClose={() => !busy && onClose()} title={'Μεταφορά ' + ids.length + ' cases στον κάδο'} micro="Μαζική διαγραφή">
+      <div className="space-y-3">
+        <p className="text-[14px] text-ink/75">Τα επιλεγμένα cases θα αφαιρεθούν από τις κανονικές λίστες και θα μεταφερθούν στον Κάδο. Μπορείτε να τα επαναφέρετε ή να τα διαγράψετε οριστικά από τη Διαχείριση → Κάδος.</p>
+        <Field label="Αιτία (προαιρετική)">
+          <input className="field" value={reason} onChange={e => setReason(e.target.value)} placeholder="π.χ. δοκιμαστικές εγγραφές, διπλότυπα" />
+        </Field>
+        {error && <div className="atx-notice" role="alert">{error}</div>}
+        <div className="flex justify-end gap-2">
+          <Btn variant="outline" disabled={busy} onClick={onClose}>Άκυρο</Btn>
+          <Btn variant="danger" disabled={busy || ids.length === 0} onClick={() => void submit()}>
+            {busy ? <Spinner /> : <Trash2 className="w-3.5 h-3.5" />} Μεταφορά στον κάδο ({ids.length})
+          </Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 function CreateCaseModal({ open, onClose, onCreated }: {
   open: boolean; onClose: () => void; onCreated: (id: string) => void;
@@ -103,6 +140,7 @@ function CreateCaseModal({ open, onClose, onCreated }: {
 
 export default function CasesPage() {
   const { openCase, view } = useNav();
+  const { role } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -112,8 +150,10 @@ export default function CasesPage() {
   const [docPending, setDocPending] = useState<Set<string>>(new Set());
   const [sigPending, setSigPending] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
   const [mode, setMode] = useState<'list' | 'board'>(() => { try { return localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'list'; } catch { return 'list'; } });
-  const pickMode = (m: 'list' | 'board') => { setMode(m); try { localStorage.setItem(VIEW_KEY, m); } catch { /* the choice lasts for this page view */ } };
+  const pickMode = (m: 'list' | 'board') => { setMode(m); if (m !== 'list') setSelectedIds(new Set()); try { localStorage.setItem(VIEW_KEY, m); } catch { /* the choice lasts for this page view */ } };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,6 +212,23 @@ export default function CasesPage() {
     return okStage && okOwner && okQ;
   });
 
+  const selectedVisible = filtered.filter(c => selectedIds.has(c.id));
+  const allVisibleSelected = filtered.length > 0 && filtered.every(c => selectedIds.has(c.id));
+  const toggleCase = (id: string, checked: boolean) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (checked) next.add(id); else next.delete(id);
+    return next;
+  });
+  const toggleAllVisible = (checked: boolean) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    filtered.forEach(c => checked ? next.add(c.id) : next.delete(c.id));
+    return next;
+  });
+  const finishBulkTrash = () => {
+    setSelectedIds(new Set());
+    void load();
+  };
+
   return (
     <div className="max-w-6xl space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -216,6 +273,22 @@ export default function CasesPage() {
         ))}
       </div>}
 
+      {mode === 'list' && canTrash(role) && !loading && filtered.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap rounded-xl border border-line bg-white/80 px-3 py-2.5" data-case-bulk-select>
+          <label className="inline-flex items-center gap-2 text-[13px] text-ink/65">
+            <input type="checkbox" checked={allVisibleSelected} onChange={e => toggleAllVisible(e.target.checked)} aria-label="Επιλογή όλων των ορατών cases" />
+            Επιλογή όλων ({filtered.length})
+          </label>
+          <span className="flex-1" />
+          <span className="text-[12px] text-ink/45">{selectedVisible.length} επιλεγμένα</span>
+          <button type="button" className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5 text-[var(--atx-red)]"
+            disabled={selectedVisible.length === 0} onClick={() => setBulkTrashOpen(true)}>
+            <Trash2 size={14} /> Μεταφορά στον κάδο ({selectedVisible.length})
+          </button>
+          {selectedVisible.length > 0 && <button type="button" className="atx-btn atx-btn-quiet" onClick={() => setSelectedIds(new Set())}>Καθαρισμός επιλογής</button>}
+        </div>
+      )}
+
       {mode === 'board' && !loading && <PipelineBoard cases={filtered} onOpen={openCase} />}
       {mode === 'board' && loading && <div className="flex items-center justify-center py-16"><Spinner /></div>}
 
@@ -227,26 +300,34 @@ export default function CasesPage() {
         {!loading && filtered.length > 0 && (
           <div className="ui-rows">
             {filtered.map(c => (
-              <button key={c.id} onClick={() => openCase(c.id)}
-                className="ui-row w-full text-left px-5 py-3.5 flex items-center gap-4 flex-wrap">
-                <span className="font-mono text-[11px] text-ink/35 w-20 shrink-0">{c.case_no}</span>
-                <span className="flex-1 min-w-[160px]">
-                  <span className="block text-[13px] font-medium text-ink truncate">{c.customer?.full_name ?? c.title}</span>
-                  <span className="block text-xs text-ink/45 truncate">{serviceLabel(c.service_type)} · {c.title}</span>
-                </span>
-                <span className="flex items-center gap-2 shrink-0 flex-wrap">
-                  <span className={pillClass(toneForStage(c.current_stage))}>{stageLabel(c.current_stage)}</span>
-                  {c.priority === 'high' || c.priority === 'critical' ? <span className={pillClass('red')}>{c.priority === 'critical' ? 'κρίσιμο' : 'υψηλή'}</span> : null}
-                  {c.next_follow_up_at && <span className="text-xs text-ink/45">FU: {fmtDate(c.next_follow_up_at)}</span>}
-                  <span className="text-[13px] font-semibold text-ink/80 ml-2">{fmtMoney(c.value)}</span>
-                </span>
-              </button>
+              <div key={c.id} className="ui-row w-full px-4 py-3.5 flex items-center gap-3 flex-wrap" data-case-row={c.id}>
+                {canTrash(role) && (
+                  <label className="inline-flex items-center justify-center p-1 shrink-0" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selectedIds.has(c.id)} onChange={e => toggleCase(c.id, e.target.checked)}
+                      aria-label={'Επιλογή case ' + (c.customer?.full_name ?? c.title)} />
+                  </label>
+                )}
+                <button type="button" onClick={() => openCase(c.id)} className="flex-1 min-w-[220px] flex items-center gap-4 flex-wrap text-left">
+                  <span className="font-mono text-[11px] text-ink/35 w-20 shrink-0">{c.case_no}</span>
+                  <span className="flex-1 min-w-[160px]">
+                    <span className="block text-[13px] font-medium text-ink truncate">{c.customer?.full_name ?? c.title}</span>
+                    <span className="block text-xs text-ink/45 truncate">{serviceLabel(c.service_type)} · {c.title}</span>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <span className={pillClass(toneForStage(c.current_stage))}>{stageLabel(c.current_stage)}</span>
+                    {c.priority === 'high' || c.priority === 'critical' ? <span className={pillClass('red')}>{c.priority === 'critical' ? 'κρίσιμο' : 'υψηλή'}</span> : null}
+                    {c.next_follow_up_at && <span className="text-xs text-ink/45">FU: {fmtDate(c.next_follow_up_at)}</span>}
+                    <span className="text-[13px] font-semibold text-ink/80 ml-2">{fmtMoney(c.value)}</span>
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>}
 
       <CreateCaseModal open={creating} onClose={() => setCreating(false)} onCreated={id => { load(); openCase(id); }} />
+      {bulkTrashOpen && <BulkTrashDialog ids={selectedVisible.map(c => c.id)} onClose={() => setBulkTrashOpen(false)} onDone={finishBulkTrash} />}
     </div>
   );
 }

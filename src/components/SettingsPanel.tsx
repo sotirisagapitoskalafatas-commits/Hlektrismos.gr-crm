@@ -926,30 +926,38 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ to: s.smtp_user || s.from_email, subject: "Test Email from Hlektrismos.gr", html: "<p>SMTP test OK ✅</p>", from_name: s.from_name || "Hlektrismos.gr" }),
+      if (!supabase) throw new Error("Η σύνδεση με το CRM δεν είναι διαθέσιμη.");
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to: s.smtp_user || s.from_email,
+          subject: "Test Email from Hlektrismos.gr",
+          html: "<p>SMTP test OK ✅</p>",
+          from_name: s.from_name || "Hlektrismos.gr",
+          transactional: true,
+        },
       });
-      const data = await res.json();
-      setTestResult(data.success ? { ok: true, msg: "SMTP test email sent!" } : { ok: false, msg: data.error || "Failed" });
-    } catch (err: any) { setTestResult({ ok: false, msg: err.message }); }
-    setTesting(false);
+      if (error) setTestResult({ ok: false, msg: error.message || "SMTP test failed" });
+      else setTestResult(data?.success ? { ok: true, msg: "SMTP test email sent!" } : { ok: false, msg: data?.error || "SMTP test failed" });
+    } catch (err: any) {
+      setTestResult({ ok: false, msg: err?.message || "SMTP test failed" });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const testImap = async () => {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-emails`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      setSyncResult(data.success ? { ok: true, msg: data.message || "IMAP sync OK!" } : { ok: false, msg: data.error || "IMAP failed" });
-    } catch (err: any) { setSyncResult({ ok: false, msg: err.message }); }
-    setSyncing(false);
+      if (!supabase) throw new Error("Η σύνδεση με το CRM δεν είναι διαθέσιμη.");
+      const { data, error } = await supabase.functions.invoke('fetch-emails', { body: {} });
+      if (error) setSyncResult({ ok: false, msg: error.message || "IMAP test failed" });
+      else setSyncResult(data?.success ? { ok: true, msg: data.message || "IMAP sync OK!" } : { ok: false, msg: data?.error || "IMAP failed" });
+    } catch (err: any) {
+      setSyncResult({ ok: false, msg: err?.message || "IMAP test failed" });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const applyWizardPreset = (provider: string) => {

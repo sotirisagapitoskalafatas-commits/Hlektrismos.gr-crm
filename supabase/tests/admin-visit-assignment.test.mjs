@@ -8,7 +8,7 @@ let db, as, run, one, su;
 before(async () => {
   ({ db, as, run, one, su } = await buildFinalDb());
   await su();
-  await applyStaged(db, ['phase7/03_admin_visit_assignment', 'phase7/05_admin_visit_assignment_invoker']);
+  await applyStaged(db, ['phase7/03_admin_visit_assignment', 'phase7/05_admin_visit_assignment_invoker', 'phase7/06_sales_agent_only_field_visit_checkin']);
 });
 
 const makeVisit = async (actor, name, status = 'planned') => {
@@ -72,4 +72,83 @@ test('completed visits remain immutable to the assignment operation and missing 
   const missing = await run('select public.assign_field_visit($1::uuid, $2::uuid) as ok', ['dddddddd-0000-4000-8000-000000000002', B]);
   assert.equal(missing.ok, true);
   assert.equal(missing.rows[0].ok, false);
+});
+
+
+test('Admin cannot claim GPS check-in or check-out through direct authenticated RPC calls', async () => {
+  const checkinVisit = await makeVisit(A, 'Έλεγχος Admin check-in');
+  const checkoutVisit = await makeVisit(A, 'Έλεγχος Admin check-out');
+  const idempotentVisit = await makeVisit(A, 'Έλεγχος Admin idempotent check-in');
+
+  await su();
+  await db.query("update public.case_visits set status='in_progress', started_at=now() where id=$1::uuid", [checkoutVisit]);
+  await db.query("update public.case_visits set status='completed', started_at=now(), ended_at=now() where id=$1::uuid", [idempotentVisit]);
+
+  await as(ADMIN);
+  const checkin = await run(
+    "select public.field_checkin($1::uuid, null, null, null, null, '') as result",
+    [checkinVisit],
+  );
+  assert.equal(checkin.ok, false, 'Admin cannot physically check in an agent visit');
+
+  const checkout = await run(
+    "select public.field_checkout($1::uuid, null, null, null, '') as result",
+    [checkoutVisit],
+  );
+  assert.equal(checkout.ok, false, 'Admin cannot physically check out an agent visit');
+
+  const checkoutOutcome = await run(
+    "select public.field_checkout_with_outcome($1::uuid, null, null, null, '', 'interested', null, 'Interested') as result",
+    [checkoutVisit],
+  );
+  assert.equal(checkoutOutcome.ok, false, 'the atomic outcome RPC cannot bypass the physical check-out guard');
+
+  const duplicateCheckin = await run(
+    "select public.field_checkin($1::uuid, null, null, null, null, '') as result",
+    [idempotentVisit],
+  );
+  assert.equal(duplicateCheckin.ok, false, 'even the idempotent branch cannot create a field-check-in record as Admin');
+
+  await su();
+  const visits = await one(
+    "select id, status, check_in, check_out, ended_at from public.case_visits where id = any($1::uuid[])",
+    [[checkinVisit, checkoutVisit, idempotentVisit]],
+  );
+  const byId = Object.fromEntries(visits.map(row => [row.id, row]));
+  assert.equal(byId[checkinVisit].status, 'planned');
+  assert.equal(byId[checkinVisit].check_in, null);
+  assert.equal(byId[checkoutVisit].status, 'in_progress');
+  assert.equal(byId[checkoutVisit].check_out, null);
+  assert.equal(byId[checkoutVisit].ended_at, null);
+  assert.equal(byId[idempotentVisit].status, 'completed');
+  assert.equal((await one(
+    "select count(*)::int n from public.field_checkins where visit_id = any($1::uuid[])",
+    [[checkinVisit, checkoutVisit, idempotentVisit]],
+  ))[0].n, 0, 'failed Admin actions leave no physical check-in rows');
+});
+
+test('Sales Agents can still check in and complete their own visit with a structured outcome', async () => {
+  const visit = await makeVisit(A, 'Έλεγχος Sales Agent check-in / check-out');
+  await as(A);
+  const checkin = await run(
+    "select public.field_checkin($1::uuid, null, null, null, null, '') as result",
+    [visit],
+  );
+  assert.equal(checkin.ok, true, checkin.error);
+  assert.equal(checkin.rows[0].result.accepted, true);
+  assert.equal(checkin.rows[0].result.code, 'NO_GPS');
+
+  const checkout = await run(
+    "select public.field_checkout_with_outcome($1::uuid, null, null, null, 'Επικοινωνία ολοκληρώθηκε', 'interested', null, 'Interested') as result",
+    [visit],
+  );
+  assert.equal(checkout.ok, true, checkout.error);
+  assert.equal(checkout.rows[0].result.accepted, true);
+
+  await su();
+  const saved = (await one(
+    "select status, outcome_key, outcome_reason from public.case_visits where id=$1::uuid",
+    [visit],
+  ))[0];
+  assert.deepEqual(saved, { status: 'completed', outcome_key: 'interested', outcome_reason: null });
 });

@@ -16,6 +16,10 @@ const CASE2 = 'cccccccc-0000-4000-8000-000000000002';
 const CASE3 = 'cccccccc-0000-4000-8000-000000000003';
 const APP = 'dddddddd-0000-4000-8000-000000000001';
 const VISIT = 'eeeeeeee-0000-4000-8000-000000000001';
+const VISIT_CASE3 = 'eeeeeeee-0000-4000-8000-000000000003';
+const VISIT_RESCHEDULED = 'eeeeeeee-0000-4000-8000-000000000004';
+const FOLLOW_CROSS = 'ffffffff-0000-4000-8000-000000000008';
+const CHECKIN_CROSS = 'ffffffff-0000-4000-8000-000000000009';
 const DOC = 'ffffffff-0000-4000-8000-000000000001';
 const SIGN = 'ffffffff-0000-4000-8000-000000000002';
 const CHECKIN = 'ffffffff-0000-4000-8000-000000000003';
@@ -74,7 +78,7 @@ before(async () => {
     create table public.follow_ups (id uuid primary key, case_id uuid references public.cases(id), visit_id uuid references public.case_visits(id));
     create table public.app_notifications (id uuid primary key, case_id uuid references public.cases(id));
     create table public.timeline_events (id uuid primary key, case_id uuid not null references public.cases(id));
-    create table public.field_checkins (id uuid primary key, case_id uuid references public.cases(id) on delete cascade);
+    create table public.field_checkins (id uuid primary key, case_id uuid references public.cases(id) on delete cascade, visit_id uuid references public.case_visits(id) on delete cascade);
     create table public.activity_log (id uuid primary key default gen_random_uuid(), entity_type text, entity_id uuid, action text, details jsonb, created_at timestamptz default now());
 
     create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text not null, name text not null);
@@ -207,12 +211,35 @@ test('converted leads and provider applications block permanent deletion', async
   assert.match(appBlock.err, /energy_applications/);
 });
 
+test('case visits referenced by other cases are protected; purge only removes case-owned follow-ups', async () => {
+  await as(ADMIN);
+  await db.exec("insert into public.case_visits(id,case_id) values ('" + VISIT_CASE3 + "','" + CASE3 + "')");
+  await db.exec("insert into public.case_visits(id,case_id,rescheduled_from_id) values ('" + VISIT_RESCHEDULED + "','" + CASE2 + "','" + VISIT_CASE3 + "')");
+  await db.exec("insert into public.follow_ups(id,case_id,visit_id) values ('" + FOLLOW_CROSS + "','" + CASE2 + "','" + VISIT_CASE3 + "')");
+  await db.exec("insert into public.field_checkins(id,case_id,visit_id) values ('" + CHECKIN_CROSS + "','" + CASE2 + "','" + VISIT_CASE3 + "')");
+
+  const blocked = await run("select public.purge_record('case',$1)", [CASE3]);
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.err, /rescheduled_visits/);
+  assert.match(blocked.err, /follow_ups/);
+  assert.match(blocked.err, /field_checkins/);
+
+  await db.exec("delete from public.case_visits where id='" + VISIT_RESCHEDULED + "'");
+  await db.exec("delete from public.follow_ups where id='" + FOLLOW_CROSS + "'");
+  await db.exec("delete from public.field_checkins where id='" + CHECKIN_CROSS + "'");
+  const purged = await run("select public.purge_record('case',$1)", [CASE3]);
+  assert.equal(purged.ok, true);
+  assert.equal(await rowCount('case_visits', VISIT_CASE3), 0);
+  assert.equal(await rowCount('follow_ups', FOLLOW_CROSS), 0);
+  assert.equal(await rowCount('field_checkins', CHECKIN_CROSS), 0);
+});
+
 test('Storage RLS exposes the case-file removal policy only to Admin and only for its owned prefix', async () => {
   const policies = await db.query("select policyname,roles,qual from pg_policies where schemaname='storage' and tablename='objects'");
   const policy = policies.rows.find(p => p.policyname === 'admin deletes case files');
   assert.ok(policy, 'the admin case-file policy exists');
   assert.deepEqual(policy.roles, ['authenticated']);
   assert.match(policy.qual, /client_documents/);
-  assert.match(policy.qual, /cases\\/%/);
-  assert.match(policy.qual, /is_role\\('admin'/);
+  assert.ok(policy.qual.includes('cases/%'));
+  assert.ok(policy.qual.includes("is_role('admin'"));
 });

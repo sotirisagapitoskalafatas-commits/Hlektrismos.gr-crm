@@ -238,7 +238,14 @@ export function TrashTab() {
       )}
       {purge && <PurgeDialog row={purge} onClose={() => setPurge(null)} onDone={async () => {
         const fresh = await load();
-        return !fresh.some(x => x.id === purge.id);
+        const remains = fresh.some(x => x.id === purge.id);
+        if (!remains) setSelectedLeadIds(current => {
+          if (!current.has(purge.id)) return current;
+          const next = new Set(current);
+          next.delete(purge.id);
+          return next;
+        });
+        return !remains;
       }} />}
     </div>
   );

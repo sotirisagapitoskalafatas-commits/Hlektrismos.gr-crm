@@ -926,37 +926,48 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ to: s.smtp_user || s.from_email, subject: "Test Email from Hlektrismos.gr", html: "<p>SMTP test OK ✅</p>", from_name: s.from_name || "Hlektrismos.gr" }),
+      if (!supabase) throw new Error("Η σύνδεση με το CRM δεν είναι διαθέσιμη.");
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to: s.smtp_user || s.from_email,
+          subject: "Test Email from Hlektrismos.gr",
+          html: "<p>SMTP test OK ✅</p>",
+          from_name: s.from_name || "Hlektrismos.gr",
+          transactional: true,
+        },
       });
-      const data = await res.json();
-      setTestResult(data.success ? { ok: true, msg: "SMTP test email sent!" } : { ok: false, msg: data.error || "Failed" });
-    } catch (err: any) { setTestResult({ ok: false, msg: err.message }); }
-    setTesting(false);
+      if (error) setTestResult({ ok: false, msg: error.message || "SMTP test failed" });
+      else setTestResult(data?.success ? { ok: true, msg: "SMTP test email sent!" } : { ok: false, msg: data?.error || "SMTP test failed" });
+    } catch (err: any) {
+      setTestResult({ ok: false, msg: err?.message || "SMTP test failed" });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const testImap = async () => {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-emails`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      setSyncResult(data.success ? { ok: true, msg: data.message || "IMAP sync OK!" } : { ok: false, msg: data.error || "IMAP failed" });
-    } catch (err: any) { setSyncResult({ ok: false, msg: err.message }); }
-    setSyncing(false);
+      if (!supabase) throw new Error("Η σύνδεση με το CRM δεν είναι διαθέσιμη.");
+      const { data, error } = await supabase.functions.invoke('fetch-emails', { body: {} });
+      if (error) setSyncResult({ ok: false, msg: error.message || "IMAP test failed" });
+      else setSyncResult(data?.success ? { ok: true, msg: data.message || "IMAP sync OK!" } : { ok: false, msg: data?.error || "IMAP failed" });
+    } catch (err: any) {
+      setSyncResult({ ok: false, msg: err?.message || "IMAP test failed" });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const applyWizardPreset = (provider: string) => {
     const presets: Record<string, any> = {
-      gmail: { smtp_host: 'smtp.gmail.com', smtp_port: 587, imap_host: 'imap.gmail.com', imap_port: 993 },
-      outlook: { smtp_host: 'smtp.office365.com', smtp_port: 587, imap_host: 'outlook.office365.com', imap_port: 993 },
-      cpanel: { smtp_host: '', smtp_port: 587, imap_host: '', imap_port: 993 },
+      gmail: { smtp_host: 'smtp.gmail.com', smtp_port: 465, imap_host: 'imap.gmail.com', imap_port: 993 },
+      // This CRM's IMAP connector uses password-based LOGIN, not Microsoft OAuth.
+      // Leave both hosts blank so selecting this informational preset cannot save unusable credentials.
+      outlook: { smtp_host: '', smtp_port: 465, imap_host: '', imap_port: 993 },
+      cpanel: { smtp_host: '', smtp_port: 465, imap_host: '', imap_port: 993 },
+      ses: { smtp_host: '', smtp_port: 2587, imap_host: '', imap_port: 993 },
     };
     const p = presets[provider] || {};
     update('email_config', { ...s, ...p });
@@ -974,7 +985,7 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
           <span style={{ fontSize: 13, fontWeight: 600 }}>🧙 Quick Setup Wizard</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {[['gmail', 'Gmail'], ['outlook', 'Outlook / 365'], ['cpanel', 'cPanel / Custom']].map(([key, label]) => (
+          {[['gmail', 'Gmail'], ['outlook', 'Microsoft 365 (OAuth required)'], ['cpanel', 'cPanel / Custom'], ['ses', 'Amazon SES']].map(([key, label]) => (
             <button key={key} onClick={() => applyWizardPreset(key)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: wizardProvider === key ? 'rgba(0,102,204,0.1)' : '#fff', color: 'var(--text)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{label}</button>
           ))}
         </div>
@@ -987,22 +998,30 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
                 <li>Go to <strong>App Passwords</strong> (search in Google Account settings)</li>
                 <li>Create a new App Password for "Mail"</li>
                 <li>Copy the 16-character password and paste it in <strong>App Password</strong> fields below</li>
-                <li>SMTP: <code>smtp.gmail.com:587</code> | IMAP: <code>imap.gmail.com:993</code></li>
+                <li>SMTP: <code>smtp.gmail.com:465</code> (implicit TLS) | IMAP: <code>imap.gmail.com:993</code></li>
               </ol>
             )}
             {wizardProvider === 'outlook' && (
               <ol style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Go to <strong>account.microsoft.com</strong> → Security</li>
-                <li>Enable <strong>Two-step verification</strong></li>
-                <li>Go to <strong>Advanced security options</strong> → App passwords</li>
-                <li>Create a new App password</li>
-                <li>SMTP: <code>smtp.office365.com:587</code> | IMAP: <code>outlook.office365.com:993</code></li>
+                <li><strong>Do not enter a Microsoft 365 password or app password here.</strong> Exchange Online has disabled Basic authentication for IMAP/POP, and app passwords are blocked when Basic authentication is disabled.</li>
+                <li>This CRM's current IMAP connector uses password-based IMAP LOGIN and does not implement Microsoft OAuth 2.0, so it cannot connect to a Microsoft 365 mailbox protected by Modern Authentication.</li>
+                <li>For incoming Microsoft 365 mail, an OAuth 2.0 / Microsoft Graph integration is required; it is not available in this connector.</li>
+                <li>For outbound email, Microsoft 365 SMTP AUTH uses port <code>587</code>, which Supabase Edge Functions cannot reach. Use an HTTPS email API or a provider-supported SMTP port such as <code>465</code> or <code>2587</code>.</li>
+              </ol>
+            )}
+            {wizardProvider === 'ses' && (
+              <ol style={{ margin: 0, paddingLeft: 16 }}>
+                <li>In AWS Console → Amazon SES → SMTP settings, create SMTP credentials for the verified sender domain.</li>
+                <li>Use the regional SES SMTP endpoint shown in that page (for example, the endpoint for your selected AWS region).</li>
+                <li>Use port <code>2587</code> with STARTTLS, the SES SMTP username, and the generated SES SMTP password.</li>
+                <li>Verify <code>hlektrismos.gr</code> and the sender address in SES before sending.</li>
               </ol>
             )}
             {wizardProvider === 'cpanel' && (
               <ol style={{ margin: 0, paddingLeft: 16 }}>
                 <li>Check your hosting control panel for SMTP/IMAP settings</li>
-                <li>Typical SMTP: <code>mail.yourdomain.gr:587</code> (STARTTLS)</li>
+                <li>Typical SMTP: <code>mail.yourdomain.gr:465</code> (implicit TLS, if your host supports it)</li>
+                <li>Some hosts offer a non-blocked STARTTLS port; confirm the exact port with your hosting provider.</li>
                 <li>Typical IMAP: <code>mail.yourdomain.gr:993</code> (SSL)</li>
                 <li>Use your full email address as username</li>
                 <li>Contact your hosting provider if unsure</li>
@@ -1017,7 +1036,7 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
         <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>📤 Outgoing (SMTP)</h5>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <FieldRow label="SMTP Host"><TextInput value={s.smtp_host || ''} onChange={(v) => update('email_config', { ...s, smtp_host: v })} placeholder="smtp.gmail.com" /></FieldRow>
-          <FieldRow label="SMTP Port" desc="587 (STARTTLS) or 465 (TLS)"><NumberInput value={s.smtp_port || 587} onChange={(v) => update('email_config', { ...s, smtp_port: v })} min={25} max={65535} /></FieldRow>
+          <FieldRow label="SMTP Port" desc="Choose a port supported by Supabase Edge Functions."><select className="field" value={String(s.smtp_port || 465)} onChange={(e) => update('email_config', { ...s, smtp_port: Number(e.target.value) })}><option value="465">465 — Implicit TLS</option><option value="2587">2587 — STARTTLS (Amazon SES)</option></select></FieldRow>
           <FieldRow label="Email / Username"><TextInput value={s.smtp_user || ''} onChange={(v) => update('email_config', { ...s, smtp_user: v })} placeholder="your@email.gr" /></FieldRow>
           <FieldRow label="App Password" desc="NOT your real password"><TextInput type="password" value={s.smtp_password || ''} onChange={(v) => update('email_config', { ...s, smtp_password: v })} placeholder="xxxx-xxxx-xxxx-xxxx" /></FieldRow>
           <FieldRow label="From Name"><TextInput value={s.from_name || ''} onChange={(v) => update('email_config', { ...s, from_name: v })} placeholder="Hlektrismos.gr" /></FieldRow>

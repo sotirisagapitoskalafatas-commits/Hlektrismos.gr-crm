@@ -27,7 +27,7 @@ const seed = (extra = {}) => createDb({
     { id: LB, assigned_to: B, first_name: 'Lead', last_name: 'B', email: 'lead.b@example.gr', phone: '6900000002', bill_files: [{ path: 'contact-forms/b.pdf' }] },
   ],
   crm_settings: [
-    { setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 587, smtp_user: '', from_email: 'info@hlektrismos.gr', from_name: 'Hlektrismos.gr' } },
+    { setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr', from_name: 'Hlektrismos.gr' } },
     ...(extra.crm_settings ?? []),
   ],
   email_suppressions: [],

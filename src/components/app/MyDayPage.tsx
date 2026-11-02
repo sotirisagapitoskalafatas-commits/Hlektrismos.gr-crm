@@ -246,12 +246,12 @@ export default function MyDayPage() {
                     style={{ width: 'auto', minWidth: 190, minHeight: 36, paddingTop: 6, paddingBottom: 6 }}
                     aria-label={`Ανάθεση επίσκεψης ${name}`}
                     value={v.user_id ?? ''}
-                    disabled={busyId === v.id || fieldAgents.length === 0}
+                    disabled={busyId === v.id || !fieldAgents.some(agent => agent.is_active)}
                     onChange={(e) => void assignVisit(v.id, e.target.value)}
                   >
                     <option value="" disabled>Χωρίς ανάθεση</option>
                     {fieldAgents.map(agent => (
-                      <option key={agent.id} value={agent.id}>
+                      <option key={agent.id} value={agent.id} disabled={!agent.is_active}>
                         {agent.full_name}{agent.is_active ? '' : ' (ανενεργός λογαριασμός)'}
                       </option>
                     ))}

@@ -48,15 +48,25 @@ test('service worker refreshes static assets from network before using the offli
   assert.equal(worker.cacheWrites[0].url, 'https://atlas.test/assets/index-a1b2c3d4.js');
 });
 
-test('service worker never intercepts or caches CRM API responses', () => {
-  const worker = loadWorker(async () => ({ ok: true, clone: () => ({} ) }));
-  let intercepted = false;
-  worker.listeners.get('fetch')({
-    request: request('/rest/v1/leads'),
-    respondWith: () => { intercepted = true; },
-  });
+test('service worker never intercepts or caches CRM API, auth, or private storage responses', () => {
+  const worker = loadWorker(async () => ({ ok: true, clone: () => ({}) }));
+  const privateUrls = [
+    request('/rest/v1/leads'),
+    request('/api/customer-document.svg', 'image'),
+    request('/auth/v1/user'),
+    request('/storage/private/id-card.png', 'image'),
+    request('/functions/v1/private-file', 'image'),
+  ];
 
-  assert.equal(intercepted, false);
+  for (const privateRequest of privateUrls) {
+    let intercepted = false;
+    worker.listeners.get('fetch')({
+      request: privateRequest,
+      respondWith: () => { intercepted = true; },
+    });
+    assert.equal(intercepted, false, `unexpected cache interception: ${privateRequest.url}`);
+  }
+
   assert.equal(worker.cacheWrites.length, 0);
 });
 

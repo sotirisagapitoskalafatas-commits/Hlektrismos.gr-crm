@@ -13,6 +13,12 @@ drop policy if exists "trashed cases hidden" on public.cases;
 create policy "trashed cases hidden" on public.cases as restrictive for select to authenticated
   using (deleted_at is null);
 
+-- The legacy permissive "admin delete cases" policy must not allow bypassing Trash.
+-- SECURITY DEFINER purge_record remains the only permanent-delete path.
+drop policy if exists "cases delete only through trash" on public.cases;
+create policy "cases delete only through trash" on public.cases as restrictive for delete to authenticated
+  using (false);
+
 create or replace function public.case_trash_columns_guard()
 returns trigger language plpgsql set search_path = public
 as $$

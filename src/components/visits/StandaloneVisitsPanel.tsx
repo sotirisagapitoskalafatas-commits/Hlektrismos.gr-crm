@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { createLead, fieldCheckin, fieldCheckoutWithOutcome } from '@/lib/api';
 import { fetchDefaultBackofficeAssignee } from '@/lib/lead-intake';
-import { cancelFieldVisit, createVisitFollowUp, fetchFieldVisits, linkVisitToLead, markVisitNoShow, rescheduleFieldVisit, visitsExtendedAvailable } from '@/lib/field-api';
+import { assignFieldVisit, cancelFieldVisit, createVisitFollowUp, fetchFieldVisitAssignees, fetchFieldVisits, linkVisitToLead, markVisitNoShow, rescheduleFieldVisit, visitsExtendedAvailable } from '@/lib/field-api';
 import type { FieldVisit } from '@/lib/field-api';
 import { OUTCOMES, checkoutNote, checkoutReady, groupVisits, outcomeByLabel } from '@/lib/field-day';
 import { SUBJECT_CHIP, isReadyToVisit, isRescheduled, nextStepFor, queuePayload, reasonError, reasonOf, validateFollowUp, visitStateText, visitSubject } from '@/lib/field-visits';
@@ -22,11 +22,13 @@ type Dialog = { id: string; kind: 'reschedule' | 'cancel' | 'no_show'; reason: s
 const nameOf = (v: FieldVisit) => visitSubject(v, { customerName: v.customer?.full_name, leadName: v.lead?.full_name ?? v.lead?.client_name }).label;
 
 export default function StandaloneVisitsPanel() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === 'admin';
   const { go } = useNav();
   const { toast } = useToast();
   const [available, setAvailable] = useState(false);
   const [visits, setVisits] = useState<FieldVisit[]>([]);
+  const [assignees, setAssignees] = useState<Array<{ id: string; full_name: string; is_active: boolean }>>([]);
   const [now, setNow] = useState(() => Date.now());
   const [scheduler, setScheduler] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -37,13 +39,29 @@ export default function StandaloneVisitsPanel() {
 
   const load = useCallback(async () => {
     const ok = await visitsExtendedAvailable(); setAvailable(ok); if (!ok || !user?.id) return;
-    const all = await fetchFieldVisits({ userId: user.id });
-    setVisits((all ?? []).filter((v) => !v.case_id)); setNow(Date.now()); setQueued(countQueue());
-  }, [user?.id]);
+    // RLS returns the whole team to Admin / Back Office, and only owned rows to a Sales Agent.
+    const [all, team] = await Promise.all([
+      fetchFieldVisits(isAdmin ? {} : { userId: user.id }),
+      isAdmin ? fetchFieldVisitAssignees() : Promise.resolve([]),
+    ]);
+    setVisits((all ?? []).filter((v) => !v.case_id));
+    setAssignees(team);
+    setNow(Date.now()); setQueued(countQueue());
+  }, [user?.id, isAdmin]);
   useEffect(() => { void load(); }, [load]);
 
   const g = useMemo(() => groupVisits(visits, now), [visits, now]);
   const coords = async () => { try { const p = await getCurrentLocation(); return { lat: p.lat, lng: p.lng, accuracy: p.accuracy }; } catch { return undefined; } };
+
+  const reassign = async (visitId: string, agentId: string) => {
+    if (!isAdmin || !agentId) return;
+    setBusy(visitId);
+    const result = await assignFieldVisit(visitId, agentId);
+    setBusy(null);
+    if (!result.ok) { toast(result.error, 'bad'); return; }
+    toast('Η επίσκεψη ανατέθηκε στον Sales Agent. Η ενέργεια καταγράφηκε στο ιστορικό.', 'ok');
+    void load();
+  };
 
   const checkIn = async (v: FieldVisit) => {
     setBusy(v.id); const c = await coords();
@@ -155,6 +173,32 @@ export default function StandaloneVisitsPanel() {
         {v.status === 'no_show' && v.status_reason && <p className="text-xs text-ink/55">Λόγος: {v.status_reason}</p>}
         {v.rescheduled_from_id && <p className="text-xs text-ink/55">Νέα ώρα μετά από επαναπρογραμματισμό.</p>}
 
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-ink/60">
+            <span>Υπεύθυνος επίσκεψης</span>
+            {(v.status === 'planned' || v.status === 'in_progress') ? (
+              <select
+                className="field"
+                style={{ minWidth: 190, width: 'auto', minHeight: 36, paddingTop: 6, paddingBottom: 6 }}
+                aria-label={`Ανάθεση επίσκεψης ${nameOf(v)}`}
+                value={v.user_id ?? ''}
+                disabled={busy === v.id || assignees.length === 0}
+                onChange={(e) => void reassign(v.id, e.target.value)}
+              >
+                <option value="" disabled>Χωρίς ανάθεση</option>
+                {assignees.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.full_name}{agent.is_active ? '' : ' (ανενεργός λογαριασμός)'}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>{assignees.find((agent) => agent.id === v.user_id)?.full_name ?? '—'}</span>
+            )}
+          </div>
+        )}
+
+        {v.status === 'planned' && (
         {v.status === 'planned' && (
           <div className="flex flex-wrap gap-2">
             {phone && <a className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" href={`tel:${phone.replace(/\s+/g, '')}`}><Phone size={15} aria-hidden="true" /> Κλήση</a>}

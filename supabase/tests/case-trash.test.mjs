@@ -14,6 +14,7 @@ const LEAD = 'bbbbbbbb-0000-4000-8000-000000000002';
 const CASE1 = 'cccccccc-0000-4000-8000-000000000001';
 const CASE2 = 'cccccccc-0000-4000-8000-000000000002';
 const CASE3 = 'cccccccc-0000-4000-8000-000000000003';
+const CASE_FORGED = 'cccccccc-0000-4000-8000-000000000004';
 const APP = 'dddddddd-0000-4000-8000-000000000001';
 const VISIT = 'eeeeeeee-0000-4000-8000-000000000001';
 const VISIT_CASE3 = 'eeeeeeee-0000-4000-8000-000000000003';
@@ -138,6 +139,11 @@ test('direct Trash-column writes are blocked; trashed cases are hidden from norm
   const directDelete = await run('delete from public.cases where id=$1 returning id', [CASE3]);
   assert.equal(directDelete.ok, true);
   assert.equal(directDelete.rows.length, 0, 'legacy direct-delete policy is neutralized by restrictive RLS');
+  const forgedInsert = await run(
+    "insert into public.cases(id,title,current_stage,deleted_at,deleted_by,deleted_reason) values ($1,'Forged','cancelled',now(),$2,'forged')",
+    [CASE_FORGED, ADMIN]
+  );
+  assert.equal(forgedInsert.ok, false, 'staff cannot insert a case directly into Trash');
   assert.equal((await run("select public.trash_record('case',$1,'single test')", [CASE3])).ok, true);
   for (const uid of [ADMIN, SALES]) {
     await as(uid);

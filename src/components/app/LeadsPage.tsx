@@ -12,6 +12,7 @@ import LeadSupplySection from '@/components/leads/LeadSupplySection';
 import { leadSupplyBlocking, supplyPointTitle } from '@/lib/supply-points';
 import type { SupplyPointDraft, TariffCategory } from '@/lib/supply-points';
 import { useToast } from '@/lib/toast';
+import { pruneLeadSelection, toggleVisibleLeadSelection } from '@/lib/lead-selection';
 import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
 import { classifyUpload, MAX_FORM_FILES, PUBLIC_FORM_ACCEPT } from '@/lib/upload-files';
 import { Btn, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
@@ -70,6 +71,8 @@ export default function LeadsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
   const [bulkTrashBusy, setBulkTrashBusy] = useState(false);
+  const [bulkStageValue, setBulkStageValue] = useState('');
+  const [bulkStageBusy, setBulkStageBusy] = useState(false);
 
   const openEdit = (l: Lead) => {
     setEditErr('');
@@ -113,6 +116,7 @@ export default function LeadsPage() {
   const load = useCallback(async () => {
     const list = await fetchLeads();
     setItems(list);
+    setSelectedIds(current => pruneLeadSelection(current, list.map(lead => lead.id)));
     setLoading(false);
   }, []);
 
@@ -133,13 +137,7 @@ export default function LeadsPage() {
   };
 
   const toggleVisibleSelection = () => {
-    const ids = visible.map(l => l.id);
-    setSelectedIds(current => {
-      const next = new Set(current);
-      if (ids.length > 0 && ids.every(id => next.has(id))) ids.forEach(id => next.delete(id));
-      else ids.forEach(id => next.add(id));
-      return next;
-    });
+    setSelectedIds(current => toggleVisibleLeadSelection(current, visible.map(l => l.id)));
   };
 
   const bulkTrash = async () => {
@@ -164,6 +162,32 @@ export default function LeadsPage() {
     } else {
       toast(`${moved} leads μεταφέρθηκαν στον Κάδο. Μπορείτε να τα επαναφέρετε από τη Διαχείριση → Κάδος.`, 'ok');
     }
+  };
+
+  const bulkUpdateStage = async () => {
+    const status = bulkStageValue;
+    if (!status || bulkStageBusy) return;
+    const selected = items.filter(l => selectedIds.has(l.id));
+    const eligible = selected.filter(l => l.status !== 'converted' && (l.status ?? 'new') !== status);
+    if (!eligible.length) {
+      toast('Τα επιλεγμένα leads βρίσκονται ήδη σε αυτό το στάδιο ή έχουν ήδη μετατραπεί σε Case.', 'warn');
+      setBulkStageValue('');
+      return;
+    }
+
+    setBulkStageBusy(true);
+    const results = await Promise.all(eligible.map(l => updateLeadStage(l.id, status)));
+    const updated = results.filter(Boolean).length;
+    const failed = eligible.length - updated;
+    const converted = selected.filter(l => l.status === 'converted').length;
+    await load();
+    setBulkStageBusy(false);
+    setBulkStageValue('');
+
+    const message = `Ενημερώθηκαν ${updated} από ${eligible.length} επιλεγμένα leads.`
+      + (converted ? ` ${converted} μετατρεμμένα leads δεν άλλαξαν.` : '')
+      + (failed ? ` ${failed} δεν ενημερώθηκαν.` : '');
+    toast(message, failed ? 'bad' : 'ok');
   };
 
   const onConvert = async (l: Lead) => {
@@ -265,7 +289,7 @@ export default function LeadsPage() {
         {tabs.map(t => {
           const count = t.id === 'all' ? items.length : (counts.get(t.id) ?? 0);
           return (
-            <button key={t.id} type="button" onClick={() => { setTab(t.id); setSelectedIds(new Set()); }} aria-pressed={tab === t.id} className="ui-chip shrink-0">
+            <button key={t.id} type="button" onClick={() => setTab(t.id)} aria-pressed={tab === t.id} className="ui-chip shrink-0">
               <span aria-hidden="true">{t.emoji}</span> {t.id === 'all' ? t.label : leadStatusDisplay(t.id).label}{t.id !== 'all' && leadStatusDisplay(t.id).detail ? ` · ${leadStatusDisplay(t.id).detail}` : ''}
               <span className="ui-chip__n">{count}</span>
             </button>
@@ -281,6 +305,7 @@ export default function LeadsPage() {
         >
           <div className="flex items-center gap-3 flex-wrap text-[13px]">
             <span className="font-semibold text-blue-900">Μαζική επιλογή</span>
+            <Pill tone="blue">Admin</Pill>
             <label className="inline-flex items-center gap-2 cursor-pointer font-medium text-ink">
               <input
                 type="checkbox"
@@ -291,12 +316,26 @@ export default function LeadsPage() {
               />
               <span>Επιλογή όλων των {visible.length} εμφανιζόμενων leads</span>
             </label>
-            <span className="text-ink/60">{selectedIds.size} επιλεγμένα</span>
+            <span className="text-ink/60">{selectedIds.size} επιλεγμένα συνολικά</span>
           </div>
           {selectedIds.size > 0 && (
-            <div className="flex items-center gap-2">
-              <button type="button" className="text-[12px] font-medium text-ink/65 hover:text-ink" onClick={() => setSelectedIds(new Set())}>Καθαρισμός</button>
-              <Btn variant="danger" onClick={() => setBulkTrashOpen(true)} disabled={bulkTrashBusy}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="field !w-auto !py-1.5 text-xs"
+                value={bulkStageValue}
+                onChange={e => setBulkStageValue(e.target.value)}
+                aria-label="Αλλαγή σταδίου για τα επιλεγμένα leads"
+              >
+                <option value="">Αλλαγή σταδίου…</option>
+                {LEAD_STATUSES.filter(s => s.id !== 'converted').map(s => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+              <Btn variant="outline" onClick={() => void bulkUpdateStage()} disabled={!bulkStageValue || bulkStageBusy || bulkTrashBusy}>
+                {bulkStageBusy ? <Spinner /> : null} Εφαρμογή
+              </Btn>
+              <button type="button" className="text-[12px] font-medium text-ink/65 hover:text-ink" onClick={() => { setSelectedIds(new Set()); setBulkStageValue(''); }}>Καθαρισμός</button>
+              <Btn variant="danger" onClick={() => setBulkTrashOpen(true)} disabled={bulkTrashBusy || bulkStageBusy}>
                 <Trash2 className="w-3.5 h-3.5" /> Μεταφορά στον Κάδο ({selectedIds.size})
               </Btn>
             </div>
@@ -321,8 +360,9 @@ export default function LeadsPage() {
               const converted = l.status === 'converted';
               const isStaff = can(role, 'create_case');
               return (
-                <div key={l.id} className="ui-row px-5 py-3 flex items-center gap-3 flex-wrap">
-                  {canTrash(role) && <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleLeadSelection(l.id)} aria-label={`Επιλογή lead ${name}`} className="w-4 h-4 shrink-0" />}
+                <div key={l.id} data-lead-selected={selectedIds.has(l.id) ? 'true' : 'false'}
+                  className={`ui-row px-5 py-3 flex items-center gap-3 flex-wrap ${selectedIds.has(l.id) ? 'bg-blue-50/60' : ''}`}>
+                  {canTrash(role) && <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleLeadSelection(l.id)} aria-label={`Επιλογή lead ${name}`} className="h-4 w-4 shrink-0 cursor-pointer accent-blue-600" />}
                   <span className="ui-tile shrink-0" title={src.label}>
                     {src.emoji}
                   </span>

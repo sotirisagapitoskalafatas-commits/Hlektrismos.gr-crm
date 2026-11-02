@@ -274,23 +274,34 @@ export default function LeadsPage() {
       </div>
 
       {canTrash(role) && (
-        <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-line bg-white px-4 py-3">
+        <section
+          data-testid="lead-bulk-actions"
+          aria-label="Μαζική επιλογή leads"
+          className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 shadow-sm"
+        >
           <div className="flex items-center gap-3 flex-wrap text-[13px]">
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisibleSelection} aria-label="Επιλογή όλων των εμφανιζόμενων leads" />
-              <span>Επιλογή όλων ({visible.length})</span>
+            <span className="font-semibold text-blue-900">Μαζική επιλογή</span>
+            <label className="inline-flex items-center gap-2 cursor-pointer font-medium text-ink">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-blue-600"
+                checked={allVisibleSelected}
+                onChange={toggleVisibleSelection}
+                aria-label="Επιλογή όλων των εμφανιζόμενων leads"
+              />
+              <span>Επιλογή όλων των {visible.length} εμφανιζόμενων leads</span>
             </label>
-            <span className="text-ink/50">{selectedIds.size} επιλεγμένα</span>
+            <span className="text-ink/60">{selectedIds.size} επιλεγμένα</span>
           </div>
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2">
-              <button type="button" className="text-[12px] text-ink/55 hover:text-ink" onClick={() => setSelectedIds(new Set())}>Καθαρισμός</button>
+              <button type="button" className="text-[12px] font-medium text-ink/65 hover:text-ink" onClick={() => setSelectedIds(new Set())}>Καθαρισμός</button>
               <Btn variant="danger" onClick={() => setBulkTrashOpen(true)} disabled={bulkTrashBusy}>
                 <Trash2 className="w-3.5 h-3.5" /> Μεταφορά στον Κάδο ({selectedIds.size})
               </Btn>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       <div className="ui-card overflow-hidden">

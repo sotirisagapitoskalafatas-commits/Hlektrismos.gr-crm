@@ -211,7 +211,7 @@ export default function CasesPage() {
     return okStage && okOwner && okQ;
   });
 
-  const selectedVisible = filtered.filter(c => selectedIds.has(c.id));
+  const selectedCases = cases.filter(c => selectedIds.has(c.id));
   const allVisibleSelected = filtered.length > 0 && filtered.every(c => selectedIds.has(c.id));
   const toggleCase = (id: string, checked: boolean) => setSelectedIds(prev => {
     const next = new Set(prev);
@@ -279,12 +279,12 @@ export default function CasesPage() {
             Επιλογή όλων ({filtered.length})
           </label>
           <span className="flex-1" />
-          <span className="text-[12px] text-ink/45">{selectedVisible.length} επιλεγμένα</span>
+          <span className="text-[12px] text-ink/45">{selectedCases.length} επιλεγμένα</span>
           <button type="button" className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5 text-[var(--atx-red)]"
-            disabled={selectedVisible.length === 0} onClick={() => setBulkTrashOpen(true)}>
-            <Trash2 size={14} /> Μεταφορά στον κάδο ({selectedVisible.length})
+            disabled={selectedCases.length === 0} onClick={() => setBulkTrashOpen(true)}>
+            <Trash2 size={14} /> Μεταφορά στον κάδο ({selectedCases.length})
           </button>
-          {selectedVisible.length > 0 && <button type="button" className="atx-btn atx-btn-quiet" onClick={() => setSelectedIds(new Set())}>Καθαρισμός επιλογής</button>}
+          {selectedCases.length > 0 && <button type="button" className="atx-btn atx-btn-quiet" onClick={() => setSelectedIds(new Set())}>Καθαρισμός επιλογής</button>}
         </div>
       )}
 
@@ -326,7 +326,7 @@ export default function CasesPage() {
       </div>}
 
       <CreateCaseModal open={creating} onClose={() => setCreating(false)} onCreated={id => { load(); openCase(id); }} />
-      {bulkTrashOpen && <BulkTrashDialog ids={selectedVisible.map(c => c.id)} onClose={() => setBulkTrashOpen(false)} onDone={finishBulkTrash} />}
+      {bulkTrashOpen && <BulkTrashDialog ids={selectedCases.map(c => c.id)} onClose={() => setBulkTrashOpen(false)} onDone={finishBulkTrash} />}
     </div>
   );
 }

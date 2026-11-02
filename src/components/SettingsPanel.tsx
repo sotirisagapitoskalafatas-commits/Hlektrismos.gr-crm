@@ -1028,7 +1028,7 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
         <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>📤 Outgoing (SMTP)</h5>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <FieldRow label="SMTP Host"><TextInput value={s.smtp_host || ''} onChange={(v) => update('email_config', { ...s, smtp_host: v })} placeholder="smtp.gmail.com" /></FieldRow>
-          <FieldRow label="SMTP Port" desc="465 (TLS) or 2587 (STARTTLS / SES). Ports 25 and 587 are blocked."><NumberInput value={s.smtp_port || 465} onChange={(v) => update('email_config', { ...s, smtp_port: v })} min={465} max={2587} /></FieldRow>
+          <FieldRow label="SMTP Port" desc="Choose a port supported by Supabase Edge Functions."><select className="field" value={String(s.smtp_port || 465)} onChange={(e) => update('email_config', { ...s, smtp_port: Number(e.target.value) })}><option value="465">465 — Implicit TLS</option><option value="2587">2587 — STARTTLS (Amazon SES)</option></select></FieldRow>
           <FieldRow label="Email / Username"><TextInput value={s.smtp_user || ''} onChange={(v) => update('email_config', { ...s, smtp_user: v })} placeholder="your@email.gr" /></FieldRow>
           <FieldRow label="App Password" desc="NOT your real password"><TextInput type="password" value={s.smtp_password || ''} onChange={(v) => update('email_config', { ...s, smtp_password: v })} placeholder="xxxx-xxxx-xxxx-xxxx" /></FieldRow>
           <FieldRow label="From Name"><TextInput value={s.from_name || ''} onChange={(v) => update('email_config', { ...s, from_name: v })} placeholder="Hlektrismos.gr" /></FieldRow>

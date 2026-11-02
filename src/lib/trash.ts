@@ -58,7 +58,7 @@ export function trashError(message: string | undefined, fallback: string): strin
   if (open) return `Ο πελάτης έχει ${open[1]} ανοιχτά cases. Κλείστε ή ολοκληρώστε τα πρώτα.`;
   if (/already in trash|not found/i.test(m)) return 'Η εγγραφή δεν βρέθηκε ή είναι ήδη στον κάδο.';
   if (/not in trash|move the record to the trash first/i.test(m)) return 'Η εγγραφή δεν βρίσκεται στον κάδο.';
-  if (/only an administrator/i.test(m)) return 'Μόνο ο διαχειριστής μπορεί να εκτελέσει αυτή την ενέργεια.';
+  if (/only an administrator/i.test(m)) return 'Μόνο ο διαχειριστής μπορεί να διαγράψει οριστικά.';
   if (/not allowed|42501|permission/i.test(m)) return 'Δεν έχετε δικαίωμα για αυτή την ενέργεια.';
   if (/PREVIEW_READ_ONLY|μόνο ανάγνωση/.test(m)) return 'Προεπισκόπηση ρόλου: μόνο ανάγνωση.';
   if (/Could not find the function|PGRST202|schema cache/i.test(m)) return 'Ο κάδος δεν είναι ακόμη διαθέσιμος.';

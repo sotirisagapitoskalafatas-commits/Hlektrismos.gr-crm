@@ -955,9 +955,9 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
   const applyWizardPreset = (provider: string) => {
     const presets: Record<string, any> = {
       gmail: { smtp_host: 'smtp.gmail.com', smtp_port: 465, imap_host: 'imap.gmail.com', imap_port: 993 },
-      // Microsoft 365 SMTP AUTH requires port 587; Supabase Edge Functions cannot reach it.
-      // Keep the IMAP preset, but do not preconfigure an unusable outbound SMTP endpoint.
-      outlook: { smtp_host: '', smtp_port: 465, imap_host: 'outlook.office365.com', imap_port: 993 },
+      // This CRM's IMAP connector uses password-based LOGIN, not Microsoft OAuth.
+      // Leave both hosts blank so selecting this informational preset cannot save unusable credentials.
+      outlook: { smtp_host: '', smtp_port: 465, imap_host: '', imap_port: 993 },
       cpanel: { smtp_host: '', smtp_port: 465, imap_host: '', imap_port: 993 },
       ses: { smtp_host: '', smtp_port: 2587, imap_host: '', imap_port: 993 },
     };
@@ -977,7 +977,7 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
           <span style={{ fontSize: 13, fontWeight: 600 }}>🧙 Quick Setup Wizard</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {[['gmail', 'Gmail'], ['outlook', 'Outlook / 365 (IMAP)'], ['cpanel', 'cPanel / Custom'], ['ses', 'Amazon SES']].map(([key, label]) => (
+          {[['gmail', 'Gmail'], ['outlook', 'Microsoft 365 (OAuth required)'], ['cpanel', 'cPanel / Custom'], ['ses', 'Amazon SES']].map(([key, label]) => (
             <button key={key} onClick={() => applyWizardPreset(key)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: wizardProvider === key ? 'rgba(0,102,204,0.1)' : '#fff', color: 'var(--text)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{label}</button>
           ))}
         </div>
@@ -995,10 +995,10 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
             )}
             {wizardProvider === 'outlook' && (
               <ol style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Incoming mail: <code>outlook.office365.com:993</code> (IMAP over SSL).</li>
-                <li>Microsoft 365 SMTP AUTH uses port <code>587</code>; Supabase Edge Functions cannot connect to that port.</li>
-                <li>This preset configures IMAP only. Do not use it for visitor confirmations or CRM outbound mail.</li>
-                <li>For outbound email, configure a provider that supports HTTPS API delivery or an SMTP TLS port reachable from Supabase.</li>
+                <li><strong>Do not enter a Microsoft 365 password or app password here.</strong> Exchange Online has disabled Basic authentication for IMAP/POP, and app passwords are blocked when Basic authentication is disabled.</li>
+                <li>This CRM's current IMAP connector uses password-based IMAP LOGIN and does not implement Microsoft OAuth 2.0, so it cannot connect to a Microsoft 365 mailbox protected by Modern Authentication.</li>
+                <li>For incoming Microsoft 365 mail, an OAuth 2.0 / Microsoft Graph integration is required; it is not available in this connector.</li>
+                <li>For outbound email, Microsoft 365 SMTP AUTH uses port <code>587</code>, which Supabase Edge Functions cannot reach. Use an HTTPS email API or a provider-supported SMTP port such as <code>465</code> or <code>2587</code>.</li>
               </ol>
             )}
             {wizardProvider === 'ses' && (

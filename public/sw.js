@@ -44,6 +44,8 @@ self.addEventListener('fetch', event => {
   // shared service-worker cache; refresh static assets from the network first so
   // a deployment cannot leave an old app bundle in control.
   const pathname = new URL(req.url).pathname;
+  // Explicitly exclude same-origin endpoints even when they return images or files.
+  if (/^\/(?:api|rest|auth|storage|functions|rpc)(?:\/|$)/i.test(pathname)) return;
   if (!STATIC_DESTINATIONS.has(req.destination) && !STATIC_EXTENSIONS.test(pathname)) return;
 
   event.respondWith(

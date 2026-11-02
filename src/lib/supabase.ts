@@ -20,9 +20,14 @@ const guardedFetch: typeof fetch = (input, init) => {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { fetch: guardedFetch } });
 
-/** A client WITHOUT the user's session — used only for the Admin Center's "what can an anonymous visitor read" checks. */
+/**
+ * A fresh client that never inherits the current staff member's JWT.
+ * Use it for genuinely public operations (and anonymous-policy probes).
+ * The request still passes through guardedFetch so role-preview mode remains read-only.
+ */
 export function anonymousClient() {
   return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { fetch: guardedFetch },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'atlas-anon-check' },
   });
 }

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { anonymousClient, supabase } from '@/lib/supabase';
 import { classifyUpload, storageName } from '@/lib/upload-files';
 
 const BUCKET = 'hlektrismos_docs';
@@ -29,7 +29,12 @@ export async function uploadDocument(
   const folder = leadId ? `leads/${leadId}` : 'contact-forms';
   const path = `${folder}/${storageName(file.name, check.ext)}`;
 
-  const { error: uploadError } = await supabase.storage
+  // Public form uploads happen before a lead exists. Use a fresh anon client so a staff
+  // Sales Agent session cannot make the contact-forms upload fail the restrictive
+  // sales-ownership policy. CRM uploads keep the signed-in client and lead ownership checks.
+  const storageClient = leadId ? supabase : anonymousClient();
+
+  const { error: uploadError } = await storageClient.storage
     .from(BUCKET)
     .upload(path, file, {
       contentType: check.contentType,

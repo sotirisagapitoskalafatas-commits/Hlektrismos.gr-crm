@@ -36,7 +36,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 drop trigger if exists cases_trash_guard on public.cases;
 create trigger cases_trash_guard before insert or update on public.cases
 for each row execute function public.case_trash_columns_guard();

@@ -199,7 +199,6 @@ export default function StandaloneVisitsPanel() {
         )}
 
         {v.status === 'planned' && !isAdmin && (
-        {v.status === 'planned' && (
           <div className="flex flex-wrap gap-2">
             {phone && <a className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" href={`tel:${phone.replace(/\s+/g, '')}`}><Phone size={15} aria-hidden="true" /> Κλήση</a>}
             <Btn onClick={() => void checkIn(v)} disabled={busy === v.id}><LogIn size={15} className="inline mr-1" aria-hidden="true" />{busy === v.id ? 'Αποστολή…' : 'Check In'}</Btn>

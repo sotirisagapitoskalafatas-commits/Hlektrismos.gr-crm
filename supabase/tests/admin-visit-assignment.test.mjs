@@ -8,7 +8,7 @@ let db, as, run, one, su;
 before(async () => {
   ({ db, as, run, one, su } = await buildFinalDb());
   await su();
-  await applyStaged(db, ['phase7/03_admin_visit_assignment']);
+  await applyStaged(db, ['phase7/03_admin_visit_assignment', 'phase7/05_admin_visit_assignment_invoker']);
 });
 
 const makeVisit = async (actor, name, status = 'planned') => {
@@ -30,6 +30,8 @@ test('migration is additive and exposes only the authenticated RPC', async () =>
     has_function_privilege('authenticated', 'public.assign_field_visit(uuid,uuid)', 'EXECUTE') as auth_exec,
     has_function_privilege('service_role', 'public.assign_field_visit(uuid,uuid)', 'EXECUTE') as service_exec`);
   assert.deepEqual(grants[0], { anon_exec: false, auth_exec: true, service_exec: false });
+  const definer = await one(`select prosecdef from pg_proc where oid = 'public.assign_field_visit(uuid,uuid)'::regprocedure`);
+  assert.equal(definer[0].prosecdef, false, 'reassignment must preserve caller rights and table RLS');
 });
 
 test('only Admin may assign an open visit to an active Sales Agent; change is audited', async () => {

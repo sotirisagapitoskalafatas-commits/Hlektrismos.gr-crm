@@ -236,6 +236,7 @@ test('phase6/28 aligns staff administration with the exact admin / sales_agent s
   assert.equal(await can(MANAGER, null, 'sales_agent'), false, 'legacy Manager has no account-management access');
   assert.equal(await can(ADMIN, 'sales_agent', 'sales_agent'), true, 'Admin can retain/edit a Sales Agent');
 
+  const priorUpdates = (await one("select count(*)::int n from public.staff_admin_audit where target_id = $1 and action = 'update'", [FIELD]))[0].n;
   await as(ADMIN);
   assert.ok((await run("select public.staff_update($1, 'Field Updated', null, 'sales_agent')", [FIELD])).ok);
   assert.equal((await one('select full_name from public.profiles where id = $1', [FIELD]))[0].full_name, 'Field Updated');
@@ -243,6 +244,6 @@ test('phase6/28 aligns staff administration with the exact admin / sales_agent s
   assert.ok(!(await run("select public.staff_update($1, 'Other', null, 'sales_agent')", [INSIDE])).ok);
   await su();
 
-  assert.equal((await one("select count(*)::int n from public.staff_admin_audit where target_id = $1 and action = 'update'", [FIELD]))[0].n, 1,
-    'the profile update remains audited');
+  assert.equal((await one("select count(*)::int n from public.staff_admin_audit where target_id = $1 and action = 'update'", [FIELD]))[0].n, priorUpdates + 1,
+    'the profile update adds exactly one audited row');
 });

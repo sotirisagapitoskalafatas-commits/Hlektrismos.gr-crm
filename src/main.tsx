@@ -16,19 +16,19 @@ createRoot(document.getElementById('root')!).render(
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // A newly activated worker takes control of existing tabs. Reload once so an open
-    // ATLAS tab cannot keep rendering JavaScript from the previous production build.
-    const hadController = Boolean(navigator.serviceWorker.controller);
-    if (hadController) {
-      let reloaded = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloaded) return;
-        reloaded = true;
-        window.location.reload();
-      }, { once: true });
-    }
+    // Reload once whenever a newly installed worker first takes control or replaces an
+    // older worker. This also covers first-time PWA installs where no controller existed
+    // when the page started.
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!navigator.serviceWorker.controller || reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    }, { once: true });
 
-    // Bypass the browser HTTP cache when checking for a new worker after deployment.
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+    // Bypass the browser HTTP cache and explicitly check for a worker update.
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      .then(registration => registration.update().catch(() => {}))
+      .catch(() => {});
   });
 }

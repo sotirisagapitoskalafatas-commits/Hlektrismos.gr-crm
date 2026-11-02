@@ -104,7 +104,11 @@ test('temporary-password provisioning enforces a first-login password change usi
   const src = readFileSync(fileURLToPath(new URL('../../admin-users/index.ts', import.meta.url)), 'utf8');
   assert.match(src, /must_change_password:\s*true/);
   assert.match(src, /body\.action === "complete_password_change"/);
-  assert.match(src, /admin\.auth\.admin\.updateUserById\(caller\.id, \{ app_metadata: appMetadata \}\)/);
+  assert.match(src, /admin\.auth\.admin\.updateUserById\(caller\.id, \{[\s\S]*password: ownPassword,[\s\S]*app_metadata: appMetadata/);
+  assert.match(src, /validateChosenPassword\(ownPassword\)/);
+  assert.equal(S.validateChosenPassword('Correct-horse-9'), null);
+  assert.ok(S.validateChosenPassword('short1'));
+  assert.ok(S.validateChosenPassword('aaaaaaaaaaaa'));
   assert.match(src, /password_change_completed/);
   assert.doesNotMatch(src, /user_metadata:\s*\{[^}]*must_change_password/i, 'the user-editable metadata cannot clear the gate');
 });

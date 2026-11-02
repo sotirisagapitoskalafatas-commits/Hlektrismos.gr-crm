@@ -82,6 +82,7 @@ before(async () => {
     alter table public.cases enable row level security;
     create policy "staff read cases" on public.cases for select to authenticated using (public.is_staff());
     create policy "staff update cases" on public.cases for update to authenticated using (public.is_staff()) with check (public.is_staff());
+    create policy "admin delete cases" on public.cases for delete to authenticated using (public.is_role('admin'));
     create policy "staff storage read" on storage.objects for select to authenticated using (public.is_staff());
     grant usage on schema public, storage, auth to authenticated;
     grant select, insert, update, delete on public.profiles, public.customers, public.leads, public.cases,
@@ -130,6 +131,9 @@ test('only Admin can bulk-trash cases; IDs are de-duplicated and the batch is at
 test('direct Trash-column writes are blocked; trashed cases are hidden from normal queries', async () => {
   await as(ADMIN);
   assert.equal((await run('update public.cases set deleted_at=now() where id=$1', [CASE3])).ok, false);
+  const directDelete = await run('delete from public.cases where id=$1 returning id', [CASE3]);
+  assert.equal(directDelete.ok, true);
+  assert.equal(directDelete.rows.length, 0, 'legacy direct-delete policy is neutralized by restrictive RLS');
   assert.equal((await run("select public.trash_record('case',$1,'single test')", [CASE3])).ok, true);
   for (const uid of [ADMIN, SALES]) {
     await as(uid);

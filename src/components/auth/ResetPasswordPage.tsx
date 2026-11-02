@@ -33,10 +33,34 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     if (issues.length || !supabase) return;
     setBusy(true); setError('');
-    const { error: err } = await supabase.auth.updateUser({ password: pw });
+    const mustChangePassword = session.user.app_metadata?.must_change_password === true;
+    if (mustChangePassword) {
+      // The Edge Function sets the new password and removes the server-only flag in one Auth Admin API call.
+      const { error: completionErr } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'complete_password_change', password: pw },
+      });
+      if (completionErr) {
+        setBusy(false);
+        setError('Δεν ολοκληρώθηκε η αλλαγή κωδικού. Ελέγξτε τον νέο κωδικό και δοκιμάστε ξανά.');
+        return;
+      }
+      const { error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) {
+        setBusy(false);
+        setError('Ο κωδικός άλλαξε. Δεν ανανεώθηκε ακόμη η σύνδεση· δοκιμάστε ξανά για να ολοκληρωθεί η διαδικασία.');
+        return;
+      }
+    } else {
+      const { error: err } = await supabase.auth.updateUser({ password: pw });
+      if (err) {
+        setBusy(false);
+        setError('Ο κωδικός δεν άλλαξε. Δοκιμάστε έναν διαφορετικό κωδικό ή ζητήστε νέο σύνδεσμο.');
+        return;
+      }
+    }
+
     setBusy(false);
-    if (err) setError('Ο κωδικός δεν άλλαξε. Δοκιμάστε έναν διαφορετικό κωδικό ή ζητήστε νέο σύνδεσμο.');
-    else setDone(true);
+    setDone(true);
   };
 
   if (done) {

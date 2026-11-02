@@ -9,7 +9,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "../_shared/keys.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { canManage, decideDelete, decideReset, validateCreate } from "../_shared/staff-admin.ts";
+import { canManage, decideDelete, decideReset, validateCreate, validateChosenPassword } from "../_shared/staff-admin.ts";
 import { crmSiteUrl } from "../_shared/site-url.ts";
 
 Deno.serve(async (req: Request) => {
@@ -34,6 +34,34 @@ Deno.serve(async (req: Request) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return errorResponse("Μη έγκυρο αίτημα.", 400); }
+
+  if (body.action === "complete_password_change") {
+    // A temporary credential can be replaced only by its own authenticated account.
+    const ownPassword = String(body.password ?? "");
+    const passwordError = validateChosenPassword(ownPassword);
+    if (passwordError) return errorResponse(passwordError, 400);
+
+    const { data: ownProfile, error: profileErr } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", caller.id)
+      .maybeSingle();
+    if (profileErr || !ownProfile) return errorResponse("Δεν βρέθηκε προφίλ για τον λογαριασμό.", 403);
+
+    // Idempotent when Auth accepted the previous request but its response was lost.
+    if (caller.app_metadata?.must_change_password !== true) return jsonResponse({ ok: true, already_completed: true });
+
+    const appMetadata = { ...(caller.app_metadata ?? {}) };
+    delete appMetadata.must_change_password;
+    // Password replacement and clearing the server-only gate happen in one Auth Admin API call.
+    const { error: updateErr } = await admin.auth.admin.updateUserById(caller.id, {
+      password: ownPassword,
+      app_metadata: appMetadata,
+    });
+    if (updateErr) return errorResponse("Δεν ήταν δυνατή η αλλαγή κωδικού. Ελέγξτε την ισχύ του νέου κωδικού και δοκιμάστε ξανά.", 400);
+    await audit({ action: "password_change_completed", target_id: caller.id, target_email: caller.email ?? null });
+    return jsonResponse({ ok: true });
+  }
 
   if (body.action === "create") {
     const v = validateCreate(body);
@@ -65,6 +93,18 @@ Deno.serve(async (req: Request) => {
       await admin.auth.admin.deleteUser(newId); // compensation: never leave an orphaned auth account
       return errorResponse("Ο λογαριασμός δεν ολοκληρώθηκε και αναιρέθηκε. Δοκιμάστε ξανά.", 500);
     }
+
+    // Temporary passwords are one-time credentials: app_metadata is server-controlled, so the user cannot clear this gate.
+    if (input.mode === "password") {
+      const appMetadata = { ...(created.data.user.app_metadata ?? {}), must_change_password: true };
+      const { error: markerErr } = await admin.auth.admin.updateUserById(newId, { app_metadata: appMetadata });
+      if (markerErr) {
+        await admin.from("profiles").delete().eq("id", newId);
+        await admin.auth.admin.deleteUser(newId);
+        return errorResponse("Δεν ενεργοποιήθηκε η υποχρεωτική αλλαγή κωδικού. Ο λογαριασμός αναιρέθηκε.", 500);
+      }
+    }
+
     await audit({ action: "create", target_id: newId, target_email: input.email, after: { full_name: input.full_name, role: input.role, mode: input.mode } });
     return jsonResponse({ ok: true, id: newId, invited: input.mode === "invite" });
   }

@@ -216,3 +216,33 @@ test('rollback restores every role, active flag and grant, then the migration ap
   await db.exec(read(M625));
   assert.deepEqual((await one('select distinct role from public.profiles order by 1')).map((r) => r.role), ['admin', 'sales_agent']);
 });
+
+
+test('phase6/28 aligns staff administration with the exact admin / sales_agent schema', async () => {
+  await su();
+  await db.exec(read('../staged-migrations/phase6/28_staff_admin_sales_agent_sync.sql'));
+
+  const can = async (actor, target, nextRole) => {
+    await as(actor);
+    const result = await one('select public.staff_admin_can($1, $2, $3) allowed', [actor, target, nextRole]);
+    await su();
+    return result[0].allowed;
+  };
+
+  assert.equal(await can(ADMIN, null, 'sales_agent'), true, 'active Admin can create Sales Agents');
+  assert.equal(await can(ADMIN, null, 'admin'), false, 'Admin cannot create another Admin');
+  assert.equal(await can(ADMIN, null, 'field_sales'), false, 'legacy roles cannot be created');
+  assert.equal(await can(FIELD, null, 'sales_agent'), false, 'Sales Agent cannot provision staff');
+  assert.equal(await can(MANAGER, null, 'sales_agent'), false, 'legacy Manager has no account-management access');
+  assert.equal(await can(ADMIN, 'sales_agent', 'sales_agent'), true, 'Admin can retain/edit a Sales Agent');
+
+  await as(ADMIN);
+  assert.ok((await run("select public.staff_update($1, 'Field Updated', null, 'sales_agent')", [FIELD])).ok);
+  assert.equal((await one('select full_name from public.profiles where id = $1', [FIELD]))[0].full_name, 'Field Updated');
+  await as(FIELD);
+  assert.ok(!(await run("select public.staff_update($1, 'Other', null, 'sales_agent')", [INSIDE])).ok);
+  await su();
+
+  assert.equal((await one("select count(*)::int n from public.staff_admin_audit where target_id = $1 and action = 'update'", [FIELD]))[0].n, 1,
+    'the profile update remains audited');
+});

@@ -4,7 +4,7 @@
 create or replace function public.assign_field_visit(p_visit uuid, p_agent uuid)
 returns boolean
 language plpgsql
-security definer
+security invoker
 set search_path = pg_catalog, public, pg_temp
 as $$
 declare

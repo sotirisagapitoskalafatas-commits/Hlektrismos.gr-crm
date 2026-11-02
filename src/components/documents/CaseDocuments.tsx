@@ -18,6 +18,7 @@ import type { DocGroup } from '@/lib/documents';
 import { Btn, Card, CardHeader, EmptyState, Modal, Pill, Spinner, fmtDateTime } from '@/lib/ui';
 import { useToast } from '@/lib/toast';
 import CaptureModal from '@/components/app/CaptureModal';
+import FilePreview from '@/components/documents/FilePreview';
 
 const ACCEPT = 'image/*,application/pdf';
 const MAX_MB = 15;
@@ -146,15 +147,16 @@ export default function CaseDocuments({ c, onChanged, leadFiles = [] }: { c: Cas
             {leadFiles.map(f => {
               const pending = unfiled.includes(f);
               return (
-                <div key={f.path} className="flex items-center gap-3 p-3 rounded-xl border border-line bg-white flex-wrap" data-lead-file={f.name}>
-                  <span className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0"><Globe className="w-4 h-4 text-brand-600" /></span>
-                  <div className="flex-1 min-w-[180px]">
-                    <div className="text-[14px] font-medium text-ink truncate">{f.name}</div>
-                    <div className="text-xs text-ink/50">{[fileSizeText(f.size), pending ? 'Χωρίς τύπο εγγράφου' : 'Καταχωρήθηκε ως έγγραφο'].filter(Boolean).join(' · ')}</div>
-                    {leadUrls[f.path] ? <a href={leadUrls[f.path]} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline">Άνοιγμα αρχείου ↗</a>
-                      : <span className="text-xs text-ink/40">Ο σύνδεσμος δεν είναι διαθέσιμος</span>}
+                <div key={f.path} className="grid gap-3 rounded-xl border border-line bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(220px,360px)]" data-lead-file={f.name}>
+                  <div className="flex min-w-0 flex-col items-start gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0"><Globe className="w-4 h-4 text-brand-600" /></span>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-medium text-ink break-words">{f.name}</div>
+                      <div className="text-xs text-ink/50">{[fileSizeText(f.size), pending ? 'Χωρίς τύπο εγγράφου' : 'Καταχωρήθηκε ως έγγραφο'].filter(Boolean).join(' · ')}</div>
+                    </div>
+                    {pending && canAdd && <Btn variant="outline" onClick={() => openPicker('', f)}>Καταχώρηση ως…</Btn>}
                   </div>
-                  {pending && canAdd && <Btn variant="outline" onClick={() => openPicker('', f)}>Καταχώρηση ως…</Btn>}
+                  <FilePreview url={leadUrls[f.path]} name={f.name} mimeType={f.type} />
                 </div>
               );
             })}
@@ -169,16 +171,18 @@ export default function CaseDocuments({ c, onChanged, leadFiles = [] }: { c: Cas
         {!loading && items.length === 0 && <EmptyState icon={FolderOpen} title="Δεν υπάρχουν έγγραφα" hint="Πατήστε «Προσθήκη εγγράφου» και επιλέξτε πρώτα τον τύπο του εγγράφου." />}
         <div className="space-y-2">
           {items.map(d => (
-            <div key={d.id} className="flex items-center gap-3 p-3 rounded-xl border border-line bg-white flex-wrap">
-              <span className="w-8 h-8 rounded-lg bg-ink/[0.05] flex items-center justify-center shrink-0"><FileText className="w-4 h-4 text-ink/60" /></span>
-              <div className="flex-1 min-w-[180px]">
-                <div className="text-[14px] font-medium text-ink">{docLabel(d.category)}</div>
-                <div className="text-xs text-ink/50 truncate">{[d.description, d.file_name, fmtDateTime(d.created_at)].filter(Boolean).join(' · ')}</div>
-                {urls[d.id] && <a href={urls[d.id]} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline">Άνοιγμα αρχείου ↗</a>}
+            <div key={d.id} className="rounded-xl border border-line bg-white p-3" data-case-document={d.file_name}>
+              <div className="mb-3 flex items-center gap-3 flex-wrap">
+                <span className="w-8 h-8 rounded-lg bg-ink/[0.05] flex items-center justify-center shrink-0"><FileText className="w-4 h-4 text-ink/60" /></span>
+                <div className="min-w-[180px] flex-1">
+                  <div className="text-[14px] font-medium text-ink">{docLabel(d.category)}</div>
+                  <div className="text-xs text-ink/50">{[d.description, d.file_name, fmtDateTime(d.created_at)].filter(Boolean).join(' · ')}</div>
+                </div>
+                <Pill tone={STATUS_TONE[d.status] ?? 'gray'}>{DOC_STATUSES[d.status] ?? d.status}</Pill>
+                {canVerify && d.status !== 'verified' && <Btn variant="ok" onClick={() => void setStatus(d, 'verified')}><Check className="w-3.5 h-3.5" /> Έλεγχος</Btn>}
+                {canVerify && d.status !== 'rejected' && <Btn variant="danger" onClick={() => void setStatus(d, 'rejected')}>Απόρριψη</Btn>}
               </div>
-              <Pill tone={STATUS_TONE[d.status] ?? 'gray'}>{DOC_STATUSES[d.status] ?? d.status}</Pill>
-              {canVerify && d.status !== 'verified' && <Btn variant="ok" onClick={() => void setStatus(d, 'verified')}><Check className="w-3.5 h-3.5" /> Έλεγχος</Btn>}
-              {canVerify && d.status !== 'rejected' && <Btn variant="danger" onClick={() => void setStatus(d, 'rejected')}>Απόρριψη</Btn>}
+              <FilePreview url={urls[d.id]} name={d.file_name || docLabel(d.category)} mimeType={d.mime_type} />
             </div>
           ))}
         </div>

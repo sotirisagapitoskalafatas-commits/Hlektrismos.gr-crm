@@ -8,6 +8,8 @@ import { ArrowLeft, Briefcase, Clock, FileText, Mail, MapPin, Pencil, Phone, Spa
 import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, TimelineComposer, VisitsTab } from '@/components/app/CaseDetailPage';
 import { CaseProgress } from '@/components/cases/CaseOverview';
 import CaseDocuments from '@/components/documents/CaseDocuments';
+import FilePreview from '@/components/documents/FilePreview';
+import AddressMapPicker from '@/components/maps/AddressMapPicker';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { ORIGIN_TEXT, convertedNotice, folderBadge, folderOrigin, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
 import type { FolderTab } from '@/lib/folder';
@@ -21,7 +23,7 @@ import { caseCountText } from '@/lib/status-text';
 import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
-import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getDocumentUrl, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
 import { supplyLabelFor } from '@/lib/supply-points';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
@@ -46,6 +48,7 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [cust, setCust] = useState<Customer | null | undefined>(undefined);
   const [cases, setCases] = useState<Case[]>([]);
   const [docs, setDocs] = useState<Record<string, CaseDocument[]>>({});
+  const [otherDocUrls, setOtherDocUrls] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<(TimelineEvent & { case_no: string })[]>([]);
   const [tab, setTab] = useState<FolderTab>('overview');
   // «Αιτήσεις & επισκέψεις» appears only once the staged SQL (phase7) is applied: until then the folder is exactly what it was.
@@ -64,7 +67,6 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [names, setNames] = useState(false);
   useEffect(() => { void customerNamesAvailable().then(setNames); }, []);
   const [form, setForm] = useState({ first_name: '', last_name: '', full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', notes: '', lat: '', lng: '' });
-  const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [now] = useState(() => Date.now());
   const canEdit = can(role, 'edit_case');
@@ -91,6 +93,20 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
     setEvents(mine.flatMap((k, i) => t[i].map(e => ({ ...e, case_no: k.case_no }))));
   }, [customerId]);
   useEffect(() => { void load(); }, [load]);
+
+  // Other-case documents also need fresh private URLs so the customer folder can preview them in place.
+  useEffect(() => {
+    let alive = true;
+    const selectedId = selectedCase(cases, picked)?.id ?? null;
+    const other = cases.filter(k => k.id !== selectedId).flatMap(k => docs[k.id] ?? []);
+    void Promise.all(other.map(async d => {
+      const url = d.file_url ? await getDocumentUrl(d.file_url) : null;
+      return [d.id, url] as const;
+    })).then(entries => {
+      if (alive) setOtherDocUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => !!entry[1])));
+    });
+    return () => { alive = false; };
+  }, [cases, docs, picked]);
 
   const summary = useMemo(() => customerSummary(cases, now), [cases, now]);
   const sel = useMemo(() => selectedCase(cases, picked), [cases, picked]);
@@ -211,16 +227,14 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
                 <input className="field mt-1" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} />
               </label>
             ))}
-            <label className="text-[13px] font-medium">Γεωγρ. πλάτος (lat)
-              <input className="field mt-1" inputMode="decimal" value={form.lat} onChange={e => setForm(f => ({ ...f, lat: e.target.value }))} />
-            </label>
-            <label className="text-[13px] font-medium">Γεωγρ. μήκος (lng)
-              <input className="field mt-1" inputMode="decimal" value={form.lng} onChange={e => setForm(f => ({ ...f, lng: e.target.value }))} />
-            </label>
-            <button type="button" className="atx-link !p-0 text-left sm:col-span-2" disabled={locating}
-              onClick={async () => { setLocating(true); const p = await getPosition(); setLocating(false); if (p) setForm(f => ({ ...f, lat: String(p.lat), lng: String(p.lng) })); else toast('Η τοποθεσία δεν είναι διαθέσιμη.', 'bad'); }}>
-              {locating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
-            </button>
+            <AddressMapPicker
+              address={form.address}
+              city={form.city}
+              postalCode={form.postal_code}
+              lat={form.lat}
+              lng={form.lng}
+              onChange={value => setForm(f => ({ ...f, ...value }))}
+            />
             <label className="text-[13px] font-medium sm:col-span-2">Σημειώσεις
               <textarea className="field mt-1" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </label>
@@ -339,13 +353,16 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
               <div className="atx-section-head" style={{ padding: '16px 16px 0' }}><h2 className="atx-section-title">Έγγραφα άλλων cases</h2><span className="text-[13px] text-[var(--atx-muted)]">{otherDocs.length}</span></div>
               <ul className="m-0 p-0 list-none">
                 {otherDocs.map(d => (
-                  <li key={d.id} className="atx-row">
-                    <span className="atx-icon" aria-hidden="true"><FileText size={16} /></span>
-                    <button className="atx-row-main" onClick={() => setPicked(d.case_id)}>
-                      <span className="atx-row-title">{docLabel(d.category)}</span>
-                      <span className="atx-row-sub">Case {d.case_no} · {fmtDateTime(d.created_at)}{d.description ? ` · ${d.description}` : ''}</span>
-                    </button>
-                    <span className={`atx-tag ${DOC_TONE[d.status] ?? ''}`}>{DOC_TEXT[d.status] ?? d.status}</span>
+                  <li key={d.id} className="atx-panel p-3 space-y-3" data-other-case-document={d.file_name}>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="atx-icon" aria-hidden="true"><FileText size={16} /></span>
+                      <button className="min-w-0 flex-1 text-left" onClick={() => setPicked(d.case_id)}>
+                        <span className="block text-[14px] font-semibold">{docLabel(d.category)}</span>
+                        <span className="block text-[12.5px] text-[var(--atx-muted)]">Case {d.case_no} · {fmtDateTime(d.created_at)}{d.description ? ` · ${d.description}` : ''}</span>
+                      </button>
+                      <span className={`atx-tag ${DOC_TONE[d.status] ?? ''}`}>{DOC_TEXT[d.status] ?? d.status}</span>
+                    </div>
+                    <FilePreview url={otherDocUrls[d.id]} name={d.file_name || docLabel(d.category)} mimeType={d.mime_type} />
                   </li>
                 ))}
               </ul>

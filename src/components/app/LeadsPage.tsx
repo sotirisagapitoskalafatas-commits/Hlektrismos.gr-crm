@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import LeadDetail from '@/components/leads/LeadDetail';
+import AddressMapPicker from '@/components/maps/AddressMapPicker';
 import { TrashButton } from '@/components/trash/TrashControls';
 import { canTrash, trashRecord } from '@/lib/trash';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo, propertyLabel, serviceLabel } from '@/lib/roles';
 import { leadStatusDisplay } from '@/lib/lead-status';
 import { pillClass, toneForLeadStatus } from '@/lib/status-style';
-import { Lead, convertLeadToCase, createLead, createLeadSupplyPoint, fetchLeads, fetchTariffCategories, getPosition, leadSupplyAvailable, updateLeadChecked, updateLeadStage } from '@/lib/api';
+import { Lead, convertLeadToCase, createLead, createLeadSupplyPoint, fetchLeads, fetchTariffCategories, leadSupplyAvailable, updateLeadChecked, updateLeadStage } from '@/lib/api';
 import LeadSupplySection from '@/components/leads/LeadSupplySection';
 import { leadSupplyBlocking, supplyPointTitle } from '@/lib/supply-points';
 import type { SupplyPointDraft, TariffCategory } from '@/lib/supply-points';
@@ -17,7 +18,7 @@ import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
 import { classifyUpload, MAX_FORM_FILES, PUBLIC_FORM_ACCEPT } from '@/lib/upload-files';
 import { Btn, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
-import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowRight, ExternalLink, Pencil, Plus, Trash2, Users } from 'lucide-react';
 
 const EMPTY_FORM = {
   full_name: '', phone: '', email: '', address: '', service_category: 'energy', source: 'inside_sales',
@@ -40,7 +41,6 @@ export default function LeadsPage() {
   const [editForm, setEditForm] = useState({
     full_name: '', phone: '', email: '', address: '', lat: '', lng: '', comments: '',
   });
-  const [locating, setLocating] = useState(false);
   // Errors are shown INSIDE the dialog that caused them (the page-level message was hidden behind the open modal).
   const [createErr, setCreateErr] = useState('');
   const [creating, setCreating] = useState(false);
@@ -86,13 +86,6 @@ export default function LeadsPage() {
       lng: l.lng ?? '',
       comments: l.comments || '',
     });
-  };
-
-  const fillMyLocation = async () => {
-    setLocating(true);
-    const coords = await getPosition();
-    setLocating(false);
-    if (coords) setEditForm(f => ({ ...f, lat: String(coords.lat), lng: String(coords.lng) }));
   };
 
   const saveEdit = async () => {
@@ -473,16 +466,12 @@ export default function LeadsPage() {
             <input className="field" value={editForm.address ?? ''} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Οδός, αριθμός…" />
           </Field>
           <p className="text-[12px] text-ink/55 -mt-2">Οι διευθύνσεις παροχών είναι στην καρτέλα Παροχές.</p>
-          <Field label="Τοποθεσία (γεωγραφικές συντεταγμένες)">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <input type="number" step="any" className="field" value={editForm.lat ?? ''} onChange={e => setEditForm(f => ({ ...f, lat: e.target.value }))} placeholder="lat" />
-              <input type="number" step="any" className="field" value={editForm.lng ?? ''} onChange={e => setEditForm(f => ({ ...f, lng: e.target.value }))} placeholder="lng" />
-            </div>
-            <button type="button" onClick={fillMyLocation} disabled={locating}
-              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-600 hover:underline">
-              <Crosshair className="w-3.5 h-3.5" /> {locating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
-            </button>
-          </Field>
+          <AddressMapPicker
+            address={editForm.address}
+            lat={String(editForm.lat ?? '')}
+            lng={String(editForm.lng ?? '')}
+            onChange={value => setEditForm(f => ({ ...f, ...value }))}
+          />
           <Field label="Σχόλια">
             <textarea className="field" rows={2} value={editForm.comments ?? ''} onChange={e => setEditForm(f => ({ ...f, comments: e.target.value }))} />
           </Field>

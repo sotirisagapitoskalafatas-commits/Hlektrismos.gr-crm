@@ -11,6 +11,7 @@ import { convertLeadToCase, fetchCase, fetchEntityActivity, fetchLead, fetchLead
 import SupplyPointsTab from '@/components/customers/SupplyPointsTab';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import { fileSizeText, leadFiles } from '@/lib/lead-files';
+import FilePreview from '@/components/documents/FilePreview';
 import { tagLeadFile } from '@/lib/lead-intake';
 import { supplyLabelFor } from '@/lib/supply-points';
 import { InTrashBanner, TrashButton } from '@/components/trash/TrashControls';
@@ -203,22 +204,22 @@ export default function LeadDetail({ leadId, version, onEdit }: { leadId: string
             </p>
             <ul className="m-0 p-0 list-none space-y-2">
               {files.map(f => (
-                <li key={f.path} className="flex items-center gap-3 text-[14px]">
-                  <span className="atx-icon" style={{ width: 30, height: 30 }} aria-hidden="true"><FileText size={14} /></span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block font-medium truncate">{f.name}</span>
-                    <span className="block text-[12.5px] text-[var(--atx-muted)]">{fileSizeText(f.size) || '—'}{f.supply_point_id && supplyLabelFor(supplyPoints, f.supply_point_id) ? ` · ${supplyLabelFor(supplyPoints, f.supply_point_id)}` : ''}</span>
-                  </span>
-                  {supplyPoints && supplyPoints.some(p => !p.archived_at) && !lead.converted_case_id && (
-                    <select className="field !py-1 text-[12.5px] w-48" value={f.supply_point_id ?? ''} aria-label={`Παροχή για το αρχείο ${f.name}`} data-lead-file-tag={f.path}
-                      onChange={e => { void tagLeadFile(lead.id, f.path, e.target.value || null).then(err => { if (err) toast(err, 'bad'); else { toast('Η παροχή του αρχείου αποθηκεύτηκε.', 'ok'); void load(); } }); }}>
-                      <option value="">Χωρίς παροχή</option>
-                      {supplyPoints.filter(p => !p.archived_at).map(p => <option key={p.id} value={p.id}>{supplyLabelFor(supplyPoints, p.id)}</option>)}
-                    </select>
-                  )}
-                  {fileUrls[f.path]
-                    ? <a className="atx-btn atx-btn-quiet" href={fileUrls[f.path]} target="_blank" rel="noreferrer">Άνοιγμα</a>
-                    : <span className="text-[12.5px] text-[var(--atx-faint)]">Μη διαθέσιμο</span>}
+                <li key={f.path} className="rounded-xl border border-[var(--atx-line)] p-3" data-lead-attachment={f.name}>
+                  <div className="mb-3 flex items-start gap-3 flex-wrap">
+                    <span className="atx-icon" style={{ width: 30, height: 30 }} aria-hidden="true"><FileText size={14} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium truncate">{f.name}</span>
+                      <span className="block text-[12.5px] text-[var(--atx-muted)]">{fileSizeText(f.size) || '—'}{f.supply_point_id && supplyLabelFor(supplyPoints, f.supply_point_id) ? ` · ${supplyLabelFor(supplyPoints, f.supply_point_id)}` : ''}</span>
+                    </span>
+                    {supplyPoints && supplyPoints.some(p => !p.archived_at) && !lead.converted_case_id && (
+                      <select className="field !py-1 text-[12.5px] w-48" value={f.supply_point_id ?? ''} aria-label={`Παροχή για το αρχείο ${f.name}`} data-lead-file-tag={f.path}
+                        onChange={e => { void tagLeadFile(lead.id, f.path, e.target.value || null).then(err => { if (err) toast(err, 'bad'); else { toast('Η παροχή του αρχείου αποθηκεύτηκε.', 'ok'); void load(); } }); }}>
+                        <option value="">Χωρίς παροχή</option>
+                        {supplyPoints.filter(p => !p.archived_at).map(p => <option key={p.id} value={p.id}>{supplyLabelFor(supplyPoints, p.id)}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <FilePreview url={fileUrls[f.path]} name={f.name} mimeType={f.type} />
                 </li>
               ))}
             </ul>

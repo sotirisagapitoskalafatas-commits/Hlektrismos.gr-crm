@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import LeadDetail from '@/components/leads/LeadDetail';
 import { TrashButton } from '@/components/trash/TrashControls';
+import { canTrash, trashRecord } from '@/lib/trash';
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICES, can, leadSourceInfo, leadStatusInfo, propertyLabel, serviceLabel } from '@/lib/roles';
 import { leadStatusDisplay } from '@/lib/lead-status';
 import { pillClass, toneForLeadStatus } from '@/lib/status-style';
@@ -15,7 +16,7 @@ import { attachLeadFiles, routeLeadToBackoffice } from '@/lib/lead-intake';
 import { classifyUpload, MAX_FORM_FILES, PUBLIC_FORM_ACCEPT } from '@/lib/upload-files';
 import { Btn, CardHeader, EmptyState, Field, Micro, Modal, Pill, Spinner } from '@/lib/ui';
 import ProviderProgramPicker, { ProviderDot } from './ProviderProgramPicker';
-import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Users } from 'lucide-react';
+import { ArrowRight, Crosshair, ExternalLink, Pencil, Plus, Trash2, Users } from 'lucide-react';
 
 const EMPTY_FORM = {
   full_name: '', phone: '', email: '', address: '', service_category: 'energy', source: 'inside_sales',
@@ -66,6 +67,9 @@ export default function LeadsPage() {
   const [editErr, setEditErr] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
+  const [bulkTrashBusy, setBulkTrashBusy] = useState(false);
 
   const openEdit = (l: Lead) => {
     setEditErr('');
@@ -118,6 +122,49 @@ export default function LeadsPage() {
   for (const l of items) counts.set(l.status ?? 'new', (counts.get(l.status ?? 'new') ?? 0) + 1);
 
   const visible = tab === 'all' ? items : items.filter(l => (l.status ?? 'new') === tab);
+  const allVisibleSelected = visible.length > 0 && visible.every(l => selectedIds.has(l.id));
+
+  const toggleLeadSelection = (id: string) => {
+    setSelectedIds(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleVisibleSelection = () => {
+    const ids = visible.map(l => l.id);
+    setSelectedIds(current => {
+      const next = new Set(current);
+      if (ids.length > 0 && ids.every(id => next.has(id))) ids.forEach(id => next.delete(id));
+      else ids.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
+  const bulkTrash = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length || bulkTrashBusy) return;
+    setBulkTrashBusy(true);
+    const failures: string[] = [];
+    for (const id of ids) {
+      const error = await trashRecord('lead', id, 'Μαζική διαγραφή από τη λίστα Leads');
+      if (error) failures.push(error);
+    }
+    const fresh = await fetchLeads();
+    const moved = ids.filter(id => !fresh.some(l => l.id === id)).length;
+    setItems(fresh);
+    setSelectedIds(new Set(ids.filter(id => fresh.some(l => l.id === id))));
+    setBulkTrashBusy(false);
+    setBulkTrashOpen(false);
+    if (failures.length || moved !== ids.length) {
+      const message = `${moved} από ${ids.length} leads μεταφέρθηκαν στον Κάδο. ${ids.length - moved} δεν μεταφέρθηκαν${failures[0] ? `: ${failures[0]}` : '.'}`;
+      setErr(message);
+      toast(message, 'bad');
+    } else {
+      toast(`${moved} leads μεταφέρθηκαν στον Κάδο. Μπορείτε να τα επαναφέρετε από τη Διαχείριση → Κάδος.`, 'ok');
+    }
+  };
 
   const onConvert = async (l: Lead) => {
     setBusyId(l.id);
@@ -218,13 +265,33 @@ export default function LeadsPage() {
         {tabs.map(t => {
           const count = t.id === 'all' ? items.length : (counts.get(t.id) ?? 0);
           return (
-            <button key={t.id} type="button" onClick={() => setTab(t.id)} aria-pressed={tab === t.id} className="ui-chip shrink-0">
+            <button key={t.id} type="button" onClick={() => { setTab(t.id); setSelectedIds(new Set()); }} aria-pressed={tab === t.id} className="ui-chip shrink-0">
               <span aria-hidden="true">{t.emoji}</span> {t.id === 'all' ? t.label : leadStatusDisplay(t.id).label}{t.id !== 'all' && leadStatusDisplay(t.id).detail ? ` · ${leadStatusDisplay(t.id).detail}` : ''}
               <span className="ui-chip__n">{count}</span>
             </button>
           );
         })}
       </div>
+
+      {canTrash(role) && (
+        <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-line bg-white px-4 py-3">
+          <div className="flex items-center gap-3 flex-wrap text-[13px]">
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisibleSelection} aria-label="Επιλογή όλων των εμφανιζόμενων leads" />
+              <span>Επιλογή όλων ({visible.length})</span>
+            </label>
+            <span className="text-ink/50">{selectedIds.size} επιλεγμένα</span>
+          </div>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2">
+              <button type="button" className="text-[12px] text-ink/55 hover:text-ink" onClick={() => setSelectedIds(new Set())}>Καθαρισμός</button>
+              <Btn variant="danger" onClick={() => setBulkTrashOpen(true)} disabled={bulkTrashBusy}>
+                <Trash2 className="w-3.5 h-3.5" /> Μεταφορά στον Κάδο ({selectedIds.size})
+              </Btn>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="ui-card overflow-hidden">
         <CardHeader micro="Πορεία leads" title={`${tab === 'all' ? 'Όλα τα leads' : leadStatusInfo(tab).label}`}
@@ -244,6 +311,7 @@ export default function LeadsPage() {
               const isStaff = can(role, 'create_case');
               return (
                 <div key={l.id} className="ui-row px-5 py-3 flex items-center gap-3 flex-wrap">
+                  {canTrash(role) && <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleLeadSelection(l.id)} aria-label={`Επιλογή lead ${name}`} className="w-4 h-4 shrink-0" />}
                   <span className="ui-tile shrink-0" title={src.label}>
                     {src.emoji}
                   </span>
@@ -304,7 +372,18 @@ export default function LeadsPage() {
                       </span>
                     )}
                     <TrashButton compact type="lead" id={l.id} name={name}
-                      onTrashed={async () => { const list = await fetchLeads(); setItems(list); return !list.some(x => x.id === l.id); }} />
+                      onTrashed={async () => {
+                        const list = await fetchLeads();
+                        const remains = list.some(x => x.id === l.id);
+                        setItems(list);
+                        if (!remains) setSelectedIds(current => {
+                          if (!current.has(l.id)) return current;
+                          const next = new Set(current);
+                          next.delete(l.id);
+                          return next;
+                        });
+                        return !remains;
+                      }} />
                   </div>
                 </div>
               );
@@ -314,6 +393,17 @@ export default function LeadsPage() {
       </div>
 
       </>)}
+
+      <Modal open={bulkTrashOpen} onClose={() => !bulkTrashBusy && setBulkTrashOpen(false)} title={`Μεταφορά ${selectedIds.size} leads στον Κάδο`} micro="Μαζική διαγραφή">
+        <div className="space-y-3">
+          <p className="text-[14px] text-ink/75">Τα επιλεγμένα leads θα αφαιρεθούν από την ενεργή λίστα και θα μεταφερθούν στον Κάδο. Δεν διαγράφονται οριστικά και μπορούν να επαναφερθούν από τη Διαχείριση → Κάδος.</p>
+          <p className="text-[12px] text-ink/50">Η οριστική διαγραφή γίνεται ξεχωριστά από τον Κάδο, μόνο από Admin και μόνο όταν δεν υπάρχουν συνδεδεμένες εγγραφές.</p>
+          <div className="flex justify-end gap-2">
+            <Btn variant="outline" disabled={bulkTrashBusy} onClick={() => setBulkTrashOpen(false)}>Ακύρωση</Btn>
+            <Btn variant="danger" disabled={bulkTrashBusy || selectedIds.size === 0} onClick={() => void bulkTrash()}>{bulkTrashBusy ? <Spinner /> : <Trash2 className="w-3.5 h-3.5" />} Μεταφορά στον Κάδο</Btn>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="Επεξεργασία Lead" micro="Στοιχεία επικοινωνίας">
         <div className="space-y-4">

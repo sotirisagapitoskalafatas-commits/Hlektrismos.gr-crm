@@ -6,7 +6,7 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { Btn, Field, Modal, Spinner, fmtDateTime } from '@/lib/ui';
-import { canPurge, canTrash, describeReferences, listTrash, purgeRecord, restoreRecord, trashRecord } from '@/lib/trash';
+import { canPurge, canTrash, describeReferences, isBulkPurgeEligibleLead, listTrash, purgeRecord, restoreRecord, trashRecord } from '@/lib/trash';
 import type { TrashRow, TrashType } from '@/lib/trash';
 
 const TYPE_TEXT: Record<TrashType, string> = { lead: 'Lead', customer: 'Πελάτης' };
@@ -90,6 +90,10 @@ export function TrashTab() {
   const [error, setError] = useState<string | null>(null);
   const [purge, setPurge] = useState<TrashRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(() => new Set());
+  const [bulkPurgeOpen, setBulkPurgeOpen] = useState(false);
+  const [bulkPurgeConfirm, setBulkPurgeConfirm] = useState('');
+  const [bulkPurgeBusy, setBulkPurgeBusy] = useState(false);
 
   const load = useCallback(async () => {
     const r = await listTrash();
@@ -97,6 +101,60 @@ export function TrashTab() {
     return r.rows;
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const eligibleLeadRows = (rows ?? []).filter(isBulkPurgeEligibleLead);
+  const allEligibleLeadsSelected = eligibleLeadRows.length > 0 && eligibleLeadRows.every(r => selectedLeadIds.has(r.id));
+
+  const toggleLeadSelection = (id: string) => {
+    setSelectedLeadIds(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleEligibleLeads = () => {
+    setSelectedLeadIds(current => {
+      const next = new Set(current);
+      if (eligibleLeadRows.length > 0 && eligibleLeadRows.every(r => next.has(r.id))) eligibleLeadRows.forEach(r => next.delete(r.id));
+      else eligibleLeadRows.forEach(r => next.add(r.id));
+      return next;
+    });
+  };
+
+  const bulkPurge = async () => {
+    const ids = [...selectedLeadIds];
+    if (!ids.length || bulkPurgeBusy || bulkPurgeConfirm.trim() !== 'ΟΡΙΣΤΙΚΗ ΔΙΑΓΡΑΦΗ') return;
+    setBulkPurgeBusy(true);
+    let deleted = 0;
+    let filesLeft = 0;
+    const failures: string[] = [];
+    for (const id of ids) {
+      const row = (rows ?? []).find(r => r.id === id && r.entity_type === 'lead');
+      if (!row || !isBulkPurgeEligibleLead(row)) {
+        failures.push(`${row?.name ?? 'Lead'}: συνδέεται με άλλες εγγραφές`);
+        continue;
+      }
+      const result = await purgeRecord('lead', id);
+      if (result.error) failures.push(`${row.name ?? 'Lead'}: ${result.error}`);
+      else { deleted += 1; filesLeft += result.filesLeft; }
+    }
+    const fresh = await load();
+    setSelectedLeadIds(new Set(ids.filter(id => fresh.some(r => r.id === id))));
+    setBulkPurgeBusy(false);
+    setBulkPurgeOpen(false);
+    setBulkPurgeConfirm('');
+    if (failures.length) {
+      const message = `Διαγράφηκαν οριστικά ${deleted} από ${ids.length} leads. ${failures.length} δεν διαγράφηκαν: ${failures.slice(0, 2).join(' · ')}`;
+      setError(message);
+      toast(message, 'bad');
+    } else {
+      const message = filesLeft
+        ? `Διαγράφηκαν οριστικά ${deleted} leads. ${filesLeft} αρχεία δεν αφαιρέθηκαν από την αποθήκευση.`
+        : `Διαγράφηκαν οριστικά ${deleted} leads.`;
+      toast(message, filesLeft ? 'bad' : 'ok');
+    }
+  };
 
   const restore = async (r: TrashRow) => {
     setBusyId(r.id);
@@ -115,13 +173,34 @@ export function TrashTab() {
         {rows === null && [0, 1].map(i => <div key={i} className="atx-skeleton" aria-hidden="true" />)}
         {rows && rows.length === 0 && !error && <div className="atx-empty !py-8"><strong>Ο κάδος είναι άδειος</strong>Δεν υπάρχουν διαγραμμένα leads ή πελάτες.</div>}
         {rows && rows.length > 0 && (
-          <table className="atx-table">
-            <thead><tr><th>Εγγραφή</th><th>Τύπος</th><th className="max-md:hidden">Διαγραφή</th><th className="max-md:hidden">Αιτία</th><th aria-label="Ενέργειες" /></tr></thead>
+          <>
+            {canPurge(role) && eligibleLeadRows.length > 0 && (
+              <div className="px-4 pt-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 text-[13px]">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={allEligibleLeadsSelected} onChange={toggleEligibleLeads} aria-label="Επιλογή όλων των leads χωρίς συνδεδεμένες εγγραφές" />
+                    <span>Επιλογή διαθέσιμων leads ({eligibleLeadRows.length})</span>
+                  </label>
+                  <span className="text-[var(--atx-muted)]">{selectedLeadIds.size} επιλεγμένα</span>
+                </div>
+                {selectedLeadIds.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="atx-link" onClick={() => setSelectedLeadIds(new Set())}>Καθαρισμός</button>
+                    <button type="button" className="atx-btn atx-btn-quiet !h-8 inline-flex items-center gap-1 text-[var(--atx-red)]" onClick={() => { setBulkPurgeConfirm(''); setBulkPurgeOpen(true); }} disabled={bulkPurgeBusy}>
+                      <Trash2 size={14} /> Οριστική διαγραφή ({selectedLeadIds.size})
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            <table className="atx-table">
+            <thead><tr>{canPurge(role) && <th>Επιλογή</th>}<th>Εγγραφή</th><th>Τύπος</th><th className="max-md:hidden">Διαγραφή</th><th className="max-md:hidden">Αιτία</th><th aria-label="Ενέργειες" /></tr></thead>
             <tbody>
               {rows.map(r => {
                 const refs = describeReferences(r.references_json);
                 return (
                   <tr key={`${r.entity_type}-${r.id}`} data-trash={r.name ?? r.id}>
+                    {canPurge(role) && <td>{r.entity_type === 'lead' && <input type="checkbox" checked={selectedLeadIds.has(r.id)} disabled={!isBulkPurgeEligibleLead(r)} onChange={() => toggleLeadSelection(r.id)} aria-label={`Επιλογή lead ${r.name ?? r.id}`} title={isBulkPurgeEligibleLead(r) ? 'Επιλογή για οριστική διαγραφή' : 'Δεν είναι διαθέσιμο: υπάρχουν συνδεδεμένες εγγραφές'} />}</td>}
                     <td>
                       <span className="block font-medium">{r.name || '—'}</span>
                       <span className="block text-[12.5px] text-[var(--atx-muted)]">{[r.phone, r.email].filter(Boolean).join(' · ') || '—'}{refs ? ` · συνδέεται με ${refs}` : ''}</span>
@@ -139,12 +218,34 @@ export function TrashTab() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </>
         )}
       </div>
+      {bulkPurgeOpen && (
+        <Modal open onClose={() => !bulkPurgeBusy && setBulkPurgeOpen(false)} title={`Οριστική διαγραφή ${selectedLeadIds.size} leads`} micro="Μη αναστρέψιμη ενέργεια">
+          <div className="space-y-3">
+            <p className="text-[14px] text-ink/75">Τα επιλεγμένα leads και τα συνημμένα αρχεία τους θα διαγραφούν οριστικά. Η ενέργεια δεν αναιρείται. Όσα έχουν συνδεδεμένα cases, follow-ups ή άλλα δεδομένα δεν μπορούν να διαγραφούν και θα παραμείνουν στον Κάδο.</p>
+            <Field label="Πληκτρολογήστε «ΟΡΙΣΤΙΚΗ ΔΙΑΓΡΑΦΗ» για επιβεβαίωση">
+              <input className="field" value={bulkPurgeConfirm} onChange={e => setBulkPurgeConfirm(e.target.value)} autoComplete="off" />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Btn variant="outline" disabled={bulkPurgeBusy} onClick={() => setBulkPurgeOpen(false)}>Ακύρωση</Btn>
+              <Btn variant="danger" disabled={bulkPurgeBusy || bulkPurgeConfirm.trim() !== 'ΟΡΙΣΤΙΚΗ ΔΙΑΓΡΑΦΗ' || selectedLeadIds.size === 0} onClick={() => void bulkPurge()}>{bulkPurgeBusy ? <Spinner /> : <Trash2 className="w-3.5 h-3.5" />} Οριστική διαγραφή</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
       {purge && <PurgeDialog row={purge} onClose={() => setPurge(null)} onDone={async () => {
         const fresh = await load();
-        return !fresh.some(x => x.id === purge.id);
+        const remains = fresh.some(x => x.id === purge.id);
+        if (!remains) setSelectedLeadIds(current => {
+          if (!current.has(purge.id)) return current;
+          const next = new Set(current);
+          next.delete(purge.id);
+          return next;
+        });
+        return !remains;
       }} />}
     </div>
   );

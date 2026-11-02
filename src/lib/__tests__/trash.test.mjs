@@ -25,3 +25,10 @@ test('database refusals become clear Greek messages', () => {
   assert.equal(T.trashError('something else', 'fallback'), 'fallback');
   assert.equal(T.describeReferences({ cases: 1, follow_ups: 0 }), '1 cases');
 });
+
+test('bulk permanent deletion only selects unreferenced leads, never customers or leads linked to CRM history', () => {
+  assert.equal(T.isBulkPurgeEligibleLead({ entity_type: 'lead', references_json: {} }), true);
+  assert.equal(T.isBulkPurgeEligibleLead({ entity_type: 'lead', references_json: { cases: 2 } }), false);
+  assert.equal(T.isBulkPurgeEligibleLead({ entity_type: 'lead', references_json: { follow_ups: 1 } }), false);
+  assert.equal(T.isBulkPurgeEligibleLead({ entity_type: 'customer', references_json: {} }), false);
+});

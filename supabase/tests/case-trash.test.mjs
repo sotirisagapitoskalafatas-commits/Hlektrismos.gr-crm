@@ -111,7 +111,7 @@ before(async () => {
     insert into public.follow_ups values ('ffffffff-0000-4000-8000-000000000004','cccccccc-0000-4000-8000-000000000001','eeeeeeee-0000-4000-8000-000000000001');
     insert into public.app_notifications values ('ffffffff-0000-4000-8000-000000000006','cccccccc-0000-4000-8000-000000000001');
     insert into public.timeline_events values ('ffffffff-0000-4000-8000-000000000007','cccccccc-0000-4000-8000-000000000001');
-    insert into public.field_checkins values ('ffffffff-0000-4000-8000-000000000003','cccccccc-0000-4000-8000-000000000001');
+    insert into public.field_checkins(id,case_id) values ('ffffffff-0000-4000-8000-000000000003','cccccccc-0000-4000-8000-000000000001');
     insert into storage.objects(bucket_id,name) values
       ('client_documents','cases/case1_bill.pdf'),('client_documents','cases/signature.jpg');
   `);

@@ -14,6 +14,7 @@ import PublicFooter from '@/components/public/PublicFooter';
 import WaveDivider from '@/components/public/WaveDivider';
 import '@/styles/landing.css';
 import { uploadDocument } from '@/lib/storage';
+import { isLeadConfirmationDelivered } from '@/lib/lead-confirmation.mjs';
 
 /* ─── Landing page content ─────────────────────────────────── */
 const PHONE_HREF = `tel:${COMPANY.phone.replace(/\s+/g, '')}`;
@@ -104,7 +105,7 @@ export default function LandingPage() {
     region: '', propertyType: '', service: 'Ρεύμα', message: '', billFiles: [], consent: false, adult: false,
   });
   const [submitted, setSubmitted] = useState(false);
-  const [leadEmailSent, setLeadEmailSent] = useState(false);
+  const [leadEmailStatus, setLeadEmailStatus] = useState<'sent' | 'failed' | 'not-provided'>('not-provided');
   const [uploadStatus, setUploadStatus] = useState('');
   const [sentFiles, setSentFiles] = useState(0);
   // Files already stored during a failed submit are not uploaded again on retry.
@@ -219,18 +220,27 @@ export default function LandingPage() {
     // Bill OCR (billing-ocr) is staff-only and runs from the lead view in the
     // CRM; the public form never triggers it.
 
-    // Send a confirmation email to the lead (fire-and-forget; skipped when no email given)
+    // The lead is already safely stored. Report confirmation delivery only when the
+    // Edge Function explicitly confirms provider acceptance; a skipped/failed send
+    // must never be described to the visitor as a delivered email.
     const leadEmail = form.email.trim().toLowerCase();
+    let confirmationStatus: 'sent' | 'failed' | 'not-provided' = 'not-provided';
     if (leadEmail && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(leadEmail)) {
-      setLeadEmailSent(true);
-      supabase.functions.invoke('send-lead-confirmation', {
-        body: {
-          email: leadEmail,
-          first_name: form.firstName.trim() || leadEmail.split('@')[0],
-          service: form.service,
-        },
-      }).catch(() => {});
+      try {
+        const confirmation = await supabase.functions.invoke('send-lead-confirmation', {
+          body: {
+            email: leadEmail,
+            first_name: form.firstName.trim() || leadEmail.split('@')[0],
+            service: form.service,
+            source: 'website',
+          },
+        });
+        confirmationStatus = isLeadConfirmationDelivered(confirmation) ? 'sent' : 'failed';
+      } catch {
+        confirmationStatus = 'failed';
+      }
     }
+    setLeadEmailStatus(confirmationStatus);
 
     setSentFiles(uploadedFiles.length);
     uploadedRef.current = new WeakMap();
@@ -403,7 +413,7 @@ export default function LandingPage() {
                   <span className="lp-success__icon"><CheckCircle2 size={30} aria-hidden="true" /></span>
                   <h3>Ευχαριστούμε!</h3>
                   <p>
-                    Λάβαμε το αίτημά σου{sentFiles > 0 ? ` και ${sentFiles === 1 ? '1 αρχείο' : `${sentFiles} αρχεία`}` : ''}. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailSent ? ' — μόλις σου στείλαμε και email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : '.'}
+                    Λάβαμε το αίτημά σου{sentFiles > 0 ? ` και ${sentFiles === 1 ? '1 αρχείο' : `${sentFiles} αρχεία`}` : ''}. Ένας σύμβουλος ενέργειας θα επικοινωνήσει μαζί σου μέσα σε λίγες ώρες{leadEmailStatus === 'sent' ? ' — σου στείλαμε email επιβεβαίωσης, έλεγξε τα εισερχόμενά σου.' : leadEmailStatus === 'failed' ? ' — το αίτημα καταχωρήθηκε, αλλά δεν ήταν δυνατή η αποστολή email επιβεβαίωσης.' : '.'}
                   </p>
                 </div>
               ) : (

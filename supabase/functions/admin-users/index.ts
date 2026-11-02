@@ -9,7 +9,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { missingKeyResponse, presentsSecretKey, secretKey, userBearer } from "../_shared/keys.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { canManage, decideDelete, decideReset, validateCreate } from "../_shared/staff-admin.ts";
+import { canManage, decideDelete, decideReset, validateCreate, validateChosenPassword } from "../_shared/staff-admin.ts";
 import { crmSiteUrl } from "../_shared/site-url.ts";
 
 Deno.serve(async (req: Request) => {
@@ -36,7 +36,11 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return errorResponse("Μη έγκυρο αίτημα.", 400); }
 
   if (body.action === "complete_password_change") {
-    // A user may clear only their own server-controlled marker, after Supabase has accepted a password update.
+    // A temporary credential can be replaced only by its own authenticated account.
+    const ownPassword = String(body.password ?? "");
+    const passwordError = validateChosenPassword(ownPassword);
+    if (passwordError) return errorResponse(passwordError, 400);
+
     const { data: ownProfile, error: profileErr } = await admin
       .from("profiles")
       .select("id")
@@ -44,15 +48,18 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (profileErr || !ownProfile) return errorResponse("Δεν βρέθηκε προφίλ για τον λογαριασμό.", 403);
 
-    if (caller.app_metadata?.must_change_password === true) {
-      const appMetadata = { ...(caller.app_metadata ?? {}) };
-      delete appMetadata.must_change_password;
-      const { error: markerErr } = await admin.auth.admin.updateUserById(caller.id, { app_metadata: appMetadata });
-      if (markerErr) return errorResponse("Ο κωδικός άλλαξε, αλλά δεν ολοκληρώθηκε η επαλήθευση. Δοκιμάστε ξανά.", 500);
-      await audit({ action: "password_change_completed", target_id: caller.id, target_email: caller.email ?? null });
-    }
+    // Idempotent when Auth accepted the previous request but its response was lost.
+    if (caller.app_metadata?.must_change_password !== true) return jsonResponse({ ok: true, already_completed: true });
 
-    // Idempotent for retries after a successful server update but a failed client refresh.
+    const appMetadata = { ...(caller.app_metadata ?? {}) };
+    delete appMetadata.must_change_password;
+    // Password replacement and clearing the server-only gate happen in one Auth Admin API call.
+    const { error: updateErr } = await admin.auth.admin.updateUserById(caller.id, {
+      password: ownPassword,
+      app_metadata: appMetadata,
+    });
+    if (updateErr) return errorResponse("Δεν ήταν δυνατή η αλλαγή κωδικού. Ελέγξτε την ισχύ του νέου κωδικού και δοκιμάστε ξανά.", 400);
+    await audit({ action: "password_change_completed", target_id: caller.id, target_email: caller.email ?? null });
     return jsonResponse({ ok: true });
   }
 

@@ -48,5 +48,5 @@ begin
 end;
 $$;
 
-revoke all on function public.assign_field_visit(uuid, uuid) from public, anon;
+revoke all on function public.assign_field_visit(uuid, uuid) from public, anon, service_role;
 grant execute on function public.assign_field_visit(uuid, uuid) to authenticated;

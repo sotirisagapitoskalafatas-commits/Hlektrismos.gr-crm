@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { canTrash, trashCases } from '@/lib/trash';
-import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
 import { ACTIVE_STAGES, SERVICES, serviceLabel, stageLabel } from '@/lib/roles';
 import type { Stage } from '@/lib/roles';

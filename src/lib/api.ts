@@ -38,6 +38,8 @@ export type Customer = {
 
 export type Case = {
   id: string;
+  /** Set when this case has been moved to the Admin Trash. */
+  deleted_at?: string | null;
   case_no: string;
   title: string;
   /** «Επιστροφή για διόρθωση» (staged migration phase2/07). */
@@ -486,7 +488,7 @@ export async function fetchCases(opts?: { search?: string; stage?: string; inclu
     }
     const { data, error } = await q;
     if (error) { logError('fetchCases', error); return []; }
-    let list = (data ?? []) as Case[];
+    let list = notTrashed((data ?? []) as Case[]);
     if (opts?.search) {
       const s = opts.search.toLowerCase();
       list = list.filter(c =>
@@ -513,7 +515,7 @@ export async function fetchCase(id: string): Promise<Case | null> {
     .maybeSingle();
   if (error) { logError('fetchCase', error); return null; }
   const row = (data ?? null) as Case | null;
-  if (!row) return null;
+  if (!row || row.deleted_at) return null;
   const catalog = await loadCatalog();
   return applyCanonicalLabels([row], catalog)[0];
 }

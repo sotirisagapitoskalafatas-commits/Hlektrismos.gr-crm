@@ -21,7 +21,7 @@ create policy "cases delete only through trash" on public.cases as restrictive f
 
 create or replace function public.case_trash_columns_guard()
 returns trigger language plpgsql set search_path = public
-as $
+as $$
 begin
   if current_user in ('authenticated', 'anon') then
     if tg_op = 'INSERT' then
@@ -36,7 +36,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 drop trigger if exists cases_trash_guard on public.cases;
 create trigger cases_trash_guard before insert or update on public.cases
 for each row execute function public.case_trash_columns_guard();

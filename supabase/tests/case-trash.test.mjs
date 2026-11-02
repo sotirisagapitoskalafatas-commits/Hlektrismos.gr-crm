@@ -62,8 +62,8 @@ before(async () => {
     create function public.trash_references(p_type text,p_id uuid) returns jsonb language sql stable security definer
       as $$ select '{}'::jsonb $$;
 
-    create table public.customers (id uuid primary key, full_name text, phone text, email text);
-    create table public.leads (id uuid primary key, full_name text, client_name text, phone text, email text, attached_files jsonb, converted_case_id uuid);
+    create table public.customers (id uuid primary key, full_name text, phone text, email text, deleted_at timestamptz, deleted_by uuid references public.profiles(id), deleted_reason text);
+    create table public.leads (id uuid primary key, full_name text, client_name text, phone text, email text, attached_files jsonb, converted_case_id uuid, deleted_at timestamptz, deleted_by uuid references public.profiles(id), deleted_reason text);
     create table public.cases (
       id uuid primary key, case_no text, title text not null, customer_id uuid references public.customers(id),
       lead_id uuid references public.leads(id), source text default 'crm', service_type text default 'energy',

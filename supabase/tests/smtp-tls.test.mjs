@@ -14,6 +14,11 @@ const ADMIN = 'aaaaaaaa-0000-4000-8000-0000000000a1';
 const users = { 'tok-admin': ADMIN };
 const PASS = 'smtp-password-not-real';
 const env = { UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000' };
+const CONFIRMATION_SMTP_ENV = {
+  ...env, LEAD_CONFIRMATION_SMTP_HOST: 'smtp.example.test', LEAD_CONFIRMATION_SMTP_PORT: '2587',
+  LEAD_CONFIRMATION_SMTP_USER: 'mailer@example.gr', LEAD_CONFIRMATION_SMTP_PASSWORD: PASS,
+  LEAD_CONFIRMATION_FROM_EMAIL: 'info@hlektrismos.gr',
+};
 const db = (port) => createDb({
   profiles: [{ id: ADMIN, role: 'admin', is_active: true }],
   crm_settings: [{ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: port, smtp_user: 'mailer@example.gr', smtp_password: PASS, from_email: 'info@hlektrismos.gr' } }],
@@ -113,17 +118,16 @@ test('send-lead-confirmation: the same transport rule; a failed upgrade releases
   const now = new Date().toISOString();
   const lead = () => createDb({
     leads: [{ id: 'bbbbbbbb-0000-4000-8000-0000000000a1', email: 'new@example.gr', first_name: 'Νέος', source: 'website', created_at: now, ack_sent_at: null }],
-    crm_settings: db(2587).rows('crm_settings'),
   });
   const body = { body: { email: 'new@example.gr', first_name: 'Νέος' } };
-  const bad = await loadFunction('send-lead-confirmation', { db: lead(), smtpMode: 'no-starttls' });
+  const bad = await loadFunction('send-lead-confirmation', { db: lead(), env: CONFIRMATION_SMTP_ENV, smtpMode: 'no-starttls' });
   const refused = await bad.call(body);
   assert.equal(refused.status, 500, JSON.stringify(refused.json));
   assert.equal(bad.smtp[0].data, null);
   assert.ok(!bad.smtp[0].commands.some((c) => /^(AUTH|MAIL|RCPT)/.test(c)));
   assert.equal(bad.db.rows('leads')[0].ack_sent_at, null, 'a genuine retry still works');
   bad.restore();
-  const good = await loadFunction('send-lead-confirmation', { db: lead() });
+  const good = await loadFunction('send-lead-confirmation', { db: lead(), env: CONFIRMATION_SMTP_ENV });
   assert.equal((await good.call(body)).status, 200);
   assert.ok(good.smtp[0].data.includes('\r\n\r\n--'), 'a blank line separates the headers from the body');
   good.restore();

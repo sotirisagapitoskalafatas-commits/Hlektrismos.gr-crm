@@ -22,6 +22,11 @@ const CAMPAIGN = 'dddddddd-0000-4000-8000-0000000000a1';
 const users = { 'tok-admin': ADMIN };
 const VAPI = 'vapi-webhook-secret-Q7w2Lm9Zp4VdR1tY8hNc5sGa';
 const GATE_ENV = { OUTREACH_ENABLED: 'on', LEGAL_APPROVAL_RECORDED: 'yes', AUTO_VOICE_CALLS: 'on', VAPI_WEBHOOK_SECRET: VAPI };
+const CONFIRMATION_SMTP_ENV = {
+  LEAD_CONFIRMATION_SMTP_HOST: 'smtp.example.test', LEAD_CONFIRMATION_SMTP_PORT: '465',
+  LEAD_CONFIRMATION_SMTP_USER: 'mailer@example.gr', LEAD_CONFIRMATION_SMTP_PASSWORD: 'smtp-password-not-real',
+  LEAD_CONFIRMATION_FROM_EMAIL: 'info@hlektrismos.gr',
+};
 
 const NOON_ATHENS = Date.parse('2026-10-30T10:00:00Z');
 const withClock = async (fn) => {
@@ -158,10 +163,10 @@ test('direct email: a person over their limit gets no mail, and the same mail tw
 test('confirmation mail: limited, logged, and skipped without limits or over the person limit, with the claim given back', async () => {
   const now = new Date().toISOString();
   const LEADID = 'bbbbbbbb-0000-4000-8000-0000000000f1';
-  const confirmDb = () => { const d = db(); d.tables.leads = [{ id: LEADID, email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }]; d.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } }); return d; };
+  const confirmDb = () => { const d = db(); d.tables.leads = [{ id: LEADID, email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }]; return d; };
   const run = async (env, tweak) => {
     const d = confirmDb(); tweak?.(d);
-    const f = await loadFunction('send-lead-confirmation', { db: d, env });
+    const f = await loadFunction('send-lead-confirmation', { db: d, env: { ...CONFIRMATION_SMTP_ENV, OUTREACH_LIMITS: limits(), ...env } });
     const r = await f.call({ body: { email: 'new@example.gr' } });
     f.restore();
     return { json: r.json, sent: f.smtp.filter((x) => x.data).length, ack: d.rows('leads')[0].ack_sent_at, log: d.rows('communication_log').map((x) => x.result) };
@@ -185,8 +190,7 @@ test('confirmation mail: a visitor cannot starve other customers or the staff ma
   const now = new Date().toISOString();
   const database = db();
   database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
-  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
-  const f = await loadFunction('send-lead-confirmation', { db: database, env: { OUTREACH_LIMITS: limits() } });
+  const f = await loadFunction('send-lead-confirmation', { db: database, env: { ...CONFIRMATION_SMTP_ENV, OUTREACH_LIMITS: limits() } });
   await f.call({ body: { email: 'new@example.gr' } });
   const buckets = f.db.log.rpc.filter((c) => c.name === 'consume_rate_limits').flatMap((c) => c.args.p_items.map((i) => i.bucket));
   assert.ok(buckets.length === 2 && buckets.every((b) => b.startsWith('contact:ec:')), buckets.join(' '));
@@ -198,8 +202,7 @@ test('confirmation mail: after DATA the claim stays, so an unknown outcome canno
   const now = new Date().toISOString();
   const database = db();
   database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
-  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
-  const f = await loadFunction('send-lead-confirmation', { db: database, smtpMode: 'reject-data' });
+  const f = await loadFunction('send-lead-confirmation', { db: database, env: { ...CONFIRMATION_SMTP_ENV, OUTREACH_LIMITS: limits() }, smtpMode: 'reject-data' });
   assert.equal((await f.call({ body: { email: 'new@example.gr' } })).status, 500);
   assert.ok(database.rows('leads')[0].ack_sent_at, 'claim kept');
   assert.deepEqual(database.rows('communication_log').map((r) => r.result), ['attempt', 'unknown'], 'an explicit unknown outcome is recorded for reconciliation');

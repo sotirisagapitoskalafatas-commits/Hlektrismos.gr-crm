@@ -182,12 +182,12 @@ export default function StandaloneVisitsPanel() {
                 style={{ minWidth: 190, width: 'auto', minHeight: 36, paddingTop: 6, paddingBottom: 6 }}
                 aria-label={`Ανάθεση επίσκεψης ${nameOf(v)}`}
                 value={v.user_id ?? ''}
-                disabled={busy === v.id || assignees.length === 0}
+                disabled={busy === v.id || !assignees.some(agent => agent.is_active)}
                 onChange={(e) => void reassign(v.id, e.target.value)}
               >
                 <option value="" disabled>Χωρίς ανάθεση</option>
                 {assignees.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
+                  <option key={agent.id} value={agent.id} disabled={!agent.is_active}>
                     {agent.full_name}{agent.is_active ? '' : ' (ανενεργός λογαριασμός)'}
                   </option>
                 ))}

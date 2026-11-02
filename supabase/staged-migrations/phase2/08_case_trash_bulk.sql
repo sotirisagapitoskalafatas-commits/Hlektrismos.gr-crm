@@ -21,19 +21,24 @@ create policy "cases delete only through trash" on public.cases as restrictive f
 
 create or replace function public.case_trash_columns_guard()
 returns trigger language plpgsql set search_path = public
-as $$
+as $
 begin
-  if current_user in ('authenticated', 'anon')
-     and (new.deleted_at is distinct from old.deleted_at
+  if current_user in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      if new.deleted_at is not null or new.deleted_by is not null or new.deleted_reason is not null then
+        raise exception 'trash: use Διαγραφή / Επαναφορά' using errcode = '42501';
+      end if;
+    elsif new.deleted_at is distinct from old.deleted_at
        or new.deleted_by is distinct from old.deleted_by
-       or new.deleted_reason is distinct from old.deleted_reason) then
-    raise exception 'trash: use Διαγραφή / Επαναφορά' using errcode = '42501';
+       or new.deleted_reason is distinct from old.deleted_reason then
+      raise exception 'trash: use Διαγραφή / Επαναφορά' using errcode = '42501';
+    end if;
   end if;
   return new;
 end;
-$$;
+$;
 drop trigger if exists cases_trash_guard on public.cases;
-create trigger cases_trash_guard before update on public.cases
+create trigger cases_trash_guard before insert or update on public.cases
 for each row execute function public.case_trash_columns_guard();
 
 -- References that must survive the case. Case-owned timeline, offers, documents, signatures, visits,

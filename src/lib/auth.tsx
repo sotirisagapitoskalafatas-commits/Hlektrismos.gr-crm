@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // An invitation signs the person in with no password yet: the same page lets them choose one.
       else if (event === 'SIGNED_IN') {
         const type = takeAuthLink();
-        if (type === 'invite') window.location.hash = '/reset';
+        if (sess?.user?.app_metadata?.must_change_password === true || type === 'invite') window.location.hash = '/reset';
         // The e-mail-change link signs the person in only after Supabase has accepted it: success is shown now, never earlier, and they land in the CRM.
         else if (type === 'email_change') { pushAuthNotice(NOTICE_EMAIL_CHANGED); window.location.hash = '/app'; }
       }

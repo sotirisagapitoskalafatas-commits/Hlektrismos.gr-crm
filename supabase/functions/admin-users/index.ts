@@ -35,6 +35,27 @@ Deno.serve(async (req: Request) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return errorResponse("Μη έγκυρο αίτημα.", 400); }
 
+  if (body.action === "complete_password_change") {
+    // A user may clear only their own server-controlled marker, after Supabase has accepted a password update.
+    const { data: ownProfile, error: profileErr } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", caller.id)
+      .maybeSingle();
+    if (profileErr || !ownProfile) return errorResponse("Δεν βρέθηκε προφίλ για τον λογαριασμό.", 403);
+
+    if (caller.app_metadata?.must_change_password === true) {
+      const appMetadata = { ...(caller.app_metadata ?? {}) };
+      delete appMetadata.must_change_password;
+      const { error: markerErr } = await admin.auth.admin.updateUserById(caller.id, { app_metadata: appMetadata });
+      if (markerErr) return errorResponse("Ο κωδικός άλλαξε, αλλά δεν ολοκληρώθηκε η επαλήθευση. Δοκιμάστε ξανά.", 500);
+      await audit({ action: "password_change_completed", target_id: caller.id, target_email: caller.email ?? null });
+    }
+
+    // Idempotent for retries after a successful server update but a failed client refresh.
+    return jsonResponse({ ok: true });
+  }
+
   if (body.action === "create") {
     const v = validateCreate(body);
     if (!v.ok) return errorResponse(v.error, 400);
@@ -65,6 +86,18 @@ Deno.serve(async (req: Request) => {
       await admin.auth.admin.deleteUser(newId); // compensation: never leave an orphaned auth account
       return errorResponse("Ο λογαριασμός δεν ολοκληρώθηκε και αναιρέθηκε. Δοκιμάστε ξανά.", 500);
     }
+
+    // Temporary passwords are one-time credentials: app_metadata is server-controlled, so the user cannot clear this gate.
+    if (input.mode === "password") {
+      const appMetadata = { ...(created.data.user.app_metadata ?? {}), must_change_password: true };
+      const { error: markerErr } = await admin.auth.admin.updateUserById(newId, { app_metadata: appMetadata });
+      if (markerErr) {
+        await admin.from("profiles").delete().eq("id", newId);
+        await admin.auth.admin.deleteUser(newId);
+        return errorResponse("Δεν ενεργοποιήθηκε η υποχρεωτική αλλαγή κωδικού. Ο λογαριασμός αναιρέθηκε.", 500);
+      }
+    }
+
     await audit({ action: "create", target_id: newId, target_email: input.email, after: { full_name: input.full_name, role: input.role, mode: input.mode } });
     return jsonResponse({ ok: true, id: newId, invited: input.mode === "invite" });
   }

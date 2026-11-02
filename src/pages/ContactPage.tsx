@@ -59,7 +59,7 @@ export default function ContactPage() {
       const confirmation = await supabase.functions.invoke('send-lead-confirmation', {
         body: {
           email: form.email.trim().toLowerCase(),
-          first_name: form.name.trim().split(/\\s+/)[0] || form.email.trim().split('@')[0],
+          first_name: form.name.trim().split(/\s+/)[0] || form.email.trim().split('@')[0],
           service: 'Επικοινωνία',
           source: 'contact',
         },

@@ -23,7 +23,7 @@ import { caseCountText } from '@/lib/status-text';
 import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
-import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getDocumentUrl, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
 import { supplyLabelFor } from '@/lib/supply-points';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';

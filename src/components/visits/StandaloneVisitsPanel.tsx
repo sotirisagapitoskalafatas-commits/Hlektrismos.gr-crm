@@ -198,7 +198,7 @@ export default function StandaloneVisitsPanel() {
           </div>
         )}
 
-        {v.status === 'planned' && (
+        {v.status === 'planned' && !isAdmin && (
         {v.status === 'planned' && (
           <div className="flex flex-wrap gap-2">
             {phone && <a className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" href={`tel:${phone.replace(/\s+/g, '')}`}><Phone size={15} aria-hidden="true" /> Κλήση</a>}
@@ -217,7 +217,7 @@ export default function StandaloneVisitsPanel() {
           </div>
         )}
 
-        {v.status === 'in_progress' && (
+        {v.status === 'in_progress' && !isAdmin && (
           <div className="rounded-xl border border-line p-3 grid gap-2" data-testid="standalone-checkout">
             <div className="text-sm font-semibold">Ολοκλήρωση επίσκεψης</div>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Αποτέλεσμα επίσκεψης">{OUTCOMES.map((o) => <button key={o.key} type="button" role="radio" aria-checked={form.outcome === o.label} className="atx-chip" aria-pressed={form.outcome === o.label} style={{ height: 38 }} onClick={() => setForm((f) => ({ ...f, outcome: o.label, reason: '' }))}>{o.label}</button>)}</div>

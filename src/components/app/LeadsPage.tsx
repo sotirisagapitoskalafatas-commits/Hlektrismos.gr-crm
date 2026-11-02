@@ -372,7 +372,18 @@ export default function LeadsPage() {
                       </span>
                     )}
                     <TrashButton compact type="lead" id={l.id} name={name}
-                      onTrashed={async () => { const list = await fetchLeads(); setItems(list); return !list.some(x => x.id === l.id); }} />
+                      onTrashed={async () => {
+                        const list = await fetchLeads();
+                        const remains = list.some(x => x.id === l.id);
+                        setItems(list);
+                        if (!remains) setSelectedIds(current => {
+                          if (!current.has(l.id)) return current;
+                          const next = new Set(current);
+                          next.delete(l.id);
+                          return next;
+                        });
+                        return !remains;
+                      }} />
                   </div>
                 </div>
               );

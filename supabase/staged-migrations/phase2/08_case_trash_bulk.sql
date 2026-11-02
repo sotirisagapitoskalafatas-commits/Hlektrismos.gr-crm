@@ -45,6 +45,8 @@ declare
   v_leads integer := 0;
   v_apps integer := 0;
   v_visits integer := 0;
+  v_followups integer := 0;
+  v_checkins integer := 0;
   v_signatures integer := 0;
   v_out jsonb := '{}'::jsonb;
 begin
@@ -54,6 +56,15 @@ begin
     from public.case_visits newer
     join public.case_visits older on older.id = newer.rescheduled_from_id
     where older.case_id = p_id and newer.case_id is distinct from p_id;
+  -- Never remove a visit that is still used by a different case or standalone activity.
+  select count(*) into v_followups
+    from public.follow_ups f
+    join public.case_visits v on v.id = f.visit_id
+    where v.case_id = p_id and f.case_id is distinct from p_id;
+  select count(*) into v_checkins
+    from public.field_checkins fc
+    join public.case_visits v on v.id = fc.visit_id
+    where v.case_id = p_id and fc.case_id is distinct from p_id;
   select count(*) into v_signatures
     from public.case_signatures sig
     join public.case_documents doc on doc.id = sig.document_id
@@ -62,6 +73,8 @@ begin
   if v_leads > 0 then v_out := v_out || jsonb_build_object('converted_leads', v_leads); end if;
   if v_apps > 0 then v_out := v_out || jsonb_build_object('energy_applications', v_apps); end if;
   if v_visits > 0 then v_out := v_out || jsonb_build_object('rescheduled_visits', v_visits); end if;
+  if v_followups > 0 then v_out := v_out || jsonb_build_object('follow_ups', v_followups); end if;
+  if v_checkins > 0 then v_out := v_out || jsonb_build_object('field_checkins', v_checkins); end if;
   if v_signatures > 0 then v_out := v_out || jsonb_build_object('other_case_signatures', v_signatures); end if;
   return v_out;
 end;
@@ -188,7 +201,6 @@ declare
   v_role text := public.trash_actor_role();
   v_refs jsonb;
   v_files jsonb := '[]'::jsonb;
-  v_visit_ids uuid[] := '{}'::uuid[];
   v_done integer;
 begin
   if v_role is distinct from 'admin' then
@@ -206,9 +218,6 @@ begin
     if v_refs <> '{}'::jsonb then
       raise exception 'purge: referenced by %', v_refs::text using errcode = 'P0001', hint = 'has_references';
     end if;
-
-    select coalesce(array_agg(id), '{}'::uuid[]) into v_visit_ids
-      from public.case_visits where case_id = p_id;
 
     select coalesce(jsonb_agg(jsonb_build_object('bucket', 'client_documents', 'path', path)), '[]'::jsonb)
       into v_files
@@ -237,8 +246,9 @@ begin
       where path like 'cases/%';
 
     -- Child order follows the live foreign keys: follow-ups/signatures before visits/documents.
-    delete from public.follow_ups
-      where case_id = p_id or visit_id = any(v_visit_ids);
+    -- A cross-case / standalone follow-up that references one of these visits was checked above.
+    -- Delete only follow-ups owned by this case; never delete another case's work item.
+    delete from public.follow_ups where case_id = p_id;
     delete from public.case_signatures where case_id = p_id;
     delete from public.case_offers where case_id = p_id;
     delete from public.case_documents where case_id = p_id;

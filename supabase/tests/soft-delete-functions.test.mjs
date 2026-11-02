@@ -22,7 +22,7 @@ const db = (deleted = true) => {
     cases: [{ id: CASE, owner_id: AGENT, customer_id: CUSTOMER }],
     energy_tariffs: [{ id: TARIFF, provider_name: 'P', program_name: 'Q' }],
     crm_settings: [
-      { setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } },
+      { setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } },
       { setting_key: 'INFOBIP_API_KEY', setting_value: 'k' }, { setting_key: 'RESEND_API_KEY', setting_value: 'k' }, { setting_key: 'VAPI_API_KEY', setting_value: 'k' }, { setting_key: 'VAPI_PHONE_NUMBER_ID', setting_value: 'p' },
     ],
     crm_tasks: [], lead_notes: [], campaign_sends: [], voice_calls: [],

@@ -163,7 +163,7 @@ test('direct email: a person over their limit gets no mail, and the same mail tw
 test('confirmation mail: limited, logged, and skipped without limits or over the person limit, with the claim given back', async () => {
   const now = new Date().toISOString();
   const LEADID = 'bbbbbbbb-0000-4000-8000-0000000000f1';
-  const confirmDb = () => { const d = db(); d.tables.leads = [{ id: LEADID, email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }]; d.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } }); return d; };
+  const confirmDb = () => { const d = db(); d.tables.leads = [{ id: LEADID, email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }]; return d; };
   const run = async (env, tweak) => {
     const d = confirmDb(); tweak?.(d);
     const f = await loadFunction('send-lead-confirmation', { db: d, env: { ...CONFIRMATION_SMTP_ENV, OUTREACH_LIMITS: limits(), ...env } });
@@ -190,7 +190,6 @@ test('confirmation mail: a visitor cannot starve other customers or the staff ma
   const now = new Date().toISOString();
   const database = db();
   database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
-  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
   const f = await loadFunction('send-lead-confirmation', { db: database, env: { ...CONFIRMATION_SMTP_ENV, OUTREACH_LIMITS: limits() } });
   await f.call({ body: { email: 'new@example.gr' } });
   const buckets = f.db.log.rpc.filter((c) => c.name === 'consume_rate_limits').flatMap((c) => c.args.p_items.map((i) => i.bucket));
@@ -203,7 +202,6 @@ test('confirmation mail: after DATA the claim stays, so an unknown outcome canno
   const now = new Date().toISOString();
   const database = db();
   database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
-  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
   const f = await loadFunction('send-lead-confirmation', { db: database, env: { ...CONFIRMATION_SMTP_ENV, OUTREACH_LIMITS: limits() }, smtpMode: 'reject-data' });
   assert.equal((await f.call({ body: { email: 'new@example.gr' } })).status, 500);
   assert.ok(database.rows('leads')[0].ack_sent_at, 'claim kept');

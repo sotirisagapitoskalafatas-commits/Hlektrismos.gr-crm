@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import PublicHeader from '@/components/public/PublicHeader';
 import PublicFooter from '@/components/public/PublicFooter';
 import WaveDivider from '@/components/public/WaveDivider';
+import { isLeadConfirmationDelivered } from '@/lib/lead-confirmation.mjs';
 
 const contactCards = [
   { icon: MapPin, label: 'Διεύθυνση', value: 'Ζαλοκώστα 8, Αθήνα Τ.Κ. 10671', link: null },
@@ -21,6 +22,7 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [adult, setAdult] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,12 +45,31 @@ export default function ContactPage() {
         age_confirmed: adult,
       },
     });
-    setSending(false);
     if (error) {
+      setSending(false);
       console.error('Contact lead error:', error);
-      setError('Σφάλμα αποστολής. Δοκιμάστε ξανά ή καλέστε μας.');
+      setError('Δεν ήταν δυνατή η καταχώρηση του μηνύματος. Δοκιμάστε ξανά ή καλέστε μας.');
       return;
     }
+
+    // Saving the enquiry and delivering the acknowledgement are separate outcomes.
+    // Never tell the visitor that an email was sent unless the provider accepted it.
+    let emailSent = false;
+    try {
+      const confirmation = await supabase.functions.invoke('send-lead-confirmation', {
+        body: {
+          email: form.email.trim().toLowerCase(),
+          first_name: form.name.trim().split(/\\s+/)[0] || form.email.trim().split('@')[0],
+          service: 'Επικοινωνία',
+          source: 'contact',
+        },
+      });
+      emailSent = isLeadConfirmationDelivered(confirmation);
+    } catch {
+      emailSent = false;
+    }
+    setConfirmationEmailSent(emailSent);
+    setSending(false);
     setSubmitted(true);
   };
 
@@ -89,8 +110,13 @@ export default function ContactPage() {
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,200,120,0.1)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: '#00c878' }}>
                       <Send size={24} />
                     </div>
-                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--text)' }}>Το μήνυμά σου στάλθηκε!</div>
-                    <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Θα σε επικοινωνήσουμε το συντομότερο.</div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--text)' }}>Το μήνυμά σου καταχωρήθηκε!</div>
+                    <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Θα επικοινωνήσουμε μαζί σου το συντομότερο.</div>
+                    <div style={{ fontSize: 13, color: confirmationEmailSent ? '#0b9960' : '#b45309', marginTop: 10 }}>
+                      {confirmationEmailSent
+                        ? 'Σου στείλαμε email επιβεβαίωσης.'
+                        : 'Δεν ήταν δυνατή η αποστολή email επιβεβαίωσης. Το μήνυμά σου έχει καταχωρηθεί κανονικά.'}
+                    </div>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>

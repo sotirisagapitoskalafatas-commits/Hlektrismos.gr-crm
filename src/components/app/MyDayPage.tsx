@@ -29,6 +29,8 @@ import { formatWhen } from '@/lib/work-format';
 import { stageText } from '@/lib/case-flow';
 import NavigationButton from '@/components/navigation/NavigationButton';
 import StandaloneVisitsPanel from '@/components/visits/StandaloneVisitsPanel';
+import { assignFieldVisit, fetchFieldVisitAssignees } from '@/lib/field-api';
+import type { FieldVisitAssignee } from '@/lib/field-api';
 
 type Fallback = { visitId: string; message: string; reason: string };
 
@@ -37,6 +39,7 @@ export default function MyDayPage() {
   const { openCase, go } = useNav();
   const { toast } = useToast();
   const [visits, setVisits] = useState<CaseVisit[]>([]);
+  const [fieldAgents, setFieldAgents] = useState<FieldVisitAssignee[]>([]);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,9 +59,15 @@ export default function MyDayPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
-    const [v, f, c] = await Promise.all([fetchVisits({ user: true }), fetchFollowUps({ status: 'all' }), fetchCases()]);
-    setVisits(v); setFollowUps(f); setCases(c); setLoading(false); setNow(Date.now());
-  }, []);
+    const [v, f, c] = await Promise.all([
+      // Sales Agents remain personally scoped; the shared Admin sees the team through RLS.
+      fetchVisits({ user: role !== 'admin' }),
+      fetchFollowUps({ status: 'all' }),
+      fetchCases(),
+    ]);
+    const agents = role === 'admin' ? await fetchFieldVisitAssignees() : [];
+    setVisits(v); setFollowUps(f); setCases(c); setFieldAgents(agents); setLoading(false); setNow(Date.now());
+  }, [role]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setQueued(countQueue()); }, []);
 
@@ -72,12 +81,12 @@ export default function MyDayPage() {
       if (!silent) toast(GEO_ERRORS[code] ?? 'Η θέση σας δεν είναι διαθέσιμη.', 'warn');
     } finally { setLocBusy(false); }
   }, [toast]);
-  useEffect(() => { void locate(true); }, [locate]);
+  useEffect(() => { if (role !== 'admin') void locate(true); }, [locate, role]);
   useEffect(() => { void fetchArrivalRadius().then(r => { if (r) setArrivalRadius(r); }); }, []);
 
   // While this page is open and visible, follow the position ONLY if permission was already granted (no new prompt).
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions?.query) return;
+    if (role === 'admin' || typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions?.query) return;
     let stopWatch: (() => void) | null = null;
     let alive = true;
     const start = () => {
@@ -92,7 +101,7 @@ export default function MyDayPage() {
       document.addEventListener('visibilitychange', onVis);
     }).catch(() => {});
     return () => { alive = false; stop(); document.removeEventListener('visibilitychange', onVis); };
-  }, []);
+  }, [role]);
 
   const caseById = useMemo(() => new Map(cases.map(c => [c.id, c])), [cases]);
   const coords = useCallback((v: CaseVisit) => {
@@ -110,7 +119,7 @@ export default function MyDayPage() {
       .sort((a, b) => +new Date(a.due_at) - +new Date(b.due_at));
   }, [followUps, user?.id, now]);
   const near = useMemo(() => nearestCases(cases, loc), [cases, loc]);
-  const arrival = useMemo(() => (can(role, 'check_in') ? arrivalCandidate(visits, coords, loc, arrivalRadius, dismissed) : null),
+  const arrival = useMemo(() => (role !== 'admin' && can(role, 'check_in') ? arrivalCandidate(visits, coords, loc, arrivalRadius, dismissed) : null),
     [visits, coords, loc, arrivalRadius, dismissed, role]);
 
   // A position the page already holds (≤30 s old, e.g. from the arrival watch) is used as is; otherwise ask once.
@@ -197,6 +206,16 @@ export default function MyDayPage() {
     void load();
   };
 
+  const assignVisit = async (visitId: string, agentId: string) => {
+    if (role !== 'admin' || !agentId) return;
+    setBusyId(visitId);
+    const result = await assignFieldVisit(visitId, agentId);
+    setBusyId(null);
+    if (!result.ok) { toast(result.error, 'bad'); return; }
+    toast('Η επίσκεψη ανατέθηκε στον Sales Agent. Η αλλαγή καταγράφηκε στο ιστορικό.', 'ok');
+    void load();
+  };
+
   const visitCard = (v: CaseVisit, hero = false) => {
     const pos = coords(v);
     const km = loc && pos ? distanceKm(loc, pos) : null;
@@ -211,18 +230,42 @@ export default function MyDayPage() {
           <button className="atx-row-main" onClick={() => setOpenId(openId === v.id ? null : v.id)} aria-expanded={expanded}>
             <span className="atx-row-title" style={hero ? { fontSize: 19, whiteSpace: 'normal' } : { whiteSpace: 'normal' }}>{name}</span>
             <span className="atx-row-sub" style={{ whiteSpace: 'normal' }}>
-              {[v.scheduled_at ? fmtTime(v.scheduled_at) : 'Χωρίς ώρα', v.purpose || 'Επίσκεψη', v.case?.case_no, km != null ? `${formatDistance(km)} · ~${durationMinutes(km)}′` : null].filter(Boolean).join(' · ')}
+              {[v.scheduled_at ? fmtTime(v.scheduled_at) : 'Χωρίς ώρα', v.purpose || 'Επίσκεψη', v.case?.case_no, role === 'admin' ? (fieldAgents.find(a => a.id === v.user_id)?.full_name ?? 'Χωρίς ανάθεση') : null, km != null ? `${formatDistance(km)} · ~${durationMinutes(km)}′` : null].filter(Boolean).join(' · ')}
             </span>
           </button>
           <span className="order-last sm:order-none basis-full sm:basis-auto pl-[46px] sm:pl-0"><span className={`atx-tag ${inProgress ? 't-info' : ''}`}>{inProgress ? 'Σε εξέλιξη' : 'Προγραμματισμένη'}</span></span>
         </div>
         {expanded && (
           <div className="w-full grid gap-2" style={{ paddingLeft: hero ? 0 : 46 }}>
+            {role === 'admin' && (
+              <label className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--atx-muted)]">
+                <span>Υπεύθυνος επίσκεψης</span>
+                {(v.status === 'planned' || v.status === 'in_progress') ? (
+                  <select
+                    className="field"
+                    style={{ width: 'auto', minWidth: 190, minHeight: 36, paddingTop: 6, paddingBottom: 6 }}
+                    aria-label={`Ανάθεση επίσκεψης ${name}`}
+                    value={v.user_id ?? ''}
+                    disabled={busyId === v.id || !fieldAgents.some(agent => agent.is_active)}
+                    onChange={(e) => void assignVisit(v.id, e.target.value)}
+                  >
+                    <option value="" disabled>Χωρίς ανάθεση</option>
+                    {fieldAgents.map(agent => (
+                      <option key={agent.id} value={agent.id} disabled={!agent.is_active}>
+                        {agent.full_name}{agent.is_active ? '' : ' (ανενεργός λογαριασμός)'}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span>{fieldAgents.find(agent => agent.id === v.user_id)?.full_name ?? '—'}</span>
+                )}
+              </label>
+            )}
             <div className="flex flex-wrap gap-2">
               {pos ? <NavigationButton destination={{ ...pos, label: name }} caseId={v.case_id} label="Πλοήγηση" showSelector={false} />
                 : <span className="text-[13px] text-[var(--atx-muted)]">Δεν υπάρχει αποθηκευμένη θέση για πλοήγηση.</span>}
               {phone && <a className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" style={{ height: 40 }} href={`tel:${phone.replace(/\s+/g, '')}`}><Phone size={15} /> Κλήση</a>}
-              {v.status === 'planned' && can(role, 'check_in') && (
+              {v.status === 'planned' && role !== 'admin' && can(role, 'check_in') && (
                 <button className="atx-btn atx-btn-primary inline-flex items-center gap-1.5" style={{ height: 40 }} disabled={busyId === v.id} onClick={() => void checkIn(v)}>
                   <LogIn size={15} /> {busyId === v.id ? 'Αποστολή…' : 'Check In'}
                 </button>
@@ -242,7 +285,7 @@ export default function MyDayPage() {
               </div>
             )}
 
-            {inProgress && can(role, 'check_out') && (
+            {inProgress && role !== 'admin' && can(role, 'check_out') && (
               <div className="atx-panel grid gap-3" style={{ padding: 14 }}>
                 <div className="text-[14px] font-semibold">Ολοκλήρωση επίσκεψης</div>
                 <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Αποτέλεσμα επίσκεψης">
@@ -287,7 +330,7 @@ export default function MyDayPage() {
   return (
     <div className="atx-page" style={{ maxWidth: 860 }}>
       <div className="atx-head">
-        {can(role, 'check_in') && (
+        {role !== 'admin' && can(role, 'check_in') && (
           <div className="float-right ml-3">
             <Btn variant="primary" onClick={() => go('field')}><Navigation size={15} strokeWidth={1.6} aria-hidden="true" /> Λειτουργία πεδίου</Btn>
           </div>
@@ -298,8 +341,12 @@ export default function MyDayPage() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className={`atx-tag ${loc ? 't-success' : 't-warning'}`}>{loc ? `GPS έτοιμο${loc.accuracy != null ? ` · ±${Math.round(loc.accuracy)} μ` : ''}` : locErr ? GEO_ERRORS[locErr] : 'Αναζήτηση θέσης…'}</span>
-        <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" disabled={locBusy} onClick={() => void locate()}><RefreshCw size={14} /> Θέση</button>
+        {role !== 'admin' && (
+          <>
+            <span className={`atx-tag ${loc ? 't-success' : 't-warning'}`}>{loc ? `GPS έτοιμο${loc.accuracy != null ? ` · ±${Math.round(loc.accuracy)} μ` : ''}` : locErr ? GEO_ERRORS[locErr] : 'Αναζήτηση θέσης…'}</span>
+            <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" disabled={locBusy} onClick={() => void locate()}><RefreshCw size={14} /> Θέση</button>
+          </>
+        )}
         {queued > 0 && (
           <button className="atx-btn atx-btn-quiet inline-flex items-center gap-1.5" disabled={syncing} onClick={() => void sync()} style={{ color: 'var(--atx-amber)' }}>
             <RefreshCw size={14} /> {syncing ? 'Αποστολή…' : `${queued} σε αναμονή — αποστολή`}
@@ -438,6 +485,7 @@ export default function MyDayPage() {
             </div>
           )}
 
+          {role !== 'admin' && (
           <div className="atx-section">
             <div className="atx-section-head"><h2 className="atx-section-title">{near.sorted ? 'Κοντά σας' : 'Cases με αποθηκευμένη θέση'}</h2></div>
             <div className="atx-panel">
@@ -457,6 +505,7 @@ export default function MyDayPage() {
               )}
             </div>
           </div>
+          )}
         </>
       )}
     </div>

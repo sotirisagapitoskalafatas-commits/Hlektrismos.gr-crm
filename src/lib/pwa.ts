@@ -56,7 +56,7 @@ export function isStandalone() {
 export async function cacheAppShell(): Promise<boolean> {
   if (!('caches' in window)) return false;
   try {
-    const cache = await caches.open('atlas-crm-shell-v1');
+    const cache = await caches.open('atlas-crm-shell-v2');
     await cache.addAll(['/', '/manifest.webmanifest', '/app-icon.svg']);
     return true;
   } catch {

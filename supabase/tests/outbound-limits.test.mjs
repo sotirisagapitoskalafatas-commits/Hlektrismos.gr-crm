@@ -145,7 +145,7 @@ test('direct email: a person over their limit gets no mail, and the same mail tw
   await withClock(async () => {
     const mail = (subject) => ({ token: 'tok-admin', body: { to: 'p@example.gr', subject, text: 't' } });
     const database = db();
-    database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+    database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
     const f = await load('send-email', database, { OUTREACH_LIMITS: limits({ contact: { email: { perHour: 1 } } }) });
     assert.equal((await f.call(mail('a'))).status, 200);
     assert.equal((await f.call(mail('a'))).status, 409, 'the same mail');
@@ -158,7 +158,7 @@ test('direct email: a person over their limit gets no mail, and the same mail tw
 test('confirmation mail: limited, logged, and skipped without limits or over the person limit, with the claim given back', async () => {
   const now = new Date().toISOString();
   const LEADID = 'bbbbbbbb-0000-4000-8000-0000000000f1';
-  const confirmDb = () => { const d = db(); d.tables.leads = [{ id: LEADID, email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }]; d.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } }); return d; };
+  const confirmDb = () => { const d = db(); d.tables.leads = [{ id: LEADID, email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }]; d.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } }); return d; };
   const run = async (env, tweak) => {
     const d = confirmDb(); tweak?.(d);
     const f = await loadFunction('send-lead-confirmation', { db: d, env });
@@ -185,7 +185,7 @@ test('confirmation mail: a visitor cannot starve other customers or the staff ma
   const now = new Date().toISOString();
   const database = db();
   database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
-  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
   const f = await loadFunction('send-lead-confirmation', { db: database, env: { OUTREACH_LIMITS: limits() } });
   await f.call({ body: { email: 'new@example.gr' } });
   const buckets = f.db.log.rpc.filter((c) => c.name === 'consume_rate_limits').flatMap((c) => c.args.p_items.map((i) => i.bucket));
@@ -198,7 +198,7 @@ test('confirmation mail: after DATA the claim stays, so an unknown outcome canno
   const now = new Date().toISOString();
   const database = db();
   database.tables.leads = [{ id: 'bbbbbbbb-0000-4000-8000-0000000000f1', email: 'new@example.gr', source: 'website', created_at: now, ack_sent_at: null }];
-  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+  database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
   const f = await loadFunction('send-lead-confirmation', { db: database, smtpMode: 'reject-data' });
   assert.equal((await f.call({ body: { email: 'new@example.gr' } })).status, 500);
   assert.ok(database.rows('leads')[0].ack_sent_at, 'claim kept');
@@ -392,14 +392,14 @@ test('an attempt that cannot be recorded is not sent, on every sender', async ()
       ['make-voice-call', { lead_id: LEAD }], ['send-email', { to: 'a@example.gr', subject: 's', text: 't' }],
     ]) {
       const database = db();
-      database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+      database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
       database.failInsert = ['communication_log']; // reads still work, so the gate lets it through to this check
       const f = await load(fn, database);
       await f.call({ token: 'tok-admin', body });
       assert.equal(providerCalls(f) + f.smtp.filter((x) => x.data).length, 0, fn);
       f.restore();
       const control = db();
-      control.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, from_email: 'info@hlektrismos.gr' } });
+      control.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 465, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
       const g = await load(fn, control);
       await g.call({ token: 'tok-admin', body });
       assert.equal(providerCalls(g) + g.smtp.filter((x) => x.data).length, 1, `${fn}: the same request sends when the record can be written`);

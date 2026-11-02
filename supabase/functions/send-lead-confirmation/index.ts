@@ -26,7 +26,11 @@ serve(async (req) => {
   }
 
   try {
-    const { email, first_name, service: rawService } = await req.json();
+    const { email, first_name, service: rawService, source: rawSource } = await req.json();
+    const leadSource = rawSource === undefined ? "website" : rawSource;
+    if (leadSource !== "website" && leadSource !== "contact") {
+      return new Response(JSON.stringify({ ok: false, error: "Invalid source" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       return new Response(JSON.stringify({ ok: false, error: "Invalid email" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -41,7 +45,7 @@ serve(async (req) => {
       .from("leads")
       .select("id, first_name, email, created_at, ack_sent_at")
       .eq("email", email)
-      .eq("source", "website")
+      .eq("source", leadSource)
       .is("deleted_at", null)
       .gte("created_at", cutoff)
       .order("created_at", { ascending: false })
@@ -88,16 +92,21 @@ serve(async (req) => {
       .eq("setting_key", "email_config")
       .single();
 
-    if (!setting?.setting_value?.smtp_host) {
+    const cfg = setting?.setting_value ?? {};
+    const smtpHost = String(cfg.smtp_host ?? "").trim();
+    const smtpPort = Number(cfg.smtp_port || 465);
+    const smtpUser = String(cfg.smtp_user ?? "").trim();
+    const smtpPass = String(cfg.smtp_password ?? "");
+    if (!smtpHost || !smtpUser || !smtpPass || !Number.isInteger(smtpPort)) {
       await releaseClaim();
-      return new Response(JSON.stringify({ ok: false, error: "SMTP not configured" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: false, error: "Transactional email is not configured" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
-    const cfg = setting.setting_value;
-    const smtpHost = cfg.smtp_host;
-    const smtpPort = cfg.smtp_port || 587;
-    const smtpUser = cfg.smtp_user || "";
-    const smtpPass = cfg.smtp_password || "";
+    // Supabase Edge Functions cannot reach SMTP port 587. Require implicit TLS
+    // on 465; other ports need an explicitly reviewed provider/network setup.
+    if (smtpPort !== 465) {
+      await releaseClaim();
+      return new Response(JSON.stringify({ ok: false, error: "Configure SMTP with implicit TLS on port 465" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const fromEmail = cfg.from_email || smtpUser || "info@hlektrismos.gr";
     const fromLabel = cfg.from_name || "Hlektrismos.gr";
 

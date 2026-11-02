@@ -341,3 +341,4 @@ grant execute on function public.trash_list() to authenticated;
 drop policy if exists "admin deletes case files" on storage.objects;
 create policy "admin deletes case files" on storage.objects for delete to authenticated
   using (bucket_id = 'client_documents' and name like 'cases/%' and public.is_role('admin'));
+ 

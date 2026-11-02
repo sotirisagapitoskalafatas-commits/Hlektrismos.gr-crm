@@ -10,7 +10,7 @@ This release completes the existing **Χρήστες & Ρόλοι** screen. The 
 
 ## Supabase Dashboard deployment (no Supabase CLI)
 
-1. Take/confirm a fresh Production backup and run the read-only preflight in the SQL file header.
+1. Take/confirm a fresh Production backup. The migration's first block performs a read-only, column-specific preflight and aborts before changing functions if the final two-role constraint or active Admin is missing.
 2. In **Production → SQL Editor**, run `supabase/staged-migrations/phase6/28_staff_admin_sales_agent_sync.sql`. It replaces only two authorization functions; it does not rewrite profile or CRM data.
 3. Deploy `supabase/functions/admin-users/index.ts` with its relative `_shared` dependencies and **Verify JWT = ON**. The function must use the latest `keys.ts`, `staff-admin.ts`, `permissions.ts`, `signed-link.ts`, `cors.ts`, and `site-url.ts` from this branch. Do not turn JWT verification off.
 4. In **Edge Functions → Secrets**, set `SITE_URL=https://hlektrismos-crm.vercel.app`. Do not use `https://hlektrismos.gr` (the public WordPress site). The function intentionally refuses invite/recovery links when the URL is missing or invalid.

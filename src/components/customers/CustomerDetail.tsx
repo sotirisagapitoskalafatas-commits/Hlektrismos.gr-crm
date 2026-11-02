@@ -9,6 +9,7 @@ import { BackOfficeTab, FollowUpsTab, OffersTab, SignaturesTab, TimelineComposer
 import { CaseProgress } from '@/components/cases/CaseOverview';
 import CaseDocuments from '@/components/documents/CaseDocuments';
 import FilePreview from '@/components/documents/FilePreview';
+import AddressMapPicker from '@/components/maps/AddressMapPicker';
 import { leadFiles as toLeadFiles } from '@/lib/lead-files';
 import { ORIGIN_TEXT, convertedNotice, folderBadge, folderOrigin, folderSubtitle, folderTabs, mostUrgentCase, selectedCase } from '@/lib/folder';
 import type { FolderTab } from '@/lib/folder';
@@ -22,7 +23,7 @@ import { caseCountText } from '@/lib/status-text';
 import { visitedStages } from '@/lib/case-flow';
 import { mergeHistory } from '@/lib/history-text';
 import { syncToast, syncWarningText } from '@/lib/lead-sync';
-import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, getPosition, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
+import { customerNamesAvailable, fetchCases, fetchSupplyPoints, fetchTariffCategories, fetchCustomer, fetchDocuments, fetchEntityActivity, fetchLead, fetchTimeline, syncLeadsFromCustomer, updateCustomer } from '@/lib/api';
 import { supplyLabelFor } from '@/lib/supply-points';
 import type { SupplyPoint, TariffCategory } from '@/lib/supply-points';
 import type { ActivityLogRow, Case, CaseDocument, Customer, Lead, TimelineEvent } from '@/lib/api';
@@ -66,7 +67,6 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
   const [names, setNames] = useState(false);
   useEffect(() => { void customerNamesAvailable().then(setNames); }, []);
   const [form, setForm] = useState({ first_name: '', last_name: '', full_name: '', phone: '', email: '', address: '', city: '', postal_code: '', notes: '', lat: '', lng: '' });
-  const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [now] = useState(() => Date.now());
   const canEdit = can(role, 'edit_case');
@@ -227,16 +227,14 @@ export default function CustomerDetail({ customerId, convertedNotice: notice = n
                 <input className="field mt-1" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} />
               </label>
             ))}
-            <label className="text-[13px] font-medium">Γεωγρ. πλάτος (lat)
-              <input className="field mt-1" inputMode="decimal" value={form.lat} onChange={e => setForm(f => ({ ...f, lat: e.target.value }))} />
-            </label>
-            <label className="text-[13px] font-medium">Γεωγρ. μήκος (lng)
-              <input className="field mt-1" inputMode="decimal" value={form.lng} onChange={e => setForm(f => ({ ...f, lng: e.target.value }))} />
-            </label>
-            <button type="button" className="atx-link !p-0 text-left sm:col-span-2" disabled={locating}
-              onClick={async () => { setLocating(true); const p = await getPosition(); setLocating(false); if (p) setForm(f => ({ ...f, lat: String(p.lat), lng: String(p.lng) })); else toast('Η τοποθεσία δεν είναι διαθέσιμη.', 'bad'); }}>
-              {locating ? 'Εντοπισμός…' : 'Χρήση τρέχουσας τοποθεσίας'}
-            </button>
+            <AddressMapPicker
+              address={form.address}
+              city={form.city}
+              postalCode={form.postal_code}
+              lat={form.lat}
+              lng={form.lng}
+              onChange={value => setForm(f => ({ ...f, ...value }))}
+            />
             <label className="text-[13px] font-medium sm:col-span-2">Σημειώσεις
               <textarea className="field mt-1" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </label>

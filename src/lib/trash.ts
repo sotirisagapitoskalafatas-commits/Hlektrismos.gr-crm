@@ -15,6 +15,11 @@ export interface TrashRow {
 export const canTrash = (role: Role | null | undefined) => role === 'admin';
 export const canPurge = (role: Role | null | undefined) => role === 'admin';
 
+/** Bulk permanent deletion is deliberately limited to leads with no linked CRM records. The database rechecks this too. */
+export function isBulkPurgeEligibleLead(row: Pick<TrashRow, 'entity_type' | 'references_json'>): boolean {
+  return row.entity_type === 'lead' && !Object.values(row.references_json ?? {}).some(count => count > 0);
+}
+
 /** Rows in the trash are never part of normal lists (also when the column does not exist yet). */
 export const notTrashed = <T extends { deleted_at?: string | null }>(rows: T[]) => rows.filter(r => !r.deleted_at);
 

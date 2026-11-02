@@ -209,11 +209,16 @@ export default function MyDayPage() {
   const assignVisit = async (visitId: string, agentId: string) => {
     if (role !== 'admin' || !agentId) return;
     setBusyId(visitId);
-    const result = await assignFieldVisit(visitId, agentId);
-    setBusyId(null);
-    if (!result.ok) { toast(result.error, 'bad'); return; }
-    toast('Η επίσκεψη ανατέθηκε στον Sales Agent. Η αλλαγή καταγράφηκε στο ιστορικό.', 'ok');
-    void load();
+    try {
+      const result = await assignFieldVisit(visitId, agentId);
+      if (!result.ok) { toast(result.error, 'bad'); return; }
+      toast('Η επίσκεψη ανατέθηκε στον Sales Agent. Η αλλαγή καταγράφηκε στο ιστορικό.', 'ok');
+      void load();
+    } catch {
+      toast('Η ανάθεση απέτυχε λόγω προβλήματος σύνδεσης. Δοκιμάστε ξανά.', 'bad');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const visitCard = (v: CaseVisit, hero = false) => {

@@ -8,7 +8,7 @@ import { buildHeaders, EmailSafetyError, parseRecipient, safeDisplayName, smtpDa
 import { admitRequest, LIMITS_NOT_SET, outreachLimitsFromEnv, reserveMessage } from "../_shared/outreach-limits.ts";
 import { emailObjection } from "../_shared/outreach-gate.ts";
 import { supabaseLoaders } from "../_shared/outreach-loaders.ts";
-import { openSecureSmtp, SmtpSecurityError } from "../_shared/smtp.ts";
+import { isSupabaseEdgeSmtpPort, openSecureSmtp, SmtpSecurityError } from "../_shared/smtp.ts";
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -100,10 +100,16 @@ Deno.serve(async (req) => {
     }
 
     const cfg = setting.setting_value;
-    const smtpHost = cfg.smtp_host;
-    const smtpPort = cfg.smtp_port || 587;
-    const smtpUser = cfg.smtp_user || "";
-    const smtpPass = cfg.smtp_password || "";
+    const smtpHost = String(cfg.smtp_host ?? "").trim();
+    const smtpPort = Number(cfg.smtp_port || 465);
+    const smtpUser = String(cfg.smtp_user ?? "").trim();
+    const smtpPass = String(cfg.smtp_password ?? "");
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      return json(503, { error: "SMTP host, username and password must all be configured." });
+    }
+    if (!isSupabaseEdgeSmtpPort(smtpPort)) {
+      return json(503, { error: "Use SMTP port 465 (implicit TLS) or 2587 (STARTTLS). Ports 25 and 587 are not reachable from Supabase Edge Functions." });
+    }
     let fromEmail: string;
     try {
       fromEmail = parseRecipient(cfg.from_email || smtpUser);

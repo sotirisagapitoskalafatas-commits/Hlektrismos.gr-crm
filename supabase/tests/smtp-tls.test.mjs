@@ -118,7 +118,6 @@ test('send-lead-confirmation: the same transport rule; a failed upgrade releases
   const now = new Date().toISOString();
   const lead = () => createDb({
     leads: [{ id: 'bbbbbbbb-0000-4000-8000-0000000000a1', email: 'new@example.gr', first_name: 'Νέος', source: 'website', created_at: now, ack_sent_at: null }],
-    crm_settings: db(2587).rows('crm_settings'),
   });
   const body = { body: { email: 'new@example.gr', first_name: 'Νέος' } };
   const bad = await loadFunction('send-lead-confirmation', { db: lead(), env: CONFIRMATION_SMTP_ENV, smtpMode: 'no-starttls' });

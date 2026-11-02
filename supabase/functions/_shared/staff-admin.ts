@@ -66,6 +66,15 @@ export function validateCreate(body: Record<string, unknown>): { ok: true; value
   return { ok: true, value: { email, full_name, role: body.role, phone, mode } };
 }
 
+/** Server-side mirror of the reset-page password rules. Supabase Auth still applies the configured project policy. */
+export function validateChosenPassword(value: unknown): string | null {
+  const password = typeof value === "string" ? value : "";
+  if (password.length < 12) return "Ο νέος κωδικός πρέπει να έχει τουλάχιστον 12 χαρακτήρες.";
+  if (/^(.)\1+$/.test(password)) return "Ο κωδικός δεν μπορεί να αποτελείται από έναν επαναλαμβανόμενο χαρακτήρα.";
+  if (!/[A-Za-zΑ-Ωα-ω]/.test(password) || !/[0-9]/.test(password)) return "Συνδυάστε γράμματα και αριθμούς.";
+  return null;
+}
+
 export interface DeleteFacts {
   actorId: string; actorRole: string | null; actorActive: boolean;
   targetId: string; targetRole: string | null; targetActive: boolean;

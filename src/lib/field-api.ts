@@ -66,6 +66,30 @@ export async function fetchFieldVisits(opts: { userId?: string; customerId?: str
   return (data ?? []) as unknown as FieldVisit[];
 }
 
+export interface FieldVisitAssignee {
+  id: string;
+  full_name: string;
+  is_active: boolean;
+}
+
+/** Admin-only directory for the shared office login. staff_list enforces the same permission on the database. */
+export async function fetchFieldVisitAssignees(): Promise<FieldVisitAssignee[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('staff_list');
+  if (error) return [];
+  return ((data ?? []) as Array<{ id: string; full_name: string | null; role: string; is_active: boolean }>)
+    .filter((row) => row.role === 'sales_agent')
+    .map((row) => ({ id: row.id, full_name: row.full_name?.trim() || 'Sales Agent', is_active: row.is_active }));
+}
+
+/** Only the Admin SQL operation can change the assigned Sales Agent; the database validates the target and audits the change. */
+export async function assignFieldVisit(visitId: string, agentId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!supabase) return NOT_AVAILABLE;
+  const { data, error } = await supabase.rpc('assign_field_visit', { p_visit: visitId, p_agent: agentId });
+  if (error) return fail(error);
+  return data === true ? { ok: true } : { ok: false, error: 'Η επίσκεψη δεν βρέθηκε ή δεν μπορεί πλέον να ανατεθεί.' };
+}
+
 export async function createFieldVisit(input: ScheduleInput): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if (!supabase || !(await visitsExtendedAvailable())) return NOT_AVAILABLE;
   const { data, error } = await supabase.from('case_visits').insert(visitInsertRow(input)).select('id').single();

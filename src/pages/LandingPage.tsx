@@ -214,8 +214,11 @@ export default function LandingPage() {
       },
     });
 
-    setSubmitting(false);
-    if (error) { setFormError(`Σφάλμα καταχώρησης: ${error.message || 'Παρακαλώ δοκιμάστε ξανά.'}`); return; }
+    if (error) {
+      setSubmitting(false);
+      setFormError(`Σφάλμα καταχώρησης: ${error.message || 'Παρακαλώ δοκιμάστε ξανά.'}`);
+      return;
+    }
 
     // Bill OCR (billing-ocr) is staff-only and runs from the lead view in the
     // CRM; the public form never triggers it.
@@ -241,6 +244,7 @@ export default function LandingPage() {
       }
     }
     setLeadEmailStatus(confirmationStatus);
+    setSubmitting(false);
 
     setSentFiles(uploadedFiles.length);
     uploadedRef.current = new WeakMap();

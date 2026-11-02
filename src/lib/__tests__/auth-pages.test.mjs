@@ -71,6 +71,6 @@ test('invite and recovery links land on the site root and are routed to «choose
 test('temporary credentials are routed to the reset page and cannot enter any other route until the server flag is cleared', () => {
   assert.match(read('../auth.tsx'), /app_metadata\?\.must_change_password === true \|\| type === 'invite'/);
   assert.match(read('../../App.tsx'), /mustChangePassword && route !== 'reset'/);
-  assert.match(read('../../components/auth/ResetPasswordPage.tsx'), /action: 'complete_password_change'/);
+  assert.match(read('../../components/auth/ResetPasswordPage.tsx'), /action: 'complete_password_change', password: pw/);
   assert.match(read('../../components/auth/ResetPasswordPage.tsx'), /auth\.refreshSession\(\)/);
 });

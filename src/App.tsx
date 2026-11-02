@@ -33,6 +33,7 @@ const routeFallback = (
 function AppContent() {
   const [route, navigate] = useRoute();
   const { session, loading, profile, profileReady } = useAuth();
+  const mustChangePassword = session?.user?.app_metadata?.must_change_password === true;
 
   if (loading) {
     return (
@@ -40,6 +41,12 @@ function AppContent() {
         Φόρτωση...
       </div>
     );
+  }
+
+  // Temporary credentials never reach the CRM shell or public routes before a password chosen by the user is confirmed.
+  if (mustChangePassword && route !== 'reset') {
+    navigate('reset');
+    return null;
   }
 
   // Protect the CRM OS shell — redirect to login if not signed in.

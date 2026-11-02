@@ -230,7 +230,7 @@ test('make-voice-call: a timeout closes the records and keeps the lock', async (
 test('send-email: a refused TLS session gives the lock back, so a retry is not called a duplicate', async () => {
   await withClock(async () => {
     const database = db();
-    database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 2525, from_email: 'info@hlektrismos.gr' } });
+    database.rows('crm_settings').push({ setting_key: 'email_config', setting_value: { smtp_host: 'smtp.example.test', smtp_port: 2587, smtp_user: 'mailer@example.gr', smtp_password: 'smtp-password-not-real', from_email: 'info@hlektrismos.gr' } });
     const f = await loadFunction('send-email', { db: database, users, env: { UNSUBSCRIBE_SECRET: 'unsubscribe-secret-not-real-000000000000' }, smtpMode: 'no-starttls' });
     const mail = { token: 'tok-admin', body: { to: 'p@example.gr', subject: 's', text: 't', transactional: true } };
     assert.equal((await f.call(mail)).status, 502);

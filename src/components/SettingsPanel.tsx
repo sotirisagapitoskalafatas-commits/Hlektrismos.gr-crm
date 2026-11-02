@@ -954,9 +954,12 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
 
   const applyWizardPreset = (provider: string) => {
     const presets: Record<string, any> = {
-      gmail: { smtp_host: 'smtp.gmail.com', smtp_port: 587, imap_host: 'imap.gmail.com', imap_port: 993 },
-      outlook: { smtp_host: 'smtp.office365.com', smtp_port: 587, imap_host: 'outlook.office365.com', imap_port: 993 },
-      cpanel: { smtp_host: '', smtp_port: 587, imap_host: '', imap_port: 993 },
+      gmail: { smtp_host: 'smtp.gmail.com', smtp_port: 465, imap_host: 'imap.gmail.com', imap_port: 993 },
+      // Microsoft 365 SMTP AUTH requires port 587; Supabase Edge Functions cannot reach it.
+      // Keep the IMAP preset, but do not preconfigure an unusable outbound SMTP endpoint.
+      outlook: { smtp_host: '', smtp_port: 465, imap_host: 'outlook.office365.com', imap_port: 993 },
+      cpanel: { smtp_host: '', smtp_port: 465, imap_host: '', imap_port: 993 },
+      ses: { smtp_host: '', smtp_port: 2587, imap_host: '', imap_port: 993 },
     };
     const p = presets[provider] || {};
     update('email_config', { ...s, ...p });
@@ -974,7 +977,7 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
           <span style={{ fontSize: 13, fontWeight: 600 }}>🧙 Quick Setup Wizard</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {[['gmail', 'Gmail'], ['outlook', 'Outlook / 365'], ['cpanel', 'cPanel / Custom']].map(([key, label]) => (
+          {[['gmail', 'Gmail'], ['outlook', 'Outlook / 365 (IMAP)'], ['cpanel', 'cPanel / Custom'], ['ses', 'Amazon SES']].map(([key, label]) => (
             <button key={key} onClick={() => applyWizardPreset(key)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: wizardProvider === key ? 'rgba(0,102,204,0.1)' : '#fff', color: 'var(--text)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{label}</button>
           ))}
         </div>
@@ -987,22 +990,30 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
                 <li>Go to <strong>App Passwords</strong> (search in Google Account settings)</li>
                 <li>Create a new App Password for "Mail"</li>
                 <li>Copy the 16-character password and paste it in <strong>App Password</strong> fields below</li>
-                <li>SMTP: <code>smtp.gmail.com:587</code> | IMAP: <code>imap.gmail.com:993</code></li>
+                <li>SMTP: <code>smtp.gmail.com:465</code> (implicit TLS) | IMAP: <code>imap.gmail.com:993</code></li>
               </ol>
             )}
             {wizardProvider === 'outlook' && (
               <ol style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Go to <strong>account.microsoft.com</strong> → Security</li>
-                <li>Enable <strong>Two-step verification</strong></li>
-                <li>Go to <strong>Advanced security options</strong> → App passwords</li>
-                <li>Create a new App password</li>
-                <li>SMTP: <code>smtp.office365.com:587</code> | IMAP: <code>outlook.office365.com:993</code></li>
+                <li>Incoming mail: <code>outlook.office365.com:993</code> (IMAP over SSL).</li>
+                <li>Microsoft 365 SMTP AUTH uses port <code>587</code>; Supabase Edge Functions cannot connect to that port.</li>
+                <li>This preset configures IMAP only. Do not use it for visitor confirmations or CRM outbound mail.</li>
+                <li>For outbound email, configure a provider that supports HTTPS API delivery or an SMTP TLS port reachable from Supabase.</li>
+              </ol>
+            )}
+            {wizardProvider === 'ses' && (
+              <ol style={{ margin: 0, paddingLeft: 16 }}>
+                <li>In AWS Console → Amazon SES → SMTP settings, create SMTP credentials for the verified sender domain.</li>
+                <li>Use the regional SES SMTP endpoint shown in that page (for example, the endpoint for your selected AWS region).</li>
+                <li>Use port <code>2587</code> with STARTTLS, the SES SMTP username, and the generated SES SMTP password.</li>
+                <li>Verify <code>hlektrismos.gr</code> and the sender address in SES before sending.</li>
               </ol>
             )}
             {wizardProvider === 'cpanel' && (
               <ol style={{ margin: 0, paddingLeft: 16 }}>
                 <li>Check your hosting control panel for SMTP/IMAP settings</li>
-                <li>Typical SMTP: <code>mail.yourdomain.gr:587</code> (STARTTLS)</li>
+                <li>Typical SMTP: <code>mail.yourdomain.gr:465</code> (implicit TLS, if your host supports it)</li>
+                <li>Some hosts offer a non-blocked STARTTLS port; confirm the exact port with your hosting provider.</li>
                 <li>Typical IMAP: <code>mail.yourdomain.gr:993</code> (SSL)</li>
                 <li>Use your full email address as username</li>
                 <li>Contact your hosting provider if unsure</li>
@@ -1017,7 +1028,7 @@ function EmailSettings({ settings, update }: { settings: Record<string, any>; up
         <h5 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>📤 Outgoing (SMTP)</h5>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <FieldRow label="SMTP Host"><TextInput value={s.smtp_host || ''} onChange={(v) => update('email_config', { ...s, smtp_host: v })} placeholder="smtp.gmail.com" /></FieldRow>
-          <FieldRow label="SMTP Port" desc="587 (STARTTLS) or 465 (TLS)"><NumberInput value={s.smtp_port || 587} onChange={(v) => update('email_config', { ...s, smtp_port: v })} min={25} max={65535} /></FieldRow>
+          <FieldRow label="SMTP Port" desc="Choose a port supported by Supabase Edge Functions."><select className="field" value={String(s.smtp_port || 465)} onChange={(e) => update('email_config', { ...s, smtp_port: Number(e.target.value) })}><option value="465">465 — Implicit TLS</option><option value="2587">2587 — STARTTLS (Amazon SES)</option></select></FieldRow>
           <FieldRow label="Email / Username"><TextInput value={s.smtp_user || ''} onChange={(v) => update('email_config', { ...s, smtp_user: v })} placeholder="your@email.gr" /></FieldRow>
           <FieldRow label="App Password" desc="NOT your real password"><TextInput type="password" value={s.smtp_password || ''} onChange={(v) => update('email_config', { ...s, smtp_password: v })} placeholder="xxxx-xxxx-xxxx-xxxx" /></FieldRow>
           <FieldRow label="From Name"><TextInput value={s.from_name || ''} onChange={(v) => update('email_config', { ...s, from_name: v })} placeholder="Hlektrismos.gr" /></FieldRow>

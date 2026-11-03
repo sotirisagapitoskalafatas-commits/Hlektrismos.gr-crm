@@ -79,7 +79,7 @@ export default function ConsentBanner() {
             </p>
             <label className="lp-consent__option">
               Μέτρηση απόδοσης (Vercel Speed Insights)
-              <input type="checkbox" role="switch" className="lp-consent__switch" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} />
+              <input id="consent-analytics" name="analytics_consent" type="checkbox" role="switch" className="lp-consent__switch" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} />
             </label>
             <div className="lp-consent__actions">
               <button type="button" className="lp-btn lp-btn--primary" onClick={() => done(false)}>Απόρριψη</button>

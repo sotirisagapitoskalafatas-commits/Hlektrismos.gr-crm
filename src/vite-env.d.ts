@@ -11,3 +11,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Safe, non-secret release metadata injected by vite.config.ts at build time.
+declare const __APP_VERSION__: string;
+declare const __BUILD_COMMIT__: string;
+declare const __BUILD_REF__: string;
+declare const __BUILD_ENVIRONMENT__: string;
+declare const __BUILD_TIME__: string;

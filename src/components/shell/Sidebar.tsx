@@ -3,6 +3,7 @@
 import { ChevronsLeft, ChevronsRight, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useNav } from '@/lib/nav';
+import { releaseInfo, releaseEnvironmentLabel } from '@/lib/release';
 import type { ShellCounts } from '@/lib/roles';
 import type { AnyPage, ModuleDef, ModuleItem } from './ModuleMap';
 import ShellAvatar from './ShellAvatar';
@@ -71,6 +72,11 @@ export default function Sidebar({ module, page, counts, mode, onToggleCompact }:
             <span className="shell-usercard__name block">{profile?.full_name ?? 'Χρήστης'}</span>
             <span className="shell-usercard__sub block">Σε σύνδεση</span>
           </span>
+        </div>
+        <div className="shell-version" aria-label={`Έκδοση ATLAS CRM v${releaseInfo.version}, ${releaseEnvironmentLabel(releaseInfo.environment)}`}>
+          <span className="shell-version__name">ATLAS CRM</span>
+          <strong className="shell-version__value">v{releaseInfo.version}</strong>
+          <span className="shell-version__env">{releaseEnvironmentLabel(releaseInfo.environment)}</span>
         </div>
       </div>
     </aside>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ArrowLeft, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
 import '@/styles/atlas-auth.css';
+import { releaseInfo, releaseEnvironmentLabel } from '@/lib/release';
 
 /** Shared frame for sign-in, forgot-password and password-reset pages. */
 export default function AuthLayout({ title, lead, onBack, backLabel, children, footer }: {
@@ -73,7 +74,10 @@ export default function AuthLayout({ title, lead, onBack, backLabel, children, f
             {footer && <p className="auth-foot">{footer}</p>}
           </div>
 
-          <p className="auth-main__caption">Hlektrismos.gr <span>·</span> Εσωτερικό περιβάλλον εργασίας</p>
+          <p className="auth-main__caption">
+            Hlektrismos.gr <span>·</span> Εσωτερικό περιβάλλον εργασίας <span>·</span>
+            v{releaseInfo.version} <span>·</span> {releaseEnvironmentLabel(releaseInfo.environment)}
+          </p>
         </section>
       </div>
     </main>

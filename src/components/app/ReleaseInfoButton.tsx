@@ -1,4 +1,4 @@
-import { CalendarClock, GitBranch, GitCommit, Info } from 'lucide-react';
+import { CalendarDays, GitBranch, GitCommit, Info } from 'lucide-react';
 import { useState } from 'react';
 import { Modal, Pill } from '@/lib/ui';
 import type { PillTone } from '@/lib/ui';

@@ -146,6 +146,15 @@
 .shell-usercard .shell-avatar { width: 36px; height: 36px; }
 .shell-usercard__name { font-size: 14px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shell-usercard__sub { font-size: 12px; color: var(--shell-muted); }
+.shell-version {
+  display: flex; align-items: center; gap: 6px; padding: 2px 10px 0;
+  color: var(--shell-muted); font-size: 10px; line-height: 1.4;
+}
+.shell-version__value { color: var(--shell-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+.shell-version__env { margin-left: auto; opacity: .72; font-size: 9px; }
+.shell-sidebar[data-mode='compact'] .shell-version { justify-content: center; padding-inline: 0; }
+.shell-sidebar[data-mode='compact'] .shell-version__name,
+.shell-sidebar[data-mode='compact'] .shell-version__env { display: none; }
 
 /* Compact: icon tiles only. */
 .shell-sidebar[data-mode='compact'] { width: 58px; padding: 12px 6px; align-items: center; }

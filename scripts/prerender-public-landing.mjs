@@ -58,7 +58,7 @@ try {
     /VAPI_API_KEY/i,
     /TWILIO_AUTH_TOKEN/i,
     /sb_secret_[A-Za-z0-9_-]{12,}/i,
-    /Bearer\\s+[A-Za-z0-9._-]{30,}/i,
+    /Bearer\s+[A-Za-z0-9._-]{30,}/i,
     /sk-[A-Za-z0-9_-]{20,}/i,
   ];
   const exposedMarker = forbidden.find((pattern) => pattern.test(markup));

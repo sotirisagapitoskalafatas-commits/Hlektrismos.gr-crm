@@ -25,6 +25,11 @@ export default function LoginPage() {
   const [sent, setSent] = useState(false);
   const errRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (error) errRef.current?.focus(); }, [error]);
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'ATLAS CRM — Hlektrismos.gr';
+    return () => { document.title = previousTitle; };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +76,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Είσοδος στο CRM" lead="Hlektrismos.gr — Επιχειρησιακός Πίνακας" onBack={() => navigate('landing')} backLabel="Επιστροφή στην αρχική" footer={FOOTER}>
+    <AuthLayout title="Είσοδος στο CRM" lead="Συνδέσου στον ασφαλή χώρο εργασίας της ομάδας Hlektrismos.gr." onBack={() => navigate('landing')} backLabel="Επιστροφή στην αρχική" footer={FOOTER}>
       {error && <div ref={errRef} tabIndex={-1} className="auth-alert auth-alert--err" role="alert"><AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" /> {error}</div>}
       <form onSubmit={submit}>
         <div className="auth-field">

@@ -25,6 +25,11 @@ export default function LoginPage() {
   const [sent, setSent] = useState(false);
   const errRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (error) errRef.current?.focus(); }, [error]);
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'ATLAS CRM — Hlektrismos.gr';
+    return () => { document.title = previousTitle; };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

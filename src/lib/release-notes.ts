@@ -8,10 +8,10 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
-    version: '1.0.0',
+    version: '2.0.0',
     date: '2026-11-03',
-    title: 'Πρώτη καταγεγραμμένη έκδοση',
-    summary: 'Καθιερώνεται η πρώτη επίσημη baseline έκδοση και η ενιαία καταγραφή εκδόσεων του ATLAS CRM.',
+    title: 'Πρώτη καταγεγραμμένη έκδοση ATLAS v2',
+    summary: 'Καθιερώνεται η πρώτη επίσημη baseline έκδοση της τρέχουσας γενιάς ATLAS CRM v2 και η ενιαία καταγραφή εκδόσεων.',
     changes: [
       'Καθιερώνεται αρίθμηση εκδόσεων βάσει Semantic Versioning.',
       'Καταγράφονται αυτόματα το περιβάλλον, το Git commit, το branch και ο χρόνος δημιουργίας του build.',

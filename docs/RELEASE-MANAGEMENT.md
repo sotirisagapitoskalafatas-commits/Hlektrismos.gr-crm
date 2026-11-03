@@ -8,7 +8,7 @@ The repository uses Semantic Versioning: `MAJOR.MINOR.PATCH`.
 - **MINOR**: new backward-compatible functionality.
 - **PATCH**: backward-compatible fixes, including security and reliability fixes.
 
-The first tracked baseline is `1.0.0`. This records when release tracking was introduced; it does not claim that the existing application was first launched on that date.
+The first tracked baseline for the current ATLAS v2 generation is `2.0.0`. This is a deliberate major-generation baseline, not a reconstruction of the application's earlier history and not a claim that the product first launched on that date.
 
 ## Source of truth
 

@@ -139,6 +139,16 @@ export default function LandingPage() {
     localStorage.setItem('theme', 'light');
   }, []);
 
+  // The build outputs a complete, SEO-readable static snapshot outside #root.
+  // Remove it only after this interactive React page has mounted successfully.
+  useEffect(() => {
+    const snapshot = document.getElementById('seo-prerender');
+    if (snapshot) {
+      snapshot.remove();
+      document.documentElement.classList.remove('has-prerender');
+    }
+  }, []);
+
   const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((c) => ({ ...c, [field]: value }));
 
   const handleBillChange = (e: ChangeEvent<HTMLInputElement>) => {

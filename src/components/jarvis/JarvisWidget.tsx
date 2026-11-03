@@ -340,6 +340,8 @@ export function JarvisWidget({ onSend }: { onSend?: (text: string) => Promise<st
 
           <form className="jv-form" onSubmit={e => { e.preventDefault(); submit(input); }}>
             <input
+              id="jarvis-message"
+              name="message"
               ref={inputRef}
               value={input}
               onChange={e => { setInput(e.target.value); mascot.signal({ type: 'typing' }); }}

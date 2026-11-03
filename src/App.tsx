@@ -5,7 +5,7 @@ import { DeviceProvider } from '@/lib/device-context';
 import { useRoute } from '@/lib/router';
 import { NavProvider } from '@/lib/nav';
 import { ToastProvider } from '@/lib/toast';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { JarvisWidget } from '@/components/jarvis/JarvisWidget';
 import ConsentBanner from '@/components/ConsentBanner';
 import AuthNoticeBanner from '@/components/app/AuthNoticeBanner';
@@ -34,6 +34,27 @@ function AppContent() {
   const [route, navigate] = useRoute();
   const { session, loading, profile, profileReady } = useAuth();
   const mustChangePassword = session?.user?.app_metadata?.must_change_password === true;
+
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      landing: 'Hlektrismos.gr | Ο προσωπικός σου σύμβουλος ενέργειας',
+      login: 'Σύνδεση προσωπικού | Hlektrismos.gr',
+      reset: 'Αλλαγή κωδικού | Hlektrismos.gr',
+      app: 'ATLAS CRM | Hlektrismos.gr',
+      about: 'Η εταιρεία | Hlektrismos.gr',
+      services: 'Υπηρεσίες | Hlektrismos.gr',
+      energy: 'Σύγκριση ενέργειας | Hlektrismos.gr',
+      faq: 'Συχνές ερωτήσεις | Hlektrismos.gr',
+      contact: 'Επικοινωνία | Hlektrismos.gr',
+      terms: 'Όροι χρήσης | Hlektrismos.gr',
+      privacy: 'Πολιτική απορρήτου | Hlektrismos.gr',
+      cookies: 'Πολιτική cookies | Hlektrismos.gr',
+      copyright: 'Πνευματικά δικαιώματα | Hlektrismos.gr',
+      unsubscribed: 'Επιβεβαίωση διαγραφής | Hlektrismos.gr',
+      offer: 'Προσφορά | Hlektrismos.gr',
+    };
+    document.title = titles[route] ?? 'Hlektrismos.gr';
+  }, [route]);
 
   if (loading) {
     return (

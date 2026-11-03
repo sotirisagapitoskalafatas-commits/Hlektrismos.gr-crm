@@ -50,19 +50,19 @@ try {
   }
 
   // Every rendered public form control must have stable browser/autofill identity.
-  const formControls = [...markup.matchAll(/<(?:input|select|textarea)\\b[^>]*>/g)].map(([tag]) => tag);
-  const controlsWithoutIdentity = formControls.filter((tag) => !/\\sid=/.test(tag) || !/\\sname=/.test(tag));
+  const formControls = [...markup.matchAll(/<(?:input|select|textarea)\b[^>]*>/g)].map(([tag]) => tag);
+  const controlsWithoutIdentity = formControls.filter((tag) => !/\sid=/.test(tag) || !/\sname=/.test(tag));
   if (controlsWithoutIdentity.length) {
     throw new Error(`Public landing form has ${controlsWithoutIdentity.length} control(s) without both id and name attributes.`);
   }
-  const controlIds = formControls.map((tag) => tag.match(/\\sid="([^"]+)"/)?.[1]).filter(Boolean);
+  const controlIds = formControls.map((tag) => tag.match(/\sid="([^"]+)"/)?.[1]).filter(Boolean);
   if (new Set(controlIds).size !== controlIds.length) {
     throw new Error('Public landing form contains duplicate control IDs.');
   }
 
   // Lazy images must reserve their intrinsic layout space before downloading.
-  const lazyImages = [...markup.matchAll(/<img\\b[^>]*\\bloading="lazy"[^>]*>/g)].map(([tag]) => tag);
-  const lazyImagesWithoutDimensions = lazyImages.filter((tag) => !/\\swidth=/.test(tag) || !/\\sheight=/.test(tag));
+  const lazyImages = [...markup.matchAll(/<img\b[^>]*\bloading="lazy"[^>]*>/g)].map(([tag]) => tag);
+  const lazyImagesWithoutDimensions = lazyImages.filter((tag) => !/\swidth=/.test(tag) || !/\sheight=/.test(tag));
   if (lazyImagesWithoutDimensions.length) {
     throw new Error(`Public landing has ${lazyImagesWithoutDimensions.length} lazy image(s) without width and height.`);
   }

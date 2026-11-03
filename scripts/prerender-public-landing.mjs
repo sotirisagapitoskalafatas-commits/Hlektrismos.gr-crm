@@ -17,6 +17,15 @@ const distDir = resolve(root, 'dist');
 const indexPath = resolve(distDir, 'index.html');
 const assetsDir = resolve(distDir, 'assets');
 
+// React-rendering this public page imports the shared Supabase client, but the
+// static snapshot does not submit forms or make network requests. Use explicit
+// invalid placeholders in this short-lived prerender process so CI can build
+// without production environment variables and never needs real Supabase
+// credentials just to render public copy. The preceding Vite browser build has
+// already completed in its own process and is not affected by these values.
+process.env.VITE_SUPABASE_URL = 'https://prerender.invalid';
+process.env.VITE_SUPABASE_ANON_KEY = 'prerender-no-network-placeholder';
+
 const server = await createServer({
   configFile: resolve(root, 'vite.config.ts'),
   mode: 'production',

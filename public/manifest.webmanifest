@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "ATLAS CRM — PowerFor",
+  "name": "ATLAS CRM — Hlektrismos.gr",
   "short_name": "ATLAS CRM",
-  "description": "Σύστημα πωλήσεων & CRM για την Ηlektrismos.gr.",
+  "description": "Εσωτερικό σύστημα εργασίας της ομάδας Hlektrismos.gr.",
   "lang": "el",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#faf9f6",
-  "theme_color": "#0a0f14",
+  "background_color": "#f4f7fb",
+  "theme_color": "#ffffff",
   "orientation": "any",
   "icons": [
     { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

@@ -13,6 +13,7 @@ import { markNotificationsRead } from '@/lib/api';
 import { rgbaOf, timeUntil } from '@/lib/ui';
 import QuickAdd from '@/components/app/QuickAdd';
 import RoleSwitcher from '@/components/app/RoleSwitcher';
+import ReleaseInfoButton from '@/components/app/ReleaseInfoButton';
 import { firstPage } from './ModuleMap';
 import type { ModuleDef } from './ModuleMap';
 import { notifMeta, useNotifications } from './useShellData';
@@ -200,6 +201,7 @@ export default function TopBar({ modules, activeId, hasAdmin, onOpenPalette, onO
               <button role="menuitem" className="shell-menu__item" onClick={() => goAndClose(() => { window.location.hash = '/faq'; })}>
                 <CircleHelp className="w-4 h-4" strokeWidth={STROKE} aria-hidden="true" /> Κέντρο βοήθειας
               </button>
+              <ReleaseInfoButton />
               {preview.allowed && (
                 <>
                   <div className="shell-menu__sep" />

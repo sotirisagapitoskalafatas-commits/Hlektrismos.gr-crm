@@ -9,13 +9,13 @@ export default defineConfig(({ command }) => {
   // Only non-secret deployment metadata is embedded in the client bundle.
   // Vercel's system variables identify the actual deployment; GitHub variables are CI fallbacks.
   const buildEnvironment = process.env.VERCEL_ENV
-    ?? process.env.VERCEL_TARGET_ENV
-    ?? (command === 'serve' ? 'development' : process.env.CI ? 'ci' : 'build');
-  const buildCommit = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? '';
+    || process.env.VERCEL_TARGET_ENV
+    || (command === 'serve' ? 'development' : process.env.CI ? 'ci' : 'build');
+  const buildCommit = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '';
   const buildRef = process.env.VERCEL_GIT_COMMIT_REF
-    ?? process.env.GITHUB_HEAD_REF
-    ?? process.env.GITHUB_REF_NAME
-    ?? '';
+    || process.env.GITHUB_HEAD_REF
+    || process.env.GITHUB_REF_NAME
+    || '';
 
   return {
     plugins: [react()],

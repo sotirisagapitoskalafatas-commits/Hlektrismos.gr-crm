@@ -71,7 +71,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Είσοδος στο CRM" lead="Hlektrismos.gr — Επιχειρησιακός Πίνακας" onBack={() => navigate('landing')} backLabel="Επιστροφή στην αρχική" footer={FOOTER}>
+    <AuthLayout title="Είσοδος στο CRM" lead="Συνδέσου στον ασφαλή χώρο εργασίας της ομάδας Hlektrismos.gr." onBack={() => navigate('landing')} backLabel="Επιστροφή στην αρχική" footer={FOOTER}>
       {error && <div ref={errRef} tabIndex={-1} className="auth-alert auth-alert--err" role="alert"><AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" /> {error}</div>}
       <form onSubmit={submit}>
         <div className="auth-field">

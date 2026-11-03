@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "ATLAS CRM — PowerFor",
+  "name": "Hlektrismos.gr — ATLAS CRM",
   "short_name": "ATLAS CRM",
-  "description": "Σύστημα πωλήσεων & CRM για την Ηlektrismos.gr.",
+  "description": "Το σύστημα διαχείρισης πελατών και πωλήσεων της Hlektrismos.gr.",
   "lang": "el",
   "start_url": "/",
   "scope": "/",

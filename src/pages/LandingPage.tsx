@@ -139,6 +139,16 @@ export default function LandingPage() {
     localStorage.setItem('theme', 'light');
   }, []);
 
+  // The build outputs a complete, SEO-readable static snapshot outside #root.
+  // Remove it only after this interactive React page has mounted successfully.
+  useEffect(() => {
+    const snapshot = document.getElementById('seo-prerender');
+    if (snapshot) {
+      snapshot.remove();
+      document.documentElement.classList.remove('has-prerender');
+    }
+  }, []);
+
   const update = (field: keyof LeadForm, value: string | boolean | File | null) => setForm((c) => ({ ...c, [field]: value }));
 
   const handleBillChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -427,23 +437,23 @@ export default function LandingPage() {
                   <div className="lp-form">
                     <div className="lp-form__row">
                       <label className="lp-field">Όνομα *
-                        <input className="lp-input" required type="text" autoComplete="given-name" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" />
+                        <input id="lead-first-name" name="first_name" className="lp-input" required type="text" autoComplete="given-name" value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Γιάννης" />
                       </label>
                       <label className="lp-field">Επώνυμο *
-                        <input className="lp-input" required type="text" autoComplete="family-name" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" />
+                        <input id="lead-last-name" name="last_name" className="lp-input" required type="text" autoComplete="family-name" value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Παπαδόπουλος" />
                       </label>
                     </div>
                     <div className="lp-form__row">
                       <label className="lp-field">Τηλέφωνο *
-                        <input className="lp-input" required type="tel" autoComplete="tel" inputMode="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" />
+                        <input id="lead-phone" name="phone" className="lp-input" required type="tel" autoComplete="tel" inputMode="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+30 690 000 0000" />
                       </label>
                       <label className="lp-field"><span>Email <small>(προαιρετικό)</small></span>
-                        <input className="lp-input" type="email" autoComplete="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" />
+                        <input id="lead-email" name="email" className="lp-input" type="email" autoComplete="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="giannis@email.gr" />
                       </label>
                     </div>
                     <div className="lp-form__row">
                       <label className="lp-field">Τύπος ακινήτου *
-                        <select className="lp-input" required value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)}>
+                        <select id="lead-property-type" name="property_type" className="lp-input" required value={form.propertyType} onChange={(e) => update('propertyType', e.target.value)}>
                           <option value="" disabled>Επίλεξε τύπο…</option>
                           <option>Κατοικία</option>
                           <option>Διαμέρισμα</option>
@@ -452,14 +462,14 @@ export default function LandingPage() {
                         </select>
                       </label>
                       <label className="lp-field"><span>Περιοχή <small>(προαιρετικό)</small></span>
-                        <select className="lp-input" value={form.region} onChange={(e) => update('region', e.target.value)}>
+                        <select id="lead-region" name="region" className="lp-input" value={form.region} onChange={(e) => update('region', e.target.value)}>
                           <option value="">Επίλεξε περιοχή…</option>
                           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </label>
                     </div>
                     <label className="lp-field">Υπηρεσία ενδιαφέροντος
-                      <select className="lp-input" value={form.service} onChange={(e) => update('service', e.target.value)}>
+                      <select id="lead-service" name="service" className="lp-input" value={form.service} onChange={(e) => update('service', e.target.value)}>
                         {serviceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </label>
@@ -468,7 +478,7 @@ export default function LandingPage() {
                       <summary>Σχόλια ή λογαριασμός ενέργειας (προαιρετικό) <ChevronDown size={16} aria-hidden="true" /></summary>
                       <div className="lp-optional__body">
                         <label className="lp-field"><span>Σχόλια <small>(προαιρετικά)</small></span>
-                          <textarea className="lp-input" rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." />
+                          <textarea id="lead-message" name="message" className="lp-input" rows={3} value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="Πες μας τις ανάγκες σου..." />
                         </label>
                         <div className="lp-field">
                           <span>Λογαριασμοί / αρχεία <small>(προαιρετικό)</small></span>
@@ -484,7 +494,7 @@ export default function LandingPage() {
                               ))}
                             </div>
                           )}
-                          <input id="lead-file-input" className="lp-visually-hidden" type="file" multiple accept={PUBLIC_FORM_ACCEPT} onChange={handleBillChange} />
+                          <input id="lead-file-input" name="bill_files" className="lp-visually-hidden" type="file" multiple accept={PUBLIC_FORM_ACCEPT} onChange={handleBillChange} />
                           <label
                             htmlFor="lead-file-input"
                             role="button"
@@ -498,7 +508,7 @@ export default function LandingPage() {
                           </label>
                           {hasCamera && (
                             <>
-                              <input id="lead-camera-input" className="lp-visually-hidden" type="file" accept="image/*" capture="environment" onChange={handleBillChange} />
+                              <input id="lead-camera-input" name="bill_camera_file" className="lp-visually-hidden" type="file" accept="image/*" capture="environment" onChange={handleBillChange} />
                               <label htmlFor="lead-camera-input" role="button" tabIndex={0} className="lp-drop lp-drop--camera"
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('lead-camera-input')?.click(); } }}>
                                 <Camera size={17} aria-hidden="true" /> Φωτογράφισε τον λογαριασμό
@@ -511,11 +521,11 @@ export default function LandingPage() {
                     </details>
 
                     <label className="lp-check">
-                      <input required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} />
+                      <input id="lead-gdpr-consent" name="gdpr_consent" required type="checkbox" checked={form.consent} onChange={(e) => update('consent', e.target.checked)} />
                       <span>Συναινώ στην επεξεργασία των δεδομένων μου για να επικοινωνήσετε μαζί μου, σύμφωνα με την <a href="#/privacy">πολιτική απορρήτου GDPR</a>. Μπορώ να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή.</span>
                     </label>
                     <label className="lp-check">
-                      <input required type="checkbox" checked={form.adult} onChange={(e) => update('adult', e.target.checked)} />
+                      <input id="lead-adult-confirmation" name="age_confirmed" required type="checkbox" checked={form.adult} onChange={(e) => update('adult', e.target.checked)} />
                       <span>Δηλώνω ότι είμαι ενήλικας (18 ετών και άνω).</span>
                     </label>
                     {formError && <p className="lp-error" role="alert">{formError}</p>}

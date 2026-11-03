@@ -121,7 +121,10 @@ export default function ContactPage() {
                 ) : (
                   <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
                     <input
+                      id="contact-name"
+                      name="name"
                       type="text"
+                      autoComplete="name"
                       placeholder="Όνομα"
                       required
                       value={form.name}
@@ -129,7 +132,10 @@ export default function ContactPage() {
                       style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, outline: 'none' }}
                     />
                     <input
+                      id="contact-email"
+                      name="email"
                       type="email"
+                      autoComplete="email"
                       placeholder="Email"
                       required
                       value={form.email}
@@ -137,13 +143,18 @@ export default function ContactPage() {
                       style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, outline: 'none' }}
                     />
                     <input
+                      id="contact-phone"
+                      name="phone"
                       type="tel"
+                      autoComplete="tel"
                       placeholder="Τηλέφωνο"
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, outline: 'none' }}
                     />
                     <textarea
+                      id="contact-message"
+                      name="message"
                       placeholder="Μήνυμα"
                       required
                       rows={5}
@@ -152,7 +163,7 @@ export default function ContactPage() {
                       style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, outline: 'none', resize: 'vertical' }}
                     />
                     <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.5, color: 'var(--text)' }}>
-                      <input type="checkbox" required checked={adult} onChange={(e) => setAdult(e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
+                      <input id="contact-adult-confirmation" name="age_confirmed" type="checkbox" required checked={adult} onChange={(e) => setAdult(e.target.checked)} style={{ marginTop: 3, flex: 'none' }} />
                       Δηλώνω ότι είμαι ενήλικας (18+). Θα χρησιμοποιήσουμε τα στοιχεία μου μόνο για να απαντήσετε στο μήνυμά μου, σύμφωνα με την <a href="#/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Πολιτική Απορρήτου</a>.
                     </label>
                     {error && <div style={{ fontSize: 13, color: '#e11d48', background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.2)', borderRadius: 10, padding: '12px 16px' }}>{error}</div>}

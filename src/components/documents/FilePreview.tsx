@@ -19,7 +19,7 @@ export default function FilePreview({ url, name, mimeType, className = '' }: {
       {kind === 'image' ? (
         <a href={url} target="_blank" rel="noreferrer" aria-label={`Άνοιγμα εικόνας ${name} σε νέο παράθυρο`}
           className="block bg-slate-50">
-          <img src={url} alt={name} loading="lazy" decoding="async"
+          <img src={url} alt={name} width={1200} height={900} loading="lazy" decoding="async"
             className="block w-full max-h-[380px] object-contain" />
         </a>
       ) : kind === 'pdf' ? (

@@ -55,7 +55,7 @@ export default function ReleaseInfoButton() {
                 </div>
               </div>
               <div className="flex items-start gap-2.5 sm:col-span-2">
-                <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-ink/40" aria-hidden="true" />
+                <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-ink/40" aria-hidden="true" />
                 <div>
                   <dt className="text-[11px] text-ink/40">Χρόνος δημιουργίας build</dt>
                   <dd className="text-xs text-ink">{formatBuildDate(releaseInfo.builtAt)}</dd>
